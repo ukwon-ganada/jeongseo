@@ -95,12 +95,12 @@ html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black)
 /* 모바일 홈 */
 @media (max-width:767px){
   #screen-contract.active{flex-direction:column!important;}
-  .ct-content{display:block!important;padding:12px 0 40px;width:100%;overflow-x:hidden;}
-  #screen-contract .page{width:100%!important;max-width:100%!important;min-width:0;margin:0 0 16px;display:block;}
-  #screen-contract .info-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:2px;background:linear-gradient(to right,transparent 90%,rgba(0,0,0,0.04)),linear-gradient(to left,transparent 90%,rgba(0,0,0,0.04));background-attachment:local,local;}
-  #screen-contract .info-table-wrap::-webkit-scrollbar{height:4px;}
-  #screen-contract .info-table-wrap::-webkit-scrollbar-thumb{background:rgba(0,0,0,0.2);border-radius:2px;}
-  #screen-contract .info-table{min-width:480px;}
+  .ct-content{display:block!important;padding:12px 0 40px;width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  #screen-contract .page{width:210mm!important;max-width:none!important;min-width:210mm;margin:0 0 16px;display:block;}
+  .ct-content::-webkit-scrollbar{height:5px;}
+  .ct-content::-webkit-scrollbar-thumb{background:rgba(0,0,0,0.25);border-radius:3px;}
+  #screen-contract .info-table-wrap{overflow-x:visible;}
+  #screen-contract .info-table{min-width:0;}
   .ct-appbar{width:100%;left:0;right:0;}
   .home-sidebar{display:none;}
   .hm-hi,.hm-title,.hm-desc,.doc-grid{display:none;}
@@ -502,15 +502,7 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
 
 
 #screen-contract .page{width:210mm;background:#fff;box-shadow:0 2px 16px rgba(0,0,0,0.15);margin-bottom:16px;}
-@media (max-width:767px){
-  #screen-contract .page{width:100vw;height:auto;min-height:unset;box-shadow:0 1px 10px rgba(0,0,0,0.12);border-radius:0;}
-  #screen-contract .info-table td,#screen-contract .th-cell,#screen-contract .th-sub{font-size:2.8vw;}
-  #screen-contract .scope-item,#screen-contract .fee-row td,#screen-contract .receipt-row{font-size:2.8vw;}
-  #screen-contract .contract-intro,#screen-contract .article-block,#screen-contract .article-indent,#screen-contract .article-indent2,#screen-contract .special-note,#screen-contract .special-body{font-size:2.8vw;}
-  #screen-contract .doc-title{font-size:5.2vw;}
-  #screen-contract .sign-date{font-size:2.8vw;}
-  #screen-contract .date-input{font-size:2.8vw;width:6vw;}
-}
+
 
 </style>
 </head>
@@ -1452,12 +1444,28 @@ async function doAction(type){
     var canvases=await capturePages();
     var clientName=getClientName();
     if(type==='image'){
-      for(var i=0;i<canvases.length;i++){
-        var a=document.createElement('a');
-        a.download=buildFileName()+'_'+(i+1)+'p.png';
-        a.href=canvases[i].toDataURL('image/png');
-        a.click();
+      if(canvases.length===1){
+        var a0=document.createElement('a');
+        a0.download=buildFileName()+'.png';
+        a0.href=canvases[0].toDataURL('image/png');
+        a0.click();
+        hideLoading();saveToCloud();return;
       }
+      // 여러 페이지를 세로로 이어붙여 1장으로 저장
+      var gap=20;
+      var maxW=0,totH=0;
+      canvases.forEach(function(c){if(c.width>maxW)maxW=c.width;totH+=c.height;});
+      totH+=gap*(canvases.length-1);
+      var merged0=document.createElement('canvas');
+      merged0.width=maxW;merged0.height=totH;
+      var mctx0=merged0.getContext('2d');
+      mctx0.fillStyle='#ffffff';mctx0.fillRect(0,0,maxW,totH);
+      var y0=0;
+      canvases.forEach(function(c){mctx0.drawImage(c,0,y0);y0+=c.height+gap;});
+      var a=document.createElement('a');
+      a.download=buildFileName()+'.png';
+      a.href=merged0.toDataURL('image/png');
+      a.click();
       hideLoading();
       saveToCloud();
       return;
