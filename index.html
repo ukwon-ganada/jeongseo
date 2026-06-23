@@ -15,6 +15,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://t1.kakaocdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -509,6 +510,10 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
 .fs-btn.primary{background:var(--black);color:#fff;}
 .fs-btn:active{opacity:0.85;}
 .fs-hint{font-size:12px;color:var(--gray-400);margin-top:5px;line-height:1.5;}
+.fs-addr-search{display:flex;align-items:center;gap:8px;height:48px;border:1px solid var(--border);border-radius:var(--r-lg);padding:0 16px;font-size:14px;color:var(--gray-700);background:var(--gray-50);cursor:pointer;transition:all 0.15s;}
+.fs-addr-search:active{background:var(--gray-100);}
+.fs-addr-search svg{width:18px;height:18px;flex-shrink:0;color:var(--gray-500);}
+.fs-addr-search.filled{color:var(--black);background:#fff;border-color:var(--black);}
 
 /* ═══ 서명 링크 시트 ═══ */
 .sl-overlay{display:none;position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;padding:20px;}
@@ -1019,9 +1024,14 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
   <div class="fs-body">
     <div class="fs-section">위임인 정보</div>
     <div class="fs-field"><label class="fs-label">의뢰인명</label><input type="text" class="fs-input" id="f-name" placeholder="홍길동"></div>
-    <div class="fs-field"><label class="fs-label">연락처</label><input type="text" class="fs-input" id="f-tel" placeholder="010-0000-0000" inputmode="tel"></div>
-    <div class="fs-field"><label class="fs-label">주민등록번호</label><input type="text" class="fs-input" id="f-ssn" placeholder="000000-0000000"></div>
-    <div class="fs-field"><label class="fs-label">주소</label><input type="text" class="fs-input" id="f-addr" placeholder="주소"></div>
+    <div class="fs-field"><label class="fs-label">연락처</label><input type="text" class="fs-input" id="f-tel" placeholder="010-0000-0000" inputmode="tel" oninput="applyLiveFormat(this,formatPhone)"></div>
+    <div class="fs-field"><label class="fs-label">주민등록번호</label><input type="text" class="fs-input" id="f-ssn" placeholder="000000-0000000" inputmode="numeric" oninput="applyLiveFormat(this,formatSSN)"></div>
+    <div class="fs-field"><label class="fs-label">주소</label>
+      <div class="fs-addr-search" onclick="searchAddrForm()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><span id="f-addr-road-label">도로명·건물명으로 주소 검색</span></div>
+      <input type="text" class="fs-input" id="f-addr-detail" placeholder="상세주소 (동·호수 등)" style="margin-top:8px;display:none;" oninput="combineAddrForm()">
+      <input type="hidden" id="f-addr-road">
+      <input type="hidden" id="f-addr">
+      </div>
     <div class="fs-field"><label class="fs-label">이메일</label><input type="text" class="fs-input" id="f-email" placeholder="email@example.com" inputmode="email"></div>
 
     <div class="fs-section">사건 정보</div>
@@ -1699,6 +1709,27 @@ function openFormSheet(){
   document.getElementById('f-tel').value=data.tel||'';
   document.getElementById('f-ssn').value=data.ssn||'';
   document.getElementById('f-addr').value=data.addr||'';
+  // 주소 검색 UI 복원: 기존 주소가 있으면 검색 버튼에 표시
+  (function(){
+    var full=data.addr||'';
+    var roadEl=document.getElementById('f-addr-road');
+    var label=document.getElementById('f-addr-road-label');
+    var detail=document.getElementById('f-addr-detail');
+    var searchBox=document.querySelector('.fs-addr-search');
+    if(full){
+      roadEl.value=full;
+      label.textContent=full;
+      searchBox.classList.add('filled');
+      detail.style.display='block';
+      detail.value='';
+    }else{
+      roadEl.value='';
+      label.textContent='도로명·건물명으로 주소 검색';
+      searchBox.classList.remove('filled');
+      detail.style.display='none';
+      detail.value='';
+    }
+  })();
   document.getElementById('f-email').value=data.email||'';
   document.getElementById('f-casenum').value=data.casenum||'';
   document.getElementById('f-court').value=data.court||'';
@@ -1957,16 +1988,98 @@ function render(key){
 }
 var currentKey='';
 function openModal(key,label){
+  // 주소칸은 카카오 주소 검색으로
+  if(key==='addr'){
+    openAddressSearch('',function(road){
+      var detail=prompt('상세주소를 입력하세요 (동·호수 등). 없으면 비워두세요.','');
+      data.addr=(road+(detail?' '+detail:'')).trim();
+      render('addr');
+    });
+    return;
+  }
   currentKey=key;
   document.getElementById('modalTitle').textContent=label+' 입력';
-  document.getElementById('modalInput').value=data[key]||'';
+  var inp=document.getElementById('modalInput');
+  inp.value=data[key]||'';
+  // 전화/주민번호는 실시간 하이픈 포맷
+  inp.oninput=null;
+  if(key==='tel')inp.oninput=function(){applyLiveFormat(inp,formatPhone);};
+  else if(key==='ssn')inp.oninput=function(){applyLiveFormat(inp,formatSSN);};
   document.getElementById('modalOverlay').classList.add('active');
-  setTimeout(function(){document.getElementById('modalInput').focus();},80);
+  setTimeout(function(){inp.focus();},80);
 }
 function closeModal(){document.getElementById('modalOverlay').classList.remove('active');}
 function closeModalOutside(e){if(e.target===document.getElementById('modalOverlay'))closeModal();}
 function saveModal(){data[currentKey]=document.getElementById('modalInput').value.trim();render(currentKey);closeModal();}
 function formatFee(el){var raw=el.value.replace(/[^0-9]/g,'');el.value=raw?Number(raw).toLocaleString('ko-KR'):'';}
+
+/* 전화번호 자동 하이픈 */
+function formatPhone(v){
+  var n=String(v).replace(/[^0-9]/g,'');
+  if(n.length>11)n=n.slice(0,11);
+  // 서울 02
+  if(n.indexOf('02')===0){
+    if(n.length<3)return n;
+    if(n.length<6)return n.slice(0,2)+'-'+n.slice(2);
+    if(n.length<10)return n.slice(0,2)+'-'+n.slice(2,5)+'-'+n.slice(5); // 02-XXX-XXXX
+    return n.slice(0,2)+'-'+n.slice(2,6)+'-'+n.slice(6,10); // 02-XXXX-XXXX
+  }
+  // 휴대폰(010 등) 및 지역번호(0XX)
+  if(n.length<4)return n;
+  if(n.length<7)return n.slice(0,3)+'-'+n.slice(3);
+  if(n.length<11)return n.slice(0,3)+'-'+n.slice(3,6)+'-'+n.slice(6); // 0XX-XXX-XXXX
+  return n.slice(0,3)+'-'+n.slice(3,7)+'-'+n.slice(7,11); // 010-XXXX-XXXX
+}
+/* 주민번호 자동 하이픈 */
+function formatSSN(v){
+  var n=String(v).replace(/[^0-9]/g,'');
+  if(n.length>13)n=n.slice(0,13);
+  if(n.length<7)return n;
+  return n.slice(0,6)+'-'+n.slice(6);
+}
+/* input 요소에 실시간 포맷 적용 (커서 위치 보존) */
+function applyLiveFormat(el,fmtFn){
+  var fmt=fmtFn(el.value);
+  el.value=fmt;
+}
+
+/* 카카오 우편번호 주소 검색 */
+function openAddressSearch(targetInputId,onPicked){
+  if(typeof daum==='undefined'||!daum.Postcode){
+    showToast('주소 검색을 불러오는 중입니다. 잠시 후 다시 시도해 주세요');
+    return;
+  }
+  new daum.Postcode({
+    oncomplete:function(d){
+      // 도로명 주소 우선, 없으면 지번
+      var addr=d.roadAddress||d.jibunAddress||d.address||'';
+      // 참고항목(건물명 등)
+      var extra='';
+      if(d.bname&&/[동|로|가]$/.test(d.bname))extra+=d.bname;
+      if(d.buildingName&&d.apartment==='Y')extra+=(extra?', ':'')+d.buildingName;
+      if(extra)addr+=' ('+extra+')';
+      onPicked(addr);
+    }
+  }).open();
+}
+
+/* 통합폼 주소 검색 */
+function searchAddrForm(){
+  openAddressSearch('f-addr-road',function(road){
+    document.getElementById('f-addr-road').value=road;
+    document.getElementById('f-addr-road-label').textContent=road;
+    document.querySelector('.fs-addr-search').classList.add('filled');
+    var detail=document.getElementById('f-addr-detail');
+    detail.style.display='block';
+    detail.focus();
+    combineAddrForm();
+  });
+}
+function combineAddrForm(){
+  var road=document.getElementById('f-addr-road').value||'';
+  var detail=document.getElementById('f-addr-detail').value||'';
+  document.getElementById('f-addr').value=(road+(detail?' '+detail:'')).trim();
+}
 function autoResize(el){el.style.height='auto';el.style.height=el.scrollHeight+'px';}
 function clearSignature(){var cv=document.getElementById('sigCanvas');if(cv&&window._sigCtx){window._sigCtx.clearRect(0,0,cv.width,cv.height);}window._hasSig=false;var l=document.getElementById('stampLabel');if(l)l.style.display='';}
 
