@@ -1333,8 +1333,14 @@ function genToken(){
   return t;
 }
 function getSignBaseUrl(){
-  // 현재 주소에서 쿼리/해시 제거한 기본 URL
-  return location.origin+location.pathname;
+  // 서명 링크의 기본 주소 (배포된 인터넷 주소로 고정)
+  // file:// 로 열거나 잘못된 주소에서 만들어도 항상 올바른 링크가 생성됨
+  var FIXED_BASE='https://ukwon-ganada.github.io/jeongseo/';
+  // 현재 주소가 정상적인 https 인터넷 주소면 그대로 사용, 아니면 고정 주소 사용
+  if(location.protocol==='https:'&&location.hostname.indexOf('github.io')>-1){
+    return location.origin+location.pathname;
+  }
+  return FIXED_BASE;
 }
 async function createSignRequest(){
   showLoading('서명 요청 링크 만드는 중...');
