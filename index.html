@@ -96,7 +96,11 @@ html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black)
 @media (max-width:767px){
   #screen-contract.active{flex-direction:column!important;}
   .ct-content{display:block!important;padding:12px 0 40px;width:100%;overflow-x:hidden;}
-  #screen-contract .page{width:100%!important;max-width:100%!important;margin:0 auto 16px;display:block;}
+  #screen-contract .page{width:100%!important;max-width:100%!important;min-width:0;margin:0 0 16px;display:block;}
+  #screen-contract .info-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:2px;background:linear-gradient(to right,transparent 90%,rgba(0,0,0,0.04)),linear-gradient(to left,transparent 90%,rgba(0,0,0,0.04));background-attachment:local,local;}
+  #screen-contract .info-table-wrap::-webkit-scrollbar{height:4px;}
+  #screen-contract .info-table-wrap::-webkit-scrollbar-thumb{background:rgba(0,0,0,0.2);border-radius:2px;}
+  #screen-contract .info-table{min-width:480px;}
   .ct-appbar{width:100%;left:0;right:0;}
   .home-sidebar{display:none;}
   .hm-hi,.hm-title,.hm-desc,.doc-grid{display:none;}
@@ -677,7 +681,7 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
 
   <div class="doc-title">송 무 위 임 계 약 서 (형사)</div>
 
-  <table class="info-table">
+  <div class="info-table-wrap"><table class="info-table">
     <colgroup>
       <col style="width:18mm"><col style="width:14mm"><col>
       <col style="width:14mm"><col><col style="width:14mm"><col>
@@ -757,7 +761,7 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
         </select>
       </td>
     </tr>
-  </table>
+  </table></div>
 
   <p class="contract-intro">
     위임인(이하 '갑')과 법무법인 정서 (이하 '을')은 위 위임사건의 처리에 관하여<br>
@@ -1417,6 +1421,10 @@ async function capturePages(){
   var clrBtns=Array.prototype.slice.call(document.querySelectorAll('.sign-clear-btn'));
   var clrPrev=clrBtns.map(function(b){return b.style.display;});
   clrBtns.forEach(function(b){b.style.display='none';});
+  // 표 스크롤 래퍼 임시 해제 (캡처 시 표 전체가 나오도록)
+  var wraps=Array.prototype.slice.call(document.querySelectorAll('.info-table-wrap'));
+  var wrapPrev=wraps.map(function(w){return {ox:w.style.overflowX,sl:w.scrollLeft};});
+  wraps.forEach(function(w){w.style.overflowX='visible';w.scrollLeft=0;});
   for(var i=0;i<pages.length;i++){
     var page=pages[i];
     var prev={width:page.style.width,height:page.style.height,minHeight:page.style.minHeight,padding:page.style.padding};
@@ -1434,6 +1442,7 @@ async function capturePages(){
   // 테두리 + 버튼 복원
   stamps.forEach(function(s,idx){s.style.border=stampPrev[idx];});
   clrBtns.forEach(function(b,idx){b.style.display=clrPrev[idx];});
+  wraps.forEach(function(w,idx){w.style.overflowX=wrapPrev[idx].ox;w.scrollLeft=wrapPrev[idx].sl;});
   return canvases;
 }
 async function doAction(type){
