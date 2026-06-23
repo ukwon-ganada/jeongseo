@@ -1,0 +1,1317 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>법무법인 정서</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --black:#1a1a1a;
+  --gray-900:#222;
+  --gray-700:#444;
+  --gray-500:#888;
+  --gray-400:#aaa;
+  --gray-300:#ccc;
+  --gray-200:#e4e4e4;
+  --gray-100:#f2f2f2;
+  --gray-50:#f9f9f9;
+  --border:#e8e8e8;
+  --font:'Malgun Gothic','맑은 고딕','Apple SD Gothic Neo','Noto Sans KR',sans-serif;
+  --r:12px;--r-lg:18px;--r-xl:24px;--r-pill:999px;
+}
+html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black);-webkit-font-smoothing:antialiased;overflow-x:hidden;}
+
+.screen{display:none;}
+.screen.active{display:block;}
+
+.appbar-back-btn,.ab-back{width:36px;height:36px;background:none;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:var(--r-pill);flex-shrink:0;transition:background 0.12s;}
+.appbar-back-btn:hover,.ab-back:hover{background:var(--gray-100);}
+.appbar-back-btn:active,.ab-back:active{background:var(--gray-200);}
+.appbar-back-btn svg,.ab-back svg{width:20px;height:20px;stroke:var(--black);}
+
+/* ════ 공통 홈 골격 ════ */
+#screen-home.active{display:flex;min-height:100vh;}
+
+/* PC 사이드바 */
+.home-sidebar{display:none;}
+@media (min-width:768px){
+  .home-sidebar{
+    display:flex;flex-direction:column;
+    width:240px;min-width:240px;
+    border-right:1px solid var(--border);
+    padding:0;position:sticky;top:0;height:100vh;
+  }
+  .sb-brand{padding:30px 22px 22px;border-bottom:1px solid var(--border);}
+  .sb-brand-name{font-size:19px;font-weight:700;color:var(--black);letter-spacing:-0.01em;}
+  .sb-nav{padding:16px 12px;}
+  .sb-label{font-size:10px;font-weight:600;color:var(--gray-400);letter-spacing:0.1em;text-transform:uppercase;padding:0 10px;margin-bottom:6px;}
+  .sb-item{
+    display:flex;align-items:center;gap:11px;
+    padding:11px 14px;border-radius:var(--r-pill);
+    cursor:pointer;font-size:14px;color:var(--gray-700);
+    transition:all 0.15s;
+  }
+  .sb-item:hover{background:var(--gray-100);}
+  .sb-item.on{background:var(--black);color:#fff;}
+  .sb-item svg{width:16px;height:16px;flex-shrink:0;}
+  .sb-item.disabled{color:var(--gray-400);cursor:default;}
+  .sb-item.disabled:hover{background:transparent;}
+  .sb-item .sb-badge{margin-left:auto;font-size:9px;padding:1px 6px;border-radius:99px;background:var(--gray-100);color:var(--gray-400);}
+  .sb-foot{margin-top:auto;padding:18px 22px;border-top:1px solid var(--border);font-size:11px;color:var(--gray-400);line-height:1.6;}
+}
+
+/* 메인 영역 */
+.home-main{flex:1;}
+@media (min-width:768px){
+  .home-main{padding:44px 48px;}
+  .hm-hi{font-size:14px;color:var(--gray-400);margin-bottom:6px;}
+  .hm-title{font-size:30px;font-weight:700;margin-bottom:8px;letter-spacing:-0.02em;}
+  .hm-desc{font-size:14px;color:var(--gray-500);margin-bottom:32px;}
+  .hm-mobile{display:none;}
+  .doc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px;}
+  .doc-card{
+    border:1px solid var(--border);border-radius:var(--r-xl);
+    padding:24px;cursor:pointer;transition:all 0.18s;position:relative;background:#fff;
+  }
+  .doc-card:hover{border-color:var(--gray-300);transform:translateY(-2px);}
+  .doc-card.disabled{opacity:0.45;cursor:default;}
+  .doc-card.disabled:hover{border-color:var(--border);background:#fff;}
+  .dc-ico{width:46px;height:46px;background:var(--gray-50);border:1px solid var(--border);border-radius:var(--r-lg);display:flex;align-items:center;justify-content:center;margin-bottom:16px;}
+  .doc-grid-pc .doc-card:first-child .dc-ico{background:var(--black);border-color:var(--black);}
+  .doc-grid-pc .doc-card:first-child .dc-ico svg{stroke:#fff;}
+  .dc-ico svg{width:17px;height:17px;stroke:var(--gray-700);}
+  .dc-name{font-size:15px;font-weight:600;margin-bottom:4px;}
+  .dc-desc{font-size:12px;color:var(--gray-500);line-height:1.5;}
+  .dc-badge{position:absolute;top:14px;right:14px;font-size:9px;padding:2px 7px;border-radius:99px;background:var(--gray-100);color:var(--gray-400);}
+}
+
+/* 모바일 홈 */
+@media (max-width:767px){
+  .home-sidebar{display:none;}
+  .hm-title,.hm-desc,.doc-grid{display:none;}
+  .home-main{display:flex;flex-direction:column;width:100%;}
+  .hm-mobile{display:flex;flex-direction:column;flex:1;}
+  .hmh{padding:44px 22px 8px;}
+  .hmh-hi{font-size:13px;color:var(--gray-400);margin-bottom:4px;}
+  .hmh-name{font-size:26px;font-weight:700;letter-spacing:-0.01em;line-height:1.2;}
+  .hm-seclabel{font-size:18px;font-weight:700;color:var(--black);letter-spacing:-0.01em;padding:28px 22px 14px;}
+  .hm-list{padding:0 16px;display:flex;flex-direction:column;gap:8px;}
+  .hm-item{
+    display:flex;align-items:center;gap:14px;
+    border:1px solid var(--border);border-radius:var(--r-xl);
+    padding:18px 18px;cursor:pointer;transition:all 0.15s;background:#fff;
+  }
+  .hm-item:hover{border-color:var(--gray-300);}
+  .hm-item:active{background:var(--gray-100);}
+  .hm-item.disabled{opacity:0.45;}
+  .hm-item.disabled:active{background:#fff;}
+  .hmi-ico{width:44px;height:44px;flex-shrink:0;background:var(--gray-50);border:1px solid var(--border);border-radius:var(--r-lg);display:flex;align-items:center;justify-content:center;}
+  .hm-item:first-child .hmi-ico{background:var(--black);border-color:var(--black);}
+  .hm-item:first-child .hmi-ico svg{stroke:#fff;}
+  .hmi-ico svg{width:18px;height:18px;stroke:var(--gray-700);}
+  .hmi-body{flex:1;}
+  .hmi-name{font-size:15px;font-weight:600;}
+  .hmi-desc{font-size:12px;color:var(--gray-400);margin-top:2px;}
+  .hmi-badge{font-size:9px;padding:2px 7px;border-radius:99px;background:var(--gray-100);color:var(--gray-400);}
+  .hmi-arrow{color:var(--gray-300);font-size:17px;}
+  .hm-foot{margin-top:auto;padding:24px 22px;border-top:1px solid var(--border);font-size:11px;color:var(--gray-400);text-align:center;}
+}
+
+/* ════ 계약서 화면 ════ */
+#screen-contract.active{display:flex;min-height:100vh;}
+
+/* PC 계약서 사이드바 */
+.ct-sidebar{display:none;}
+@media (min-width:768px){
+  .ct-sidebar{
+    display:flex;flex-direction:column;
+    width:240px;min-width:240px;
+    border-right:1px solid var(--border);
+    position:sticky;top:0;height:100vh;
+  }
+  .cts-head{padding:22px;border-bottom:1px solid var(--border);}
+  .cts-back{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--gray-500);cursor:pointer;margin-bottom:16px;transition:color 0.12s;}
+  .cts-back:hover{color:var(--black);}
+  .cts-back svg{width:14px;height:14px;}
+  .cts-title{font-size:14px;font-weight:600;}
+  .cts-sub{font-size:11px;color:var(--gray-400);margin-top:3px;}
+  .cts-actions{padding:14px 12px;display:flex;flex-direction:column;gap:5px;}
+  .cts-btn{display:flex;align-items:center;gap:11px;padding:11px 14px;border-radius:var(--r-pill);cursor:pointer;font-size:14px;color:var(--gray-700);background:none;border:none;font-family:var(--font);width:100%;text-align:left;transition:background 0.12s;}
+  .cts-btn:hover{background:var(--gray-100);}
+  .cts-btn.primary{background:var(--black);color:#fff;font-weight:500;}
+  .cts-btn.primary:hover{background:var(--gray-900);}
+  .cts-btn svg{width:15px;height:15px;flex-shrink:0;}
+  .cts-div{height:1px;background:var(--border);margin:7px 12px;}
+}
+
+/* 모바일 계약서 앱바 */
+.ct-appbar{display:none;}
+@media (max-width:767px){
+  .ct-appbar{
+    display:flex;align-items:center;gap:8px;
+    border-bottom:1px solid var(--border);
+    padding:0 14px;height:52px;position:sticky;top:0;z-index:100;background:#fff;
+  }
+
+  .ab-label{flex:1;font-size:14px;font-weight:500;}
+  .ab-share{height:36px;padding:0 16px;background:var(--black);color:#fff;border:none;border-radius:var(--r-pill);font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font);display:flex;align-items:center;gap:5px;}
+  .ab-share:active{background:var(--gray-900);}
+  .ab-share svg{width:13px;height:13px;stroke:#fff;}
+}
+
+.ct-content{flex:1;background:var(--gray-100);display:flex;flex-direction:column;align-items:center;}
+@media (min-width:768px){.ct-content{padding:32px;}}
+@media (max-width:767px){.ct-content{padding:12px 0 40px;}}
+
+/* ════ 바텀시트 ════ */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:400;align-items:flex-end;justify-content:center;}
+.overlay.active{display:flex;}
+.sheet{background:#fff;border-radius:var(--r-xl) var(--r-xl) 0 0;width:100%;max-width:480px;padding-bottom:env(safe-area-inset-bottom,18px);animation:slideUp 0.22s cubic-bezier(0.4,0,0.2,1);border-top:1px solid var(--border);}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.sh-handle{width:32px;height:3px;background:var(--gray-300);border-radius:99px;margin:10px auto 0;}
+.sh-head{padding:14px 20px 10px;}
+.sh-title{font-size:15px;font-weight:600;}
+.sh-desc{font-size:12px;color:var(--gray-400);margin-top:3px;}
+.sh-div{height:1px;background:var(--border);margin:8px 0;}
+.type-item{display:flex;align-items:center;gap:14px;padding:16px 18px;margin:0 16px 8px;border:1px solid var(--border);border-radius:var(--r-lg);cursor:pointer;transition:all 0.15s;}
+.type-item:not(.disabled):hover{border-color:var(--gray-300);}
+.type-item:active{background:var(--gray-100);}
+.type-item.disabled{opacity:0.4;cursor:default;}
+.type-item.disabled:active{background:transparent;}
+.type-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.type-dot.on{background:var(--black);}
+.type-dot.off{background:var(--gray-300);}
+.type-body{flex:1;}
+.type-name{font-size:14px;font-weight:500;}
+.type-desc{font-size:12px;color:var(--gray-400);margin-top:1px;}
+.type-arrow{color:var(--gray-300);font-size:18px;}
+.type-soon{font-size:10px;padding:2px 7px;border-radius:99px;background:var(--gray-100);color:var(--gray-400);}
+.action-item{display:flex;align-items:center;gap:14px;padding:14px 18px;margin:0 12px;border-radius:var(--r-lg);cursor:pointer;transition:background 0.12s;}
+.action-item:active{background:var(--gray-100);}
+.action-ico{width:42px;height:42px;border-radius:var(--r-lg);border:1px solid var(--border);background:var(--gray-50);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.action-ico svg{width:17px;height:17px;stroke:var(--gray-700);}
+.action-name{font-size:14px;font-weight:500;}
+.action-desc{font-size:12px;color:var(--gray-400);margin-top:1px;}
+.sh-cancel{margin:6px 16px 14px;padding:13px;text-align:center;font-size:14px;color:var(--gray-500);cursor:pointer;border-radius:var(--r-lg);border:1px solid var(--border);background:none;font-family:var(--font);width:calc(100% - 32px);}
+.sh-cancel:active{background:var(--gray-100);}
+
+.loading{display:none;position:fixed;inset:0;background:rgba(255,255,255,0.88);z-index:600;flex-direction:column;align-items:center;justify-content:center;gap:14px;}
+.loading.active{display:flex;}
+.spin{width:32px;height:32px;border-radius:50%;border:2.5px solid var(--gray-200);border-top-color:var(--black);animation:spin 0.7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-msg{font-size:13px;color:var(--gray-500);}
+
+#screen-list.active{display:flex;flex-direction:column;min-height:100vh;background:#fff;}
+.list-appbar{display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);padding:0 14px;height:56px;position:sticky;top:0;z-index:100;background:#fff;}
+@media (min-width:768px){.list-appbar{padding:0 24px;}.list-appbar .ab-label{font-size:20px;}}
+.list-appbar .ab-label{flex:1;font-size:15px;font-weight:600;}
+.list-refresh{width:34px;height:34px;background:none;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:8px;flex-shrink:0;}
+.list-refresh:active{background:var(--gray-100);}
+.list-refresh svg{width:18px;height:18px;stroke:var(--gray-700);}
+.list-body{flex:1;padding:8px 0 40px;}
+@media (min-width:768px){.list-body{max-width:760px;margin:0 auto;width:100%;padding:20px 24px 40px;}}
+.list-search{padding:12px 16px 8px;}
+@media (min-width:768px){.list-search{padding:0 0 16px;}}
+.list-search input{width:100%;height:46px;border:1px solid var(--border);border-radius:var(--r-pill);padding:0 18px;font-size:14px;font-family:var(--font);outline:none;background:var(--gray-50);transition:all 0.15s;}
+.list-search input:hover{border-color:var(--gray-300);}
+.list-search input:focus{border-color:var(--gray-400);}
+.list-daygroup{margin-bottom:6px;}
+.list-daylabel{font-size:11px;font-weight:600;color:var(--gray-400);letter-spacing:0.04em;padding:14px 18px 6px;}
+@media (min-width:768px){.list-daylabel{padding:14px 4px 6px;}}
+.list-card{display:flex;align-items:center;gap:12px;padding:16px 18px;margin:0 12px 10px;border:1px solid var(--border);border-radius:var(--r-lg);cursor:pointer;transition:all 0.15s;background:#fff;}
+@media (min-width:768px){.list-card{margin:0 0 8px;}}
+.list-card:active{background:var(--gray-100);}
+.list-card:hover{border-color:var(--gray-400);}
+.lc-badge{font-size:10px;font-weight:600;padding:4px 10px;border-radius:var(--r-pill);background:var(--black);color:#fff;flex-shrink:0;}
+.lc-body{flex:1;min-width:0;}
+.lc-name{font-size:14px;font-weight:600;color:var(--black);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.lc-meta{font-size:12px;color:var(--gray-500);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.lc-time{font-size:11px;color:var(--gray-400);flex-shrink:0;}
+.lc-del{width:30px;height:30px;border:none;background:none;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:6px;flex-shrink:0;}
+.lc-del:active{background:var(--gray-100);}
+.lc-del svg{width:15px;height:15px;stroke:var(--gray-400);}
+.list-empty{text-align:center;padding:60px 24px;color:var(--gray-400);font-size:13px;line-height:1.7;}
+.list-loading{display:flex;flex-direction:column;align-items:center;gap:12px;padding:60px 24px;color:var(--gray-400);font-size:13px;}
+.save-toast{position:fixed;left:50%;bottom:32px;transform:translateX(-50%);background:var(--black);color:#fff;font-size:13px;padding:11px 18px;border-radius:99px;z-index:700;opacity:0;transition:opacity 0.25s,transform 0.25s;pointer-events:none;white-space:nowrap;}
+.save-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.save-toast.hide-init{transform:translateX(-50%) translateY(10px);}
+
+/* ════ 계약서 내부(격리) ════ */
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --font-body:'Malgun Gothic','맑은 고딕','Apple SD Gothic Neo','Noto Sans KR',sans-serif;
+  --page-pad-x:18mm;
+  --page-pad-top:12mm;
+  --page-pad-bottom:12mm;
+}
+
+.page{
+  width:210mm;height:297mm;
+  background:#fff;
+  box-shadow:0 2px 16px rgba(0,0,0,0.18);
+  padding:var(--page-pad-top) var(--page-pad-x) var(--page-pad-bottom);
+  position:relative;
+  margin-bottom:16px;
+  overflow:hidden;
+  display:flex;flex-direction:column;
+}
+
+/* ── 워터마크 배경 ── */
+.watermark{
+  position:absolute;
+  top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  width:55%;
+  opacity:0.055;
+  pointer-events:none;
+  z-index:0;
+  user-select:none;
+}
+.page-content{position:relative;z-index:1;flex:1;display:flex;flex-direction:column;}
+
+/* ── 제목 ── */
+.doc-title{
+  text-align:center;font-size:17.5pt;font-weight:700;
+  letter-spacing:0.2em;margin-bottom:9px;
+}
+
+/* ── 상단 정보 테이블 ── */
+.info-table{width:100%;border-collapse:collapse;font-size:9pt;margin-bottom:0;}
+.info-table td{border:1px solid #000;padding:3px 5px;vertical-align:middle;line-height:1.45;}
+.th-cell{background:#f0f0f0;font-weight:700;text-align:center;white-space:nowrap;width:18mm;}
+.th-sub{background:#f0f0f0;font-weight:700;text-align:center;white-space:nowrap;width:14mm;font-size:8pt;}
+.val-cell{min-width:26mm;}
+.val-cell.editable{cursor:pointer;transition:background 0.15s;}
+.val-cell.editable:hover{background:#fffbe6;}
+.val-cell .placeholder{color:#aaa;font-style:italic;}
+
+/* ── 업무범위 ── */
+.scope-row td{padding:5px 6px;vertical-align:middle;}
+.scope-items{display:flex;flex-wrap:wrap;gap:5px 12px;align-items:center;}
+.scope-item{display:inline-flex;align-items:center;gap:3px;font-size:9pt;white-space:nowrap;cursor:pointer;user-select:none;}
+.scope-item input[type="checkbox"]{
+  appearance:none;-webkit-appearance:none;
+  width:12px;height:12px;border:1.5px solid #000;border-radius:1px;
+  position:relative;cursor:pointer;flex-shrink:0;margin-right:1px;
+}
+.scope-item input[type="checkbox"]:checked::after{
+  content:'✓';position:absolute;top:-2px;left:0px;font-size:11px;color:#000;font-weight:700;
+}
+.sub-input{
+  border:none;border-bottom:1px solid #000;outline:none;
+  font-size:9pt;font-family:var(--font-body);
+  width:22px;text-align:center;background:transparent;
+}
+
+/* ── 수임조건 ── */
+.fee-row td{padding:4px 6px;vertical-align:middle;font-size:9pt;}
+.fee-label{font-size:8.5pt;color:#555;white-space:nowrap;margin-right:4px;}
+.fee-input{
+  border:none;border-bottom:1px solid #000;outline:none;
+  font-size:9pt;font-family:var(--font-body);
+  width:68px;text-align:right;background:transparent;padding:0 2px;
+}
+.account-select{
+  font-size:8.5pt;border:1px solid #888;border-radius:2px;
+  padding:1px 4px;outline:none;font-family:var(--font-body);background:#fff;
+}
+
+/* ── 계산서 ── */
+.receipt-row{font-size:9pt;}
+.receipt-items{display:inline-flex;gap:16px;align-items:center;}
+.receipt-item{display:inline-flex;align-items:center;gap:3px;cursor:pointer;}
+.receipt-item input[type="radio"]{
+  appearance:none;-webkit-appearance:none;
+  width:12px;height:12px;border:1.5px solid #000;border-radius:1px;
+  position:relative;cursor:pointer;
+}
+.receipt-item input[type="radio"]:checked::after{
+  content:'✓';position:absolute;top:-2px;left:0;font-size:11px;color:#000;font-weight:700;
+}
+
+/* ── 계약 전문 ── */
+.contract-intro{
+  font-size:9pt;text-align:center;
+  margin:10px 0 7px;line-height:1.85;
+}
+
+/* ── 조문 ── */
+.article-block{font-size:9pt;line-height:1.88;margin-bottom:6px;}
+.article-title{font-weight:700;}
+.article-indent{padding-left:4mm;font-size:9pt;line-height:1.88;}
+.article-indent2{padding-left:8mm;font-size:9pt;line-height:1.88;}
+.special-note{font-size:9pt;margin-top:3px;font-weight:700;}
+.special-
+
+/* ── 날짜 ── */
+.sign-date{
+  font-size:10.5pt;text-align:center;
+  margin-bottom:10px;letter-spacing:0.04em;
+}
+.date-input{
+  border:none;outline:none;
+  font-size:10.5pt;font-family:var(--font-body);
+  width:28px;text-align:center;background:transparent;
+}
+
+/* ── 서명란 ── */
+.sign-table{width:100%;border-collapse:collapse;font-size:9pt;margin-top:2px;}
+.sign-table td{padding:6px 8px;vertical-align:top;}
+.sign-party{font-weight:700;font-size:9.5pt;margin-bottom:6px;}
+.sign-stamp-circle{
+  position:relative;
+  width:72px;height:72px;
+  border:1.5px solid #1a1a4e;
+  border-radius:50%;
+  display:inline-flex;align-items:center;justify-content:center;
+  cursor:crosshair;overflow:hidden;flex-shrink:0;
+}
+.sign-stamp-circle canvas{
+  position:absolute;top:0;left:0;
+  border-radius:50%;
+}
+.sign-stamp-label{
+  position:absolute;
+  font-size:7.5pt;color:#bbb;
+  pointer-events:none;user-select:none;
+  text-align:center;line-height:1.3;
+}
+.sign-clear-btn{
+  font-size:7.5pt;color:#888;cursor:pointer;
+  background:none;border:none;padding:1px 0;
+  display:block;margin-top:3px;text-decoration:underline;
+}
+.firm-logo{height:28px;width:auto;display:block;margin-bottom:5px;}
+.firm-info{font-size:8pt;line-height:1.7;color:#222;}
+.firm-lawyers{font-size:8pt;}
+
+/* ── 모바일 ── */
+@media screen and (max-width:740px){
+  
+  .page{width:100%;height:auto;min-height:100vh;box-shadow:none;padding:6vw 5vw 10vw;margin-bottom:0;}
+  .doc-title{font-size:5.2vw;}
+  .info-table td,.th-cell,.th-sub,.val-cell{font-size:2.8vw;}
+  .scope-item,.fee-row td,.receipt-row{font-size:2.8vw;}
+  .contract-intro,.article-block,.article-indent,.article-indent2,.special-note,.special-
+  .sign-date{font-size:3.5vw;}
+  .date-input{font-size:3.5vw;width:8vw;}
+}
+
+/* ── 인쇄 ── */
+@media print{
+  html,body{background:#fff!important;width:210mm;height:auto;margin:0;padding:0;}
+  .home-sidebar,.ct-sidebar,.ct-appbar,.overlay,.loading,.no-print{display:none!important;}
+  #screen-home{display:none!important;}
+  #screen-contract{display:block!important;}
+  #screen-contract .ct-content{padding:0!important;margin:0!important;background:#fff!important;display:block!important;}
+  #screen-contract .page{
+    width:210mm!important;height:297mm!important;min-height:297mm!important;
+    box-shadow:none!important;margin:0!important;padding:12mm 18mm!important;
+    page-break-after:always;border-radius:0!important;
+    transform:none!important;
+  }
+  #screen-contract .page:last-of-type{page-break-after:auto;}
+  #screen-contract .info-table td,#screen-contract .th-cell,#screen-contract .th-sub{font-size:9pt!important;}
+  #screen-contract .scope-item,#screen-contract .fee-row td,#screen-contract .receipt-row{font-size:9pt!important;}
+  #screen-contract .contract-intro,#screen-contract .article-block,#screen-contract .article-indent,#screen-contract .article-indent2,#screen-contract .special-note,#screen-contract .special-body{font-size:9pt!important;}
+  #screen-contract .doc-title{font-size:17.5pt!important;}
+  #screen-contract .sign-date{font-size:10.5pt!important;}
+  #screen-contract .date-input{font-size:10.5pt!important;width:28px!important;}
+  #special-extra{border:none!important;resize:none;-webkit-appearance:none;max-height:none;}
+  @page{size:A4 portrait;margin:0;}
+}
+
+/* ── 모달 ── */
+.modal-overlay{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,0.45);z-index:1000;
+  align-items:center;justify-content:center;
+}
+.modal-overlay.active{display:flex;}
+.modal-box{
+  background:#fff;border-radius:14px;padding:24px 20px 18px;
+  width:88%;max-width:360px;box-shadow:0 8px 32px rgba(0,0,0,0.22);
+}
+.modal-title{font-size:14px;font-weight:700;margin-bottom:12px;color:#111;}
+.modal-input{
+  width:100%;border:1px solid #ccc;border-radius:8px;
+  padding:10px 12px;font-size:15px;font-family:var(--font-body);
+  outline:none;transition:border-color 0.15s;
+}
+.modal-input:focus{border-color:#000;}
+.modal-btns{display:flex;gap:8px;margin-top:14px;justify-content:flex-end;}
+.modal-btn{
+  border-radius:8px;padding:8px 20px;font-size:14px;
+  font-family:var(--font-body);cursor:pointer;
+  border:1px solid #ccc;background:#fff;transition:background 0.12s;
+}
+.modal-btn.primary{background:#000;color:#fff;border-color:#000;}
+.modal-btn:active{opacity:0.7;}
+
+
+#screen-contract .page{width:210mm;background:#fff;box-shadow:0 2px 16px rgba(0,0,0,0.15);margin-bottom:16px;}
+@media (max-width:767px){
+  #screen-contract .page{width:100vw;height:auto;min-height:unset;box-shadow:0 1px 10px rgba(0,0,0,0.12);border-radius:0;}
+  #screen-contract .info-table td,#screen-contract .th-cell,#screen-contract .th-sub{font-size:2.8vw;}
+  #screen-contract .scope-item,#screen-contract .fee-row td,#screen-contract .receipt-row{font-size:2.8vw;}
+  #screen-contract .contract-intro,#screen-contract .article-block,#screen-contract .article-indent,#screen-contract .article-indent2,#screen-contract .special-note,#screen-contract .special-body{font-size:2.8vw;}
+  #screen-contract .doc-title{font-size:5.2vw;}
+  #screen-contract .sign-date{font-size:3.5vw;}
+  #screen-contract .date-input{font-size:3.5vw;width:8vw;}
+}
+
+</style>
+</head>
+<body>
+
+<div id="lockScreen" style="position:fixed;inset:0;z-index:9999;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;">
+  <div style="width:100%;max-width:320px;text-align:center;">
+    <div style="font-size:24px;font-weight:700;letter-spacing:-0.01em;margin-bottom:6px;">법무법인 정서</div>
+    <div style="font-size:13px;color:#aaa;margin-bottom:32px;">접근하려면 비밀번호를 입력하세요</div>
+    <input type="password" id="lockInput" placeholder="비밀번호" autocomplete="off"
+      style="width:100%;height:52px;border:1px solid #e8e8e8;border-radius:999px;padding:0 20px;font-size:15px;font-family:inherit;outline:none;background:#f9f9f9;text-align:center;"
+      onkeydown="if(event.key==='Enter')tryUnlock()">
+    <div id="lockError" style="font-size:12px;color:#cc3333;margin-top:10px;height:16px;"></div>
+    <button onclick="tryUnlock()"
+      style="width:100%;height:52px;margin-top:14px;background:#1a1a1a;color:#fff;border:none;border-radius:999px;font-size:15px;font-weight:600;font-family:inherit;cursor:pointer;">
+      입장하기
+    </button>
+  </div>
+</div>
+
+<div id="screen-home" class="screen active">
+  <aside class="home-sidebar">
+    <div class="sb-brand"><div class="sb-brand-name">법무법인 정서</div></div>
+    <nav class="sb-nav">
+      <div class="sb-label">문서</div>
+      <div class="sb-item on" onclick="openTypeSheet()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg>
+        계약서 작성
+      </div>
+      <div class="sb-item" onclick="openContractList()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+        계약서 목록
+      </div>
+      <div class="sb-item disabled">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+        선임계 작성<span class="sb-badge">준비중</span>
+      </div>
+      <div class="sb-item disabled">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+        합의서 작성<span class="sb-badge">준비중</span>
+      </div>
+    </nav>
+    <div class="sb-foot">인천광역시 미추홀구<br>한나루로 436, 501호<br>032-868-7171</div>
+  </aside>
+
+  <div class="home-main">
+    <div class="hm-hi">법률문서 작성</div>
+    <div class="hm-title">법무법인 정서</div>
+    <div class="hm-desc">작성할 문서를 선택하세요</div>
+    <div class="doc-grid">
+      <div class="doc-card" onclick="openTypeSheet()">
+        <div class="dc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg></div>
+        <div class="dc-name">계약서 작성</div>
+        <div class="dc-desc">송무위임계약서<br>형사·민사·가사</div>
+      </div>
+      <div class="doc-card disabled">
+        <div class="dc-badge">준비중</div>
+        <div class="dc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg></div>
+        <div class="dc-name">선임계 작성</div>
+        <div class="dc-desc">변호인 선임신고서</div>
+      </div>
+      <div class="doc-card disabled">
+        <div class="dc-badge">준비중</div>
+        <div class="dc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div>
+        <div class="dc-name">합의서 작성</div>
+        <div class="dc-desc">형사·민사 합의서</div>
+      </div>
+    </div>
+
+    <div class="hm-mobile">
+      <div class="hmh"><div class="hmh-hi">법률문서 작성</div><div class="hmh-name">법무법인 정서</div></div>
+      <div class="hm-seclabel">문서 선택</div>
+      <div class="hm-list">
+        <div class="hm-item" onclick="openTypeSheet()">
+          <div class="hmi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg></div>
+          <div class="hmi-body"><div class="hmi-name">계약서 작성</div><div class="hmi-desc">송무위임계약서 형사·민사·가사</div></div>
+          <div class="hmi-arrow">›</div>
+        </div>
+        <div class="hm-item" onclick="openContractList()">
+          <div class="hmi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div>
+          <div class="hmi-body"><div class="hmi-name">계약서 목록</div><div class="hmi-desc">저장된 계약서를 날짜별로 확인</div></div>
+          <div class="hmi-arrow">›</div>
+        </div>
+        <div class="hm-item disabled">
+          <div class="hmi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg></div>
+          <div class="hmi-body"><div class="hmi-name">선임계 작성</div><div class="hmi-desc">변호인 선임신고서</div></div>
+          <div class="hmi-badge">준비중</div>
+        </div>
+        <div class="hm-item disabled">
+          <div class="hmi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div>
+          <div class="hmi-body"><div class="hmi-name">합의서 작성</div><div class="hmi-desc">형사·민사 합의서</div></div>
+          <div class="hmi-badge">준비중</div>
+        </div>
+      </div>
+      <div class="hm-foot">법무법인 정서 · 인천광역시 미추홀구</div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="typeSheet">
+  <div class="sheet">
+    <div class="sh-handle"></div>
+    <div class="sh-head"><div class="sh-title">계약서 종류 선택</div><div class="sh-desc">작성할 계약서 유형을 선택하세요</div></div>
+    <div class="sh-div"></div>
+    <div class="type-item" onclick="goContract('형사')">
+      <div class="type-dot on"></div>
+      <div class="type-body"><div class="type-name">형사</div><div class="type-desc">형사사건 송무위임계약서</div></div>
+      <div class="type-arrow">›</div>
+    </div>
+    <div class="type-item disabled">
+      <div class="type-dot off"></div>
+      <div class="type-body"><div class="type-name">민사</div><div class="type-desc">민사사건 송무위임계약서</div></div>
+      <div class="type-soon">준비중</div>
+    </div>
+    <div class="type-item disabled">
+      <div class="type-dot off"></div>
+      <div class="type-body"><div class="type-name">가사</div><div class="type-desc">가사사건 송무위임계약서</div></div>
+      <div class="type-soon">준비중</div>
+    </div>
+    <button class="sh-cancel" onclick="closeTypeSheet()">취소</button>
+  </div>
+</div>
+
+<div id="screen-contract" class="screen">
+  <aside class="ct-sidebar">
+    <div class="cts-head">
+      <div class="cts-back" onclick="goHome()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15,18 9,12 15,6"/></svg>홈으로
+      </div>
+      <div class="cts-title">송무위임계약서</div>
+      <div class="cts-sub" id="cts-sub">형사</div>
+    </div>
+    <div class="cts-actions">
+      <button class="cts-btn primary" onclick="doAction('pdf')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>PDF 저장
+      </button>
+      <div class="cts-div"></div>
+      <button class="cts-btn" onclick="doAction('print')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="6,9 6,2 18,2 18,9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>프린트
+      </button>
+      <button class="cts-btn" onclick="doAction('image')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>이미지 저장
+      </button>
+      <button class="cts-btn" onclick="doAction('share')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>공유하기
+      </button>
+    </div>
+  </aside>
+
+  <div class="ct-appbar">
+    <button class="ab-back" onclick="goHome()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15,18 9,12 15,6"/></svg></button>
+    <div class="ab-label" id="ab-label">송무위임계약서 (형사)</div>
+    <button class="ab-share" onclick="openActionSheet()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>공유·출력
+    </button>
+  </div>
+
+  <div class="ct-content" id="ctContent">
+<!-- ═══ PAGE 1 ═══ -->
+<div class="page" id="page1">
+  
+  <div class="page-content">
+
+  <div class="doc-title">송 무 위 임 계 약 서 (형사)</div>
+
+  <table class="info-table">
+    <colgroup>
+      <col style="width:18mm"><col style="width:14mm"><col>
+      <col style="width:14mm"><col><col style="width:14mm"><col>
+    </colgroup>
+    <tr>
+      <td class="th-cell" rowspan="2">위임인</td>
+      <td class="th-sub">성명</td>
+      <td class="val-cell editable" onclick="openModal('name','성명(의뢰인명)')"><span id="val-name" class="placeholder">의뢰인명</span></td>
+      <td class="th-sub">연락처</td>
+      <td class="val-cell editable" onclick="openModal('tel','연락처')"><span id="val-tel" class="placeholder">연락처</span></td>
+      <td class="th-sub">주민번호</td>
+      <td class="val-cell editable" onclick="openModal('ssn','주민등록번호')"><span id="val-ssn" class="placeholder">주민등록번호</span></td>
+    </tr>
+    <tr>
+      <td class="th-sub">사건번호</td>
+      <td class="val-cell editable" onclick="openModal('casenum','사건번호')"><span id="val-casenum" class="placeholder">사건번호</span></td>
+      <td class="th-sub">관할</td>
+      <td class="val-cell editable" onclick="openModal('court','관할 법원')"><span id="val-court" class="placeholder">관할 법원</span></td>
+      <td class="th-sub">사건명</td>
+      <td class="val-cell editable" onclick="openModal('casename','사건명')"><span id="val-casename" class="placeholder">사건명</span></td>
+    </tr>
+    <tr>
+      <td class="th-cell">위임인</td>
+      <td class="th-sub">주소</td>
+      <td class="val-cell editable" colspan="3" onclick="openModal('addr','주소')"><span id="val-addr" class="placeholder">주소</span></td>
+      <td class="th-sub">이메일</td>
+      <td class="val-cell editable" onclick="openModal('email','이메일')"><span id="val-email" class="placeholder">이메일</span></td>
+    </tr>
+    <tr class="scope-row">
+      <td class="th-cell">업무범위</td>
+      <td colspan="6" style="padding:5px 8px;">
+        <div class="scope-items">
+          <label class="scope-item"><input type="checkbox" id="chk-police"> 수사(경찰)</label>
+          <label class="scope-item"><input type="checkbox" id="chk-prosecution"> 수사(검찰)</label>
+          <label class="scope-item"><input type="checkbox" id="chk-warrant"> 영장심사</label>
+          <label class="scope-item"><input type="checkbox" id="chk-trial"> 재판(<input type="text" id="inp-trial" class="sub-input" maxlength="2" placeholder=" ">심)</label>
+          <label class="scope-item"><input type="checkbox" id="chk-other"> 기타(<input type="text" id="inp-other" class="sub-input" style="width:56px" placeholder="내용">)</label>
+        </div>
+      </td>
+    </tr>
+    <tr class="fee-row">
+      <td class="th-cell">수임조건</td>
+      <td colspan="6" style="padding:5px 8px;">
+        <div style="display:flex;flex-wrap:wrap;gap:7px 18px;align-items:center;">
+          <div>
+            <span class="fee-label">착수금</span>
+            <input type="text" id="inp-fee1" class="fee-input" placeholder="0" oninput="formatFee(this)"> 만원
+            <label style="cursor:pointer;font-size:8.5pt;margin-left:4px;margin-right:3px;"><input type="radio" name="vat1" value="포함" checked> VAT포함</label>
+            <label style="cursor:pointer;font-size:8.5pt;"><input type="radio" name="vat1" value="별도"> VAT별도</label>
+          </div>
+          <div>
+            <span class="fee-label">2차 보수</span>
+            <input type="text" id="inp-fee2" class="fee-input" placeholder="0" oninput="formatFee(this)"> 만원
+            <label style="cursor:pointer;font-size:8.5pt;margin-left:4px;margin-right:3px;"><input type="radio" name="vat2" value="포함" checked> VAT포함</label>
+            <label style="cursor:pointer;font-size:8.5pt;"><input type="radio" name="vat2" value="별도"> VAT별도</label>
+          </div>
+        </div>
+      </td>
+    </tr>
+    <tr class="receipt-row">
+      <td class="th-cell">계산서</td>
+      <td colspan="4" style="padding:5px 8px;">
+        <div class="receipt-items">
+          <label class="receipt-item"><input type="radio" name="receipt" value="현금영수증" checked> 현금영수증 발행</label>
+          <label class="receipt-item"><input type="radio" name="receipt" value="세금계산서"> 세금계산서 발행</label>
+        </div>
+      </td>
+      <td class="th-sub" style="white-space:nowrap;font-size:7.5pt;">입금자명</td>
+      <td class="val-cell editable" onclick="openModal('payer','입금자명')"><span id="val-payer" class="placeholder">입금자명</span></td>
+    </tr>
+    <tr>
+      <td class="th-cell" style="font-size:8pt;">입금계좌</td>
+      <td colspan="6" style="padding:5px 8px;font-size:8.5pt;">
+        <select class="account-select" id="sel-account">
+          <option value="smg">새마을금고 9002-2057-8814-5 (예금주: 법무법인 정서)</option>
+          <option value="hana">하나은행 748-910745-40207 (예금주: 서고은)</option>
+        </select>
+      </td>
+    </tr>
+  </table>
+
+  <p class="contract-intro">
+    위임인(이하 '갑')과 법무법인 정서 (이하 '을')은 위 위임사건의 처리에 관하여<br>
+    다음과 같이 계약(이하 '이계약')한다.
+  </p>
+
+  <div class="article-block"><span class="article-title">제1조 (위임사건)</span><br>
+  갑이 이 계약에 따라 을에게 위임하는 사건(이하 '위임사건')은 위와 같다.</div>
+
+  <div class="article-block"><span class="article-title">제2조 (의뢰인의 권한 수여 및 위임사무의 범위)</span><br>
+  <div class="article-indent">① 갑은 위임사건을 처리하기 위하여 을에게 별도로 부여한 위임장에 기재된 일체의 권한을 을에게 수여한다.</div>
+  <div class="article-indent">② 위임사건에 대한 위임사무의 범위는 위와 같다.</div>
+  <div class="article-indent">③ 위임사건에 대한 항고(재항고), 재기수사명령, 폴리그래프 검사 참여, 구속 전 피의자 심문(영장실질심사), 보석허가청구, 구속취소신청, 구속집행정지신청사건 수행은 위임사무의 범위에서 제외된다.</div>
+  <div class="article-indent">④ 위임의 범위는 상담 과정에서 갑이 진술한 내용과 이 계약 체결 당시 특정된 혐의(공소)사실에 한정된다. 그 외 추가로 입건, 기소된 사건에 대해서까지 이 계약의 효력이 미치는 것은 아니며, 갑은 을과 협의하여 별도 선임계약을 체결하여야 한다.</div>
+  </div>
+
+  <div class="article-block"><span class="article-title">제3조 (을의 의무)</span><br>
+  을은 선량한 관리자의 주의를 다하여 위임사무를 처리한다.</div>
+
+  <div class="article-block"><span class="article-title">제4조 (보수)</span><br>
+  <div class="article-indent">① 갑은 을에게 위임계약 성립과 동시에 위임계약에 대한 변호사 보수를 위 보수조건에 따라 즉시 지급한다. 단, 상호협의에 따라 지급 시기를 조정 할 수 있다.</div>
+  <div class="article-indent">② 갑은 제1항의 보수에 대하여 고소(발)의 취소, 당사자의 사망, 위임계약의 해제·해지 등의 사유가 발생하였을 때에도 원칙적으로 그 반환을 청구할 수 없다(갑의 단순 변심에 따른 반환 요청 불가). 다만, 갑의 귀책사유가 없고 합리적인 이유가 있는 때에는 갑은 을에게 보수의 감액을 청구할 수 있다.</div>
+  <div class="article-indent">③ 사건 진행 과정에서 보수를 증액할 사정이 발생할 경우, 을은 갑에게 제1항 기재 보수의 증액을 요청할 수 있다.</div>
+  </div>
+
+  <div class="article-block"><span class="article-title">제5조 (초과 시간에 따른 보수)</span><br>
+  <div class="article-indent">① 을이 위임사무를 수행함에 있어, 위임사무 처리에 소요된 시간을 기준으로 을 소속 담당변호사의 각 시간당 요율에 따라 계산된 금액이 위 제4조 소정의 변호사보수액을 초과하였을 경우에는, 갑은 을에게 그 초과되는 금액을 위 제4조 소정의 보수와 별도로 지급한다.</div>
+  <div class="article-indent">② 제1항에 따라 추가되는 보수는 금 <span style="display:inline-block;border-bottom:1px solid #000;min-width:28mm;">&nbsp;</span> 원을 한도로 한다.</div>
+  <div class="article-indent">③ 을은 위임사무 처리 종료 이후 갑에게 담당변호사, 위임사무 처리시간, 회사내규에 따라 정해진 각 변호사 별 시간당 요율 등을 기재한 명세를 첨부하여 초과 시간에 따른 보수를 청구하며, 갑은 을의 청구일로부터 10일 이내에 위 제2항 기재 금액을 을에게 지급하여야 한다.</div>
+  </div>
+
+  <div class="article-block"><span class="article-title">제6조 (보수에 관한 특약)</span><br>
+  <div class="article-indent">갑은 을에게 제4조 및 제5조 소정의 보수와는 별도로 아래 각 호에 기재 사유가 있을 시, 업무에 소요된 1시간당 금 <span style="display:inline-block;border-bottom:1px solid #000;min-width:20mm;">&nbsp;</span> 원을 지급하여야 한다. (이동시간 포함)</div>
+  <div class="article-indent2">1. 을 소속 변호사가 1회를 초과하여 갑(피의자, 참고인 포함)과 동행하여 수사기관의 조사과정에 입회할 경우</div>
+  <div class="article-indent2">2. 을 소속 변호사가 사건 수행 과정에서 구치소(구치감) 등 수용시설에 접견할 경우</div>
+  <div class="article-indent2">3. 갑(피의자 포함)의 요청에 의하여 을 소속 변호사가 갑(피의자 포함)이 요구하는 장소나 시설에 동행할 경우(예: 합의장소 동행, 사업장 상주 등)</div>
+  </div>
+
+  <div class="article-block"><span class="article-title">제7조 (비용)</span><br>
+  <div class="article-indent">① 위임사무의 처리를 위하여 필요한 검증·감정 비용, 통·번역 비용, 증인 여비, 송달 비용 등의 각종 비용은 제4조의 보수와 별도로 갑이 부담한다.</div>
+  <div class="article-indent">② 자료수집비, 기록복사비용, 교통·통신비 등 위임사무 처리 과정에서 부수적으로 발생하는 비용은 원칙적으로 갑이 부담하되, 구체적인 금액은 실비를 기준으로 갑과 을이 합의하여 정한다.</div>
+  </div>
+
+  </div>
+</div><!-- /page1 -->
+
+
+<!-- ═══ PAGE 2 ═══ -->
+<div class="page" id="page2">
+  
+  <div class="page-content">
+
+  <div class="article-block"><span class="article-title">제8조 (자료의 보관, 유치 및 폐기)</span><br>
+  <div class="article-indent">① 위임사무를 처리하는 데 필요하다고 인정하여 을이 제출을 요청한 서류 및 자료나 조회한 사항에 대하여 갑은 신속히 이에 응하여 제출하거나 회답하여야 한다.</div>
+  <div class="article-indent">② 을은 위임사무가 종료한 이후 관련 자료 일체를 즉시 폐기함을 원칙으로 정하며, 갑이 사건 종료 후 1개월 이내에 별도의 서면 통지로 자료 반환 요청을 하지 않은 경우에는 을이 임의로 폐기하여도 갑은 이의를 제기하지 아니한다.</div>
+  </div>
+
+  <div class="article-block"><span class="article-title">제9조 (계약의 해지)</span><br>
+  갑이 이 계약에서 정한 의무를 이행하지 않을 때, 수사기관의 정당한 요구에 불응할 때 또는 위임사무의 내용에 대한 갑의 진술이 허위인 때에는 을은 이 계약을 해지하고 사임할 수 있다. 이 경우 갑은 의무 불이행, 수사기관의 정당한 요구 불응 또는 허위 진술에 관한 합리적인 이유를 증명하지 못하는 한 을에게 이미 지급한 보수의 반환을 청구할 수 없다.</div>
+
+  <div class="article-block"><span class="article-title">제10조 (손해배상 책임)</span><br>
+  <div class="article-indent">① 을 소속 변호사가 위임사건에 관하여 고의 또는 중대한 과실로 갑에게 손해를 발생시킨 때에는 을과 연대하여 손해배상책임을 진다.</div>
+  <div class="article-indent">② 을 소속 변호사가 제1항에 의한 손해배상책임을 지는 경우 그 담당 변호사를 직접 지휘·감독한 구성원 변호사도 그 손해를 배상할 책임이 있다. 다만 지휘·감독을 함에 있어서 주의를 게을리하지 아니하였음을 증명한 때에는 그러하지 아니하다.</div>
+  </div>
+
+  <div class="article-block"><span class="article-title">제11조 (다른 사건 위임에 대한 동의 및 담당 변호사 지정 제한)</span><br>
+  <div class="article-indent">① 갑은 을이 위임사건의 상대방으로부터 위임사건과 관련 없는 다른 사건에 대한 위임사무를 수임하여 처리하는 것에 대해 동의한다.</div>
+  <div class="article-indent">② 갑이 을 이외의 다른 법률사무소에게 위임사건과 관련 없는 다른 사건을 위임하였거나 그 위임을 예정하고 있는 경우, 갑은 을이 위 다른 사건의 상대방 또는 기타 이해관계인으로부터 위 다른 사건에 대한 위임사무를 수임하여 처리하는 것에 대해 동의한다.</div>
+  <div class="article-indent">③ 을이 제1항 및 제2항에 따라 다른 사건을 수임하는 경우, 을은 위임사건을 담당하는 변호사로 하여금 위 다른 사건을 수행토록 하여서는 아니 된다.</div>
+  </div>
+
+  <div class="article-block"><span class="article-title">제12조 (비밀유지)</span><br>
+  을은 업무상 취득한 갑의 모든 정보를 비밀로 유지하고, 업무수행 상 필요하거나 법적으로 공개가 요구되는 경우 이외에는 갑의 동의 없이 제3자에게 공개하지 아니한다.</div>
+
+  <div class="article-block"><span class="article-title">제13조 (준거법 및 관할에 대한 합의)</span><br>
+  이 계약으로 인하여 생기는 일체의 분쟁에 대하여는 그 준거법을 대한민국 법률로, 관할법원을 서울중앙지방법원으로 합의한다.</div>
+
+  <div class="article-block"><span class="article-title">제14조 (인장조각)</span><br>
+  이 계약의 수행상 필요한 경우, 을은 갑 또는 사건 당사자의 인장을 조각하여 사용할 수 있고, 갑은 이에 동의한다.</div>
+
+  <div class="special-note">※ 기타 특약사항</div>
+  <textarea id="special-extra" placeholder="추가 특약사항을 입력하세요&#10;예) 성공보수는 합의금의 10%로 한다." style="width:100%;min-height:48px;max-height:120px;font-size:9pt;font-family:var(--font-body);line-height:1.75;border:none;border-bottom:1px solid #bbb;outline:none;resize:vertical;background:transparent;padding:2px 0 4px;color:#111;overflow:hidden;" oninput="autoResize(this)" onfocus="this.style.borderBottomColor='#000'" onblur="this.style.borderBottomColor='#bbb'"></textarea>
+  <div class="special-body">갑과 을은 이 계약서 체결을 증명하기 위해 계약서 1부를 작성하여 각자 기명날인한 후, 을이 그 원본을 보관하고 갑에게 사본을 1부 교부한다.</div>
+
+  <!-- 여백 자동 채우기: flex spacer -->
+  <div style="flex:1;min-height:8px;"></div>
+
+  <!-- 날짜 -->
+  <div class="sign-date">
+    2026.&nbsp;
+    <span style="display:inline-flex;align-items:center;gap:1px;">
+      <input type="text" class="date-input" id="inp-month" maxlength="2" placeholder="월">월
+    </span>
+    &nbsp;&nbsp;
+    <span style="display:inline-flex;align-items:center;gap:1px;">
+      <input type="text" class="date-input" id="inp-day" maxlength="2" placeholder="일">일
+    </span>
+  </div>
+
+  <!-- 서명란 -->
+  <table class="sign-table" style="border-top:1px solid #ccc;">
+    <tr>
+      <!-- 위임인 -->
+      <td style="width:48%;border-right:1px solid #e0e0e0;padding:8px 10px 6px;">
+        <div class="sign-party">위임인</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+          <span id="sign-name-display" style="font-size:9.5pt;"></span>
+          <div class="sign-stamp-circle" id="stampCircleWrap">
+            <canvas id="sigCanvas" width="72" height="72"></canvas>
+            <span class="sign-stamp-label" id="stampLabel">(인)<br>서명</span>
+          </div>
+        </div>
+        <button class="sign-clear-btn" onclick="clearSignature()">서명 지우기</button>
+      </td>
+      <!-- 수임인 -->
+      <td style="width:52%;padding:8px 8px 6px 14px;vertical-align:top;">
+        <div class="sign-party">수임인</div>
+        <div class="firm-name-text" style="font-size:11pt;font-weight:700;margin-bottom:4px;">법무법인 정서</div>
+        <div class="firm-info">
+          <div class="firm-lawyers">서고은 변호사 · 양선화 변호사 · 우숭민 변호사</div>
+          <div style="margin-top:3px;">인천광역시 미추홀구 한나루로 436, 501호 (학익동, 두원계전빌딩)</div>
+          <div style="margin-top:2px;">전화 032-868-7171 &nbsp;·&nbsp; FAX 032-868-7676</div>
+          <div>이메일 jeosngseo@jeongseo.com</div>
+        </div>
+      </td>
+    </tr>
+  </table>
+
+  </div>
+</div><!-- /page2 -->
+
+
+<!-- 모달 -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModalOutside(event)">
+  <div class="modal-box">
+    <div class="modal-title" id="modalTitle">내용 입력</div>
+    <input type="text" class="modal-input" id="modalInput" onkeydown="if(event.key==='Enter') saveModal()">
+    <div class="modal-btns">
+      <button class="modal-btn" onclick="closeModal()">취소</button>
+      <button class="modal-btn primary" onclick="saveModal()">저장</button>
+    </div>
+  </div>
+</div>
+
+
+  </div>
+</div>
+
+<div class="overlay" id="actionSheet">
+  <div class="sheet">
+    <div class="sh-handle"></div>
+    <div class="sh-head"><div class="sh-title">공유 및 출력</div></div>
+    <div class="sh-div"></div>
+    <div class="action-item" onclick="doActionAndClose('print')">
+      <div class="action-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="6,9 6,2 18,2 18,9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></div>
+      <div class="action-body"><div class="action-name">프린트</div><div class="action-desc">A4 용지로 직접 인쇄</div></div>
+    </div>
+    <div class="action-item" onclick="doActionAndClose('pdf')">
+      <div class="action-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg></div>
+      <div class="action-body"><div class="action-name">PDF 저장</div><div class="action-desc">페이지별 이미지로 저장</div></div>
+    </div>
+    <div class="action-item" onclick="doActionAndClose('image')">
+      <div class="action-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg></div>
+      <div class="action-body"><div class="action-name">이미지 저장</div><div class="action-desc">PNG 파일로 다운로드</div></div>
+    </div>
+    <div class="action-item" onclick="doActionAndClose('share')">
+      <div class="action-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></div>
+      <div class="action-body"><div class="action-name">공유하기</div><div class="action-desc">카카오톡·이메일·메시지로 전송</div></div>
+    </div>
+    <button class="sh-cancel" onclick="closeActionSheet()">취소</button>
+  </div>
+</div>
+
+<div id="screen-list" class="screen">
+  <div class="list-appbar">
+    <button class="ab-back" onclick="goHome()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15,18 9,12 15,6"/></svg></button>
+    <div class="ab-label">계약서 목록</div>
+    <button class="list-refresh" onclick="loadContractList()" aria-label="새로고침"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button>
+  </div>
+  <div class="list-body">
+    <div class="list-search"><input type="text" id="listSearch" placeholder="의뢰인명·사건번호·사건명 검색" oninput="renderContractList()"></div>
+    <div id="listContainer"></div>
+  </div>
+</div>
+
+<div class="save-toast" id="saveToast"></div>
+
+<div class="loading" id="loading"><div class="spin"></div><div class="loading-msg" id="loadingMsg">처리 중...</div></div>
+
+<script>
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active');});
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0,0);
+}
+
+/* ═══ 비밀번호 잠금 ═══ */
+var APP_PASSWORD='jeongseo2026';
+function tryUnlock(){
+  var val=document.getElementById('lockInput').value;
+  if(val===APP_PASSWORD){
+    try{sessionStorage.setItem('js_unlocked','1');}catch(e){}
+    document.getElementById('lockScreen').style.display='none';
+  }else{
+    document.getElementById('lockError').textContent='비밀번호가 올바르지 않습니다.';
+    document.getElementById('lockInput').value='';
+  }
+}
+function checkUnlock(){
+  var ok=false;
+  try{ok=sessionStorage.getItem('js_unlocked')==='1';}catch(e){}
+  if(ok){document.getElementById('lockScreen').style.display='none';}
+}
+function goHome(){showScreen('screen-home');}
+function goContract(type){
+  closeTypeSheet();
+  currentEditId=null;
+  document.getElementById('ab-label').textContent='송무위임계약서 ('+type+')';
+  document.getElementById('cts-sub').textContent=type;
+  showScreen('screen-contract');
+}
+
+/* ═══ Supabase 연동 ═══ */
+var SUPABASE_URL='https://nyjyemjsperpakrrgzcc.supabase.co';
+var SUPABASE_KEY='sb_publishable_QKl9MIt2_MflYnpN41VRvg_cNIAbYhU';
+var sb=null;
+function getSB(){
+  if(sb)return sb;
+  if(window.supabase&&window.supabase.createClient){
+    sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+    return sb;
+  }
+  return null;
+}
+var currentEditId=null;
+var listCache=[];
+
+/* ═══ 계약서 전체 입력값 수집 ═══ */
+function collectFormData(){
+  var fd={};
+  fd.data=JSON.parse(JSON.stringify(data));
+  fd.scope={
+    police:gv('chk-police'),prosecution:gv('chk-prosecution'),warrant:gv('chk-warrant'),
+    trial:gv('chk-trial'),trialNum:vv('inp-trial'),other:gv('chk-other'),otherTxt:vv('inp-other')
+  };
+  fd.fee={fee1:vv('inp-fee1'),fee2:vv('inp-fee2'),
+    vat1:rv('vat1'),vat2:rv('vat2')};
+  fd.receipt=rv('receipt');
+  fd.account=vv('sel-account');
+  fd.special=vv('special-extra');
+  fd.month=vv('inp-month');
+  fd.day=vv('inp-day');
+  var sc=document.getElementById('sigCanvas');
+  try{fd.signature=(sc&&window._hasSig)?sc.toDataURL('image/png'):'';}catch(e){fd.signature='';}
+  return fd;
+}
+function gv(id){var e=document.getElementById(id);return e?!!e.checked:false;}
+function vv(id){var e=document.getElementById(id);return e?e.value:'';}
+function rv(name){var e=document.querySelector('input[name="'+name+'"]:checked');return e?e.value:'';}
+
+/* ═══ 계약서 입력값 복원 ═══ */
+function restoreFormData(fd){
+  if(!fd)return;
+  if(fd.data){
+    for(var k in data){if(fd.data[k]!==undefined)data[k]=fd.data[k];}
+    for(var k2 in data){render(k2);}
+  }
+  if(fd.scope){
+    sc('chk-police',fd.scope.police);sc('chk-prosecution',fd.scope.prosecution);
+    sc('chk-warrant',fd.scope.warrant);sc('chk-trial',fd.scope.trial);sc('chk-other',fd.scope.other);
+    sv('inp-trial',fd.scope.trialNum);sv('inp-other',fd.scope.otherTxt);
+  }
+  if(fd.fee){sv('inp-fee1',fd.fee.fee1);sv('inp-fee2',fd.fee.fee2);sr('vat1',fd.fee.vat1);sr('vat2',fd.fee.vat2);}
+  if(fd.receipt)sr('receipt',fd.receipt);
+  if(fd.account)sv('sel-account',fd.account);
+  if(fd.special!==undefined){sv('special-extra',fd.special);var se=document.getElementById('special-extra');if(se)autoResize(se);}
+  if(fd.month)sv('inp-month',fd.month);
+  if(fd.day)sv('inp-day',fd.day);
+  if(fd.signature){restoreSignature(fd.signature);}
+}
+function sc(id,val){var e=document.getElementById(id);if(e)e.checked=!!val;}
+function sv(id,val){var e=document.getElementById(id);if(e&&val!==undefined&&val!==null)e.value=val;}
+function sr(name,val){if(!val)return;var e=document.querySelector('input[name="'+name+'"][value="'+val+'"]');if(e)e.checked=true;}
+function restoreSignature(dataUrl){
+  var canvas=document.getElementById('sigCanvas');if(!canvas)return;
+  var ctx=canvas.getContext('2d');
+  var img=new Image();
+  img.onload=function(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.drawImage(img,0,0,canvas.width,canvas.height);
+    window._hasSig=true;
+    var l=document.getElementById('stampLabel');if(l)l.style.display='none';
+  };
+  img.src=dataUrl;
+}
+
+/* ═══ Supabase에 저장 (저장 액션 시 호출) ═══ */
+async function saveToCloud(){
+  var client=getSB();
+  if(!client)return;
+  var fd=collectFormData();
+  var payload={
+    doc_type:'형사',
+    client_name:getClientName()||'',
+    case_num:(data.casenum||'').trim(),
+    case_name:(data.casename||'').trim(),
+    court:(data.court||'').trim(),
+    form_data:fd,
+    updated_at:new Date().toISOString()
+  };
+  try{
+    if(currentEditId){
+      await client.from('contracts').update(payload).eq('id',currentEditId);
+      showToast('목록에 업데이트되었습니다');
+    }else{
+      var res=await client.from('contracts').insert(payload).select();
+      if(res&&res.data&&res.data[0])currentEditId=res.data[0].id;
+      showToast('계약서 목록에 저장되었습니다');
+    }
+  }catch(e){
+    showToast('목록 저장 실패 (네트워크 확인)');
+  }
+}
+
+/* ═══ 목록 화면 ═══ */
+function openContractList(){
+  showScreen('screen-list');
+  loadContractList();
+}
+async function loadContractList(){
+  var box=document.getElementById('listContainer');
+  var client=getSB();
+  if(!client){
+    box.innerHTML='<div class="list-empty">Supabase 라이브러리를 불러오지 못했습니다.<br>인터넷 연결을 확인해 주세요.</div>';
+    return;
+  }
+  box.innerHTML='<div class="list-loading"><div class="spin"></div>불러오는 중...</div>';
+  try{
+    var res=await client.from('contracts').select('*').order('created_at',{ascending:false});
+    if(res.error)throw res.error;
+    listCache=res.data||[];
+    renderContractList();
+  }catch(e){
+    box.innerHTML='<div class="list-empty">목록을 불러오지 못했습니다.<br>'+(e.message||'')+'</div>';
+  }
+}
+function renderContractList(){
+  var box=document.getElementById('listContainer');
+  var q=(document.getElementById('listSearch').value||'').trim().toLowerCase();
+  var items=listCache;
+  if(q){
+    items=items.filter(function(it){
+      return ((it.client_name||'')+(it.case_num||'')+(it.case_name||'')).toLowerCase().indexOf(q)>-1;
+    });
+  }
+  if(!items.length){
+    box.innerHTML='<div class="list-empty">'+(q?'검색 결과가 없습니다.':'저장된 계약서가 없습니다.<br>계약서 작성 후 저장하면 여기 표시됩니다.')+'</div>';
+    return;
+  }
+  var groups={};var order=[];
+  items.forEach(function(it){
+    var d=new Date(it.created_at);
+    var key=d.getFullYear()+'. '+(d.getMonth()+1)+'. '+d.getDate()+'.';
+    if(!groups[key]){groups[key]=[];order.push(key);}
+    groups[key].push(it);
+  });
+  var html='';
+  order.forEach(function(key){
+    html+='<div class="list-daygroup"><div class="list-daylabel">'+key+'</div>';
+    groups[key].forEach(function(it){
+      var d=new Date(it.created_at);
+      var hh=('0'+d.getHours()).slice(-2);var mm=('0'+d.getMinutes()).slice(-2);
+      var name=it.client_name||'(의뢰인명 미입력)';
+      var meta=[it.case_num,it.case_name].filter(Boolean).join(' · ')||'사건정보 없음';
+      html+='<div class="list-card" onclick="openContractDetail(\''+it.id+'\')">'+
+        '<div class="lc-badge">'+(it.doc_type||'형사')+'</div>'+
+        '<div class="lc-body"><div class="lc-name">'+esc(name)+'</div><div class="lc-meta">'+esc(meta)+'</div></div>'+
+        '<div class="lc-time">'+hh+':'+mm+'</div>'+
+        '<button class="lc-del" onclick="event.stopPropagation();deleteContract(\''+it.id+'\')" aria-label="삭제"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>'+
+        '</div>';
+    });
+    html+='</div>';
+  });
+  box.innerHTML=html;
+}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+
+/* ═══ 목록에서 계약서 불러오기 → 편집 ═══ */
+function openContractDetail(id){
+  var it=null;
+  for(var i=0;i<listCache.length;i++){if(listCache[i].id===id){it=listCache[i];break;}}
+  if(!it)return;
+  currentEditId=id;
+  document.getElementById('ab-label').textContent='송무위임계약서 ('+(it.doc_type||'형사')+')';
+  document.getElementById('cts-sub').textContent=it.doc_type||'형사';
+  showScreen('screen-contract');
+  setTimeout(function(){restoreFormData(it.form_data);},60);
+}
+
+/* ═══ 삭제 ═══ */
+async function deleteContract(id){
+  if(!confirm('이 계약서를 목록에서 삭제할까요?'))return;
+  var client=getSB();if(!client)return;
+  try{
+    await client.from('contracts').delete().eq('id',id);
+    listCache=listCache.filter(function(it){return it.id!==id;});
+    renderContractList();
+    showToast('삭제되었습니다');
+  }catch(e){showToast('삭제 실패');}
+}
+
+/* ═══ 새 계약서 작성 시 편집 ID 초기화 ═══ */
+function startNewContract(){currentEditId=null;}
+
+/* ═══ 토스트 ═══ */
+var toastTimer=null;
+function showToast(msg){
+  var t=document.getElementById('saveToast');
+  t.textContent=msg;
+  t.classList.add('hide-init');
+  void t.offsetWidth;
+  t.classList.add('show');t.classList.remove('hide-init');
+  if(toastTimer)clearTimeout(toastTimer);
+  toastTimer=setTimeout(function(){t.classList.remove('show');},2200);
+}
+function openTypeSheet(){document.getElementById('typeSheet').classList.add('active');}
+function closeTypeSheet(){document.getElementById('typeSheet').classList.remove('active');}
+function openActionSheet(){document.getElementById('actionSheet').classList.add('active');}
+function closeActionSheet(){document.getElementById('actionSheet').classList.remove('active');}
+function doActionAndClose(t){closeActionSheet();doAction(t);}
+function showLoading(m){document.getElementById('loadingMsg').textContent=m||'처리 중...';document.getElementById('loading').classList.add('active');}
+function hideLoading(){document.getElementById('loading').classList.remove('active');}
+
+function getClientName(){
+  var n=document.getElementById('val-name');
+  return (n&&n.textContent&&n.textContent!=='의뢰인명')?n.textContent:'';
+}
+function buildFileName(){
+  var parts=['(형사)송무위임계약서'];
+  var name=getClientName();
+  if(name)parts.push(name);
+  var caseNum=(data.casenum||'').trim();
+  var caseName=(data.casename||'').trim();
+  var caseSeg=caseNum+caseName;
+  if(caseSeg)parts.push(caseSeg);
+  var y=new Date().getFullYear();
+  var mEl=document.getElementById('inp-month');
+  var dEl=document.getElementById('inp-day');
+  var mo=mEl&&mEl.value?('0'+mEl.value).slice(-2):'';
+  var dy=dEl&&dEl.value?('0'+dEl.value).slice(-2):'';
+  if(mo&&dy)parts.push(y+'.'+mo+'.'+dy);
+  var name2=parts.join('_');
+  return name2.replace(/[\\\\/:*?"<>|]/g,'');
+}
+async function capturePages(){
+  var pages=Array.prototype.slice.call(document.querySelectorAll('#ctContent .page'));
+  var canvases=[];
+  var MM=3.7795275591;
+  var W=Math.round(210*MM);
+  var H=Math.round(297*MM);
+  for(var i=0;i<pages.length;i++){
+    var page=pages[i];
+    var prev={width:page.style.width,height:page.style.height,minHeight:page.style.minHeight,padding:page.style.padding};
+    page.style.width=W+'px';
+    page.style.height=H+'px';
+    page.style.minHeight=H+'px';
+    page.style.padding=Math.round(12*MM)+'px '+Math.round(18*MM)+'px';
+    var c=await html2canvas(page,{scale:2,useCORS:true,allowTaint:true,backgroundColor:'#ffffff',logging:false,width:W,height:H,windowWidth:W,windowHeight:H});
+    page.style.width=prev.width;
+    page.style.height=prev.height;
+    page.style.minHeight=prev.minHeight;
+    page.style.padding=prev.padding;
+    canvases.push(c);
+  }
+  return canvases;
+}
+async function doAction(type){
+  if(type==='print'){window.print();return;}
+  showLoading('이미지 생성 중...');
+  try{
+    var canvases=await capturePages();
+    var clientName=getClientName();
+    if(type==='image'){
+      for(var i=0;i<canvases.length;i++){
+        var a=document.createElement('a');
+        a.download=buildFileName()+'_'+(i+1)+'p.png';
+        a.href=canvases[i].toDataURL('image/png');
+        a.click();
+      }
+      hideLoading();
+      saveToCloud();
+      return;
+    }
+    if(type==='pdf'){
+      showLoading('PDF 생성 중...');
+      var jsPDFCtor=(window.jspdf&&window.jspdf.jsPDF)?window.jspdf.jsPDF:(window.jsPDF||null);
+      if(!jsPDFCtor){
+        hideLoading();
+        alert('PDF 라이브러리를 불러오지 못했습니다.\n인터넷 연결을 확인해 주세요.');
+        return;
+      }
+      var pdf=new jsPDFCtor({orientation:'portrait',unit:'mm',format:'a4'});
+      var pw=210,ph=297;
+      for(var j=0;j<canvases.length;j++){
+        var cv=canvases[j];
+        var imgData=cv.toDataURL('image/png');
+        if(j>0)pdf.addPage();
+        pdf.addImage(imgData,'PNG',0,0,pw,ph,undefined,'FAST');
+      }
+      pdf.save(buildFileName()+'.pdf');
+      hideLoading();
+      saveToCloud();
+      return;
+    }
+    if(type==='share'){
+      showLoading('공유 준비 중...');
+      var totalH=canvases.reduce(function(s,c){return s+c.height;},0);
+      var merged=document.createElement('canvas');
+      merged.width=canvases[0].width;merged.height=totalH;
+      var mctx=merged.getContext('2d');
+      var y=0;
+      canvases.forEach(function(c){mctx.drawImage(c,0,y);y+=c.height;});
+      var blob=await new Promise(function(r){merged.toBlob(r,'image/png');});
+      var fileName=buildFileName()+'.png';
+      var file=new File([blob],fileName,{type:'image/png'});
+      hideLoading();
+      if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
+        try{
+          await navigator.share({files:[file],title:'법무법인 정서 위임계약서',text:(getClientName()||'의뢰인')+' 님의 위임계약서입니다.'});
+        }catch(e){if(e.name!=='AbortError'){fallbackDownload(blob,fileName);}}
+      }else{fallbackDownload(blob,fileName);}
+      saveToCloud();
+    }
+  }catch(err){hideLoading();alert('오류가 발생했습니다.\n'+err.message);}
+}
+function fallbackDownload(blob,fileName){
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url;a.download=fileName;a.click();
+  setTimeout(function(){URL.revokeObjectURL(url);},3000);
+  alert('이미지가 저장되었습니다.\n갤러리에서 카카오톡·이메일로 공유해 주세요.');
+}
+
+var data={name:'',tel:'',ssn:'',casenum:'',court:'',casename:'',addr:'',email:'',payer:''};
+var labelMap={name:'의뢰인명',tel:'연락처',ssn:'주민등록번호',casenum:'사건번호',court:'관할 법원',casename:'사건명',addr:'주소',email:'이메일',payer:'입금자명'};
+function render(key){
+  var el=document.getElementById('val-'+key);
+  if(!el)return;
+  if(data[key]){
+    el.textContent=data[key];el.classList.remove('placeholder');
+    if(key==='name'){var s=document.getElementById('sign-name-display');if(s)s.textContent=data[key];}
+  }else{
+    el.textContent=labelMap[key];el.classList.add('placeholder');
+    if(key==='name'){var s2=document.getElementById('sign-name-display');if(s2)s2.textContent='';}
+  }
+}
+var currentKey='';
+function openModal(key,label){
+  currentKey=key;
+  document.getElementById('modalTitle').textContent=label+' 입력';
+  document.getElementById('modalInput').value=data[key]||'';
+  document.getElementById('modalOverlay').classList.add('active');
+  setTimeout(function(){document.getElementById('modalInput').focus();},80);
+}
+function closeModal(){document.getElementById('modalOverlay').classList.remove('active');}
+function closeModalOutside(e){if(e.target===document.getElementById('modalOverlay'))closeModal();}
+function saveModal(){data[currentKey]=document.getElementById('modalInput').value.trim();render(currentKey);closeModal();}
+function formatFee(el){var raw=el.value.replace(/[^0-9]/g,'');el.value=raw?Number(raw).toLocaleString('ko-KR'):'';}
+function autoResize(el){el.style.height='auto';el.style.height=el.scrollHeight+'px';}
+function clearSignature(){if(window._sigCtx){window._sigCtx.clearRect(0,0,72,72);window._hasSig=false;var l=document.getElementById('stampLabel');if(l)l.style.display='';}}
+
+document.addEventListener('DOMContentLoaded',function(){
+  checkUnlock();
+  var li=document.getElementById('lockInput');
+  if(li&&document.getElementById('lockScreen').style.display!=='none'){setTimeout(function(){li.focus();},100);}
+  var d=new Date();
+  var m=document.getElementById('inp-month');var dd=document.getElementById('inp-day');
+  if(m)m.value=d.getMonth()+1;
+  if(dd)dd.value=d.getDate();
+
+  var canvas=document.getElementById('sigCanvas');
+  if(!canvas)return;
+  var ctx=canvas.getContext('2d');
+  window._sigCtx=ctx;window._hasSig=false;
+  var stampLabel=document.getElementById('stampLabel');
+  var drawing=false,lastX=0,lastY=0;
+  (function(){var r=canvas.width/2;ctx.beginPath();ctx.arc(r,r,r,0,Math.PI*2);ctx.clip();})();
+  function getPos(e){
+    var r=canvas.getBoundingClientRect();
+    if(e.touches)return{x:(e.touches[0].clientX-r.left)*(canvas.width/r.width),y:(e.touches[0].clientY-r.top)*(canvas.height/r.height)};
+    return{x:(e.clientX-r.left)*(canvas.width/r.width),y:(e.clientY-r.top)*(canvas.height/r.height)};
+  }
+  function startDraw(e){drawing=true;var p=getPos(e);lastX=p.x;lastY=p.y;if(!window._hasSig){window._hasSig=true;if(stampLabel)stampLabel.style.display='none';}}
+  function moveDraw(e){if(!drawing)return;var p=getPos(e);ctx.beginPath();ctx.moveTo(lastX,lastY);ctx.lineTo(p.x,p.y);ctx.strokeStyle='#1a1a1a';ctx.lineWidth=1.8;ctx.lineCap='round';ctx.lineJoin='round';ctx.stroke();lastX=p.x;lastY=p.y;}
+  canvas.addEventListener('mousedown',startDraw);
+  canvas.addEventListener('mousemove',moveDraw);
+  canvas.addEventListener('mouseup',function(){drawing=false;});
+  canvas.addEventListener('mouseleave',function(){drawing=false;});
+  canvas.addEventListener('touchstart',function(e){e.preventDefault();startDraw(e);},{passive:false});
+  canvas.addEventListener('touchmove',function(e){e.preventDefault();moveDraw(e);},{passive:false});
+  canvas.addEventListener('touchend',function(){drawing=false;});
+});
+</script>
+</body>
+</html>
