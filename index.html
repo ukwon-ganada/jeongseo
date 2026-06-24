@@ -825,7 +825,7 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
   </div>
 </div>
 
-<div class="overlay" id="typeSheet">
+<div class="overlay" id="typeSheet" onclick="if(event.target===this)closeTypeSheet()">
   <div class="sheet">
     <div class="sh-handle"></div>
     <div class="sh-head"><div class="sh-title">계약서 종류 선택</div><div class="sh-desc">작성할 계약서 유형을 선택하세요</div></div>
@@ -1705,7 +1705,7 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
   </div>
   <div class="fs-foot">
     <button class="fs-btn ghost" onclick="closeFormSheet()">취소</button>
-    <button class="fs-btn primary" onclick="applyFormSheet()">완료 → 계약서 채우기</button>
+    <button class="fs-btn primary" onclick="applyFormSheet()">완료</button>
   </div>
 </div>
 
@@ -1713,7 +1713,7 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
   </div>
 </div>
 
-<div class="overlay" id="actionSheet">
+<div class="overlay" id="actionSheet" onclick="if(event.target===this)closeActionSheet()">
   <div class="sheet">
     <div class="sh-handle"></div>
     <div class="sh-head"><div class="sh-title">공유 및 출력</div></div>
@@ -1756,7 +1756,7 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
 
 
 <!-- ═══════════ 선임계 종류 선택 ═══════════ -->
-<div class="overlay" id="seonimTypeSheet">
+<div class="overlay" id="seonimTypeSheet" onclick="if(event.target===this)closeSeonimType()">
   <div class="sheet">
     <div class="sh-handle"></div>
     <div class="sh-head"><div class="sh-title">선임계 종류 선택</div><div class="sh-desc">사건 종류를 선택하세요</div></div>
@@ -1812,7 +1812,7 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
   </div>
   <div class="fs-foot">
     <button class="fs-btn ghost" onclick="closeSeonimForm()">취소</button>
-    <button class="fs-btn primary" onclick="applySeonimForm()">완료 → 선임계 보기</button>
+    <button class="fs-btn primary" onclick="applySeonimForm()">완료</button>
   </div>
 </div>
 
@@ -1854,7 +1854,7 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
   </div>
   <div class="fs-foot">
     <button class="fs-btn ghost" onclick="closeMgForm()">취소</button>
-    <button class="fs-btn primary" onclick="applyMgForm()">완료 → 위임장 보기</button>
+    <button class="fs-btn primary" onclick="applyMgForm()">완료</button>
   </div>
 </div>
 
@@ -3365,6 +3365,30 @@ function renumberClients(list){
 /* 시트 열기/닫기 */
 function openSeonimType(){document.getElementById('seonimTypeSheet').classList.add('active');}
 function closeSeonimType(){document.getElementById('seonimTypeSheet').classList.remove('active');}
+
+/* 빈 배경 탭 시 키보드 내리기: 입력 요소 밖을 누르면 포커스 해제 */
+document.addEventListener('pointerdown',function(e){
+  var ae=document.activeElement;
+  if(ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) && !e.target.closest('input,textarea,select')){
+    ae.blur();
+  }
+},true);
+
+/* ESC 키로 열려 있는 팝업/시트 닫기 */
+document.addEventListener('keydown',function(e){
+  if(e.key!=='Escape'&&e.keyCode!==27) return;
+  var overlays=['typeSheet','seonimTypeSheet','actionSheet'];
+  for(var i=0;i<overlays.length;i++){
+    var el=document.getElementById(overlays[i]);
+    if(el&&el.classList.contains('active')){ el.classList.remove('active'); return; }
+  }
+  // 입력 시트(형사/민가사)도 ESC로 닫기
+  var forms=['seonimForm','mgForm'];
+  for(var j=0;j<forms.length;j++){
+    var fm=document.getElementById(forms[j]);
+    if(fm&&fm.classList.contains('active')){ fm.classList.remove('active'); return; }
+  }
+});
 function closeSeonimForm(){document.getElementById('seonimForm').classList.remove('active');}
 
 function goSeonim(type){
