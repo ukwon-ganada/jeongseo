@@ -1817,18 +1817,43 @@ function restoreFormData(fd){
     for(var k in data){if(fd.data[k]!==undefined)data[k]=fd.data[k];}
     for(var k2 in data){render(k2);}
   }
-  if(fd.scope){
-    sc('chk-police',fd.scope.police);sc('chk-prosecution',fd.scope.prosecution);
-    sc('chk-warrant',fd.scope.warrant);sc('chk-trial',fd.scope.trial);sc('chk-other',fd.scope.other);
-    sv('inp-trial',fd.scope.trialNum);sv('inp-other',fd.scope.otherTxt);
+  var dt=fd.docType||currentDocType||'형사';
+  if(dt==='형사'){
+    if(fd.scope){
+      sc('chk-police',fd.scope.police);sc('chk-prosecution',fd.scope.prosecution);
+      sc('chk-warrant',fd.scope.warrant);sc('chk-trial',fd.scope.trial);sc('chk-other',fd.scope.other);
+      sv('inp-trial',fd.scope.trialNum);sv('inp-other',fd.scope.otherTxt);
+    }
+    if(fd.fee){sv('inp-fee1',fd.fee.fee1);sv('inp-fee2',fd.fee.fee2);sr('vat1',fd.fee.vat1);sr('vat2',fd.fee.vat2);}
+    if(fd.receipt)sr('receipt',fd.receipt);
+    if(fd.account)sv('sel-account',fd.account);
+    if(fd.special!==undefined){sv('special-extra',fd.special);var se=document.getElementById('special-extra');if(se)autoResize(se);}
+    if(fd.signature){restoreSignatureByType(fd.signature,'형사');}
+  }else if(dt==='민사'){
+    if(fd.scope){
+      sc('cv-chk-trial',fd.scope.trial);sc('cv-chk-mediation',fd.scope.mediation);
+      sc('cv-chk-preserve',fd.scope.preserve);sc('cv-chk-other',fd.scope.other);
+      sv('cv-inp-trial',fd.scope.trialNum);sv('cv-inp-other',fd.scope.otherTxt);
+    }
+    if(fd.fee)sv('cv-inp-fee1',fd.fee.fee1);
+    if(fd.success!==undefined)sv('cv-inp-success',fd.success);
+    if(fd.account)sv('cv-sel-account',fd.account);
+    if(fd.receipt)sr('cv-receipt',fd.receipt);
+    if(fd.signature){restoreSignatureByType(fd.signature,'민사');}
+  }else if(dt==='가사'){
+    if(fd.scope){
+      sc('fm-chk-trial',fd.scope.trial);sc('fm-chk-mediation',fd.scope.mediation);
+      sc('fm-chk-presolve',fd.scope.presolve);sc('fm-chk-preserve',fd.scope.preserve);sc('fm-chk-other',fd.scope.other);
+      sv('fm-inp-trial',fd.scope.trialNum);sv('fm-inp-other',fd.scope.otherTxt);
+    }
+    if(fd.fee)sv('fm-inp-fee1',fd.fee.fee1);
+    if(fd.success!==undefined)sv('fm-inp-success',fd.success);
+    if(fd.account)sv('fm-sel-account',fd.account);
+    if(fd.receipt)sr('fm-receipt',fd.receipt);
+    if(fd.signature){restoreSignatureByType(fd.signature,'가사');}
   }
-  if(fd.fee){sv('inp-fee1',fd.fee.fee1);sv('inp-fee2',fd.fee.fee2);sr('vat1',fd.fee.vat1);sr('vat2',fd.fee.vat2);}
-  if(fd.receipt)sr('receipt',fd.receipt);
-  if(fd.account)sv('sel-account',fd.account);
-  if(fd.special!==undefined){sv('special-extra',fd.special);var se=document.getElementById('special-extra');if(se)autoResize(se);}
   if(fd.month)sv('inp-month',fd.month);
   if(fd.day)sv('inp-day',fd.day);
-  if(fd.signature){restoreSignature(fd.signature);}
 }
 function sc(id,val){var e=document.getElementById(id);if(e)e.checked=!!val;}
 function sv(id,val){var e=document.getElementById(id);if(e&&val!==undefined&&val!==null)e.value=val;}
@@ -2315,19 +2340,40 @@ function openContractDetail(id){
   for(var i=0;i<listCache.length;i++){if(listCache[i].id===id){it=listCache[i];break;}}
   if(!it)return;
   currentEditId=id;
-  document.getElementById('ab-label').textContent='송무위임계약서 ('+(it.doc_type||'형사')+')';
-  document.getElementById('cts-sub').textContent=it.doc_type||'형사';
+  var dt=it.doc_type||'형사';
+  currentDocType=dt;
+  resetContract();
+  switchContractType(dt);
+  document.getElementById('ab-label').textContent='송무위임계약서 ('+dt+')';
+  document.getElementById('cts-sub').textContent=dt;
   showScreen('screen-contract');
   setTimeout(function(){
     restoreFormData(it.form_data);
     // 상대방(위임인)이 링크로 서명한 게 있으면 위임인 서명란에 표시
     if(it.counterparty_signature){
-      restoreSignature(it.counterparty_signature);
+      restoreSignatureByType(it.counterparty_signature,dt);
       setTimeout(function(){
         showToast('상대방 서명이 포함된 계약서입니다');
       },300);
     }
-  },60);
+  },80);
+}
+/* 타입별 위임인 서명 캔버스에 서명 복원 */
+function restoreSignatureByType(dataUrl,docType){
+  var canvasId=(docType==='민사')?'cvSigCanvas':(docType==='가사')?'fmSigCanvas':'sigCanvas';
+  var labelId=(docType==='민사')?'cvStampLabel':(docType==='가사')?'fmStampLabel':'stampLabel';
+  var canvas=document.getElementById(canvasId);if(!canvas)return;
+  var ctx=canvas.getContext('2d');
+  var img=new Image();
+  img.onload=function(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.drawImage(img,0,0,canvas.width,canvas.height);
+    if(docType==='민사')window._cvHasSig=true;
+    else if(docType==='가사')window._fmHasSig=true;
+    else window._hasSig=true;
+    var l=document.getElementById(labelId);if(l)l.style.display='none';
+  };
+  img.src=dataUrl;
 }
 
 /* ═══ 삭제 ═══ */
