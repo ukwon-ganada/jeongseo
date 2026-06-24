@@ -269,17 +269,17 @@ html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black)
   --font-body:'Malgun Gothic','맑은 고딕','Apple SD Gothic Neo','Noto Sans KR',sans-serif;
   --page-pad-x:18mm;
   --page-pad-top:12mm;
-  --page-pad-bottom:12mm;
+  --page-pad-bottom:10mm;
 }
 
 .page{
-  width:210mm;height:297mm;
+  width:210mm;min-height:297mm;
   background:#fff;
   box-shadow:0 2px 16px rgba(0,0,0,0.18);
   padding:var(--page-pad-top) var(--page-pad-x) var(--page-pad-bottom);
   position:relative;
   margin-bottom:16px;
-  overflow:hidden;
+  overflow:visible;
   display:flex;flex-direction:column;
 }
 
@@ -305,8 +305,8 @@ html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black)
 /* ── 상단 정보 테이블 ── */
 .info-table{width:100%;border-collapse:collapse;font-size:9pt;margin-bottom:0;}
 .info-table td{border:1px solid #000;padding:3px 5px;vertical-align:middle;line-height:1.45;}
-.th-cell{background:#f0f0f0;font-weight:700;text-align:center;white-space:nowrap;width:18mm;}
-.th-sub{background:#f0f0f0;font-weight:700;text-align:center;white-space:nowrap;width:14mm;font-size:8pt;}
+.th-cell{background:#e3e3e3;font-weight:700;text-align:center;white-space:nowrap;width:18mm;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+.th-sub{background:#e3e3e3;font-weight:700;text-align:center;white-space:nowrap;width:14mm;font-size:8pt;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
 .val-cell{min-width:26mm;}
 .val-cell.editable{cursor:pointer;transition:background 0.15s;}
 .val-cell.editable:hover{background:#fffbe6;}
@@ -363,10 +363,10 @@ html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black)
 }
 
 /* ── 조문 ── */
-.article-block{font-size:9pt;line-height:1.88;margin-bottom:6px;}
+.article-block{font-size:9pt;line-height:1.74;margin-bottom:5px;}
 .article-title{font-weight:700;}
-.article-indent{padding-left:4mm;font-size:9pt;line-height:1.88;}
-.article-indent2{padding-left:8mm;font-size:9pt;line-height:1.88;}
+.article-indent{padding-left:4mm;font-size:9pt;line-height:1.74;}
+.article-indent2{padding-left:8mm;font-size:9pt;line-height:1.74;}
 .special-note{font-size:9pt;margin-top:3px;font-weight:700;}
 .special-body{font-size:9pt;line-height:1.88;margin-top:6px;}
 
@@ -434,10 +434,13 @@ html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black)
   #screen-contract .ct-content{padding:0!important;margin:0!important;background:#fff!important;display:block!important;}
   #screen-contract .page{
     width:210mm!important;height:297mm!important;min-height:297mm!important;
-    box-shadow:none!important;margin:0!important;padding:12mm 18mm!important;
+    box-shadow:none!important;margin:0!important;padding:11mm 18mm 9mm!important;
     page-break-after:always;border-radius:0!important;
     transform:none!important;
+    overflow:hidden!important;
   }
+  #screen-contract .article-block,#screen-contract .article-indent,#screen-contract .article-indent2{line-height:1.7!important;}
+  #screen-contract .article-block{margin-bottom:4px!important;}
   #screen-contract .page:last-of-type{page-break-after:auto;}
   #screen-contract .info-table td,#screen-contract .th-cell,#screen-contract .th-sub{font-size:9pt!important;}
   #screen-contract .scope-item,#screen-contract .fee-row td,#screen-contract .receipt-row{font-size:9pt!important;}
@@ -776,7 +779,7 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
       <col style="width:14mm"><col><col style="width:14mm"><col>
     </colgroup>
     <tr>
-      <td class="th-cell" rowspan="2">위임인</td>
+      <td class="th-cell" rowspan="3">위임인</td>
       <td class="th-sub">성명</td>
       <td class="val-cell editable" onclick="openModal('name','성명(의뢰인명)')"><span id="val-name" class="placeholder">의뢰인명</span></td>
       <td class="th-sub">연락처</td>
@@ -793,7 +796,6 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
       <td class="val-cell editable" onclick="openModal('casename','사건명')"><span id="val-casename" class="placeholder">사건명</span></td>
     </tr>
     <tr>
-      <td class="th-cell">위임인</td>
       <td class="th-sub">주소</td>
       <td class="val-cell editable" colspan="3" onclick="openModal('addr','주소')"><span id="val-addr" class="placeholder">주소</span></td>
       <td class="th-sub">이메일</td>
@@ -889,11 +891,6 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
   <div class="article-indent2">3. 갑(피의자 포함)의 요청에 의하여 을 소속 변호사가 갑(피의자 포함)이 요구하는 장소나 시설에 동행할 경우(예: 합의장소 동행, 사업장 상주 등)</div>
   </div>
 
-  <div class="article-block"><span class="article-title">제7조 (비용)</span><br>
-  <div class="article-indent">① 위임사무의 처리를 위하여 필요한 검증·감정 비용, 통·번역 비용, 증인 여비, 송달 비용 등의 각종 비용은 제4조의 보수와 별도로 갑이 부담한다.</div>
-  <div class="article-indent">② 자료수집비, 기록복사비용, 교통·통신비 등 위임사무 처리 과정에서 부수적으로 발생하는 비용은 원칙적으로 갑이 부담하되, 구체적인 금액은 실비를 기준으로 갑과 을이 합의하여 정한다.</div>
-  </div>
-
   </div>
 </div><!-- /page1 -->
 
@@ -902,6 +899,11 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
 <div class="page" id="page2">
   
   <div class="page-content">
+
+  <div class="article-block"><span class="article-title">제7조 (비용)</span><br>
+  <div class="article-indent">① 위임사무의 처리를 위하여 필요한 검증·감정 비용, 통·번역 비용, 증인 여비, 송달 비용 등의 각종 비용은 제4조의 보수와 별도로 갑이 부담한다.</div>
+  <div class="article-indent">② 자료수집비, 기록복사비용, 교통·통신비 등 위임사무 처리 과정에서 부수적으로 발생하는 비용은 원칙적으로 갑이 부담하되, 구체적인 금액은 실비를 기준으로 갑과 을이 합의하여 정한다.</div>
+  </div>
 
   <div class="article-block"><span class="article-title">제8조 (자료의 보관, 유치 및 폐기)</span><br>
   <div class="article-indent">① 위임사무를 처리하는 데 필요하다고 인정하여 을이 제출을 요청한 서류 및 자료나 조회한 사항에 대하여 갑은 신속히 이에 응하여 제출하거나 회답하여야 한다.</div>
@@ -1184,7 +1186,14 @@ function goContract(type){
   document.getElementById('ab-label').textContent='송무위임계약서 ('+type+')';
   document.getElementById('cts-sub').textContent=type;
   showScreen('screen-contract');
+  scrollContractTop();
   setTimeout(function(){openFormSheet();},150);
+}
+function scrollContractTop(){
+  setTimeout(function(){
+    var cc=document.querySelector('.ct-content');
+    if(cc){cc.scrollTop=0;cc.scrollLeft=0;}
+  },50);
 }
 function resetContract(){
   // data 초기화
@@ -1801,6 +1810,7 @@ function applyFormSheet(){
   sv('inp-day',document.getElementById('f-day').value);
   closeFormSheet();
   showToast('계약서에 입력되었습니다');
+  scrollContractTop();
 }
 function applyChip(chipKey,chkId){
   var c=document.querySelector('.fs-chip[data-chip="'+chipKey+'"]');
@@ -1875,7 +1885,7 @@ async function capturePages(){
     page.style.width=W+'px';
     page.style.height=H+'px';
     page.style.minHeight=H+'px';
-    page.style.padding=Math.round(12*MM)+'px '+Math.round(18*MM)+'px';
+    page.style.padding=Math.round(11*MM)+'px '+Math.round(18*MM)+'px '+Math.round(9*MM)+'px';
     var c=await html2canvas(page,{scale:2,useCORS:true,allowTaint:true,backgroundColor:'#ffffff',logging:false,width:W,height:H,windowWidth:W,windowHeight:H});
     page.style.width=prev.width;
     page.style.height=prev.height;
