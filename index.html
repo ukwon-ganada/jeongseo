@@ -1690,6 +1690,7 @@ function goHome(){showScreen('screen-home');}
 function goContract(type){
   closeTypeSheet();
   currentEditId=null;
+  currentRecord=null;
   currentDocType=type;
   resetContract();
   switchContractType(type);
@@ -1759,6 +1760,7 @@ function getSB(){
   return null;
 }
 var currentEditId=null;
+var currentRecord=null;
 var listCache=[];
 
 /* ═══ 계약서 전체 입력값 수집 ═══ */
@@ -1804,6 +1806,10 @@ function collectFormData(){
   }
   fd.month=vv('inp-month');
   fd.day=vv('inp-day');
+  // 캔버스 서명이 비었는데 기존 레코드에 위임인 서명이 있으면 보존
+  if((!fd.signature||fd.signature==='')&&currentRecord&&currentRecord.form_data&&currentRecord.form_data.signature){
+    fd.signature=currentRecord.form_data.signature;
+  }
   return fd;
 }
 function gv(id){var e=document.getElementById(id);return e?!!e.checked:false;}
@@ -1895,6 +1901,17 @@ async function saveToCloud(explicit){
   };
   try{
     if(currentEditId){
+      // 기존 레코드의 상대방 서명·서명상태를 먼저 읽어서 보존 (덮어쓰기 방지)
+      try{
+        var existing=await client.from('contracts').select('counterparty_signature,sign_status,sign_token,sign_expires_at').eq('id',currentEditId).limit(1);
+        if(existing&&existing.data&&existing.data[0]){
+          var ex=existing.data[0];
+          if(ex.counterparty_signature)payload.counterparty_signature=ex.counterparty_signature;
+          if(ex.sign_status)payload.sign_status=ex.sign_status;
+          if(ex.sign_token)payload.sign_token=ex.sign_token;
+          if(ex.sign_expires_at)payload.sign_expires_at=ex.sign_expires_at;
+        }
+      }catch(exErr){/* 조회 실패해도 저장은 진행 */}
       var ur=await client.from('contracts').update(payload).eq('id',currentEditId);
       if(ur.error)throw ur.error;
       showToast('목록에 업데이트되었습니다');
@@ -2340,6 +2357,7 @@ function openContractDetail(id){
   for(var i=0;i<listCache.length;i++){if(listCache[i].id===id){it=listCache[i];break;}}
   if(!it)return;
   currentEditId=id;
+  currentRecord=it;
   var dt=it.doc_type||'형사';
   currentDocType=dt;
   resetContract();
@@ -2389,7 +2407,7 @@ async function deleteContract(id){
 }
 
 /* ═══ 새 계약서 작성 시 편집 ID 초기화 ═══ */
-function startNewContract(){currentEditId=null;}
+function startNewContract(){currentEditId=null;currentRecord=null;}
 
 /* ═══ 통합 입력 폼 ═══ */
 function openFormSheet(){
