@@ -2456,49 +2456,10 @@ async function submitCounterpartySign(){
     showToast('제출 실패: '+((e&&e.message)?e.message:'다시 시도'));
   }
 }
-function clearCpSign(){
-  var cv=document.getElementById('cpSigCanvas');
-  if(cv&&window._cpSigCtx){window._cpSigCtx.clearRect(0,0,cv.width,cv.height);}
-  window._cpHasSig=false;
-}
-function initCpSignCanvas(){
-  var cv=document.getElementById('cpSigCanvas');
-  if(!cv)return;
-  // 실제 표시 크기에 맞춰 캔버스 해상도 보정 (선명하게)
-  var rect=cv.getBoundingClientRect();
-  if(rect.width>0){
-    cv.width=Math.round(rect.width);
-    cv.height=Math.round(rect.height);
-  }
-  var ctx=cv.getContext('2d');
-  ctx.lineWidth=2.2;ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle='#111';
-  window._cpSigCtx=ctx;window._cpHasSig=false;
-  var drawing=false,lastX=0,lastY=0;
-  function pos(e){
-    var r=cv.getBoundingClientRect();
-    var t=(e.touches&&e.touches[0])?e.touches[0]:e;
-    return {x:t.clientX-r.left,y:t.clientY-r.top};
-  }
-  function start(e){
-    e.preventDefault();drawing=true;
-    var p=pos(e);lastX=p.x;lastY=p.y;
-  }
-  function move(e){
-    if(!drawing)return;
-    e.preventDefault();
-    var p=pos(e);
-    ctx.beginPath();ctx.moveTo(lastX,lastY);ctx.lineTo(p.x,p.y);ctx.stroke();
-    lastX=p.x;lastY=p.y;window._cpHasSig=true;
-  }
-  function end(){drawing=false;}
-  cv.addEventListener('mousedown',start);
-  cv.addEventListener('mousemove',move);
-  cv.addEventListener('mouseup',end);
-  cv.addEventListener('mouseleave',end);
-  cv.addEventListener('touchstart',start,{passive:false});
-  cv.addEventListener('touchmove',move,{passive:false});
-  cv.addEventListener('touchend',end);
-}
+/* 상대방(의뢰인) 서명 캔버스 설정값 */
+var CP_SIGPAD={canvasId:'cpSigCanvas',ctxKey:'_cpSigCtx',hasKey:'_cpHasSig',lineWidth:2.2,strokeStyle:'#111',fitResolution:true};
+function clearCpSign(){clearSignaturePad(CP_SIGPAD);}
+function initCpSignCanvas(){setupSignaturePad(CP_SIGPAD);}
 
 /* ═══ 목록 화면 ═══ */
 function openContractList(){
@@ -2561,7 +2522,7 @@ function renderContractList(){
   });
   box.innerHTML=html;
 }
-function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function esc(s){return escapeHtml(s);} /* escapeHtml과 동일 — 중복 제거 후 위임 */
 
 /* ═══ 목록에서 계약서 불러오기 → 편집 ═══ */
 function openContractDetail(id){
@@ -3127,61 +3088,80 @@ function combineOppAddrForm(){
   document.getElementById('f-oppAddr').value=(road+(detail?' '+detail:'')).trim();
 }
 function autoResize(el){el.style.height='auto';el.style.height=el.scrollHeight+'px';}
-function clearSignature(){var cv=document.getElementById('sigCanvas');if(cv&&window._sigCtx){window._sigCtx.clearRect(0,0,cv.width,cv.height);}window._hasSig=false;var l=document.getElementById('stampLabel');if(l)l.style.display='';}
-
-/* 민사 서명 캔버스 */
-function clearCivilSignature(){var cv=document.getElementById('cvSigCanvas');if(cv&&window._cvSigCtx){window._cvSigCtx.clearRect(0,0,cv.width,cv.height);}window._cvHasSig=false;var l=document.getElementById('cvStampLabel');if(l)l.style.display='';}
-function initCivilSignCanvas(){
-  var canvas=document.getElementById('cvSigCanvas');
-  if(!canvas)return;
-  var ctx=canvas.getContext('2d');
-  window._cvSigCtx=ctx;window._cvHasSig=false;
-  var stampLabel=document.getElementById('cvStampLabel');
+/* ═══════════════════════════════════════════
+   서명 캔버스 공통 엔진 (형사·민사·가사·상대방 공용)
+   - 기존 함수 이름은 그대로 두고 내부만 이 엔진을 호출
+   - opts: canvasId, ctxKey, hasKey, labelId(선택),
+           lineWidth(기본1.8), strokeStyle(기본#1a1a1a),
+           fitResolution(선택: 표시크기에 맞춰 캔버스 해상도 보정)
+   ═══════════════════════════════════════════ */
+function setupSignaturePad(opts){
+  var cv=document.getElementById(opts.canvasId);
+  if(!cv)return;
+  if(opts.fitResolution){
+    var rect=cv.getBoundingClientRect();
+    if(rect.width>0){cv.width=Math.round(rect.width);cv.height=Math.round(rect.height);}
+  }
+  var ctx=cv.getContext('2d');
+  ctx.lineWidth=opts.lineWidth||1.8;
+  ctx.lineCap='round';ctx.lineJoin='round';
+  ctx.strokeStyle=opts.strokeStyle||'#1a1a1a';
+  window[opts.ctxKey]=ctx;
+  window[opts.hasKey]=false;
+  var label=opts.labelId?document.getElementById(opts.labelId):null;
   var drawing=false,lastX=0,lastY=0;
   function getPos(e){
-    var r=canvas.getBoundingClientRect();
-    if(e.touches)return{x:(e.touches[0].clientX-r.left)*(canvas.width/r.width),y:(e.touches[0].clientY-r.top)*(canvas.height/r.height)};
-    return{x:(e.clientX-r.left)*(canvas.width/r.width),y:(e.clientY-r.top)*(canvas.height/r.height)};
+    var r=cv.getBoundingClientRect();
+    var sx=cv.width/r.width, sy=cv.height/r.height;
+    var t=(e.touches&&e.touches[0])?e.touches[0]:e;
+    return {x:(t.clientX-r.left)*sx, y:(t.clientY-r.top)*sy};
   }
-  function startDraw(e){drawing=true;var p=getPos(e);lastX=p.x;lastY=p.y;if(!window._cvHasSig){window._cvHasSig=true;if(stampLabel)stampLabel.style.display='none';}}
-  function moveDraw(e){if(!drawing)return;var p=getPos(e);ctx.beginPath();ctx.moveTo(lastX,lastY);ctx.lineTo(p.x,p.y);ctx.strokeStyle='#1a1a1a';ctx.lineWidth=1.8;ctx.lineCap='round';ctx.lineJoin='round';ctx.stroke();lastX=p.x;lastY=p.y;}
-  canvas.addEventListener('mousedown',startDraw);
-  canvas.addEventListener('mousemove',moveDraw);
-  canvas.addEventListener('mouseup',function(){drawing=false;});
-  canvas.addEventListener('mouseleave',function(){drawing=false;});
-  canvas.addEventListener('touchstart',function(e){e.preventDefault();startDraw(e);},{passive:false});
-  canvas.addEventListener('touchmove',function(e){e.preventDefault();moveDraw(e);},{passive:false});
-  canvas.addEventListener('touchend',function(){drawing=false;});
+  function startDraw(e){
+    drawing=true;var p=getPos(e);lastX=p.x;lastY=p.y;
+    if(!window[opts.hasKey]){window[opts.hasKey]=true;if(label)label.style.display='none';}
+  }
+  function moveDraw(e){
+    if(!drawing)return;var p=getPos(e);
+    ctx.beginPath();ctx.moveTo(lastX,lastY);ctx.lineTo(p.x,p.y);ctx.stroke();
+    lastX=p.x;lastY=p.y;window[opts.hasKey]=true;
+  }
+  function endDraw(){drawing=false;}
+  cv.addEventListener('mousedown',startDraw);
+  cv.addEventListener('mousemove',moveDraw);
+  cv.addEventListener('mouseup',endDraw);
+  cv.addEventListener('mouseleave',endDraw);
+  cv.addEventListener('touchstart',function(e){e.preventDefault();startDraw(e);},{passive:false});
+  cv.addEventListener('touchmove',function(e){e.preventDefault();moveDraw(e);},{passive:false});
+  cv.addEventListener('touchend',endDraw);
 }
+function clearSignaturePad(opts){
+  var cv=document.getElementById(opts.canvasId);
+  if(cv&&window[opts.ctxKey]){window[opts.ctxKey].clearRect(0,0,cv.width,cv.height);}
+  window[opts.hasKey]=false;
+  if(opts.labelId){var l=document.getElementById(opts.labelId);if(l)l.style.display='';}
+}
+/* 형사·민사·가사 서명칸 설정값 (한 곳에서 관리) */
+var SIGPAD={
+  형사:{canvasId:'sigCanvas',ctxKey:'_sigCtx',hasKey:'_hasSig',labelId:'stampLabel'},
+  민사:{canvasId:'cvSigCanvas',ctxKey:'_cvSigCtx',hasKey:'_cvHasSig',labelId:'cvStampLabel'},
+  가사:{canvasId:'fmSigCanvas',ctxKey:'_fmSigCtx',hasKey:'_fmHasSig',labelId:'fmStampLabel'}
+};
+
+/* 형사 서명 캔버스 */
+function initSignCanvas(){setupSignaturePad(SIGPAD['형사']);}
+function clearSignature(){clearSignaturePad(SIGPAD['형사']);}
+
+/* 민사 서명 캔버스 */
+function initCivilSignCanvas(){setupSignaturePad(SIGPAD['민사']);}
+function clearCivilSignature(){clearSignaturePad(SIGPAD['민사']);}
 /* 민사 성공보수 % 입력 → data 동기화 */
 function syncCivilField(){
   var s=document.getElementById('cv-inp-success');
   if(s)data.success=s.value;
 }
 /* 가사 서명 캔버스 */
-function clearFamilySignature(){var cv=document.getElementById('fmSigCanvas');if(cv&&window._fmSigCtx){window._fmSigCtx.clearRect(0,0,cv.width,cv.height);}window._fmHasSig=false;var l=document.getElementById('fmStampLabel');if(l)l.style.display='';}
-function initFamilySignCanvas(){
-  var canvas=document.getElementById('fmSigCanvas');
-  if(!canvas)return;
-  var ctx=canvas.getContext('2d');
-  window._fmSigCtx=ctx;window._fmHasSig=false;
-  var stampLabel=document.getElementById('fmStampLabel');
-  var drawing=false,lastX=0,lastY=0;
-  function getPos(e){
-    var r=canvas.getBoundingClientRect();
-    if(e.touches)return{x:(e.touches[0].clientX-r.left)*(canvas.width/r.width),y:(e.touches[0].clientY-r.top)*(canvas.height/r.height)};
-    return{x:(e.clientX-r.left)*(canvas.width/r.width),y:(e.clientY-r.top)*(canvas.height/r.height)};
-  }
-  function startDraw(e){drawing=true;var p=getPos(e);lastX=p.x;lastY=p.y;if(!window._fmHasSig){window._fmHasSig=true;if(stampLabel)stampLabel.style.display='none';}}
-  function moveDraw(e){if(!drawing)return;var p=getPos(e);ctx.beginPath();ctx.moveTo(lastX,lastY);ctx.lineTo(p.x,p.y);ctx.strokeStyle='#1a1a1a';ctx.lineWidth=1.8;ctx.lineCap='round';ctx.lineJoin='round';ctx.stroke();lastX=p.x;lastY=p.y;}
-  canvas.addEventListener('mousedown',startDraw);
-  canvas.addEventListener('mousemove',moveDraw);
-  canvas.addEventListener('mouseup',function(){drawing=false;});
-  canvas.addEventListener('mouseleave',function(){drawing=false;});
-  canvas.addEventListener('touchstart',function(e){e.preventDefault();startDraw(e);},{passive:false});
-  canvas.addEventListener('touchmove',function(e){e.preventDefault();moveDraw(e);},{passive:false});
-  canvas.addEventListener('touchend',function(){drawing=false;});
-}
+function initFamilySignCanvas(){setupSignaturePad(SIGPAD['가사']);}
+function clearFamilySignature(){clearSignaturePad(SIGPAD['가사']);}
 /* 가사 성공보수 % 입력 → data 동기화 */
 function syncFamilyField(){
   var s=document.getElementById('fm-inp-success');
@@ -3205,24 +3185,7 @@ document.addEventListener('DOMContentLoaded',function(){
 
   var canvas=document.getElementById('sigCanvas');
   if(!canvas)return;
-  var ctx=canvas.getContext('2d');
-  window._sigCtx=ctx;window._hasSig=false;
-  var stampLabel=document.getElementById('stampLabel');
-  var drawing=false,lastX=0,lastY=0;
-  function getPos(e){
-    var r=canvas.getBoundingClientRect();
-    if(e.touches)return{x:(e.touches[0].clientX-r.left)*(canvas.width/r.width),y:(e.touches[0].clientY-r.top)*(canvas.height/r.height)};
-    return{x:(e.clientX-r.left)*(canvas.width/r.width),y:(e.clientY-r.top)*(canvas.height/r.height)};
-  }
-  function startDraw(e){drawing=true;var p=getPos(e);lastX=p.x;lastY=p.y;if(!window._hasSig){window._hasSig=true;if(stampLabel)stampLabel.style.display='none';}}
-  function moveDraw(e){if(!drawing)return;var p=getPos(e);ctx.beginPath();ctx.moveTo(lastX,lastY);ctx.lineTo(p.x,p.y);ctx.strokeStyle='#1a1a1a';ctx.lineWidth=1.8;ctx.lineCap='round';ctx.lineJoin='round';ctx.stroke();lastX=p.x;lastY=p.y;}
-  canvas.addEventListener('mousedown',startDraw);
-  canvas.addEventListener('mousemove',moveDraw);
-  canvas.addEventListener('mouseup',function(){drawing=false;});
-  canvas.addEventListener('mouseleave',function(){drawing=false;});
-  canvas.addEventListener('touchstart',function(e){e.preventDefault();startDraw(e);},{passive:false});
-  canvas.addEventListener('touchmove',function(e){e.preventDefault();moveDraw(e);},{passive:false});
-  canvas.addEventListener('touchend',function(){drawing=false;});
+  initSignCanvas();
   initCivilSignCanvas();
   initFamilySignCanvas();
 
@@ -3286,8 +3249,8 @@ var seonimState = {role:'피의자',casenum:'',casename:'',date:'',agency:'',att
 var seonimMode='형사';
 var mingasaState={role:'원고',casenum:'',casename:'',opp:'',date:'',agency:'',attorneys:['서고은'],clients:[]};
 
-function sjEsc(v){return (v==null?'':String(v)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function sjFmtSSN(v){var d=(v||'').replace(/[^0-9]/g,'').slice(0,13);return d.length>6?d.slice(0,6)+'-'+d.slice(6):d;}
+function sjEsc(v){return v==null?'':escapeHtml(v);} /* null 가드 유지 + escapeHtml 위임 (따옴표까지 안전 처리) */
+function sjFmtSSN(v){return formatSSN(v);} /* formatSSN과 동일 — 중복 제거 후 위임 */
 function sjFmtDate(iso){if(!iso)return '';var p=iso.split('-');return p[0]+'. '+parseInt(p[1],10)+'. '+parseInt(p[2],10)+'.';}
 
 /* 타원 막도장 10×15mm — 실제 인주 도장 질감 */
