@@ -1810,7 +1810,7 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
 
     <div class="fs-section">작성 · 제출</div>
     <div class="fs-field"><label class="fs-label">작성일</label><input type="date" class="fs-input" id="sj-date"></div>
-    <div class="fs-field"><label class="fs-label">제출기관</label><input type="text" class="fs-input" id="sj-agency" placeholder="인천논현경찰서 수사4팀 강한솔 경사님"></div>
+    <div class="fs-field"><label class="fs-label">제출기관</label><input type="text" class="fs-input" id="sj-agency" placeholder="○○경찰서 수사과 ○○○ 수사관님"></div>
 
     <div class="fs-section">담당변호사</div>
     <div class="fs-field"><div class="fs-chips att-chips" id="sj-att"></div><div class="att-add-row"><input type="text" class="att-add-input" id="sj-att-new" placeholder="추가할 변호사 이름"><button type="button" class="att-add-btn" onclick="addAttorney('sj')">＋ 추가</button></div></div>
@@ -3355,8 +3355,8 @@ function clientCardHTML(idx,name,ssn){
   return '<div class="cl-card">'
     +'<div class="cl-num">의뢰인 '+(idx+1)+(idx===0?' (대표)':'')+'</div>'
     +(idx>0?'<button class="cl-del" onclick="removeClient(this)">×</button>':'')
-    +'<div class="fs-field"><label class="fs-label">의뢰인명</label><input type="text" class="fs-input cl-name" maxlength="6" placeholder="이용수" value="'+sjEsc(name)+'"></div>'
-    +'<div class="fs-field" style="margin-bottom:0"><label class="fs-label">주민등록번호</label><input type="text" class="fs-input cl-ssn" inputmode="numeric" placeholder="780529-1100613" value="'+sjEsc(ssn)+'" oninput="this.value=sjFmtSSN(this.value)"></div>'
+    +'<div class="fs-field"><label class="fs-label">의뢰인명</label><input type="text" class="fs-input cl-name" maxlength="6" placeholder="홍길동" value="'+sjEsc(name)+'"></div>'
+    +'<div class="fs-field" style="margin-bottom:0"><label class="fs-label">주민등록번호</label><input type="text" class="fs-input cl-ssn" inputmode="numeric" placeholder="000000-0000000" value="'+sjEsc(ssn)+'" oninput="this.value=sjFmtSSN(this.value)"></div>'
     +'</div>';
 }
 function addClient(listId){var l=document.getElementById(listId||'cl-list');l.insertAdjacentHTML('beforeend',clientCardHTML(l.children.length,'',''));}
