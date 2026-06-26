@@ -711,7 +711,7 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
 </head>
 <body>
 
-<div id="lockScreen" style="position:fixed;inset:0;z-index:9999;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;">
+<div id="lockScreen" style="position:fixed;inset:0;z-index:9999;background:#fff;display:none;flex-direction:column;align-items:center;justify-content:center;padding:24px;">
   <div style="width:100%;max-width:320px;text-align:center;">
     <div style="font-size:24px;font-weight:700;letter-spacing:-0.01em;margin-bottom:6px;">법무법인 정서</div>
     <div style="font-size:13px;color:#aaa;margin-bottom:32px;">접근하려면 비밀번호를 입력하세요</div>
@@ -722,6 +722,10 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
     <button onclick="tryUnlock()"
       style="width:100%;height:52px;margin-top:14px;background:#1a1a1a;color:#fff;border:none;border-radius:999px;font-size:15px;font-weight:600;font-family:inherit;cursor:pointer;">
       입장하기
+    </button>
+    <button onclick="closeUnlock()"
+      style="width:100%;height:46px;margin-top:10px;background:transparent;color:#999;border:none;font-size:14px;font-family:inherit;cursor:pointer;">
+      취소
     </button>
   </div>
 </div>
@@ -1873,22 +1877,31 @@ function showScreen(id){
   window.scrollTo(0,0);
 }
 
-/* ═══ 비밀번호 잠금 ═══ */
+/* ═══ 비밀번호 잠금 (계약서 목록 진입 시에만) ═══ */
 var APP_PASSWORD='7171';
+function isUnlocked(){
+  try{return sessionStorage.getItem('js_unlocked')==='1';}catch(e){return false;}
+}
+function promptUnlock(){
+  var ls=document.getElementById('lockScreen'); if(ls)ls.style.display='flex';
+  var le=document.getElementById('lockError'); if(le)le.textContent='';
+  var li=document.getElementById('lockInput'); if(li){li.value='';setTimeout(function(){li.focus();},100);}
+}
+function closeUnlock(){
+  var ls=document.getElementById('lockScreen'); if(ls)ls.style.display='none';
+  var li=document.getElementById('lockInput'); if(li)li.value='';
+  var le=document.getElementById('lockError'); if(le)le.textContent='';
+}
 function tryUnlock(){
   var val=document.getElementById('lockInput').value;
   if(val===APP_PASSWORD){
     try{sessionStorage.setItem('js_unlocked','1');}catch(e){}
-    document.getElementById('lockScreen').style.display='none';
+    closeUnlock();
+    openContractList();
   }else{
     document.getElementById('lockError').textContent='비밀번호가 올바르지 않습니다.';
     document.getElementById('lockInput').value='';
   }
-}
-function checkUnlock(){
-  var ok=false;
-  try{ok=sessionStorage.getItem('js_unlocked')==='1';}catch(e){}
-  if(ok){document.getElementById('lockScreen').style.display='none';}
 }
 function goHome(){showScreen('screen-home');}
 function goContract(type){
@@ -2455,6 +2468,7 @@ function initCpSignCanvas(){setupSignaturePad(CP_SIGPAD);}
 
 /* ═══ 목록 화면 ═══ */
 function openContractList(){
+  if(!isUnlocked()){ promptUnlock(); return; }
   showScreen('screen-list');
   loadContractList();
 }
@@ -3167,9 +3181,6 @@ document.addEventListener('DOMContentLoaded',function(){
     initSignMode(signToken);
     return; // 서명 모드면 일반 앱 초기화 건너뜀
   }
-  checkUnlock();
-  var li=document.getElementById('lockInput');
-  if(li&&document.getElementById('lockScreen').style.display!=='none'){setTimeout(function(){li.focus();},100);}
   var d=new Date();
   var m=document.getElementById('inp-month');var dd=document.getElementById('inp-day');
   if(m)m.value=d.getMonth()+1;
