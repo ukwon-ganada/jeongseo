@@ -707,6 +707,7 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
 
 
 .att-chips{display:flex;flex-wrap:wrap;gap:6px;}.att-chip-del{display:inline-block;margin-left:7px;font-size:11px;opacity:.65;cursor:pointer;}.att-chip-del:hover{opacity:1;}.att-add-row{display:flex;gap:6px;margin-top:8px;}.att-add-input{flex:1;padding:9px 11px;border:1px solid #d0d4dc;border-radius:9px;font-size:13px;}.att-add-btn{padding:9px 14px;border:1px solid #1a2740;background:#1a2740;color:#fff;border-radius:9px;font-size:13px;white-space:nowrap;cursor:pointer;}
+.sj-editable{cursor:pointer;outline:1px dashed rgba(20,60,120,0.30);outline-offset:-2px;}.sj-editable:active{outline-color:#1a4ea2;outline-width:1.5px;}.sjm-label{display:block;font-size:12px;font-weight:600;color:#555;margin:12px 0 5px;}.sjm-label:first-child{margin-top:0;}#sjModalBody .cl-card{margin-bottom:10px;}#sjModalBody .fs-chips{margin:2px 0 4px;}
 </style>
 </head>
 <body>
@@ -3469,6 +3470,62 @@ function applySeonimForm(){
 }
 
 /* 양식 렌더 */
+/* ══════ 선임계 양식 칸 클릭 수정 (형사·민가사 공용) ══════ */
+var SJ_ROLES_FORM=['피의자','피고인','고소인','피해자'];
+var sjEditCtx=null;
+function sjState(){return seonimMode==='민가사'?mingasaState:seonimState;}
+function sjRerender(){if(seonimMode==='민가사')renderMingasa();else renderSeonim();}
+function sjmPickRole(el){el.parentNode.querySelectorAll('.fs-chip').forEach(function(x){x.classList.remove('on');});el.classList.add('on');}
+function closeSjModal(){document.getElementById('sjModalOverlay').classList.remove('active');}
+function sjModalOutside(e){if(e.target===document.getElementById('sjModalOverlay'))closeSjModal();}
+function openSjEdit(type){
+  var s=sjState(), mg=(seonimMode==='민가사'); sjEditCtx=type;
+  var title='수정', html='';
+  if(type==='case'){
+    title='사건 정보';
+    html='<label class="sjm-label">사건번호</label><input type="text" class="modal-input" id="sjm-casenum" value="'+escapeHtml(s.casenum||'')+'">'
+        +'<label class="sjm-label">사건명'+(mg?'':'(죄명)')+'</label><input type="text" class="modal-input" id="sjm-casename" value="'+escapeHtml(s.casename||'')+'">';
+  } else if(type==='agency'){
+    title='제출기관'; html='<input type="text" class="modal-input" id="sjm-agency" value="'+escapeHtml(s.agency||'')+'">';
+  } else if(type==='opp'){
+    title=(s.role==='원고'?'상대방(피고)':'상대방(원고)'); html='<input type="text" class="modal-input" id="sjm-opp" value="'+escapeHtml(s.opp||'')+'">';
+  } else if(type==='date'){
+    title='작성일'; html='<input type="date" class="modal-input" id="sjm-date" value="'+escapeHtml(s.date||'')+'">';
+  } else if(type==='role'){
+    title='역할'; var roles=mg?['원고','피고']:SJ_ROLES_FORM;
+    html='<div class="fs-chips" id="sjm-role">'+roles.map(function(r){return '<div class="fs-chip'+(r===s.role?' on':'')+'" data-role="'+escapeHtml(r)+'" onclick="sjmPickRole(this)">'+escapeHtml(r)+'</div>';}).join('')+'</div>';
+  } else if(type==='att'){
+    title='담당변호사';
+    html='<div class="fs-chips att-chips" id="sjm-att"></div><div class="att-add-row"><input type="text" class="att-add-input" id="sjm-att-new" placeholder="추가할 변호사 이름"><button type="button" class="att-add-btn" onclick="addAttorney(\'sjm\')">＋ 추가</button></div>';
+  } else if(type==='clients'){
+    title='의뢰인'; html='<div id="sjm-cl-list"></div><button type="button" class="att-add-btn" style="width:100%;margin-top:8px" onclick="addClient(\'sjm-cl-list\')">＋ 의뢰인 추가</button>';
+  }
+  document.getElementById('sjModalTitle').textContent=title;
+  document.getElementById('sjModalBody').innerHTML=html;
+  if(type==='att'){
+    renderAttChips('sjm', s.attorneys);
+    var ab=document.getElementById('sjm-att');
+    if(ab)ab.addEventListener('click',function(e){attChipClick(e,'sjm');});
+  }
+  if(type==='clients'){
+    var list=document.getElementById('sjm-cl-list');
+    var arr=(s.clients&&s.clients.length)?s.clients:[{name:'',ssn:''}];
+    arr.forEach(function(c,i){list.insertAdjacentHTML('beforeend', clientCardHTML(i,c.name,c.ssn));});
+  }
+  document.getElementById('sjModalOverlay').classList.add('active');
+  setTimeout(function(){var f=document.querySelector('#sjModalBody input.modal-input');if(f&&type!=='date')f.focus();},80);
+}
+function saveSjModal(){
+  var s=sjState(), t=sjEditCtx;
+  if(t==='case'){s.casenum=document.getElementById('sjm-casenum').value.trim();s.casename=document.getElementById('sjm-casename').value.trim();}
+  else if(t==='agency'){s.agency=document.getElementById('sjm-agency').value.trim();}
+  else if(t==='opp'){s.opp=document.getElementById('sjm-opp').value.trim();}
+  else if(t==='date'){s.date=document.getElementById('sjm-date').value;}
+  else if(t==='role'){var on=document.querySelector('#sjm-role .fs-chip.on');if(on)s.role=on.dataset.role;}
+  else if(t==='att'){var a=[];document.querySelectorAll('#sjm-att .fs-chip.on').forEach(function(c){a.push(c.dataset.att);});if(!a.length)a=['서고은'];s.attorneys=a;}
+  else if(t==='clients'){var arr=[];document.querySelectorAll('#sjm-cl-list .cl-card').forEach(function(card){var n=card.querySelector('.cl-name').value.trim();var ss=card.querySelector('.cl-ssn').value.trim();if(n||ss)arr.push({name:n,ssn:ss});});if(!arr.length)arr=[{name:'',ssn:''}];s.clients=arr;}
+  sjRerender(); closeSjModal();
+}
 function renderSeonim(){
   var s=seonimState;
   var clients=s.clients.filter(function(c){return c.name.trim();});
@@ -3482,9 +3539,9 @@ function renderSeonim(){
   }).join('');
   var html='<table class="sj"><colgroup><col style="width:20.9mm"><col style="width:148.1mm"></colgroup>'
    +'<tr style="height:17mm"><td class="title" colspan="2">변호인선임신고서</td></tr>'
-   +'<tr style="height:11.4mm"><td class="lbl">사건</td><td class="val">'+sjEsc(s.casenum)+' '+sjEsc(s.casename)+'</td></tr>'
-   +'<tr style="height:12.4mm"><td class="lbl">'+sjEsc(s.role)+'</td><td class="val">'+names+'</td></tr>'
-   +'<tr style="height:29.7mm"><td class="intro" colspan="2"><p class="intro-p">위 사건에 관하여 다음 표시 수임인을 변호인으로 선임하였으므로, 이에 변호인선임신고서를 제출합니다.</p><p class="date">'+sjEsc(sjFmtDate(s.date))+'</p></td></tr>'
+   +'<tr style="height:11.4mm"><td class="lbl">사건</td><td class="val sj-editable" data-edit="case">'+sjEsc(s.casenum)+' '+sjEsc(s.casename)+'</td></tr>'
+   +'<tr style="height:12.4mm"><td class="lbl sj-editable" data-edit="role">'+sjEsc(s.role)+'</td><td class="val sj-editable" data-edit="clients">'+names+'</td></tr>'
+   +'<tr style="height:29.7mm"><td class="intro" colspan="2"><p class="intro-p">위 사건에 관하여 다음 표시 수임인을 변호인으로 선임하였으므로, 이에 변호인선임신고서를 제출합니다.</p><p class="date sj-editable" data-edit="date">'+sjEsc(sjFmtDate(s.date))+'</p></td></tr>'
    +'<tr style="height:60mm"><td class="lbl">수임인</td><td class="suim">'
      +'<div class="firm-line"><span class="firm">법무법인 정서</span><img class="firm-seal" src="'+SEONIM_FIRM_SEAL+'"></div>'
      +'<p class="addr">주&nbsp;&nbsp;소 &nbsp;인천광역시 미추홀구 한나루로 436, 5층 501호(학익동, 두원계전빌딩)</p>'
@@ -3493,11 +3550,11 @@ function renderSeonim(){
      +'<p class="rep">서고은 변호사 등록번호 19841</p>'
      +'<p class="notice">※ 위 변호인은 위 연락처로 각종 통지를 받을 의사가 있음을 확인합니다.</p>'
    +'</td></tr>'
-   +'<tr style="height:47.9mm"><td class="lbl">선임인</td><td class="sunim '+(multi?'multi':'single')+'">'+rows+'</td></tr>'
+   +'<tr style="height:47.9mm"><td class="lbl">선임인</td><td class="sunim sj-editable '+(multi?'multi':'single')+'" data-edit="clients">'+rows+'</td></tr>'
    +'<tr style="height:11.8mm"><td class="subhead" colspan="2">담당변호사 지정서</td></tr>'
    +'<tr style="height:23.2mm"><td class="desig" colspan="2">위 사건에 관하여 당 법인은 <span class="v-role-em">'+sjEsc(s.role)+'</span>의 변호인으로서 변호사법 제50조 제1항에 의거하여 그 업무를 담당할 변호사를 아래와 같이 지정합니다.</td></tr>'
-   +'<tr style="height:12.2mm"><td class="attorneys" colspan="2">담당변호사 : '+sjEsc(s.attorneys.join(', '))+'</td></tr>'
-   +'<tr style="height:17.7mm"><td class="agency" colspan="2">'+sjEsc(s.agency)+' 귀중</td></tr>'
+   +'<tr style="height:12.2mm"><td class="attorneys sj-editable" colspan="2" data-edit="att">담당변호사 : '+sjEsc(s.attorneys.join(', '))+'</td></tr>'
+   +'<tr style="height:17.7mm"><td class="agency sj-editable" colspan="2" data-edit="agency">'+sjEsc(s.agency)+' 귀중</td></tr>'
    +'</table>';
   document.getElementById('sj-host').innerHTML=html;
   var _t=document.querySelector('#screen-seonim .sj-title'); if(_t)_t.textContent='변호인선임신고서';
@@ -3589,6 +3646,8 @@ function renderMingasa(){
   var clients=s.clients.filter(function(c){return c.name.trim();});
   var ourNames=clients.map(function(c){return sjEsc(c.name);}).join(', ');
   var wongo, pigo;
+  var wongoClick=s.role==='원고'?"clients":"opp";
+  var pigoClick=s.role==='원고'?"opp":"clients";
   if(s.role==='원고'){ wongo=ourNames; pigo=sjEsc(s.opp); }
   else { wongo=sjEsc(s.opp); pigo=ourNames; }
   var multi=clients.length>=2;
@@ -3600,9 +3659,9 @@ function renderMingasa(){
   }).join('');
   var html='<table class="sj"><colgroup><col style="width:20.9mm"><col style="width:148.1mm"></colgroup>'
    +'<tr style="height:15mm"><td class="title" colspan="2">소송위임장</td></tr>'
-   +'<tr style="height:9.9mm"><td class="lbl">사건</td><td class="val">'+sjEsc(s.casenum)+' '+sjEsc(s.casename)+'</td></tr>'
-   +'<tr style="height:9.9mm"><td class="lbl" rowspan="2">당사자</td><td class="party"><span class="party-lbl">원 고</span>'+wongo+'</td></tr>'
-   +'<tr style="height:9.9mm"><td class="party"><span class="party-lbl">피 고</span>'+pigo+'</td></tr>'
+   +'<tr style="height:9.9mm"><td class="lbl">사건</td><td class="val sj-editable" data-edit="case">'+sjEsc(s.casenum)+' '+sjEsc(s.casename)+'</td></tr>'
+   +'<tr style="height:9.9mm"><td class="lbl" rowspan="2">당사자</td><td class="party sj-editable" data-edit="'+wongoClick+'"><span class="party-lbl">원 고</span>'+wongo+'</td></tr>'
+   +'<tr style="height:9.9mm"><td class="party sj-editable" data-edit="'+pigoClick+'"><span class="party-lbl">피 고</span>'+pigo+'</td></tr>'
    +'<tr style="height:11.2mm"><td class="mg-intro" colspan="2">위 당사자 간의 사건에 관하여 다음 표시 수임인을 소송대리인으로 선임하고, 다음 표시 권한을 수여한다.</td></tr>'
    +'<tr style="height:35.1mm"><td class="lbl">수임인</td><td class="mg-suim">'
      +'<div class="mg-firm">법무법인 정서</div>'
@@ -3612,11 +3671,11 @@ function renderMingasa(){
      +'<img class="firm-seal-mg" src="'+SEONIM_FIRM_SEAL+'">'
    +'</td></tr>'
    +'<tr style="height:51.5mm"><td class="lbl lbl-v">수<br>권<br>사<br>항</td><td class="mg-power">'+mgPowerHTML()+'</td></tr>'
-   +'<tr style="height:47.9mm"><td class="lbl">위임인</td><td class="mg-wiimin '+(multi?'multi':'single')+'"><div class="mg-date">'+sjEsc(sjFmtDate(s.date))+'</div>'+rows+'</td></tr>'
+   +'<tr style="height:47.9mm"><td class="lbl">위임인</td><td class="mg-wiimin sj-editable '+(multi?'multi':'single')+'" data-edit="clients"><div class="mg-date sj-editable" data-edit="date">'+sjEsc(sjFmtDate(s.date))+'</div>'+rows+'</td></tr>'
    +'<tr style="height:9.8mm"><td class="subhead" colspan="2">담당변호사 지정서</td></tr>'
-   +'<tr style="height:16.2mm"><td class="desig" colspan="2">위 사건에 관하여 당 법인은 <span class="v-role-em">'+sjEsc(s.role)+'</span>의 소송대리인으로서 변호사법 제50조 제1항에 의거하여 그 업무를 담당할 변호사를 아래와 같이 지정합니다.</td></tr>'
-   +'<tr style="height:12.2mm"><td class="attorneys" colspan="2">담당변호사 : '+sjEsc(s.attorneys.join(', '))+'</td></tr>'
-   +'<tr style="height:18.2mm"><td class="agency" colspan="2">'+sjEsc(s.agency)+' 귀중</td></tr>'
+   +'<tr style="height:16.2mm"><td class="desig" colspan="2">위 사건에 관하여 당 법인은 <span class="v-role-em sj-editable" data-edit="role">'+sjEsc(s.role)+'</span>의 소송대리인으로서 변호사법 제50조 제1항에 의거하여 그 업무를 담당할 변호사를 아래와 같이 지정합니다.</td></tr>'
+   +'<tr style="height:12.2mm"><td class="attorneys sj-editable" colspan="2" data-edit="att">담당변호사 : '+sjEsc(s.attorneys.join(', '))+'</td></tr>'
+   +'<tr style="height:18.2mm"><td class="agency sj-editable" colspan="2" data-edit="agency">'+sjEsc(s.agency)+' 귀중</td></tr>'
    +'</table>';
   document.getElementById('sj-host').innerHTML=html;
   var _t=document.querySelector('#screen-seonim .sj-title'); if(_t)_t.textContent='소송위임장';
@@ -3624,6 +3683,19 @@ function renderMingasa(){
 }
 
 /* 인원 많으면 A4 한 장에 맞춰 축소 */
+/* 선임계 양식: 칸 클릭을 한곳에서 처리 (이벤트 위임 — 환경 문제에 강함) */
+function sjBindHostClicks(){
+  var host=document.getElementById('sj-host');
+  if(!host||host._sjBound)return;
+  host._sjBound=true;
+  host.addEventListener('click',function(e){
+    var cell=e.target.closest('.sj-editable');
+    if(!cell||!host.contains(cell))return;
+    var type=cell.getAttribute('data-edit');
+    if(type)openSjEdit(type);
+  });
+}
+sjBindHostClicks();
 function fitSeonimPage(){
   var host=document.getElementById('sj-host'); if(!host)return;
   host.style.transform='';
@@ -3636,14 +3708,66 @@ function fitSeonimPage(){
 
 
 
-/* ═══ PWA 서비스 워커 등록 (홈화면 앱 설치 지원) ═══ */
+/* ═══ PWA 서비스 워커 등록 (홈화면 앱 설치 + 자동 업데이트) ═══ */
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function () {
-    navigator.serviceWorker.register('sw.js').catch(function (err) {
+    navigator.serviceWorker.register('sw.js').then(function (reg) {
+      // 페이지 열 때마다 새 버전 있는지 확인
+      reg.update();
+      // 새 서비스워커가 설치되면 즉시 교체 요청
+      reg.addEventListener('updatefound', function () {
+        var nw = reg.installing;
+        if (!nw) return;
+        nw.addEventListener('statechange', function () {
+          if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+            nw.postMessage({ type: 'SKIP_WAITING' });
+          }
+        });
+      });
+    }).catch(function (err) {
       console.log('서비스 워커 등록 실패:', err);
+    });
+    // 새 워커가 제어권을 가지면 한 번만 자동 새로고침
+    var refreshed = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      if (refreshed) return;
+      refreshed = true;
+      window.location.reload();
     });
   });
 }
 </script>
+<script>
+/* ═══ 선임계 칸 클릭 — 메인 스크립트와 독립 실행(앞에서 에러가 나도 무조건 작동) ═══ */
+(function(){
+  function bind(){
+    if(document._sjDocBound)return;
+    document._sjDocBound=true;
+    document.addEventListener('click',function(e){
+      var t=e.target;
+      var cell=(t&&t.closest)?t.closest('.sj-editable'):null;
+      if(!cell)return;
+      var host=document.getElementById('sj-host');
+      if(!host||!host.contains(cell))return;
+      var type=cell.getAttribute('data-edit');
+      if(type&&typeof openSjEdit==='function'){
+        try{openSjEdit(type);}catch(err){console.log('openSjEdit 오류:',err);}
+      }
+    });
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind);
+  else bind();
+})();
+</script>
+<div class="modal-overlay" id="sjModalOverlay" onclick="sjModalOutside(event)">
+  <div class="modal-box">
+    <div class="modal-title" id="sjModalTitle">수정</div>
+    <div id="sjModalBody"></div>
+    <div class="modal-btns">
+      <button class="modal-btn" onclick="closeSjModal()">취소</button>
+      <button class="modal-btn primary" onclick="saveSjModal()">저장</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
