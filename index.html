@@ -485,8 +485,8 @@ html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black)
 #screen-seonim .sj .date{margin:10pt 0 0;text-align:center;font-size:11pt;}
 #screen-seonim .suim{padding:3mm 12pt;position:relative;vertical-align:top;}
 #screen-seonim .firm-line{display:flex;align-items:center;justify-content:center;height:20mm;margin-bottom:2mm;}
-#screen-seonim .firm{font-size:16pt;font-weight:700;letter-spacing:.12em;}
-#screen-seonim .firm-seal{position:absolute;left:61%;top:3mm;width:20mm;height:20mm;}
+#screen-seonim .firm{position:relative;font-size:16pt;font-weight:700;letter-spacing:.12em;}
+#screen-seonim .firm-seal{position:absolute;left:100%;top:50%;transform:translateY(-50%);margin-left:1mm;width:20mm;height:20mm;}
 #screen-seonim .suim p{margin:1.5pt 0;font-size:11pt;}
 #screen-seonim .suim .addr{font-size:10.5pt;}
 #screen-seonim .suim .email{color:#1a4ea2;text-decoration:underline;}
@@ -3448,7 +3448,6 @@ function applySeonimForm(){
     var sn=cards[i].querySelector('.cl-ssn').value.trim();
     if(nm) clients.push({name:nm,ssn:sn});
   }
-  if(!clients.length){alert('의뢰인명을 한 명 이상 입력해 주세요.');return;}
   var roleOn=document.querySelector('#sj-role .fs-chip.on');
   var atts=[];
   document.querySelectorAll('#sj-att .fs-chip.on').forEach(function(c){atts.push(c.dataset.att);});
@@ -3543,7 +3542,7 @@ function renderSeonim(){
    +'<tr style="height:12.4mm"><td class="lbl sj-editable" data-edit="role">'+sjEsc(s.role)+'</td><td class="val sj-editable" data-edit="clients">'+names+'</td></tr>'
    +'<tr style="height:29.7mm"><td class="intro" colspan="2"><p class="intro-p">위 사건에 관하여 다음 표시 수임인을 변호인으로 선임하였으므로, 이에 변호인선임신고서를 제출합니다.</p><p class="date sj-editable" data-edit="date">'+sjEsc(sjFmtDate(s.date))+'</p></td></tr>'
    +'<tr style="height:60mm"><td class="lbl">수임인</td><td class="suim">'
-     +'<div class="firm-line"><span class="firm">법무법인 정서</span><img class="firm-seal" src="'+SEONIM_FIRM_SEAL+'"></div>'
+     +'<div class="firm-line"><span class="firm">법무법인 정서<img class="firm-seal" src="'+SEONIM_FIRM_SEAL+'"></span></div>'
      +'<p class="addr">주&nbsp;&nbsp;소 &nbsp;인천광역시 미추홀구 한나루로 436, 5층 501호(학익동, 두원계전빌딩)</p>'
      +'<p>전&nbsp;&nbsp;화 &nbsp;032-868-7171 &nbsp;&nbsp;팩&nbsp;스 &nbsp;032-868-7676</p>'
      +'<p>이메일 &nbsp;<span class="email">jeongseo@jeongseo.com</span></p>'
@@ -3610,7 +3609,6 @@ function applyMgForm(){
     var sn=cards[i].querySelector('.cl-ssn').value.trim();
     if(nm) clients.push({name:nm,ssn:sn});
   }
-  if(!clients.length){alert('의뢰인명을 한 명 이상 입력해 주세요.');return;}
   var roleOn=document.querySelector('#mg-role .fs-chip.on');
   var atts=[];
   document.querySelectorAll('#mg-att .fs-chip.on').forEach(function(c){atts.push(c.dataset.att);});
