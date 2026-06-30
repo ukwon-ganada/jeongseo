@@ -404,8 +404,8 @@ function setActiveOffset(o){ const f=activeFile(); if(f) f.offset=o; }
 
 /* 미리보기/출력에서 쓰는 도장 정보 */
 function metaForFile(f){
-  if(state.template){ const s=slotOfFile(f.id); return s? {kind:s.kind, stampId: stampIdFor(s.kind, s.num2), num1:s.num1, num2:s.num2} : null; }
-  return { kind:state.stampKind, stampId: stampIdFor(state.stampKind, f.num2), num1:f.num1, num2:f.num2 };
+  if(state.template){ const s=slotOfFile(f.id); return s? {kind:s.kind, stampId: stampIdFor(s.kind, s.num2), num1:s.num1, num2:s.num2, title:s.title} : null; }
+  return { kind:state.stampKind, stampId: stampIdFor(state.stampKind, f.num2), num1:f.num1, num2:f.num2, title:f.name };
 }
 
 /* ===== DOM ===== */
@@ -752,12 +752,21 @@ function wireToolbar(){
 }
 
 /* ===== 출력 대상 목록 ===== */
+function buildFileName(it){
+  // 라벨(참고자료 1 / 증 제1호증 …) + 제목 → "참고자료 1.  진술서.pdf"
+  const label=labelFor(it.kind||state.stampKind, it.num1, it.num2).trim();
+  let title=(it.title||'').trim();
+  // 모드A에서 행 이름이 파일명(확장자 포함)일 수 있으니 .pdf 등 확장자 제거
+  title=title.replace(/\.(pdf|png|jpe?g|webp|gif|hwp|hwpx)$/i,'').trim();
+  const base=(label + (title?('.  '+title):'')).replace(/[\\/:*?"<>|]/g,'_').replace(/\s+/g,' ').trim();
+  return base + '.pdf';
+}
 function getItems(){
   if(state.template){
-    return state.slots.filter(s=>s.fileId).map(s=>({ file:fileById(s.fileId), stampId:stampIdFor(s.kind,s.num2), num1:s.num1, num2:s.num2,
-      name: labelFor(s.kind,s.num1,s.num2) }));
+    return state.slots.filter(s=>s.fileId).map(s=>({ file:fileById(s.fileId), stampId:stampIdFor(s.kind,s.num2), kind:s.kind, num1:s.num1, num2:s.num2,
+      title:s.title, name: labelFor(s.kind,s.num1,s.num2) }));
   }
-  return state.files.map(f=>({ file:f, stampId:stampIdFor(state.stampKind,f.num2), num1:f.num1, num2:f.num2, name:f.name }));
+  return state.files.map(f=>({ file:f, stampId:stampIdFor(state.stampKind,f.num2), kind:state.stampKind, num1:f.num1, num2:f.num2, title:f.name, name:f.name }));
 }
 async function stampItem(it){
   const {PDFDocument}=PDFLib; const pdf=await PDFDocument.load(it.file.bytes.slice(0));
@@ -769,7 +778,7 @@ async function stampItem(it){
   x=Math.max(0,Math.min(x,width-wpt)); y=Math.max(0,Math.min(y,height-hpt));
   page.drawImage(png,{x,y,width:wpt,height:hpt}); return await pdf.save();
 }
-function stampedName(it,i){ const base=(it.name||it.file.name).replace(/\.pdf$/i,'').replace(/[\\/:*?"<>|]/g,'_'); return String(i+1).padStart(2,'0')+'_'+base+'_도장.pdf'; }
+function stampedName(it,i){ return buildFileName(it); }
 function wireActions(){ saveOne.addEventListener('click',saveSelected); saveAll.addEventListener('click',saveAllFiles); printAllBtn.addEventListener('click',printAll); resetBtn.addEventListener('click',resetAll); }
 function resetAll(){
   if(state.files.length && !confirm('올린 서류와 소장 목록을 모두 비울까요?')) return;
@@ -780,8 +789,9 @@ function resetAll(){
 async function saveSelected(){
   const f=activeFile(); const meta=f&&metaForFile(f); if(!f||!meta){ showToast('연결된 서류를 선택하세요.'); return; }
   saveOne.disabled=true; const t=saveOne.textContent; saveOne.textContent='저장 중…';
-  try{ const bytes=await stampItem({file:f, stampId:meta.stampId, num1:meta.num1, num2:meta.num2, name:f.name});
-    downloadBlob(new Blob([bytes],{type:'application/pdf'}), f.name.replace(/\.pdf$/i,'')+'_도장.pdf'); showToast('저장 완료'); }
+  try{ const it={file:f, stampId:meta.stampId, kind:meta.kind, num1:meta.num1, num2:meta.num2, title:meta.title, name:f.name };
+    const bytes=await stampItem(it);
+    downloadBlob(new Blob([bytes],{type:'application/pdf'}), buildFileName(it)); showToast('저장 완료'); }
   catch(err){ console.error(err); showToast('저장 중 문제가 발생했습니다.'); }
   saveOne.disabled=false; saveOne.textContent=t;
 }
