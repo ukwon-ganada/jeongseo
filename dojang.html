@@ -316,9 +316,12 @@ function parseHwpEvidence(arrayBuffer){
   const items=[]; let mode=null, cc=0, ce=0;
   for(const p of paras){
     const n=nn(p);
-    if((n.startsWith('입증')||n.startsWith('증거')) && n.length<=8){ mode='jeung'; continue; }
-    if(n.startsWith('참고') && n.length<=8){ mode='chamgo'; continue; }
-    if(n.startsWith('첨부') && n.length<=8){ mode='cheombu'; continue; }
+    const noAbout=!/관하여|대하여|관련/.test(n);
+    if(noAbout && n.length<=6){
+      if(n.startsWith('입증')||n.startsWith('증거')||n.startsWith('증명')){ mode='jeung'; continue; }
+      if(n.startsWith('참고')){ mode='chamgo'; continue; }
+      if(n.startsWith('첨부')){ mode='cheombu'; continue; }
+    }
     if(!mode) continue;
     if(isEnd(p)){ mode=null; continue; }
     if(mode==='jeung'){
@@ -329,8 +332,18 @@ function parseHwpEvidence(arrayBuffer){
       // 호증이 아니면 건너뜀(설명 문장 등) — 섹션은 서명부/날짜에서 끝남
     } else {
       const t=p.trim();
-      if(!/^\d+\.|^[•\-]/.test(t)) continue;
-      let title=t.replace(/^\d+\.\s*/,'').replace(/\s*\d+\s*(통|부|권|매|점|개)\s*$/,'').replace(/^(참고자료|첨부서류)\s*\d*\s*[:\-]?\s*/,'').trim();
+      const labelStart=/^(참고자료|첨부서류)\s*\d+\s*[.\)]/.test(t);
+      const hasBullet=/^\d+[.\)]|^[•\-▢□○]/.test(t);
+      const hasQty=/\s(각\s*)?\d+\s*(통|부|권|매|점|개|장|책|첩)\s*$/.test(t);
+      const isAbout=/(에\s*관하여|에\s*대하여|관련하여)\s*\.?\s*$/.test(t);
+      const isSentence=/[다요음함까죠오라]\.\s*$/.test(t) || /(니다|세요|바랍니다)\s*$/.test(t);
+      if(isAbout || isSentence) continue;                          // "…에 관하여" 소제목·안내 문장 제외
+      if(!labelStart && !hasBullet && !hasQty) continue;           // 명시 라벨·번호·수량 중 하나는 있어야 항목
+      let title=t.replace(/^(참고자료|첨부서류)\s*\d+\s*[.\):\-]?\s*/,'')
+                 .replace(/^\d+[.\)]\s*/,'').replace(/^[•\-▢□○]\s*/,'')
+                 .replace(/\s*(각\s*)?\d+\s*(통|부|권|매|점|개|장|책|첩)\s*$/,'')
+                 .replace(/^[^가-힣0-9A-Za-z(（]+/,'')                // 라벨 뒤 자동번호 자리의 제어·특수문자 제거
+                 .trim();
       if(!title || title.length>60 || /^[\d.\s]+$/.test(title)) continue;
       if(mode==='chamgo'){ cc++; items.push({kind:'chamgo', num1:String(cc), num2:'', title}); }
       else { ce++; items.push({kind:'cheombu', num1:String(ce), num2:'', title}); }
