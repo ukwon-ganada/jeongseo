@@ -728,7 +728,8 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
 /* 정렬용 표 (테두리 없음) */
 .ap-info{border-collapse:collapse;table-layout:fixed;width:148mm;margin-bottom:2mm;}
 .ap-info td{border:none;padding:0 1mm;height:8.2mm;vertical-align:middle;font-size:12pt;}
-.ap-info .ap-lbl{width:22.4mm;text-align:justify;text-align-last:justify;white-space:nowrap;}
+.ap-info .ap-lbl{width:22.4mm;font-weight:700;}
+.ap-info .ap-lbl-spread{display:inline-flex;justify-content:space-between;width:3em;}
 .ap-info .ap-lbl.bold{font-weight:700;}
 .ap-info .ap-gap{width:4.6mm;}
 .ap-info .ap-val{width:121mm;}
@@ -3997,8 +3998,8 @@ function renderAppeal(){
    +'<div class="ap-doc">'
    +'<div class="ap-title">항 소 장</div>'
    +'<table class="ap-info">'
-     +'<tr><td class="ap-lbl">사건</td><td class="ap-gap"></td><td class="ap-val ap-editable" data-edit="case">'+caseLine+'</td></tr>'
-     +'<tr><td class="ap-lbl bold">피고인</td><td class="ap-gap"></td><td class="ap-val ap-editable" data-edit="defendant">'+sjEsc(s.defendant)+'</td></tr>'
+     +'<tr><td class="ap-lbl"><span class="ap-lbl-spread"><span>사</span><span>건</span></span></td><td class="ap-gap"></td><td class="ap-val ap-editable" data-edit="case">'+caseLine+'</td></tr>'
+     +'<tr><td class="ap-lbl bold"><span class="ap-lbl-spread"><span>피</span><span>고</span><span>인</span></span></td><td class="ap-gap"></td><td class="ap-val ap-editable" data-edit="defendant">'+sjEsc(s.defendant)+'</td></tr>'
    +'</table>'
    +'<div class="ap-body ap-editable" data-edit="sentdate">위 사건에 관하여 피고인은 '+sent+' 선고를 받았으나, 피고인은 위 판결에 불복하므로 항소를 제기합니다.</div>'
    +'<div class="ap-sign">'
