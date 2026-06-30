@@ -709,6 +709,73 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
 
 .att-chips{display:flex;flex-wrap:wrap;gap:6px;}.att-chip-del{display:inline-block;margin-left:7px;font-size:11px;opacity:.65;cursor:pointer;}.att-chip-del:hover{opacity:1;}.att-add-row{display:flex;gap:6px;margin-top:8px;}.att-add-input{flex:1;padding:9px 11px;border:1px solid #d0d4dc;border-radius:9px;font-size:13px;}.att-add-btn{padding:9px 14px;border:1px solid #1a2740;background:#1a2740;color:#fff;border-radius:9px;font-size:13px;white-space:nowrap;cursor:pointer;}
 .sj-editable{cursor:pointer;outline:1px dashed rgba(20,60,120,0.30);outline-offset:-2px;}.sj-editable:active{outline-color:#1a4ea2;outline-width:1.5px;}.sjm-label{display:block;font-size:12px;font-weight:600;color:#555;margin:12px 0 5px;}.sjm-label:first-child{margin-top:0;}#sjModalBody .cl-card{margin-bottom:10px;}#sjModalBody .fs-chips{margin:2px 0 4px;}
+/* ═══════════ 항소장 (형사) ═══════════ */
+#appealForm{display:none;position:fixed;inset:0;z-index:1100;background:#fff;flex-direction:column;}
+#appealForm.active{display:flex;}
+
+/* 화면 래퍼 */
+.ap-wrap{padding:18px 12px 40px;display:flex;justify-content:center;background:var(--gray-50);min-height:100vh;overflow:auto;}
+.ap-page{background:#fff;box-shadow:0 4px 24px rgba(0,0,0,.12);width:210mm;min-height:297mm;
+  padding:30mm 30mm 20mm 30mm;box-sizing:border-box;
+  font-family:"함초롬바탕","Batang","Nanum Myeongjo",serif;color:#111;}
+#ap-host{transform-origin:top center;}
+
+/* 양식 내부 */
+.ap-doc{width:100%;font-size:12pt;line-height:2.2;}
+.ap-title{text-align:center;font-family:"맑은 고딕","Malgun Gothic","Apple SD Gothic Neo",sans-serif;
+  font-weight:700;font-size:20pt;letter-spacing:.55em;text-indent:.55em;margin:0 0 18mm;}
+
+/* 정렬용 표 (테두리 없음) */
+.ap-info{border-collapse:collapse;table-layout:fixed;width:148mm;margin-bottom:2mm;}
+.ap-info td{border:none;padding:0 1mm;height:8.2mm;vertical-align:middle;font-size:12pt;}
+.ap-info .ap-lbl{width:22.4mm;text-align:justify;text-align-last:justify;white-space:nowrap;}
+.ap-info .ap-lbl.bold{font-weight:700;}
+.ap-info .ap-gap{width:4.6mm;}
+.ap-info .ap-val{width:121mm;}
+
+/* 본문 */
+.ap-body{text-indent:2em;margin:13mm 0;text-align:justify;}
+
+/* 서명부 — 양식의 탭 6개(≈84mm) 우측 이동 */
+.ap-sign{margin-top:34mm;padding-left:84mm;}
+.ap-sign .ln{white-space:nowrap;}
+.ap-sign .firm{font-family:"맑은 고딕","Malgun Gothic","Apple SD Gothic Neo",sans-serif;
+  font-weight:700;font-size:12.5pt;}
+.ap-sign .att-line{display:flex;white-space:nowrap;}
+.ap-sign .att-label{flex:0 0 auto;}
+.ap-sign .nm{letter-spacing:.45em;margin-right:-.45em;}
+
+/* 제출법원 + 귀중 */
+.ap-court{font-family:"맑은 고딕","Malgun Gothic","Apple SD Gothic Neo",sans-serif;
+  font-weight:700;font-size:20pt;margin-top:30mm;}
+
+/* 클릭 편집 */
+.ap-editable{cursor:pointer;outline:1px dashed rgba(20,60,120,0.30);outline-offset:-2px;}
+.ap-editable:active{outline-color:#1a4ea2;outline-width:1.5px;}
+
+/* 모바일 미리보기 축소 */
+@media (max-width:768px){
+  .ap-wrap{padding:12px 0 32px;}
+}
+
+/* ════ 항소장 인쇄: A4 보장 ════ */
+@media print{
+  body.mode-appeal #screen-home,
+  body.mode-appeal #screen-contract,
+  body.mode-appeal #screen-list,
+  body.mode-appeal #screen-seonim{display:none!important;}
+  body.mode-appeal #screen-appeal{display:block!important;background:#fff!important;}
+  body.mode-appeal .sj-appbar,
+  body.mode-appeal .home-sidebar,
+  body.mode-appeal .no-print{display:none!important;}
+  body.mode-appeal .ap-wrap{padding:0!important;display:block!important;overflow:visible!important;background:#fff!important;min-height:0!important;}
+  body.mode-appeal .ap-page{box-shadow:none!important;min-height:0!important;width:210mm!important;
+    margin:0 auto!important;padding:30mm 30mm 20mm 30mm!important;}
+  body.mode-appeal #ap-host{transform:none!important;}
+  body.mode-appeal .ap-editable{outline:none!important;}
+  @page{size:A4 portrait;margin:0;}
+}
+
 </style>
 </head>
 <body>
@@ -776,6 +843,10 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
         선임계 작성
       </div>
+      <div class="sb-item" onclick="goAppeal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        항소장 작성
+      </div>
       <div class="sb-item disabled">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
         합의서 작성<span class="sb-badge">준비중</span>
@@ -798,6 +869,11 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
         <div class="dc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg></div>
         <div class="dc-name">선임계 작성</div>
         <div class="dc-desc">변호인 선임신고서</div>
+      </div>
+      <div class="doc-card" onclick="goAppeal()">
+        <div class="dc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
+        <div class="dc-name">항소장 작성</div>
+        <div class="dc-desc">형사 항소장</div>
       </div>
       <div class="doc-card disabled">
         <div class="dc-badge">준비중</div>
@@ -824,6 +900,11 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
         <div class="hm-item" onclick="openSeonimType()">
           <div class="hmi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg></div>
           <div class="hmi-body"><div class="hmi-name">선임계 작성</div><div class="hmi-desc">변호인 선임신고서</div></div>
+          <div class="hmi-arrow">›</div>
+        </div>
+        <div class="hm-item" onclick="goAppeal()">
+          <div class="hmi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
+          <div class="hmi-body"><div class="hmi-name">항소장 작성</div><div class="hmi-desc">형사 항소장</div></div>
           <div class="hmi-arrow">›</div>
         </div>
         <div class="hm-item disabled">
@@ -1871,11 +1952,52 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
   <div class="sj-wrap"><div class="sj-page"><div id="sj-host"></div></div></div>
 </div>
 
+<!-- ═══════════ 항소장 입력 (형사) ═══════════ -->
+<div id="appealForm">
+  <div class="fs-head">
+    <button class="fs-close" onclick="closeAppealForm()" aria-label="닫기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    <div class="fs-title">항소장 작성 (형사)</div>
+  </div>
+  <div class="fs-body">
+    <div class="fs-section">사건 정보</div>
+    <div class="fs-field"><label class="fs-label">사건번호</label><input type="text" class="fs-input" id="ap-casenum" placeholder="2024고단1234"></div>
+    <div class="fs-field"><label class="fs-label">사건명</label><input type="text" class="fs-input" id="ap-casename" placeholder="사기"></div>
+    <div class="fs-field"><label class="fs-label">피고인</label><input type="text" class="fs-input" id="ap-defendant" placeholder="홍길동"></div>
+
+    <div class="fs-section">판결 · 작성</div>
+    <div class="fs-field"><label class="fs-label">판결 선고일</label><input type="date" class="fs-input" id="ap-sentdate"></div>
+    <div class="fs-field"><label class="fs-label">작성일 (오늘 자동)</label><input type="date" class="fs-input" id="ap-writedate"></div>
+
+    <div class="fs-section">제출 법원</div>
+    <div class="fs-field"><label class="fs-label">제출 법원</label><input type="text" class="fs-input" id="ap-court" placeholder="인천지방법원"></div>
+
+    <div class="fs-section">담당변호사 (여러 명 선택 가능)</div>
+    <div class="fs-field"><div class="fs-chips att-chips" id="ap-att"></div><div class="att-add-row"><input type="text" class="att-add-input" id="ap-att-new" placeholder="추가할 변호사 이름"><button type="button" class="att-add-btn" onclick="addAttorney('ap')">＋ 추가</button></div></div>
+  </div>
+  <div class="fs-foot">
+    <button class="fs-btn ghost" onclick="closeAppealForm()">취소</button>
+    <button class="fs-btn primary" onclick="applyAppealForm()">완료</button>
+  </div>
+</div>
+
+<!-- ═══════════ 항소장 화면 ═══════════ -->
+<div id="screen-appeal" class="screen">
+  <div class="sj-appbar no-print">
+    <button class="sj-back" onclick="showScreen('screen-home')">‹ 처음으로</button>
+    <div class="sj-title">항소장</div>
+    <button class="sj-edit-btn" onclick="editAppeal()">수정</button>
+    <button class="sj-print-btn" onclick="window.print()">출력</button>
+  </div>
+  <div class="ap-wrap"><div class="ap-page"><div id="ap-host"></div></div></div>
+</div>
+
+
 <script>
 function showScreen(id){
   document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active');});
   document.getElementById(id).classList.add('active');
   document.body.classList.toggle('mode-seonim', id==='screen-seonim');
+  document.body.classList.toggle('mode-appeal', id==='screen-appeal');
   window.scrollTo(0,0);
 }
 
@@ -3768,5 +3890,104 @@ if ('serviceWorker' in navigator) {
     </div>
   </div>
 </div>
+<script>
+/* ═══════════ 항소장 (형사) 로직 ═══════════ */
+var appealState={casenum:'',casename:'',defendant:'',sentdate:'',writedate:'',court:'',attorneys:['서고은']};
+
+function _apToday(){var t=new Date();return t.getFullYear()+'-'+('0'+(t.getMonth()+1)).slice(-2)+'-'+('0'+t.getDate()).slice(-2);}
+
+/* 진입: 폼 초기화 후 열기 */
+function goAppeal(){
+  document.getElementById('ap-casenum').value='';
+  document.getElementById('ap-casename').value='';
+  document.getElementById('ap-defendant').value='';
+  document.getElementById('ap-sentdate').value='';
+  document.getElementById('ap-writedate').value=_apToday();
+  document.getElementById('ap-court').value='';
+  renderAttChips('ap',['서고은']);
+  document.getElementById('appealForm').classList.add('active');
+}
+function closeAppealForm(){document.getElementById('appealForm').classList.remove('active');}
+
+/* 수정: 현재 값으로 폼 다시 열기 */
+function editAppeal(){
+  var s=appealState;
+  document.getElementById('ap-casenum').value=s.casenum||'';
+  document.getElementById('ap-casename').value=s.casename||'';
+  document.getElementById('ap-defendant').value=s.defendant||'';
+  document.getElementById('ap-sentdate').value=s.sentdate||'';
+  document.getElementById('ap-writedate').value=s.writedate||_apToday();
+  document.getElementById('ap-court').value=s.court||'';
+  renderAttChips('ap', (s.attorneys&&s.attorneys.length)?s.attorneys:['서고은']);
+  document.getElementById('appealForm').classList.add('active');
+}
+
+/* 칩 토글 / 추가 이벤트 */
+document.getElementById('ap-att').addEventListener('click',function(e){ attChipClick(e,'ap'); });
+
+/* 완료 → state 저장 후 렌더 */
+function applyAppealForm(){
+  var atts=[];
+  document.querySelectorAll('#ap-att .fs-chip.on').forEach(function(c){atts.push(c.dataset.att);});
+  if(!atts.length)atts=['서고은'];
+  appealState={
+    casenum: document.getElementById('ap-casenum').value.trim(),
+    casename: document.getElementById('ap-casename').value.trim(),
+    defendant: document.getElementById('ap-defendant').value.trim(),
+    sentdate: document.getElementById('ap-sentdate').value,
+    writedate: document.getElementById('ap-writedate').value,
+    court: document.getElementById('ap-court').value.trim(),
+    attorneys: atts
+  };
+  closeAppealForm();
+  showScreen('screen-appeal');
+  renderAppeal();
+  if(document.fonts&&document.fonts.ready){document.fonts.ready.then(renderAppeal);}
+}
+
+/* 양식 렌더 */
+function renderAppeal(){
+  var s=appealState;
+  var caseLine=(sjEsc(s.casenum)+' '+sjEsc(s.casename)).replace(/^\s+|\s+$/g,'');
+  var sent=sjFmtDate(s.sentdate);
+  var write=sjFmtDate(s.writedate);
+  var atts=(s.attorneys&&s.attorneys.length)?s.attorneys:['서고은'];
+
+  /* 담당변호사: 첫 줄은 라벨 + 이름, 둘째 줄부터 라벨 너비만큼 들여쓰기 */
+  var attLines='';
+  atts.forEach(function(n,i){
+    var label= (i===0)
+      ? '<span class="att-label">담당변호사&nbsp;&nbsp;</span>'
+      : '<span class="att-label" style="visibility:hidden">담당변호사&nbsp;&nbsp;</span>';
+    attLines+='<div class="att-line">'+label+'<span class="nm">'+sjEsc(n)+'</span></div>';
+  });
+
+  var html=''
+   +'<div class="ap-doc">'
+   +'<div class="ap-title">항 소 장</div>'
+   +'<table class="ap-info">'
+     +'<tr><td class="ap-lbl">사건</td><td class="ap-gap"></td><td class="ap-val ap-editable" data-edit="case">'+caseLine+'</td></tr>'
+     +'<tr><td class="ap-lbl bold">피고인</td><td class="ap-gap"></td><td class="ap-val ap-editable" data-edit="defendant">'+sjEsc(s.defendant)+'</td></tr>'
+   +'</table>'
+   +'<div class="ap-body ap-editable" data-edit="sentdate">위 사건에 관하여 피고인은 '+sent+' 선고를 받았으나, 피고인은 위 판결에 불복하므로 항소를 제기합니다.</div>'
+   +'<div class="ap-sign">'
+     +'<div class="ln ap-editable" data-edit="writedate">'+write+'</div>'
+     +'<div class="ln">위 피고인의 변호인</div>'
+     +'<div class="ln firm">법무법인 정서</div>'
+     +attLines
+   +'</div>'
+   +'<div class="ap-court ap-editable" data-edit="court">'+sjEsc(s.court)+' 귀중</div>'
+   +'</div>';
+
+  document.getElementById('ap-host').innerHTML=html;
+  var _t=document.querySelector('#screen-appeal .sj-title'); if(_t)_t.textContent='항소장';
+}
+
+/* 양식 칸 클릭 → 입력폼 재오픈(전체 수정) */
+document.getElementById('ap-host').addEventListener('click',function(e){
+  if(e.target.closest('.ap-editable')) editAppeal();
+});
+</script>
+
 </body>
 </html>
