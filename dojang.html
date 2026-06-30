@@ -13,7 +13,45 @@
     --paper:#fafafa; --ink:#1a1a1a; --muted:#888888; --line:#e8e8e8; --line-strong:#cccccc;
     --panel:#ffffff; --seal:#c0392b; --seal-soft:#fdecea; --shadow:0 1px 2px rgba(26,26,26,.04),0 6px 20px rgba(26,26,26,.06);
   }
-  *{box-sizing:border-box}
+  /* ===== 분홍 테마 (헬로키티풍 무드 — 캐릭터 미사용, 직접 그린 리본·하트) ===== */
+  body.theme-pink{
+    --paper:#ffeef5; --ink:#5a2a43; --muted:#bd7fa0; --line:#ffd2e4; --line-strong:#ffb3d2;
+    --panel:#fffafc; --seal:#e84b8a; --seal-soft:#ffe1ee; --shadow:0 1px 2px rgba(232,75,138,.06),0 8px 24px rgba(232,75,138,.12);
+  }
+  body.theme-pink{ background:
+    radial-gradient(circle at 12% 8%, #ffd9ea 0 12px, transparent 13px),
+    radial-gradient(circle at 88% 14%, #ffe4b8 0 9px, transparent 10px),
+    radial-gradient(circle at 78% 90%, #ffd9ea 0 10px, transparent 11px),
+    linear-gradient(160deg,#ffe3f0 0%, #ffd6ea 55%, #ffcfe6 100%) fixed; }
+  body.theme-pink .toolbar, body.theme-pink .panel, body.theme-pink .stage,
+  body.theme-pink .frow, body.theme-pink .slot, body.theme-pink .pcard{ border-radius:16px; }
+  body.theme-pink .toolbar{ background:linear-gradient(135deg,#fffafc,#fff2f8); box-shadow:var(--shadow); }
+  body.theme-pink .stage, body.theme-pink .panel{ box-shadow:var(--shadow); }
+  body.theme-pink .pick{ background:linear-gradient(135deg,#fff,#fff2f8); border-color:var(--line-strong); }
+  body.theme-pink .seg button.on{ box-shadow:0 0 0 2px var(--seal-soft); }
+  body.theme-pink .mini-btn{ background:#fff; }
+  /* 떠다니는 장식 (클릭 통과) */
+  .deco{ position:fixed; pointer-events:none; z-index:9; opacity:.9; display:none; }
+  body.theme-pink .deco{ display:block; }
+  .deco.tl{ top:70px; left:14px; width:60px; transform:rotate(-12deg); }
+  .deco.tr{ top:120px; right:18px; width:46px; }
+  .deco.br{ bottom:20px; right:22px; width:62px; transform:rotate(8deg); }
+  .deco.bl{ bottom:30px; left:18px; width:38px; opacity:.7; }
+  .wrap{ position:relative; z-index:1; }
+  /* 미니멀 테마 스위치 (아이콘 없음, 원만 미끄러짐) */
+  .theme-switch{ --ts-w:48px; --ts-h:27px; --ts-pad:3px;
+    width:var(--ts-w); height:var(--ts-h); border:1.5px solid #f3a8c8; padding:0; cursor:pointer; flex:none;
+    border-radius:999px; background:#ffe1ee; position:relative; transition:background .2s ease,border-color .2s ease;
+    -webkit-appearance:none; appearance:none; box-shadow:inset 0 1px 2px rgba(232,75,138,.12); }
+  .theme-switch::after{ content:""; position:absolute; top:var(--ts-pad); left:var(--ts-pad);
+    width:calc(var(--ts-h) - var(--ts-pad)*2 - 3px); height:calc(var(--ts-h) - var(--ts-pad)*2 - 3px);
+    border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.25); transition:transform .2s ease; }
+  .theme-switch:hover{ border-color:#e84b8a; }
+  body.theme-pink .theme-switch{ background:#e84b8a; border-color:#e84b8a; box-shadow:inset 0 1px 2px rgba(0,0,0,.12); }
+  body.theme-pink .theme-switch::after{ transform:translateX(calc(var(--ts-w) - var(--ts-h))); }
+  .theme-switch-wrap{ display:flex; align-items:center; gap:7px; margin-left:auto; }
+  .theme-switch-wrap .tsw-label{ font-size:12.5px; color:var(--muted); }
+  .mini-btn{ margin-left:10px!important; }
   html,body{margin:0}
   body{background:var(--paper); color:var(--ink); line-height:1.5;
     font-family:'Malgun Gothic','맑은 고딕','Apple SD Gothic Neo','Noto Sans KR',sans-serif; -webkit-font-smoothing:antialiased}
@@ -139,6 +177,24 @@
 </style>
 </head>
 <body>
+<!-- 분홍 테마 장식 (직접 그린 리본·하트, 캐릭터 미사용) -->
+<svg class="deco tl" viewBox="0 0 100 70" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <g fill="#ff8fc0" stroke="#e84b8a" stroke-width="2.5" stroke-linejoin="round">
+    <path d="M50 35 C40 20, 14 16, 12 35 C14 54, 40 50, 50 35 Z"/>
+    <path d="M50 35 C60 20, 86 16, 88 35 C86 54, 60 50, 50 35 Z"/>
+    <circle cx="50" cy="35" r="8" fill="#ffd2e7"/>
+    <path d="M44 42 L34 64 M56 42 L66 64" fill="none" stroke-linecap="round"/>
+  </g>
+</svg>
+<svg class="deco tr" viewBox="0 0 60 56" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <path d="M30 52 C8 36, 2 20, 14 11 C22 5, 29 12, 30 18 C31 12, 38 5, 46 11 C58 20, 52 36, 30 52 Z" fill="#ff9ec9" stroke="#e84b8a" stroke-width="2.5" stroke-linejoin="round"/>
+</svg>
+<svg class="deco br" viewBox="0 0 60 56" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <path d="M30 52 C8 36, 2 20, 14 11 C22 5, 29 12, 30 18 C31 12, 38 5, 46 11 C58 20, 52 36, 30 52 Z" fill="#ffc1dd" stroke="#f06aa3" stroke-width="2.5" stroke-linejoin="round"/>
+</svg>
+<svg class="deco bl" viewBox="0 0 60 56" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <path d="M30 52 C8 36, 2 20, 14 11 C22 5, 29 12, 30 18 C31 12, 38 5, 46 11 C58 20, 52 36, 30 52 Z" fill="#ffd8e8" stroke="#f48fb9" stroke-width="2.5" stroke-linejoin="round"/>
+</svg>
 <div class="wrap">
   <div class="toolbar">
     <button class="pick" id="pickStamp">
@@ -156,6 +212,7 @@
       <input type="range" id="sizeRange" min="50" max="200" value="100">
       <span class="range-val" id="sizeVal">100%</span>
     </div>
+    <span class="theme-switch-wrap"><span class="tsw-label">분홍</span><button class="theme-switch" id="themeSwitch" role="switch" aria-label="분홍 테마 전환" onclick="toggleTheme()"></button></span>
     <button class="mini-btn" id="resetBtn">전체 초기화</button>
   </div>
 
@@ -745,6 +802,18 @@ function applyColorBtn(b){
   colorSeg.querySelectorAll('button').forEach(x=>{ x.classList.remove('on'); x.style.background=''; x.style.color=''; });
   b.classList.add('on'); b.style.background=b.dataset.c; b.style.color='#fff'; state.color=b.dataset.c;
 }
+function applyThemeLocal(pink){
+  document.body.classList.toggle('theme-pink', !!pink);
+  const sw=document.getElementById('themeSwitch'); if(sw) sw.setAttribute('aria-checked', pink?'true':'false');
+}
+function toggleTheme(){
+  const pink=!document.body.classList.contains('theme-pink');
+  applyThemeLocal(pink);
+  // 상위(메인 서비스)에 알려 동기화·영구저장
+  try{ if(window.parent && window.parent!==window) window.parent.postMessage({type:'theme-changed', pink:pink}, '*'); }catch(e){}
+}
+// 메인에서 내려주는 테마 적용 (단독 실행 시엔 무시됨)
+window.addEventListener('message', function(e){ if(e.data && e.data.type==='set-theme'){ applyThemeLocal(!!e.data.pink); } });
 function wireToolbar(){
   colorSeg.querySelectorAll('button').forEach(b=> b.addEventListener('click',()=>{ applyColorBtn(b); updatePickButton(); refreshStamp(); }));
   applyColorBtn(colorSeg.querySelector('button.on') || colorSeg.querySelector('button'));

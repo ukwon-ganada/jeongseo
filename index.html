@@ -35,6 +35,40 @@
 }
 html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black);-webkit-font-smoothing:antialiased;overflow-x:hidden;}
 
+/* ===== 분홍 테마 (문서 종이는 보호) ===== */
+body.theme-pink{
+  --black:#5a2a43; --gray-900:#6a3450; --gray-700:#8a5570; --gray-500:#bd7fa0; --gray-400:#d59fbb;
+  --gray-300:#ffb3d2; --gray-200:#ffd2e4; --gray-100:#ffe1ee; --gray-50:#fff3f8; --border:#ffd2e4;
+  background:linear-gradient(160deg,#ffe9f3 0%, #ffdcec 60%, #ffd6ea 100%) fixed;
+}
+body.theme-pink .home-sidebar{ background:linear-gradient(180deg,#fffafc,#fff2f8); }
+body.theme-pink .doc-card, body.theme-pink .hm-item, body.theme-pink .sb-item{ border-radius:16px; }
+/* 문서 종이·인쇄 영역은 항상 흰색 유지 */
+body.theme-pink .page, body.theme-pink .ap-page{ background:#fff!important; color:#1a1a1a!important; }
+
+/* ===== 미니멀 테마 스위치 (아이콘 없음, 원만 미끄러짐) ===== */
+.theme-switch{ --ts-w:48px; --ts-h:27px; --ts-pad:3px;
+  width:var(--ts-w); height:var(--ts-h); border:1.5px solid #f3a8c8; padding:0; cursor:pointer; flex:none;
+  border-radius:999px; background:#ffe1ee; position:relative; transition:background .2s ease,border-color .2s ease;
+  -webkit-appearance:none; appearance:none; box-shadow:inset 0 1px 2px rgba(232,75,138,.12); }
+.theme-switch::after{ content:""; position:absolute; top:var(--ts-pad); left:var(--ts-pad);
+  width:calc(var(--ts-h) - var(--ts-pad)*2 - 3px); height:calc(var(--ts-h) - var(--ts-pad)*2 - 3px);
+  border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.25); transition:transform .2s ease; }
+.theme-switch:hover{ border-color:#e84b8a; }
+body.theme-pink .theme-switch{ background:#e84b8a; border-color:#e84b8a; box-shadow:inset 0 1px 2px rgba(0,0,0,.12); }
+body.theme-pink .theme-switch::after{ transform:translateX(calc(var(--ts-w) - var(--ts-h))); }
+.theme-switch-wrap{ display:flex; align-items:center; gap:8px; flex:none; }
+.theme-switch-wrap .tsw-label{ font-size:12.5px; color:var(--gray-500); white-space:nowrap; }
+
+/* 떠다니는 장식 (분홍 테마에서만 표시, 클릭 통과, 인쇄 제외) */
+.deco{ position:fixed; pointer-events:none; z-index:9; opacity:.9; display:none; }
+body.theme-pink .deco{ display:block; }
+.deco.tl{ top:74px; left:14px; width:58px; transform:rotate(-12deg); }
+.deco.tr{ top:120px; right:18px; width:44px; }
+.deco.br{ bottom:22px; right:24px; width:60px; transform:rotate(8deg); }
+.deco.bl{ bottom:30px; left:18px; width:36px; opacity:.7; }
+@media print{ .deco{ display:none!important; } }
+
 .screen{display:none;}
 .screen.active{display:block;}
 #screen-dojang.active{display:flex;flex-direction:column;height:100dvh;}
@@ -60,8 +94,8 @@ html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black)
     border-right:1px solid var(--border);
     padding:0;position:sticky;top:0;height:100vh;
   }
-  .sb-brand{padding:30px 22px 22px;border-bottom:1px solid var(--border);}
-  .sb-brand-name{font-size:19px;font-weight:700;color:var(--black);letter-spacing:-0.01em;}
+  .sb-brand{padding:30px 22px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;}
+  .sb-brand-name{font-size:19px;font-weight:700;color:var(--black);letter-spacing:-0.01em;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .sb-nav{padding:16px 12px;}
   .sb-label{font-size:10px;font-weight:600;color:var(--gray-400);letter-spacing:0.1em;text-transform:uppercase;padding:0 10px;margin-bottom:6px;}
   .sb-item{
@@ -118,7 +152,7 @@ html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black)
   .hm-hi,.hm-title,.hm-desc,.doc-grid{display:none;}
   .home-main{display:flex;flex-direction:column;width:100%;}
   .hm-mobile{display:flex;flex-direction:column;flex:1;}
-  .hmh{padding:44px 22px 8px;}
+  .hmh{padding:44px 22px 8px;display:flex;align-items:flex-end;justify-content:space-between;gap:12px;}
   .hmh-hi{font-size:13px;color:var(--gray-400);margin-bottom:4px;}
   .hmh-name{font-size:26px;font-weight:700;letter-spacing:-0.01em;line-height:1.2;}
   .hm-seclabel{font-size:18px;font-weight:700;color:var(--black);letter-spacing:-0.01em;padding:28px 22px 14px;}
@@ -794,6 +828,24 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
 </style>
 </head>
 <body>
+<!-- 분홍 테마 장식 (직접 그린 리본·하트, 캐릭터 미사용) -->
+<svg class="deco tl" viewBox="0 0 100 70" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <g fill="#ff8fc0" stroke="#e84b8a" stroke-width="2.5" stroke-linejoin="round">
+    <path d="M50 35 C40 20, 14 16, 12 35 C14 54, 40 50, 50 35 Z"/>
+    <path d="M50 35 C60 20, 86 16, 88 35 C86 54, 60 50, 50 35 Z"/>
+    <circle cx="50" cy="35" r="8" fill="#ffd2e7"/>
+    <path d="M44 42 L34 64 M56 42 L66 64" fill="none" stroke-linecap="round"/>
+  </g>
+</svg>
+<svg class="deco tr" viewBox="0 0 60 56" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <path d="M30 52 C8 36, 2 20, 14 11 C22 5, 29 12, 30 18 C31 12, 38 5, 46 11 C58 20, 52 36, 30 52 Z" fill="#ff9ec9" stroke="#e84b8a" stroke-width="2.5" stroke-linejoin="round"/>
+</svg>
+<svg class="deco br" viewBox="0 0 60 56" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <path d="M30 52 C8 36, 2 20, 14 11 C22 5, 29 12, 30 18 C31 12, 38 5, 46 11 C58 20, 52 36, 30 52 Z" fill="#ffc1dd" stroke="#f06aa3" stroke-width="2.5" stroke-linejoin="round"/>
+</svg>
+<svg class="deco bl" viewBox="0 0 60 56" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <path d="M30 52 C8 36, 2 20, 14 11 C22 5, 29 12, 30 18 C31 12, 38 5, 46 11 C58 20, 52 36, 30 52 Z" fill="#ffd8e8" stroke="#f48fb9" stroke-width="2.5" stroke-linejoin="round"/>
+</svg>
 
 <div id="lockScreen" style="position:fixed;inset:0;z-index:9999;background:#fff;display:none;flex-direction:column;align-items:center;justify-content:center;padding:24px;">
   <div style="width:100%;max-width:320px;text-align:center;">
@@ -843,7 +895,7 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
 
 <div id="screen-home" class="screen active">
   <aside class="home-sidebar">
-    <div class="sb-brand"><div class="sb-brand-name">법무법인 정서</div></div>
+    <div class="sb-brand"><div class="sb-brand-name">법무법인 정서</div><span class="theme-switch-wrap"><span class="tsw-label">분홍</span><button class="theme-switch" id="themeSwitch" role="switch" aria-label="분홍 테마 전환" onclick="toggleTheme()"></button></span></div>
     <nav class="sb-nav">
       <div class="sb-label">문서</div>
       <div class="sb-item on" onclick="openTypeSheet()">
@@ -908,7 +960,7 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
     </div>
 
     <div class="hm-mobile">
-      <div class="hmh"><div class="hmh-hi">법률문서 작성</div><div class="hmh-name">법무법인 정서</div></div>
+      <div class="hmh"><div><div class="hmh-hi">법률문서 작성</div><div class="hmh-name">법무법인 정서</div></div><span class="theme-switch-wrap"><span class="tsw-label">분홍</span><button class="theme-switch" id="themeSwitchM" role="switch" aria-label="분홍 테마 전환" onclick="toggleTheme()"></button></span></div>
       <div class="hm-seclabel">문서 선택</div>
       <div class="hm-list">
         <div class="hm-item" onclick="openTypeSheet()">
@@ -2031,11 +2083,37 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
 
 
 <script>
+/* ===== 테마 (분홍) : IndexedDB 영구저장 + 도장 iframe 동기화 ===== */
+function _themeDB(){ return new Promise(function(res){ try{ var r=indexedDB.open('jeongseo-prefs',1);
+  r.onupgradeneeded=function(e){ e.target.result.createObjectStore('kv'); };
+  r.onsuccess=function(e){ res(e.target.result); }; r.onerror=function(){ res(null); }; }catch(e){ res(null); } }); }
+function _themeGet(){ return _themeDB().then(function(db){ if(!db) return null; return new Promise(function(res){
+  try{ var t=db.transaction('kv','readonly').objectStore('kv').get('theme'); t.onsuccess=function(){ res(t.result||null); }; t.onerror=function(){ res(null); }; }catch(e){ res(null); } }); }); }
+function _themeSet(v){ return _themeDB().then(function(db){ if(!db) return; try{ db.transaction('kv','readwrite').objectStore('kv').put(v,'theme'); }catch(e){} }); }
+function applyTheme(pink){
+  document.body.classList.toggle('theme-pink', !!pink);
+  var s1=document.getElementById('themeSwitch'), s2=document.getElementById('themeSwitchM');
+  if(s1) s1.setAttribute('aria-checked', pink?'true':'false');
+  if(s2) s2.setAttribute('aria-checked', pink?'true':'false');
+  // 도장 iframe에 동기화
+  var fr=document.getElementById('dojangFrame');
+  if(fr && fr.contentWindow){ try{ fr.contentWindow.postMessage({type:'set-theme', pink:!!pink}, '*'); }catch(e){} }
+}
+function toggleTheme(){ var pink=!document.body.classList.contains('theme-pink'); applyTheme(pink); _themeSet(pink?'pink':'light'); }
+// iframe(도장 페이지)에서 토글한 경우 메인도 반영
+window.addEventListener('message', function(e){ if(e.data && e.data.type==='theme-changed'){ applyTheme(!!e.data.pink); _themeSet(e.data.pink?'pink':'light'); } });
+// 초기 적용
+_themeGet().then(function(v){ applyTheme(v==='pink'); });
+
 function openDojang(){
   var fr=document.getElementById('dojangFrame');
   if(!fr.getAttribute('src')) fr.setAttribute('src','./dojang.html');
   showScreen('screen-dojang');
   window.scrollTo(0,0);
+  // 로드 후 현재 테마 전달
+  var pink=document.body.classList.contains('theme-pink');
+  var send=function(){ try{ fr.contentWindow.postMessage({type:'set-theme', pink:pink}, '*'); }catch(e){} };
+  send(); setTimeout(send,300); fr.addEventListener('load', send, {once:true});
 }
 function showScreen(id){
   document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active');});
