@@ -37,6 +37,8 @@ html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black)
 
 .screen{display:none;}
 .screen.active{display:block;}
+#screen-dojang.active{display:flex;flex-direction:column;height:100dvh;}
+.dj-frame{flex:1;width:100%;border:none;display:block;min-height:0;background:#fff;}
 
 .appbar-back-btn,.ab-back{width:36px;height:36px;background:none;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:var(--r-pill);flex-shrink:0;transition:background 0.12s;}
 .appbar-back-btn:hover,.ab-back:hover{background:var(--gray-100);}
@@ -864,6 +866,10 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
         합의서 작성<span class="sb-badge">준비중</span>
       </div>
+      <div class="sb-item" onclick="openDojang()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg>
+        도장찍기
+      </div>
     </nav>
     <div class="sb-foot">인천광역시 미추홀구<br>한나루로 436, 501호<br>032-868-7171</div>
   </aside>
@@ -893,6 +899,11 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
         <div class="dc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div>
         <div class="dc-name">합의서 작성</div>
         <div class="dc-desc">형사·민사 합의서</div>
+      </div>
+      <div class="doc-card" onclick="openDojang()">
+        <div class="dc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg></div>
+        <div class="dc-name">도장찍기</div>
+        <div class="dc-desc">증거·참고자료<br>도장 날인</div>
       </div>
     </div>
 
@@ -924,6 +935,11 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
           <div class="hmi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div>
           <div class="hmi-body"><div class="hmi-name">합의서 작성</div><div class="hmi-desc">형사·민사 합의서</div></div>
           <div class="hmi-badge">준비중</div>
+        </div>
+        <div class="hm-item" onclick="openDojang()">
+          <div class="hmi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg></div>
+          <div class="hmi-body"><div class="hmi-name">도장찍기</div><div class="hmi-desc">증거·참고자료 도장 날인</div></div>
+          <div class="hmi-arrow">›</div>
         </div>
       </div>
       <div class="hm-foot">법무법인 정서 · 인천광역시 미추홀구</div>
@@ -2005,8 +2021,22 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
   <div class="ap-wrap"><div class="ap-page"><div id="ap-host"></div></div></div>
 </div>
 
+<div id="screen-dojang" class="screen">
+  <div class="sj-appbar no-print">
+    <button class="sj-back" onclick="showScreen('screen-home')">‹ 처음으로</button>
+    <div class="sj-title">도장찍기</div>
+  </div>
+  <iframe id="dojangFrame" class="dj-frame" title="도장찍기"></iframe>
+</div>
+
 
 <script>
+function openDojang(){
+  var fr=document.getElementById('dojangFrame');
+  if(!fr.getAttribute('src')) fr.setAttribute('src','./dojang.html');
+  showScreen('screen-dojang');
+  window.scrollTo(0,0);
+}
 function showScreen(id){
   document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active');});
   document.getElementById(id).classList.add('active');
