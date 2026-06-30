@@ -47,27 +47,43 @@ body.theme-pink .doc-card, body.theme-pink .hm-item, body.theme-pink .sb-item{ b
 body.theme-pink .page, body.theme-pink .ap-page{ background:#fff!important; color:#1a1a1a!important; }
 
 /* ===== 미니멀 테마 스위치 (아이콘 없음, 원만 미끄러짐) ===== */
-.theme-switch{ --ts-w:48px; --ts-h:27px; --ts-pad:3px;
-  width:var(--ts-w); height:var(--ts-h); border:1.5px solid #f3a8c8; padding:0; cursor:pointer; flex:none;
-  border-radius:999px; background:#ffe1ee; position:relative; transition:background .2s ease,border-color .2s ease;
-  -webkit-appearance:none; appearance:none; box-shadow:inset 0 1px 2px rgba(232,75,138,.12); }
+.theme-switch{ --ts-w:46px; --ts-h:26px; --ts-pad:3px;
+  width:var(--ts-w); height:var(--ts-h); border:1.5px solid var(--gray-300); padding:0; cursor:pointer; flex:none;
+  border-radius:999px; background:var(--gray-100); position:relative; transition:background .2s ease,border-color .2s ease;
+  -webkit-appearance:none; appearance:none; }
 .theme-switch::after{ content:""; position:absolute; top:var(--ts-pad); left:var(--ts-pad);
   width:calc(var(--ts-h) - var(--ts-pad)*2 - 3px); height:calc(var(--ts-h) - var(--ts-pad)*2 - 3px);
   border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.25); transition:transform .2s ease; }
-.theme-switch:hover{ border-color:#e84b8a; }
-body.theme-pink .theme-switch{ background:#e84b8a; border-color:#e84b8a; box-shadow:inset 0 1px 2px rgba(0,0,0,.12); }
+.theme-switch:hover{ border-color:var(--gray-500); }
+body.theme-pink .theme-switch{ background:#e84b8a; border-color:#e84b8a; }
+body.theme-pink .theme-switch:hover{ border-color:#d63b7a; }
 body.theme-pink .theme-switch::after{ transform:translateX(calc(var(--ts-w) - var(--ts-h))); }
-.theme-switch-wrap{ display:flex; align-items:center; gap:8px; flex:none; }
-.theme-switch-wrap .tsw-label{ font-size:12.5px; color:var(--gray-500); white-space:nowrap; }
 
 /* 떠다니는 장식 (분홍 테마에서만 표시, 클릭 통과, 인쇄 제외) */
-.deco{ position:fixed; pointer-events:none; z-index:9; opacity:.9; display:none; }
+.deco{ position:fixed; pointer-events:none; z-index:9; display:none; }
 body.theme-pink .deco{ display:block; }
-.deco.tl{ top:74px; left:14px; width:58px; transform:rotate(-12deg); }
-.deco.tr{ top:120px; right:18px; width:44px; }
-.deco.br{ bottom:22px; right:24px; width:60px; transform:rotate(8deg); }
-.deco.bl{ bottom:30px; left:18px; width:36px; opacity:.7; }
+.deco.d1{ top:72px; left:16px; width:58px; transform:rotate(-10deg); opacity:.85; }
+.deco.d2{ top:108px; right:46px; width:38px; opacity:.8; }
+.deco.d3{ top:44%; right:24px; width:24px; opacity:.6; transform:rotate(10deg); }
+.deco.d4{ bottom:42px; right:44px; width:56px; transform:rotate(7deg); opacity:.85; }
+.deco.d5{ bottom:150px; right:160px; width:26px; opacity:.55; transform:rotate(-8deg); }
+.deco.d6{ bottom:96px; left:22px; width:38px; transform:rotate(10deg); opacity:.8; }
+.deco.d7{ top:60%; left:42px; width:22px; opacity:.55; }
+@media (max-width:720px){ .deco.d3, .deco.d5, .deco.d7{ display:none; } }
 @media print{ .deco{ display:none!important; } }
+
+/* 모서리 이미지 슬롯 (corner-1~4.png 가 폴더에 있으면 표시; 없으면 자동 숨김) */
+/* 모서리 이미지 슬롯 (corner-1~4.png). 위치/크기는 아래 c1~c4 의 값으로 조정 가능 */
+.corner-img{ position:fixed; z-index:10; pointer-events:none; display:none; width:80px; height:auto;
+  filter:drop-shadow(0 4px 10px rgba(232,75,138,.18)); }
+body.theme-pink .corner-img.loaded{ display:block; }
+.corner-img.c1{ top:8px; left:8px; }       /* 좌상단 */
+.corner-img.c2{ top:60px; right:12px; }     /* 우상단 (테마 스위치 아래) */
+.corner-img.c3{ bottom:12px; left:8px; }     /* 좌하단 */
+.corner-img.c4{ bottom:14px; right:14px; }   /* 우하단 */
+@media print{ .corner-img{ display:none!important; } }
+/* 도장 화면(iframe)에서는 메인 장식을 숨김 — 도장 페이지가 자체 장식을 그리므로 중복 방지 */
+body.on-dojang .deco, body.on-dojang .corner-img{ display:none!important; }
 
 .screen{display:none;}
 .screen.active{display:block;}
@@ -828,8 +844,8 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
 </style>
 </head>
 <body>
-<!-- 분홍 테마 장식 (직접 그린 리본·하트, 캐릭터 미사용) -->
-<svg class="deco tl" viewBox="0 0 100 70" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+<!-- 분홍 테마 장식 (직접 그린 리본·하트·반짝이, 캐릭터 미사용) -->
+<svg class="deco d1" viewBox="0 0 100 70" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
   <g fill="#ff8fc0" stroke="#e84b8a" stroke-width="2.5" stroke-linejoin="round">
     <path d="M50 35 C40 20, 14 16, 12 35 C14 54, 40 50, 50 35 Z"/>
     <path d="M50 35 C60 20, 86 16, 88 35 C86 54, 60 50, 50 35 Z"/>
@@ -837,15 +853,34 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
     <path d="M44 42 L34 64 M56 42 L66 64" fill="none" stroke-linecap="round"/>
   </g>
 </svg>
-<svg class="deco tr" viewBox="0 0 60 56" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+<svg class="deco d2" viewBox="0 0 60 56" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
   <path d="M30 52 C8 36, 2 20, 14 11 C22 5, 29 12, 30 18 C31 12, 38 5, 46 11 C58 20, 52 36, 30 52 Z" fill="#ff9ec9" stroke="#e84b8a" stroke-width="2.5" stroke-linejoin="round"/>
 </svg>
-<svg class="deco br" viewBox="0 0 60 56" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+<svg class="deco d3" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <path d="M20 2 C22 14, 26 18, 38 20 C26 22, 22 26, 20 38 C18 26, 14 22, 2 20 C14 18, 18 14, 20 2 Z" fill="#ffd0e4" stroke="#f48fb9" stroke-width="1.5" stroke-linejoin="round"/>
+</svg>
+<svg class="deco d4" viewBox="0 0 60 56" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
   <path d="M30 52 C8 36, 2 20, 14 11 C22 5, 29 12, 30 18 C31 12, 38 5, 46 11 C58 20, 52 36, 30 52 Z" fill="#ffc1dd" stroke="#f06aa3" stroke-width="2.5" stroke-linejoin="round"/>
 </svg>
-<svg class="deco bl" viewBox="0 0 60 56" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+<svg class="deco d5" viewBox="0 0 60 56" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
   <path d="M30 52 C8 36, 2 20, 14 11 C22 5, 29 12, 30 18 C31 12, 38 5, 46 11 C58 20, 52 36, 30 52 Z" fill="#ffd8e8" stroke="#f48fb9" stroke-width="2.5" stroke-linejoin="round"/>
 </svg>
+<svg class="deco d6" viewBox="0 0 100 70" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <g fill="#ffb0d2" stroke="#f06aa3" stroke-width="2.5" stroke-linejoin="round">
+    <path d="M50 35 C40 20, 14 16, 12 35 C14 54, 40 50, 50 35 Z"/>
+    <path d="M50 35 C60 20, 86 16, 88 35 C86 54, 60 50, 50 35 Z"/>
+    <circle cx="50" cy="35" r="8" fill="#ffe1ee"/>
+    <path d="M44 42 L34 64 M56 42 L66 64" fill="none" stroke-linecap="round"/>
+  </g>
+</svg>
+<svg class="deco d7" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <path d="M20 2 C22 14, 26 18, 38 20 C26 22, 22 26, 20 38 C18 26, 14 22, 2 20 C14 18, 18 14, 20 2 Z" fill="#ffe0ec" stroke="#f8a9c8" stroke-width="1.5" stroke-linejoin="round"/>
+</svg>
+<!-- 모서리 이미지 슬롯: corner-1~4.png 를 같은 폴더에 넣으면 표시됨 (없으면 자동 숨김) -->
+<img class="corner-img c1" src="./corner-1.png" alt="" aria-hidden="true" onload="this.classList.add('loaded'); if(window.hideOverlappingDeco)hideOverlappingDeco();" onerror="this.remove()">
+<img class="corner-img c2" src="./corner-2.png" alt="" aria-hidden="true" onload="this.classList.add('loaded'); if(window.hideOverlappingDeco)hideOverlappingDeco();" onerror="this.remove()">
+<img class="corner-img c3" src="./corner-3.png" alt="" aria-hidden="true" onload="this.classList.add('loaded'); if(window.hideOverlappingDeco)hideOverlappingDeco();" onerror="this.remove()">
+<img class="corner-img c4" src="./corner-4.png" alt="" aria-hidden="true" onload="this.classList.add('loaded'); if(window.hideOverlappingDeco)hideOverlappingDeco();" onerror="this.remove()">
 
 <div id="lockScreen" style="position:fixed;inset:0;z-index:9999;background:#fff;display:none;flex-direction:column;align-items:center;justify-content:center;padding:24px;">
   <div style="width:100%;max-width:320px;text-align:center;">
@@ -895,7 +930,7 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
 
 <div id="screen-home" class="screen active">
   <aside class="home-sidebar">
-    <div class="sb-brand"><div class="sb-brand-name">법무법인 정서</div><span class="theme-switch-wrap"><span class="tsw-label">분홍</span><button class="theme-switch" id="themeSwitch" role="switch" aria-label="분홍 테마 전환" onclick="toggleTheme()"></button></span></div>
+    <div class="sb-brand"><div class="sb-brand-name">법무법인 정서</div><button class="theme-switch" id="themeSwitch" role="switch" aria-label="분홍 테마 전환" onclick="toggleTheme()"></button></div>
     <nav class="sb-nav">
       <div class="sb-label">문서</div>
       <div class="sb-item on" onclick="openTypeSheet()">
@@ -960,7 +995,7 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
     </div>
 
     <div class="hm-mobile">
-      <div class="hmh"><div><div class="hmh-hi">법률문서 작성</div><div class="hmh-name">법무법인 정서</div></div><span class="theme-switch-wrap"><span class="tsw-label">분홍</span><button class="theme-switch" id="themeSwitchM" role="switch" aria-label="분홍 테마 전환" onclick="toggleTheme()"></button></span></div>
+      <div class="hmh"><div><div class="hmh-hi">법률문서 작성</div><div class="hmh-name">법무법인 정서</div></div><button class="theme-switch" id="themeSwitchM" role="switch" aria-label="분홍 테마 전환" onclick="toggleTheme()"></button></div>
       <div class="hm-seclabel">문서 선택</div>
       <div class="hm-list">
         <div class="hm-item" onclick="openTypeSheet()">
@@ -2090,11 +2125,25 @@ function _themeDB(){ return new Promise(function(res){ try{ var r=indexedDB.open
 function _themeGet(){ return _themeDB().then(function(db){ if(!db) return null; return new Promise(function(res){
   try{ var t=db.transaction('kv','readonly').objectStore('kv').get('theme'); t.onsuccess=function(){ res(t.result||null); }; t.onerror=function(){ res(null); }; }catch(e){ res(null); } }); }); }
 function _themeSet(v){ return _themeDB().then(function(db){ if(!db) return; try{ db.transaction('kv','readwrite').objectStore('kv').put(v,'theme'); }catch(e){} }); }
+function hideOverlappingDeco(){
+  if(!document.body.classList.contains('theme-pink')) return;
+  var decos=[].slice.call(document.querySelectorAll('.deco'));
+  decos.forEach(function(d){ d.style.display=''; });
+  var imgs=[].slice.call(document.querySelectorAll('.corner-img.loaded'));
+  if(!imgs.length) return;
+  decos.forEach(function(d){ var b=d.getBoundingClientRect(); var pad=10;
+    for(var i=0;i<imgs.length;i++){ var a=imgs[i].getBoundingClientRect();
+      if(!(a.right+pad<b.left||a.left-pad>b.right||a.bottom+pad<b.top||a.top-pad>b.bottom)){ d.style.display='none'; break; }
+    }
+  });
+}
+window.addEventListener('resize', function(){ setTimeout(hideOverlappingDeco,50); });
 function applyTheme(pink){
   document.body.classList.toggle('theme-pink', !!pink);
   var s1=document.getElementById('themeSwitch'), s2=document.getElementById('themeSwitchM');
   if(s1) s1.setAttribute('aria-checked', pink?'true':'false');
   if(s2) s2.setAttribute('aria-checked', pink?'true':'false');
+  setTimeout(hideOverlappingDeco,50);
   // 도장 iframe에 동기화
   var fr=document.getElementById('dojangFrame');
   if(fr && fr.contentWindow){ try{ fr.contentWindow.postMessage({type:'set-theme', pink:!!pink}, '*'); }catch(e){} }
@@ -2120,6 +2169,7 @@ function showScreen(id){
   document.getElementById(id).classList.add('active');
   document.body.classList.toggle('mode-seonim', id==='screen-seonim');
   document.body.classList.toggle('mode-appeal', id==='screen-appeal');
+  document.body.classList.toggle('on-dojang', id==='screen-dojang');
   window.scrollTo(0,0);
 }
 
