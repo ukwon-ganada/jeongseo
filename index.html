@@ -3658,7 +3658,7 @@ function openGyeongyu(){
   panel.document.close();
 
   /* 2) 우측 인천변호사회 창 */
-  try{ window.open('https://via.incheonbar.or.kr/', 'incheonbar_via', rightFeat); }catch(e){}
+  try{ window.open('https://via.incheonbar.or.kr/pageManageView.php?pageIndex=sheet_input', 'incheonbar_via', rightFeat); }catch(e){}
   try{ panel.focus(); }catch(e){}
 }
 function gyPanelHTML(rows, caseType, half, W, H){
@@ -3710,7 +3710,7 @@ function gyPanelHTML(rows, caseType, half, W, H){
    +'function gyFallback(v,btn){var t=document.createElement("textarea");t.value=v;t.style.position="fixed";t.style.opacity="0";document.body.appendChild(t);t.focus();t.select();try{document.execCommand("copy");gyOk(btn);}catch(e){prompt("아래 값을 직접 복사하세요(Ctrl+C):",v);}document.body.removeChild(t);}'
    +'function gyCopy(btn){var v=btn.getAttribute("data-v")||"";if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(v).then(function(){gyOk(btn);},function(){gyFallback(v,btn);});}else{gyFallback(v,btn);}}'
    +'document.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest(".gy-copy");if(b&&!b.disabled)gyCopy(b);});'
-   +'function gyReopen(){window.open("https://via.incheonbar.or.kr/","incheonbar_via","'+reopenFeat+'");}'
+   +'function gyReopen(){window.open("https://via.incheonbar.or.kr/pageManageView.php?pageIndex=sheet_input","incheonbar_via","'+reopenFeat+'");}'
    +'<\/script></body></html>';
 }
 
