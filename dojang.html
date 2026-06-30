@@ -18,11 +18,13 @@
     --paper:#ffeef5; --ink:#5a2a43; --muted:#bd7fa0; --line:#ffd2e4; --line-strong:#ffb3d2;
     --panel:#fffafc; --seal:#e84b8a; --seal-soft:#ffe1ee; --shadow:0 1px 2px rgba(232,75,138,.06),0 8px 24px rgba(232,75,138,.12);
   }
+  @font-face{ font-family:'CuteTheme'; src:url('./gamja.woff2') format('woff2'); font-display:swap; }
   body.theme-pink{ background:
     radial-gradient(circle at 12% 8%, #ffd9ea 0 12px, transparent 13px),
     radial-gradient(circle at 88% 14%, #ffe4b8 0 9px, transparent 10px),
     radial-gradient(circle at 78% 90%, #ffd9ea 0 10px, transparent 11px),
-    linear-gradient(160deg,#ffe3f0 0%, #ffd6ea 55%, #ffcfe6 100%) fixed; }
+    linear-gradient(160deg,#ffe3f0 0%, #ffd6ea 55%, #ffcfe6 100%) fixed;
+    font-family:'CuteTheme','Malgun Gothic','맑은 고딕','Apple SD Gothic Neo','Noto Sans KR',sans-serif; }
   body.theme-pink .toolbar, body.theme-pink .panel, body.theme-pink .stage,
   body.theme-pink .frow, body.theme-pink .slot, body.theme-pink .pcard{ border-radius:16px; }
   body.theme-pink .toolbar{ background:linear-gradient(135deg,#fffafc,#fff2f8); box-shadow:var(--shadow); }
@@ -33,12 +35,15 @@
   /* 떠다니는 장식 (클릭 통과) */
   .deco{ position:fixed; pointer-events:none; z-index:9; display:none; }
   body.theme-pink .deco{ display:block; }
-  .deco.d1{ bottom:70px; left:24px; width:56px; transform:rotate(-10deg); opacity:.85; }
+  #heartCanvas{ position:fixed; inset:0; width:100%; height:100%; z-index:8; pointer-events:none; display:none; }
+  body.theme-pink #heartCanvas{ display:block; }
+  @media print{ #heartCanvas{ display:none!important; } }
+  .deco.d1{ bottom:70px; left:24px; width:64px; transform:rotate(-10deg); opacity:.85; }
   .deco.d2{ bottom:150px; right:30px; width:38px; opacity:.8; }
   .deco.d3{ bottom:280px; right:120px; width:24px; opacity:.6; transform:rotate(10deg); }
   .deco.d4{ bottom:46px; right:54px; width:56px; transform:rotate(7deg); opacity:.85; }
   .deco.d5{ bottom:210px; right:230px; width:26px; opacity:.55; transform:rotate(-8deg); }
-  .deco.d6{ bottom:44px; left:150px; width:40px; transform:rotate(10deg); opacity:.8; }
+  .deco.d6{ bottom:44px; left:150px; width:48px; transform:rotate(10deg); opacity:.8; }
   .deco.d7{ bottom:160px; left:50px; width:22px; opacity:.55; }
   @media (max-width:720px){ .deco.d3, .deco.d5, .deco.d7{ display:none; } }
   @media print{ .deco{ display:none!important; } }
@@ -190,15 +195,9 @@
 </style>
 </head>
 <body>
+<canvas id="heartCanvas" aria-hidden="true"></canvas>
 <!-- 분홍 테마 장식 (직접 그린 리본·하트·반짝이, 캐릭터 미사용) -->
-<svg class="deco d1" viewBox="0 0 100 70" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-  <g fill="#ff8fc0" stroke="#e84b8a" stroke-width="2.5" stroke-linejoin="round">
-    <path d="M50 35 C40 20, 14 16, 12 35 C14 54, 40 50, 50 35 Z"/>
-    <path d="M50 35 C60 20, 86 16, 88 35 C86 54, 60 50, 50 35 Z"/>
-    <circle cx="50" cy="35" r="8" fill="#ffd2e7"/>
-    <path d="M44 42 L34 64 M56 42 L66 64" fill="none" stroke-linecap="round"/>
-  </g>
-</svg>
+<img class="deco d1" src="./ribbon.png" alt="" aria-hidden="true" onerror="this.style.display='none'">
 <svg class="deco d2" viewBox="0 0 60 56" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
   <path d="M30 52 C8 36, 2 20, 14 11 C22 5, 29 12, 30 18 C31 12, 38 5, 46 11 C58 20, 52 36, 30 52 Z" fill="#ff9ec9" stroke="#e84b8a" stroke-width="2.5" stroke-linejoin="round"/>
 </svg>
@@ -211,14 +210,7 @@
 <svg class="deco d5" viewBox="0 0 60 56" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
   <path d="M30 52 C8 36, 2 20, 14 11 C22 5, 29 12, 30 18 C31 12, 38 5, 46 11 C58 20, 52 36, 30 52 Z" fill="#ffd8e8" stroke="#f48fb9" stroke-width="2.5" stroke-linejoin="round"/>
 </svg>
-<svg class="deco d6" viewBox="0 0 100 70" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-  <g fill="#ffb0d2" stroke="#f06aa3" stroke-width="2.5" stroke-linejoin="round">
-    <path d="M50 35 C40 20, 14 16, 12 35 C14 54, 40 50, 50 35 Z"/>
-    <path d="M50 35 C60 20, 86 16, 88 35 C86 54, 60 50, 50 35 Z"/>
-    <circle cx="50" cy="35" r="8" fill="#ffe1ee"/>
-    <path d="M44 42 L34 64 M56 42 L66 64" fill="none" stroke-linecap="round"/>
-  </g>
-</svg>
+<img class="deco d6" src="./ribbon.png" alt="" aria-hidden="true" onerror="this.style.display='none'">
 <svg class="deco d7" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
   <path d="M20 2 C22 14, 26 18, 38 20 C26 22, 22 26, 20 38 C18 26, 14 22, 2 20 C14 18, 18 14, 20 2 Z" fill="#ffe0ec" stroke="#f8a9c8" stroke-width="1.5" stroke-linejoin="round"/>
 </svg>
@@ -847,10 +839,59 @@ function hideOverlappingDeco(){
   });
 }
 window.addEventListener('resize', function(){ setTimeout(hideOverlappingDeco,50); });
+
+/* ===== 하트 내리는 배경 효과 (은은하게) ===== */
+var heartFx=(function(){
+  var cv=null, ctx=null, parts=[], raf=0, running=false, W=0, H=0;
+  function rnd(a,b){ return a+Math.random()*(b-a); }
+  function count(){ return window.innerWidth<=720 ? 9 : 16; }
+  function mkHeart(initial){
+    return { x:rnd(0,W), y: initial?rnd(-H,H):rnd(-60,-10),
+      s:rnd(9,18), vy:rnd(14,30), sway:rnd(10,26), ph:rnd(0,Math.PI*2), sp:rnd(.4,1.0),
+      rot:rnd(-0.3,0.3), op:rnd(0.18,0.5) }; }
+  function ensure(){ cv=document.getElementById('heartCanvas'); if(!cv) return false;
+    ctx=cv.getContext('2d'); resize(); return true; }
+  function resize(){ if(!cv) return; var dpr=Math.min(window.devicePixelRatio||1,2);
+    W=window.innerWidth; H=window.innerHeight; cv.width=W*dpr; cv.height=H*dpr;
+    ctx.setTransform(dpr,0,0,dpr,0,0); }
+  function heartPath(c,x,y,s){ c.moveTo(x,y+s*0.3);
+    c.bezierCurveTo(x,y,x-s*0.5,y-s*0.1,x-s*0.5,y+s*0.25);
+    c.bezierCurveTo(x-s*0.5,y+s*0.55,x,y+s*0.7,x,y+s*0.95);
+    c.bezierCurveTo(x,y+s*0.7,x+s*0.5,y+s*0.55,x+s*0.5,y+s*0.25);
+    c.bezierCurveTo(x+s*0.5,y-s*0.1,x,y,x,y+s*0.3); }
+  var last=0;
+  function frame(t){ if(!running) return;
+    var dt=last?Math.min((t-last)/1000,0.05):0.016; last=t;
+    ctx.clearRect(0,0,W,H);
+    for(var i=0;i<parts.length;i++){ var p=parts[i];
+      p.y+=p.vy*dt; p.ph+=p.sp*dt; p.x+=Math.sin(p.ph)*p.sway*dt;
+      if(p.y>H+30){ parts[i]=mkHeart(false); continue; }
+      ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot+Math.sin(p.ph)*0.15);
+      ctx.globalAlpha=p.op; ctx.fillStyle='#ff7fb6';
+      ctx.beginPath(); heartPath(ctx,0,-p.s*0.5,p.s); ctx.fill();
+      ctx.restore();
+    }
+    raf=requestAnimationFrame(frame);
+  }
+  function start(){ if(running) return; if(!cv && !ensure()) return;
+    if(!parts.length){ var n=count(); for(var i=0;i<n;i++) parts.push(mkHeart(true)); }
+    running=true; last=0; raf=requestAnimationFrame(frame); }
+  function stop(){ running=false; if(raf) cancelAnimationFrame(raf); raf=0;
+    if(ctx) ctx.clearRect(0,0,W,H); }
+  window.addEventListener('resize', function(){ if(cv) resize(); });
+  return { start:start, stop:stop };
+})();
+function updateHeartFx(){
+  var on = document.body.classList.contains('theme-pink') && document.visibilityState!=='hidden';
+  if(on) heartFx.start(); else heartFx.stop();
+}
+document.addEventListener('visibilitychange', updateHeartFx);
+
 function applyThemeLocal(pink){
   document.body.classList.toggle('theme-pink', !!pink);
   const sw=document.getElementById('themeSwitch'); if(sw) sw.setAttribute('aria-checked', pink?'true':'false');
   setTimeout(hideOverlappingDeco,50);
+  updateHeartFx();
 }
 function toggleTheme(){
   const pink=!document.body.classList.contains('theme-pink');
