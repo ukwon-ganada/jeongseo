@@ -225,7 +225,9 @@ body.on-dojang #heartCanvas{ display:none!important; }   /* 도장 화면은 ifr
     position:sticky;top:0;height:100vh;
   }
   .cts-head{padding:22px;border-bottom:1px solid var(--border);}
+  .cts-navrow{display:flex;gap:16px;margin-bottom:16px;}
   .cts-back{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--gray-500);cursor:pointer;margin-bottom:16px;transition:color 0.12s;}
+  .cts-navrow .cts-back{margin-bottom:0;}
   .cts-back:hover{color:var(--black);}
   .cts-back svg{width:14px;height:14px;}
   .cts-title{font-size:14px;font-weight:600;}
@@ -336,6 +338,29 @@ body.on-dojang #heartCanvas{ display:none!important; }   /* 도장 화면은 ifr
 .lc-name{font-size:14px;font-weight:600;color:var(--black);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .lc-meta{font-size:12px;color:var(--gray-500);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .lc-signed{display:inline-block;margin-left:8px;font-size:11px;font-weight:600;color:#1a7f3c;background:#e8f5ec;padding:1px 7px;border-radius:999px;vertical-align:middle;}
+.lc-hist{font-size:11px;color:var(--gray-500);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.lc-hist-btn{flex-shrink:0;width:34px;height:34px;border:none;background:none;color:var(--gray-400);cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:8px;}
+.lc-hist-btn:hover{background:var(--gray-100);color:#1a2740;}
+.lc-hist-btn svg{width:18px;height:18px;}
+.hist-box{max-width:440px;text-align:left;}
+.hist-body{max-height:60vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin:8px 0 4px;}
+.hist-status{display:inline-block;font-size:12.5px;font-weight:700;padding:3px 12px;border:1.5px solid;border-radius:999px;margin-bottom:14px;}
+.hist-step{display:flex;gap:12px;padding:11px 0;border-bottom:1px solid var(--gray-100);}
+.hist-step:last-child{border-bottom:none;}
+.hist-ico{flex-shrink:0;width:26px;height:26px;display:flex;align-items:center;justify-content:center;color:var(--gray-400);}
+.hist-ico svg{width:17px;height:17px;}
+.hist-txt{flex:1;min-width:0;}
+.hist-label{font-size:12px;color:var(--gray-500);font-weight:600;}
+.hist-val{font-size:14px;color:var(--black);font-weight:600;margin-top:1px;}
+.hist-sub{font-size:11.5px;color:var(--gray-400);margin-top:2px;}
+.hist-none{color:var(--gray-400);font-weight:400;font-size:13px;}
+.hist-edits{margin-top:16px;padding-top:14px;border-top:2px solid var(--gray-100);}
+.hist-edits-title{font-size:13px;font-weight:700;color:#1a2740;margin-bottom:10px;}
+.hist-edit-item{background:var(--gray-50);border-radius:8px;padding:10px 12px;margin-bottom:8px;}
+.hist-edit-time{font-size:11.5px;color:var(--gray-500);font-weight:600;margin-bottom:5px;}
+.hist-edit-change{font-size:12.5px;color:var(--gray-700);line-height:1.7;}
+.he-from{color:#b23b3b;text-decoration:line-through;}
+.he-to{color:#1a7f3c;font-weight:600;}
 .lc-pending{display:inline-block;margin-left:8px;font-size:11px;font-weight:600;color:#a06000;background:#fdf3e3;padding:1px 7px;border-radius:999px;vertical-align:middle;}
 .lc-time{font-size:11px;color:var(--gray-400);flex-shrink:0;}
 .lc-del{width:30px;height:30px;border:none;background:none;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:6px;flex-shrink:0;}
@@ -802,6 +827,8 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
 .sd-sign-label{font-size:12px;color:var(--gray-700);font-weight:600;margin-bottom:8px;}
 .sd-sign-img{max-width:160px;height:auto;border:1px solid var(--border);border-radius:8px;background:#fff;}
 .sign-consent-section{background:#fff;border-radius:var(--r-lg);padding:16px 18px;box-shadow:0 1px 8px rgba(0,0,0,0.06);margin-bottom:14px;}
+.sd-verify-hint{background:#eef2fb;border:1px solid #d5e0f5;border-radius:10px;padding:11px 13px;margin-bottom:14px;font-size:12.5px;line-height:1.6;color:#2a3b5e;}
+.sd-verify-hint b{color:#1a2740;font-weight:700;}
 .sign-consent{display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13.5px;line-height:1.6;color:var(--gray-700);}
 .sign-consent input{width:20px;height:20px;flex-shrink:0;margin-top:1px;accent-color:#1a2740;cursor:pointer;}
 .sign-consent b{color:var(--black);font-weight:700;}
@@ -956,6 +983,10 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
   <div id="signMsgBox" class="sign-msg-box">
     <div class="sign-msg-spinner"></div>
     <div class="sign-msg-text">불러오는 중...</div>
+    <div id="signDoneActions" style="display:none;margin-top:26px;width:100%;max-width:300px;">
+      <button class="sign-submit-btn" onclick="downloadSignedContract()">서명한 계약서 저장 (PDF)</button>
+      <div class="sign-submit-note" style="margin-top:10px;">서명·서명일시·문서지문이 포함된 계약서를<br>본인 기기에 보관용으로 저장합니다.</div>
+    </div>
   </div>
   <div id="signContent" class="sign-content" style="display:none;">
     <div class="sign-doc-wrap">
@@ -1114,8 +1145,13 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
 <div id="screen-contract" class="screen">
   <aside class="ct-sidebar">
     <div class="cts-head">
-      <div class="cts-back" onclick="goHome()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15,18 9,12 15,6"/></svg>홈으로
+      <div class="cts-navrow">
+        <div class="cts-back" onclick="goHome()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15,18 9,12 15,6"/></svg>홈으로
+        </div>
+        <div class="cts-back" onclick="openContractList()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>목록으로
+        </div>
       </div>
       <div class="cts-title">송무위임계약서</div>
       <div class="cts-sub" id="cts-sub">형사</div>
@@ -1127,7 +1163,7 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
       <button class="cts-btn" onclick="saveToListBtn()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>목록에 저장
       </button>
-      <button class="cts-btn cts-sign" onclick="openRecipientSheet()">
+      <button class="cts-btn cts-sign" onclick="createSignRequest()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>서명요청
       </button>
       <div class="cts-div"></div>
@@ -1148,14 +1184,15 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
   </aside>
 
   <div class="ct-appbar">
-    <button class="ab-back" onclick="goHome()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15,18 9,12 15,6"/></svg></button>
+    <button class="ab-back" onclick="goHome()" aria-label="홈으로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15,18 9,12 15,6"/></svg></button>
+    <button class="ab-back" onclick="openContractList()" aria-label="목록으로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></button>
     <div class="ab-label" id="ab-label">송무위임계약서 (형사)</div>
     <button class="ab-edit" onclick="openFormSheet()" aria-label="정보 입력"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
     <button class="ab-edit" onclick="saveToListBtn()" aria-label="목록에 저장"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg></button>
     <button class="ab-share" onclick="openActionSheet()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>공유
     </button>
-    <button class="ab-sign" onclick="openRecipientSheet()">
+    <button class="ab-sign" onclick="createSignRequest()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>서명
     </button>
   </div>
@@ -1824,20 +1861,12 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
 </div>
 
 <!-- 통합 입력 폼 -->
-<!-- 받는 분 정보 시트 (서명요청 전 단계) -->
-<div class="sl-overlay" id="recipientSheet" onclick="if(event.target===this)closeRecipientSheet()">
-  <div class="sl-box">
-    <div class="sl-title">받는 분 정보</div>
-    <div class="sl-desc">이 서명 링크를 <b>누구에게 보내는지</b> 기록해 둡니다. 나중에 "언제·누구에게 보냈고, 그 링크로 서명되었다"는 증빙이 됩니다.</div>
-    <input type="text" class="sl-input" id="recipNameInput" placeholder="받는 분 성함 (예: 홍길동)" style="margin-bottom:8px;">
-    <input type="text" class="sl-input" id="recipPhoneInput" placeholder="휴대폰 번호 (예: 010-1234-5678)" inputmode="tel">
-    <div class="sl-btns" style="margin-top:14px;">
-      <button class="sl-btn primary" onclick="proceedCreateSign()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
-        서명 링크 만들기
-      </button>
-    </div>
-    <button class="sl-close" onclick="closeRecipientSheet()">취소</button>
+<!-- 서명 이력 시트 -->
+<div class="sl-overlay" id="historySheet" onclick="if(event.target===this)closeHistorySheet()">
+  <div class="sl-box hist-box">
+    <div class="sl-title">서명 진행 이력</div>
+    <div id="historyBody" class="hist-body"></div>
+    <button class="sl-close" onclick="closeHistorySheet()">닫기</button>
   </div>
 </div>
 
@@ -2514,6 +2543,45 @@ function restoreSignature(dataUrl){
   img.src=dataUrl;
 }
 
+/* ═══ 서명 완료 계약서: 사건번호·사건명·관할만 수정 + 변경 이력 기록 ═══ */
+async function saveLockedCaseInfo(client, explicit){
+  try{
+    var r=await client.from('contracts').select('form_data,case_num,case_name,court,audit').eq('id',currentEditId).limit(1);
+    if(r.error||!r.data||!r.data[0]){ if(explicit)showToast('저장 실패: 다시 시도해 주세요'); return false; }
+    var rec=r.data[0];
+    var newCasenum=(data.casenum||'').trim();
+    var newCasename=(data.casename||'').trim();
+    var newCourt=(data.court||'').trim();
+    var oldCasenum=(rec.case_num||'').trim();
+    var oldCasename=(rec.case_name||'').trim();
+    var oldCourt=(rec.court||'').trim();
+    var changes=[];
+    if(newCasenum!==oldCasenum)changes.push({field:'사건번호',from:oldCasenum,to:newCasenum});
+    if(newCasename!==oldCasename)changes.push({field:'사건명',from:oldCasename,to:newCasename});
+    if(newCourt!==oldCourt)changes.push({field:'관할법원',from:oldCourt,to:newCourt});
+    if(!changes.length){ if(explicit)showToast('변경된 사건정보가 없습니다'); return true; }
+    // 서명 시점 내용은 그대로 두고, form_data 안의 사건정보만 갱신
+    var nfd=rec.form_data||{};
+    if(!nfd.data)nfd.data={};
+    nfd.data.casenum=newCasenum;
+    nfd.data.casename=newCasename;
+    nfd.data.court=newCourt;
+    // 수정 이력 누적 (언제·무엇을·무엇에서 무엇으로)
+    var audit=rec.audit||{};
+    if(!Array.isArray(audit.edits))audit.edits=[];
+    audit.edits.push({at:new Date().toISOString(), changes:changes});
+    var ur=await client.from('contracts').update({
+      case_num:newCasenum, case_name:newCasename, court:newCourt,
+      form_data:nfd, audit:audit, updated_at:new Date().toISOString()
+    }).eq('id',currentEditId);
+    if(ur.error){ if(explicit)showToast('저장 실패: '+((ur.error.message)||'')); return false; }
+    // 화면 캐시도 갱신
+    for(var i=0;i<listCache.length;i++){ if(listCache[i].id===currentEditId){ listCache[i].case_num=newCasenum; listCache[i].case_name=newCasename; listCache[i].court=newCourt; listCache[i].audit=audit; break; } }
+    if(explicit)showToast('사건정보가 수정되었습니다 (수정 이력이 기록됩니다)');
+    return true;
+  }catch(e){ if(explicit)showToast('저장 실패: '+((e&&e.message)?e.message:'다시 시도')); return false; }
+}
+
 /* ═══ Supabase에 저장 (저장 액션 시 호출) ═══ */
 async function saveToCloud(explicit){
   var client=getSB();
@@ -2543,10 +2611,9 @@ async function saveToCloud(explicit){
         var existing=await client.from('contracts').select('counterparty_signature,sign_status,sign_token,sign_expires_at').eq('id',currentEditId).limit(1);
         if(existing&&existing.data&&existing.data[0]){
           var ex=existing.data[0];
-          // ── 무결성 잠금: 이미 서명 완료된 계약서는 내용 수정 저장을 차단 ──
+          // ── 서명 완료된 계약서: 사건번호·사건명·관할만 수정 허용 (그 외 내용은 잠금) ──
           if(ex.sign_status==='signed'){
-            if(explicit)showToast('서명이 완료된 계약서는 내용을 수정할 수 없습니다');
-            return false;
+            return await saveLockedCaseInfo(client, explicit);
           }
           if(ex.counterparty_signature)payload.counterparty_signature=ex.counterparty_signature;
           if(ex.sign_status)payload.sign_status=ex.sign_status;
@@ -2636,40 +2703,13 @@ function getSignBaseUrl(){
   return FIXED_BASE;
 }
 /* 받는 분 정보 시트 열고/닫기 */
-function openRecipientSheet(){
-  var nm=document.getElementById('recipNameInput');
-  var ph=document.getElementById('recipPhoneInput');
-  // ① 계약서에 입력해 둔 의뢰인 이름·연락처를 그대로 자동 입력
-  var preName=(data.name||'').trim();
-  var prePhone=(data.tel||'').trim();
-  // ② 이 계약서로 이미 서명요청한 적이 있으면, 그때 받는 분 정보를 우선 사용
-  if(currentRecord){
-    if(currentRecord.recipient_name)preName=currentRecord.recipient_name;
-    if(currentRecord.recipient_phone)prePhone=currentRecord.recipient_phone;
-  }
-  nm.value=preName;
-  ph.value=prePhone;
-  ph.oninput=function(){applyLiveFormat(ph,formatPhone);};
-  document.getElementById('recipientSheet').classList.add('active');
-  // 비어 있는 칸에만 커서를 둠 (둘 다 채워졌으면 바로 버튼만 누르면 됨)
-  setTimeout(function(){
-    if(!preName)nm.focus();
-    else if(!prePhone)ph.focus();
-  },100);
-}
-function closeRecipientSheet(){
-  document.getElementById('recipientSheet').classList.remove('active');
-}
-function proceedCreateSign(){
-  var name=(document.getElementById('recipNameInput').value||'').trim();
-  var phone=(document.getElementById('recipPhoneInput').value||'').trim();
-  if(!phone){ showToast('받는 분 휴대폰 번호를 입력해 주세요'); return; }
-  closeRecipientSheet();
-  createSignRequest({recipient_name:name, recipient_phone:phone});
-}
-
 async function createSignRequest(recipient){
   recipient=recipient||{};
+  // 서명 완료된 계약서는 다시 서명요청(재발송)할 수 없도록 잠금
+  if(currentRecord&&currentRecord.sign_status==='signed'){
+    showToast('이미 서명이 완료된 계약서는 다시 서명요청할 수 없습니다');
+    return;
+  }
   showLoading('서명 요청 링크 만드는 중...');
   var client=getSB();
   if(!client){
@@ -2677,6 +2717,9 @@ async function createSignRequest(recipient){
     client=getSB();
   }
   if(!client){hideLoading();showToast('연결 실패: 잠시 후 다시 시도해 주세요');return;}
+  // 받는 분 정보는 계약서에 적힌 의뢰인 이름·연락처를 자동으로 기록 (변호사가 따로 입력할 필요 없음)
+  var autoName=(getClientName()||data.name||'').trim();
+  var autoPhone=(data.tel||'').trim();
   var token=genToken();
   var expires=new Date(Date.now()+96*3600*1000).toISOString(); // 96시간
   var fd=collectFormData();
@@ -2690,8 +2733,8 @@ async function createSignRequest(recipient){
     sign_token:token,
     sign_expires_at:expires,
     sign_status:'requested',
-    recipient_name:recipient.recipient_name||'',
-    recipient_phone:recipient.recipient_phone||'',
+    recipient_name:recipient.recipient_name||autoName,
+    recipient_phone:recipient.recipient_phone||autoPhone,
     updated_at:new Date().toISOString()
   };
   try{
@@ -2822,6 +2865,7 @@ async function initSignMode(token){
 function setSignState(state,msg){
   var msgBox=document.getElementById('signMsgBox');
   var content=document.getElementById('signContent');
+  var doneActions=document.getElementById('signDoneActions');
   if(state==='ready'){
     msgBox.style.display='none';
     content.style.display='block';
@@ -2831,6 +2875,8 @@ function setSignState(state,msg){
     msgBox.querySelector('.sign-msg-text').textContent=msg;
     var sp=msgBox.querySelector('.sign-msg-spinner');
     if(sp)sp.style.display=(state==='loading')?'block':'none';
+    // 방금 서명을 마친 경우에만 계약서 저장 버튼 노출
+    if(doneActions)doneActions.style.display=(state==='done'&&window._signedInfo)?'block':'none';
   }
 }
 function renderSignContract(rec){
@@ -2864,13 +2910,13 @@ function renderSignContract(rec){
 
   var html='';
   html+='<div class="sd-doctitle">송무위임계약서 ('+docType+')</div>';
-  html+='<div class="sd-fill-hint" style="margin-bottom:12px;font-size:12px;">노란색 칸은 직접 입력·수정하실 수 있습니다.</div>';
+  html+='<div class="sd-verify-hint">✔ <b>본인 확인</b>을 위해 아래 <b>연락처</b>와 <b>주민등록번호</b>를 정확히 입력해 주세요. 입력하신 정보는 서명과 함께 기록됩니다.</div>';
   html+='<table class="sd-table">';
   // 성명: 읽기전용
   html+=roRow('성명',d.name||'');
-  // 연락처·주민번호·주소·이메일: 입력 가능
-  html+=inputRow('연락처','sf-tel',d.tel||'','010-0000-0000','tel');
-  html+=inputRow('주민등록번호','sf-ssn',d.ssn||'','000000-0000000','ssn');
+  // 연락처·주민번호: 본인확인 필수 입력
+  html+=inputRow('연락처 *','sf-tel',d.tel||'','010-0000-0000','tel');
+  html+=inputRow('주민등록번호 *','sf-ssn',d.ssn||'','000000-0000000','ssn');
   html+=addrRow('주소','sf-addr',d.addr||'');
   html+=inputRow('이메일','sf-email',d.email||'','email@example.com','email');
   // 사건정보: 읽기전용
@@ -2952,6 +2998,11 @@ async function submitCounterpartySign(){
   // 동의 확인
   var chk=document.getElementById('cpConsentChk');
   if(!chk||!chk.checked){showToast('계약 내용 동의에 체크해 주세요');return;}
+  // 본인확인 필수 입력 확인
+  var telVal=((document.getElementById('sf-tel')||{}).value||'').trim();
+  var ssnVal=((document.getElementById('sf-ssn')||{}).value||'').trim();
+  if(!telVal){showToast('본인 확인을 위해 연락처를 입력해 주세요');return;}
+  if(ssnVal.replace(/[^0-9]/g,'').length<7){showToast('본인 확인을 위해 주민등록번호를 정확히 입력해 주세요');return;}
   var cv=document.getElementById('cpSigCanvas');
   if(!window._cpHasSig){showToast('서명을 입력해 주세요');return;}
   var sigData='';
@@ -2998,6 +3049,10 @@ async function submitCounterpartySign(){
     audit.signed_ua=(navigator.userAgent||'').slice(0,300);
     audit.consent=true;
     audit.hash_algo='SHA-256';
+    // 서명자가 본인확인용으로 직접 기재한 정보 (주민번호는 마스킹하여 기록)
+    audit.signer_tel=telVal;
+    var ssnDigits=ssnVal.replace(/[^0-9]/g,'');
+    audit.signer_ssn_masked=ssnDigits.slice(0,6)+'-'+ssnDigits.slice(6,7)+'******';
 
     var ur=await client.from('contracts').update({
       counterparty_signature:sigData,
@@ -3011,6 +3066,15 @@ async function submitCounterpartySign(){
       updated_at:signedAt
     }).eq('sign_token',signModeRecord.sign_token);
     if(ur.error)throw ur.error;
+    // 완료 화면으로 넘어가기 전에, 화면의 계약서 표를 저장용으로 스냅샷
+    window._signedInfo={
+      docType:signModeRecord.doc_type||'형사',
+      clientName:signModeRecord.client_name||(newFd.data&&newFd.data.name)||'',
+      signedAt:signedAt,
+      hash:docHash,
+      sigData:sigData,
+      docHtml:snapshotSignDocHtml()
+    };
     setSignState('done','서명이 제출되었습니다.\n감사합니다.');
   }catch(e){
     btn.disabled=false;btn.textContent='서명 제출';
@@ -3022,6 +3086,95 @@ function updateSubmitState(){
   var chk=document.getElementById('cpConsentChk');
   var btn=document.getElementById('cpSubmitBtn');
   if(btn)btn.disabled=!(chk&&chk.checked);
+}
+/* 화면의 계약서 표를 읽기전용 HTML로 복제 (input을 입력값 텍스트로 치환) */
+function snapshotSignDocHtml(){
+  var src=document.getElementById('signDocView');
+  if(!src)return '';
+  var clone=src.cloneNode(true);
+  var inputs=clone.querySelectorAll('input');
+  for(var i=0;i<inputs.length;i++){
+    var inp=inputs[i];
+    if(inp.type==='radio'||inp.type==='checkbox'){
+      // 선택된 라디오만 남기고 표시
+      var span0=document.createElement('span');
+      span0.textContent=inp.checked?'선택됨':'';
+      if(inp.parentNode)inp.parentNode.replaceChild(span0,inp);
+      continue;
+    }
+    var span=document.createElement('span');
+    span.textContent=inp.value||'';
+    if(inp.parentNode)inp.parentNode.replaceChild(span,inp);
+  }
+  return clone.innerHTML;
+}
+/* 서명한 계약서를 PDF로 저장 (서명 이미지·서명일시·문서지문 포함) */
+async function downloadSignedContract(){
+  var info=window._signedInfo;
+  if(!info){showToast('저장할 계약서 정보가 없습니다');return;}
+  var jsPDFCtor=(window.jspdf&&window.jspdf.jsPDF)?window.jspdf.jsPDF:(window.jsPDF||null);
+  var btn=document.querySelector('#signDoneActions .sign-submit-btn');
+  if(btn){btn.disabled=true;btn.textContent='저장 준비 중...';}
+  try{
+    // 서명일시 사람이 읽기 좋은 형식으로
+    var dt=new Date(info.signedAt);
+    var pad=function(n){return (n<10?'0':'')+n;};
+    var when=dt.getFullYear()+'-'+pad(dt.getMonth()+1)+'-'+pad(dt.getDate())+' '+pad(dt.getHours())+':'+pad(dt.getMinutes());
+    var hashShort=(info.hash||'').slice(0,32);
+
+    // 화면 밖 임시 컨테이너에 저장용 문서 조립
+    var wrap=document.createElement('div');
+    wrap.style.cssText='position:fixed;left:-9999px;top:0;width:640px;background:#fff;padding:34px 34px 30px;font-family:'+getComputedStyle(document.body).fontFamily+';color:#111;box-sizing:border-box;';
+    wrap.innerHTML=
+      '<div style="text-align:center;font-size:20px;font-weight:800;letter-spacing:-0.01em;margin-bottom:6px;">송무위임계약서 ('+escapeHtml(info.docType)+')</div>'+
+      '<div style="text-align:center;font-size:12px;color:#666;margin-bottom:18px;">법무법인 정서</div>'+
+      '<div class="sd-signed-body">'+info.docHtml+'</div>'+
+      '<div style="margin-top:22px;padding-top:14px;border-top:1px solid #ddd;">'+
+        '<div style="font-size:13px;font-weight:700;color:#333;margin-bottom:8px;">위임인 (전자)서명</div>'+
+        '<img src="'+info.sigData+'" style="max-width:200px;height:auto;border:1px solid #eee;border-radius:6px;background:#fff;">'+
+      '</div>'+
+      '<div style="margin-top:20px;padding:14px 16px;background:#f6f7f9;border-radius:8px;font-size:11.5px;color:#444;line-height:1.7;">'+
+        '<div style="font-weight:700;color:#1a2740;margin-bottom:4px;">■ 전자서명 정보</div>'+
+        '서명 일시 : '+when+'<br>'+
+        '문서 고유지문 (SHA-256) : '+hashShort+'…<br>'+
+        '<span style="color:#888;">위 지문은 서명 시점의 계약 내용으로 계산된 값으로, 이후 내용이 한 글자라도 바뀌면 지문이 달라집니다.</span>'+
+      '</div>';
+    document.body.appendChild(wrap);
+
+    // sd-table 등 기본 스타일이 임시 컨테이너에도 적용되도록 최소 스타일 보강
+    var style=document.createElement('style');
+    style.textContent='.sd-signed-body table{width:100%;border-collapse:collapse;font-size:12px;}'+
+      '.sd-signed-body td{padding:6px 8px;border:1px solid #e5e7eb;vertical-align:top;}'+
+      '.sd-signed-body .sd-th{background:#f3f4f6;font-weight:600;width:34%;color:#333;}'+
+      '.sd-signed-body .sd-doctitle,.sd-signed-body .sd-fill-hint{display:none;}';
+    wrap.appendChild(style);
+
+    var canvas=await html2canvas(wrap,{scale:2,backgroundColor:'#ffffff',useCORS:true});
+    document.body.removeChild(wrap);
+
+    var fname='송무위임계약서_'+(info.clientName||'서명본')+'_'+dt.getFullYear()+pad(dt.getMonth()+1)+pad(dt.getDate());
+
+    if(jsPDFCtor){
+      var pdf=new jsPDFCtor({orientation:'portrait',unit:'mm',format:'a4'});
+      var pw=210,ph=297,margin=8;
+      var cw=canvas.width, ch=canvas.height;
+      var s=Math.min((pw-margin*2)/cw, (ph-margin*2)/ch);
+      var dw=cw*s, dh=ch*s;
+      var dx=(pw-dw)/2, dy=margin;
+      pdf.addImage(canvas.toDataURL('image/png'),'PNG',dx,dy,dw,dh,undefined,'FAST');
+      pdf.save(fname+'.pdf');
+    }else{
+      // PDF 라이브러리 실패 시 이미지로 폴백
+      var a=document.createElement('a');
+      a.download=fname+'.png';
+      a.href=canvas.toDataURL('image/png');
+      a.click();
+    }
+    if(btn){btn.disabled=false;btn.textContent='서명한 계약서 저장 (PDF)';}
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent='서명한 계약서 저장 (PDF)';}
+    showToast('저장 실패: '+((e&&e.message)?e.message:'다시 시도'));
+  }
 }
 /* 상대방(의뢰인) 서명 캔버스 설정값 */
 var CP_SIGPAD={canvasId:'cpSigCanvas',ctxKey:'_cpSigCtx',hasKey:'_cpHasSig',lineWidth:2.2,strokeStyle:'#111',fitResolution:true};
@@ -3079,10 +3232,19 @@ function renderContractList(){
       var hh=('0'+d.getHours()).slice(-2);var mm=('0'+d.getMinutes()).slice(-2);
       var name=it.client_name||'(의뢰인명 미입력)';
       var meta=[it.case_num,it.case_name].filter(Boolean).join(' · ')||'사건정보 없음';
+      // 서명 이력 요약 (발송 → 서명완료/열람)
+      var histParts=[];
+      if(it.sent_at)histParts.push('발송 '+fmtShort(it.sent_at));
+      if(it.signed_at)histParts.push('서명완료 '+fmtShort(it.signed_at));
+      else if(it.accessed_at)histParts.push('열람 '+fmtShort(it.accessed_at));
+      var histLine=histParts.length?'<div class="lc-hist">'+histParts.join(' → ')+'</div>':'';
+      var hasHist=it.sent_at||it.accessed_at||it.signed_at||it.sign_status;
+      var histBtn=hasHist?'<button class="lc-hist-btn" onclick="event.stopPropagation();openHistorySheet(\''+it.id+'\')" aria-label="서명 이력"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg></button>':'';
       html+='<div class="list-card" onclick="openContractDetail(\''+it.id+'\')">'+
         '<div class="lc-badge">'+(it.doc_type||'형사')+'</div>'+
-        '<div class="lc-body"><div class="lc-name">'+esc(name)+(it.sign_status==='signed'?'<span class="lc-signed">✓ 서명완료</span>':(it.sign_status==='requested'?'<span class="lc-pending">서명대기</span>':''))+'</div><div class="lc-meta">'+esc(meta)+'</div></div>'+
+        '<div class="lc-body"><div class="lc-name">'+esc(name)+(it.sign_status==='signed'?'<span class="lc-signed">✓ 서명완료</span>':(it.sign_status==='requested'?'<span class="lc-pending">서명대기</span>':''))+'</div><div class="lc-meta">'+esc(meta)+'</div>'+histLine+'</div>'+
         '<div class="lc-time">'+hh+':'+mm+'</div>'+
+        histBtn+
         '<button class="lc-del" onclick="event.stopPropagation();deleteContract(\''+it.id+'\')" aria-label="삭제"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>'+
         '</div>';
     });
@@ -3091,6 +3253,94 @@ function renderContractList(){
   box.innerHTML=html;
 }
 function esc(s){return escapeHtml(s);} /* escapeHtml과 동일 — 중복 제거 후 위임 */
+
+/* 이력 표시용 시각 포맷 */
+function fmtShort(iso){
+  if(!iso)return '';
+  var d=new Date(iso);if(isNaN(d))return '';
+  var p=function(n){return (n<10?'0':'')+n;};
+  return (d.getMonth()+1)+'/'+d.getDate()+' '+p(d.getHours())+':'+p(d.getMinutes());
+}
+function fmtFull(iso){
+  if(!iso)return '기록 없음';
+  var d=new Date(iso);if(isNaN(d))return '기록 없음';
+  var p=function(n){return (n<10?'0':'')+n;};
+  return d.getFullYear()+'.'+p(d.getMonth()+1)+'.'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());
+}
+/* 서명 이력 상세 시트 열기 */
+function openHistorySheet(id){
+  var it=null;
+  for(var i=0;i<listCache.length;i++){if(listCache[i].id===id){it=listCache[i];break;}}
+  if(!it){showToast('이력을 찾을 수 없습니다');return;}
+  var audit=it.audit||{};
+  var box=document.getElementById('historyBody');
+
+  // 상태 라벨
+  var statusLabel='—', statusColor='#888';
+  if(it.sign_status==='signed'){statusLabel='서명 완료';statusColor='#1a7f3c';}
+  else if(it.sign_status==='requested'){statusLabel='서명 대기 중';statusColor='#a06000';}
+
+  // 발송 방법 한글화
+  var methodMap={share:'카톡·문자 공유',copy:'링크 복사',sms:'문자'};
+  var sentMethod=audit.sent_method?(methodMap[audit.sent_method]||audit.sent_method):'';
+
+  var rows='';
+  // 앱 전체와 통일된 가는 선(line) 아이콘
+  var IC={
+    user:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+    send:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>',
+    eye:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
+    pen:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>',
+    idcard:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="12" r="2"/><line x1="14" y1="10.5" x2="18" y2="10.5"/><line x1="14" y1="14" x2="18" y2="14"/></svg>',
+    shield:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>'
+  };
+  var step=function(icon,label,val,sub){
+    return '<div class="hist-step">'+
+      '<div class="hist-ico">'+icon+'</div>'+
+      '<div class="hist-txt"><div class="hist-label">'+label+'</div>'+
+      '<div class="hist-val">'+(val||'<span class="hist-none">기록 없음</span>')+'</div>'+
+      (sub?'<div class="hist-sub">'+sub+'</div>':'')+'</div></div>';
+  };
+  rows+=step(IC.user,'받는 분', esc(it.recipient_name||it.client_name||'—'), it.recipient_phone?esc(it.recipient_phone):'');
+  rows+=step(IC.send,'링크 발송', it.sent_at?fmtFull(it.sent_at):'', sentMethod);
+  rows+=step(IC.eye,'의뢰인 열람', it.accessed_at?fmtFull(it.accessed_at):'', '');
+  rows+=step(IC.pen,'서명 완료', it.signed_at?fmtFull(it.signed_at):'', it.consent_agreed?'계약 내용 동의함':'');
+  // 서명자 본인확인 기재정보
+  if(audit.signer_tel||audit.signer_ssn_masked){
+    var vinfo=[];
+    if(audit.signer_tel)vinfo.push('연락처 '+esc(audit.signer_tel));
+    if(audit.signer_ssn_masked)vinfo.push('주민번호 '+esc(audit.signer_ssn_masked));
+    rows+=step(IC.idcard,'본인확인 기재', vinfo.join(' · '), '서명자가 직접 입력');
+  }
+  // 문서지문
+  if(it.signed_hash){
+    rows+=step(IC.shield,'문서 고유지문', '<span style="font-family:monospace;font-size:11px;word-break:break-all;">'+esc(it.signed_hash.slice(0,32))+'…</span>', 'SHA-256 · 내용이 바뀌면 지문이 달라집니다');
+  }
+
+  // 사건정보 수정 이력 (서명 후 사건번호·사건명·관할 변경 내역)
+  var editHtml='';
+  if(Array.isArray(audit.edits)&&audit.edits.length){
+    editHtml='<div class="hist-edits"><div class="hist-edits-title">사건정보 수정 이력 ('+audit.edits.length+'건)</div>';
+    // 최신순으로
+    for(var k=audit.edits.length-1;k>=0;k--){
+      var ed=audit.edits[k];
+      editHtml+='<div class="hist-edit-item"><div class="hist-edit-time">'+fmtFull(ed.at)+'</div>';
+      (ed.changes||[]).forEach(function(c){
+        editHtml+='<div class="hist-edit-change">'+esc(c.field)+' : <span class="he-from">'+esc(c.from||'(빈칸)')+'</span> → <span class="he-to">'+esc(c.to||'(빈칸)')+'</span></div>';
+      });
+      editHtml+='</div>';
+    }
+    editHtml+='</div>';
+  }
+
+  box.innerHTML=
+    '<div class="hist-status" style="color:'+statusColor+';border-color:'+statusColor+';">'+statusLabel+'</div>'+
+    rows+editHtml;
+  document.getElementById('historySheet').classList.add('active');
+}
+function closeHistorySheet(){
+  document.getElementById('historySheet').classList.remove('active');
+}
 
 /* ═══ 목록에서 계약서 불러오기 → 편집 ═══ */
 function openContractDetail(id){
@@ -3113,7 +3363,7 @@ function openContractDetail(id){
       restoreSignatureByType(it.counterparty_signature,dt);
       setTimeout(function(){
         if(it.sign_status==='signed'){
-          showToast('🔒 서명 완료된 계약서입니다 (내용 잠김 · 수정 불가)');
+          showToast('🔒 서명 완료 · 사건번호·사건명·관할만 수정 가능합니다');
         }else{
           showToast('상대방 서명이 포함된 계약서입니다');
         }
