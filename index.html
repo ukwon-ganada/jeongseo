@@ -1026,6 +1026,7 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
     <div id="signDoneActions" style="display:none;margin-top:26px;width:100%;max-width:300px;">
       <button class="sign-submit-btn" onclick="downloadSignedContract()">서명한 계약서 저장 (이미지)</button>
       <div class="sign-submit-note" style="margin-top:10px;">서명이 완료된 계약서를<br>사진(이미지)으로 본인 기기에 저장합니다.</div>
+      <div class="app-ver" style="text-align:center;font-size:10px;color:#cfd3d9;margin-top:14px;"></div>
     </div>
   </div>
   <div id="signContent" class="sign-content" style="display:none;">
@@ -1048,6 +1049,7 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
     <div class="sign-submit-bar">
       <button id="cpSubmitBtn" class="sign-submit-btn" onclick="submitCounterpartySign()" disabled>서명 제출</button>
       <div class="sign-submit-note">위 내용에 동의하고 서명하시면 활성화됩니다.<br>제출 시점의 계약서 내용이 그대로 고정·보관됩니다.</div>
+      <div class="app-ver" style="text-align:center;font-size:10px;color:#cfd3d9;margin-top:12px;"></div>
     </div>
   </div>
 </div>
@@ -2455,6 +2457,7 @@ function resetContract(){
 }
 
 /* ═══ Supabase 연동 ═══ */
+var APP_VERSION='v49';
 var SUPABASE_URL='https://nyjyemjsperpakrrgzcc.supabase.co';
 var SUPABASE_KEY='sb_publishable_QKl9MIt2_MflYnpN41VRvg_cNIAbYhU';
 var sb=null;
@@ -2863,6 +2866,7 @@ async function initSignMode(token){
   // 잠금화면 숨기고 서명 화면 컨테이너 표시
   var lock=document.getElementById('lockScreen');if(lock)lock.style.display='none';
   document.getElementById('signModeScreen').style.display='flex';
+  stampVersion();
   setSignState('loading','계약서를 불러오는 중입니다...');
   var client=getSB();
   if(!client){
@@ -2902,6 +2906,11 @@ async function initSignMode(token){
   }catch(e){
     setSignState('error','계약서를 불러오지 못했습니다.\n'+((e&&e.message)?e.message:''));
   }
+}
+/* 서명 화면에 현재 시스템 버전 표시 (배포 최신 여부 확인용) */
+function stampVersion(){
+  var els=document.querySelectorAll('.app-ver');
+  for(var i=0;i<els.length;i++){els[i].textContent='시스템 '+APP_VERSION;}
 }
 function setSignState(state,msg){
   var msgBox=document.getElementById('signMsgBox');
