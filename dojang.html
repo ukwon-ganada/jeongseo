@@ -16,56 +16,7 @@
     --r:12px; --r-lg:18px; --r-xl:24px; --r-pill:999px;
     --font:'Malgun Gothic','맑은 고딕','Apple SD Gothic Neo','Noto Sans KR',sans-serif;
   }
-  @font-face{ font-family:'CuteTheme'; src:url('./gamja.woff2') format('woff2'); font-display:swap; }
-  /* ===== 분홍 테마 (문서·인쇄 영역은 흰색 보호) ===== */
-  body.theme-pink{
-    --black:#5a2a43; --gray-900:#6a3450; --gray-700:#8a5570; --gray-500:#bd7fa0; --gray-400:#d59fbb;
-    --gray-300:#ffb3d2; --gray-200:#ffd2e4; --gray-100:#ffe1ee; --gray-50:#fff3f8; --border:#ffd2e4; --seal:#e84b8a;
-    background:
-      radial-gradient(circle at 12% 8%, #ffd9ea 0 12px, transparent 13px),
-      radial-gradient(circle at 88% 14%, #ffe4b8 0 9px, transparent 10px),
-      radial-gradient(circle at 78% 90%, #ffd9ea 0 10px, transparent 11px),
-      linear-gradient(160deg,#ffe3f0 0%, #ffd6ea 55%, #ffcfe6 100%) fixed;
-    font-family:'CuteTheme','Malgun Gothic','맑은 고딕','Apple SD Gothic Neo','Noto Sans KR',sans-serif; }
-  body.theme-pink .app-card{ background:linear-gradient(180deg,#fffafc,#fff2f8); }
-  body.theme-pink .worklane{ background:#fff6fa; }
-
-  /* 떠다니는 장식 (클릭 통과) */
-  .deco{ position:fixed; pointer-events:none; z-index:9; display:none; }
-  body.theme-pink .deco{ display:block; }
-  #heartCanvas{ position:fixed; inset:0; width:100%; height:100%; z-index:8; pointer-events:none; display:none; }
-  body.theme-pink #heartCanvas{ display:block; }
-  @media print{ #heartCanvas{ display:none!important; } }
-  .deco.d1{ bottom:70px; left:24px; width:64px; transform:rotate(-10deg); opacity:.85; }
-  .deco.d2{ bottom:150px; right:30px; width:38px; opacity:.8; }
-  .deco.d3{ bottom:280px; right:120px; width:24px; opacity:.6; transform:rotate(10deg); }
-  .deco.d4{ bottom:46px; right:54px; width:56px; transform:rotate(7deg); opacity:.85; }
-  .deco.d5{ bottom:210px; right:230px; width:26px; opacity:.55; transform:rotate(-8deg); }
-  .deco.d6{ bottom:44px; left:150px; width:48px; transform:rotate(10deg); opacity:.8; }
-  .deco.d7{ bottom:160px; left:50px; width:22px; opacity:.55; }
-  @media (max-width:720px){ .deco.d3, .deco.d5, .deco.d7{ display:none; } }
-  @media print{ .deco{ display:none!important; } }
-  .corner-img{ position:fixed; z-index:10; pointer-events:none; display:none; width:80px; height:auto;
-    filter:drop-shadow(0 4px 10px rgba(232,75,138,.18)); }
-  body.theme-pink .corner-img.loaded{ display:block; }
-  .corner-img.c1{ top:64px; left:8px; }
-  .corner-img.c2{ top:64px; right:12px; }
-  .corner-img.c3{ bottom:12px; left:8px; }
-  .corner-img.c4{ bottom:14px; right:14px; }
-  @media print{ .corner-img{ display:none!important; } }
-
-  /* 미니멀 테마 스위치 */
-  .theme-switch{ --ts-w:46px; --ts-h:26px; --ts-pad:3px;
-    width:var(--ts-w); height:var(--ts-h); border:1.5px solid var(--gray-300); padding:0; cursor:pointer; flex:none;
-    border-radius:999px; background:var(--gray-100); position:relative; transition:background .2s,border-color .2s;
-    -webkit-appearance:none; appearance:none; }
-  .theme-switch::after{ content:""; position:absolute; top:var(--ts-pad); left:var(--ts-pad);
-    width:calc(var(--ts-h) - var(--ts-pad)*2 - 3px); height:calc(var(--ts-h) - var(--ts-pad)*2 - 3px);
-    border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.25); transition:transform .2s; }
-  .theme-switch:hover{ border-color:var(--gray-500); }
-  body.theme-pink .theme-switch{ background:#e84b8a; border-color:#e84b8a; }
-  body.theme-pink .theme-switch:hover{ border-color:#d63b7a; }
-  body.theme-pink .theme-switch::after{ transform:translateX(calc(var(--ts-w) - var(--ts-h))); }
+  
 
   html,body{ margin:0; height:auto; }
   body{ background:#fff; color:var(--black); line-height:1.5; font-family:var(--font); -webkit-font-smoothing:antialiased; }
@@ -199,30 +150,7 @@
   </style>
 </head>
 <body>
-<canvas id="heartCanvas" aria-hidden="true"></canvas>
-<!-- 분홍 테마 장식 (직접 그린 리본·하트·반짝이, 캐릭터 미사용) -->
-<img class="deco d1" src="./ribbon.png" alt="" aria-hidden="true" onerror="this.style.display='none'">
-<svg class="deco d2" viewBox="0 0 60 56" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-  <path d="M30 52 C8 36, 2 20, 14 11 C22 5, 29 12, 30 18 C31 12, 38 5, 46 11 C58 20, 52 36, 30 52 Z" fill="#ff9ec9" stroke="#e84b8a" stroke-width="2.5" stroke-linejoin="round"/>
-</svg>
-<svg class="deco d3" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-  <path d="M20 2 C22 14, 26 18, 38 20 C26 22, 22 26, 20 38 C18 26, 14 22, 2 20 C14 18, 18 14, 20 2 Z" fill="#ffd0e4" stroke="#f48fb9" stroke-width="1.5" stroke-linejoin="round"/>
-</svg>
-<svg class="deco d4" viewBox="0 0 60 56" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-  <path d="M30 52 C8 36, 2 20, 14 11 C22 5, 29 12, 30 18 C31 12, 38 5, 46 11 C58 20, 52 36, 30 52 Z" fill="#ffc1dd" stroke="#f06aa3" stroke-width="2.5" stroke-linejoin="round"/>
-</svg>
-<svg class="deco d5" viewBox="0 0 60 56" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-  <path d="M30 52 C8 36, 2 20, 14 11 C22 5, 29 12, 30 18 C31 12, 38 5, 46 11 C58 20, 52 36, 30 52 Z" fill="#ffd8e8" stroke="#f48fb9" stroke-width="2.5" stroke-linejoin="round"/>
-</svg>
-<img class="deco d6" src="./ribbon.png" alt="" aria-hidden="true" onerror="this.style.display='none'">
-<svg class="deco d7" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-  <path d="M20 2 C22 14, 26 18, 38 20 C26 22, 22 26, 20 38 C18 26, 14 22, 2 20 C14 18, 18 14, 20 2 Z" fill="#ffe0ec" stroke="#f8a9c8" stroke-width="1.5" stroke-linejoin="round"/>
-</svg>
-<!-- 모서리 이미지 슬롯: corner-1~4.png 를 같은 폴더에 넣으면 표시됨 (없으면 자동 숨김) -->
-<img class="corner-img c1" src="./corner-1.png" alt="" aria-hidden="true" onload="this.classList.add('loaded'); if(window.hideOverlappingDeco)hideOverlappingDeco();" onerror="this.remove()">
-<img class="corner-img c2" src="./corner-2.png" alt="" aria-hidden="true" onload="this.classList.add('loaded'); if(window.hideOverlappingDeco)hideOverlappingDeco();" onerror="this.remove()">
-<img class="corner-img c3" src="./corner-3.png" alt="" aria-hidden="true" onload="this.classList.add('loaded'); if(window.hideOverlappingDeco)hideOverlappingDeco();" onerror="this.remove()">
-<img class="corner-img c4" src="./corner-4.png" alt="" aria-hidden="true" onload="this.classList.add('loaded'); if(window.hideOverlappingDeco)hideOverlappingDeco();" onerror="this.remove()">
+
 <div class="wrap">
   <div class="app-card">
 
@@ -232,7 +160,6 @@
         <span class="sub">서류에 도장을 찍고 순서대로 병합·저장</span>
       </div>
       <div class="head-tools">
-        <button class="theme-switch" id="themeSwitch" role="switch" aria-label="분홍 테마 전환" onclick="toggleTheme()"></button>
         <button class="mini-btn" id="resetBtn">전체 초기화</button>
       </div>
     </div>
@@ -924,81 +851,7 @@ function applyColorSwatch(b){
   colorSwatches.querySelectorAll('.swatch').forEach(x=> x.classList.remove('on'));
   b.classList.add('on'); state.color=b.dataset.c;
 }
-function hideOverlappingDeco(){
-  if(!document.body.classList.contains('theme-pink')) return;
-  const decos=[...document.querySelectorAll('.deco')];
-  decos.forEach(d=>{ d.style.display=''; });
-  const imgs=[...document.querySelectorAll('.corner-img.loaded')];
-  if(!imgs.length) return;
-  decos.forEach(d=>{ const b=d.getBoundingClientRect(); const pad=10;
-    for(const im of imgs){ const a=im.getBoundingClientRect();
-      if(!(a.right+pad<b.left||a.left-pad>b.right||a.bottom+pad<b.top||a.top-pad>b.bottom)){ d.style.display='none'; break; }
-    }
-  });
-}
-window.addEventListener('resize', function(){ setTimeout(hideOverlappingDeco,50); });
 
-/* ===== 하트 내리는 배경 효과 (은은하게) ===== */
-var heartFx=(function(){
-  var cv=null, ctx=null, parts=[], raf=0, running=false, W=0, H=0;
-  function rnd(a,b){ return a+Math.random()*(b-a); }
-  function count(){ return window.innerWidth<=720 ? 9 : 16; }
-  function mkHeart(initial){
-    return { x:rnd(0,W), y: initial?rnd(-H,H):rnd(-60,-10),
-      s:rnd(9,18), vy:rnd(14,30), sway:rnd(10,26), ph:rnd(0,Math.PI*2), sp:rnd(.4,1.0),
-      rot:rnd(-0.3,0.3), op:rnd(0.18,0.5) }; }
-  function ensure(){ cv=document.getElementById('heartCanvas'); if(!cv) return false;
-    ctx=cv.getContext('2d'); resize(); return true; }
-  function resize(){ if(!cv) return; var dpr=Math.min(window.devicePixelRatio||1,2);
-    W=window.innerWidth; H=window.innerHeight; cv.width=W*dpr; cv.height=H*dpr;
-    ctx.setTransform(dpr,0,0,dpr,0,0); }
-  function heartPath(c,x,y,s){ c.moveTo(x,y+s*0.3);
-    c.bezierCurveTo(x,y,x-s*0.5,y-s*0.1,x-s*0.5,y+s*0.25);
-    c.bezierCurveTo(x-s*0.5,y+s*0.55,x,y+s*0.7,x,y+s*0.95);
-    c.bezierCurveTo(x,y+s*0.7,x+s*0.5,y+s*0.55,x+s*0.5,y+s*0.25);
-    c.bezierCurveTo(x+s*0.5,y-s*0.1,x,y,x,y+s*0.3); }
-  var last=0;
-  function frame(t){ if(!running) return;
-    var dt=last?Math.min((t-last)/1000,0.05):0.016; last=t;
-    ctx.clearRect(0,0,W,H);
-    for(var i=0;i<parts.length;i++){ var p=parts[i];
-      p.y+=p.vy*dt; p.ph+=p.sp*dt; p.x+=Math.sin(p.ph)*p.sway*dt;
-      if(p.y>H+30){ parts[i]=mkHeart(false); continue; }
-      ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot+Math.sin(p.ph)*0.15);
-      ctx.globalAlpha=p.op; ctx.fillStyle='#ff7fb6';
-      ctx.beginPath(); heartPath(ctx,0,-p.s*0.5,p.s); ctx.fill();
-      ctx.restore();
-    }
-    raf=requestAnimationFrame(frame);
-  }
-  function start(){ if(running) return; if(!cv && !ensure()) return;
-    if(!parts.length){ var n=count(); for(var i=0;i<n;i++) parts.push(mkHeart(true)); }
-    running=true; last=0; raf=requestAnimationFrame(frame); }
-  function stop(){ running=false; if(raf) cancelAnimationFrame(raf); raf=0;
-    if(ctx) ctx.clearRect(0,0,W,H); }
-  window.addEventListener('resize', function(){ if(cv) resize(); });
-  return { start:start, stop:stop };
-})();
-function updateHeartFx(){
-  var on = document.body.classList.contains('theme-pink') && document.visibilityState!=='hidden';
-  if(on) heartFx.start(); else heartFx.stop();
-}
-document.addEventListener('visibilitychange', updateHeartFx);
-
-function applyThemeLocal(pink){
-  document.body.classList.toggle('theme-pink', !!pink);
-  const sw=document.getElementById('themeSwitch'); if(sw) sw.setAttribute('aria-checked', pink?'true':'false');
-  setTimeout(hideOverlappingDeco,50);
-  updateHeartFx();
-}
-function toggleTheme(){
-  const pink=!document.body.classList.contains('theme-pink');
-  applyThemeLocal(pink);
-  // 상위(메인 서비스)에 알려 동기화·영구저장
-  try{ if(window.parent && window.parent!==window) window.parent.postMessage({type:'theme-changed', pink:pink}, '*'); }catch(e){}
-}
-// 메인에서 내려주는 테마 적용 (단독 실행 시엔 무시됨)
-window.addEventListener('message', function(e){ if(e.data && e.data.type==='set-theme'){ applyThemeLocal(!!e.data.pink); } });
 function wireToolbar(){
   kindSeg.querySelectorAll('button').forEach(b=> b.addEventListener('click',()=>{
     state.stampKind=b.dataset.kind; updateKindSeg();
