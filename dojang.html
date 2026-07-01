@@ -105,6 +105,10 @@
   .stage-bar{display:flex; align-items:center; gap:8px; margin-bottom:10px; min-height:22px}
   .stage-bar .ord{background:var(--ink); color:#fff; border-radius:6px; font-size:11px; font-weight:600; padding:2px 7px}
   .stage-bar .fn{font-size:13px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .stage-bar .rotate-btn{margin-left:auto; flex:none; border:1px solid var(--line-strong); background:var(--panel); color:var(--ink);
+    border-radius:8px; font-size:12px; font-weight:600; padding:5px 11px; cursor:pointer; font-family:inherit; white-space:nowrap}
+  .stage-bar .rotate-btn:hover{border-color:var(--seal); color:var(--seal)}
+  .stage-bar .rotate-btn:active{transform:translateY(1px)}
   .stage{position:relative; line-height:0; max-width:540px; margin:0 auto; touch-action:none}
   .stage canvas.page{width:100%; height:auto; border:1px solid var(--line); border-radius:6px; cursor:crosshair; display:block}
   .stamp-ov{position:absolute; left:0; top:0; cursor:grab; touch-action:none; filter:drop-shadow(0 2px 5px rgba(0,0,0,.18)); user-select:none}
@@ -303,6 +307,7 @@ const PICKS = [
   { kind:'jeung',   label:'증 제○호증',   stampId:'jeung_h' },
 ];
 const MM2PT=2.8346457, STAMP_W_MM=10, STAMP_H_MM=50;
+const A4W_PT=595.276, A4H_PT=841.890;   // A4 세로 (pt) — 모든 페이지를 이 크기로 통일
 function stampIdFor(kind, num2){ return kind==='jeung' ? (String(num2||'').trim()?'jeung_hu':'jeung_h') : kind; }
 
 /* ===== 도장 캔버스 ===== */
@@ -340,16 +345,55 @@ function readAsDataURL(file){ return new Promise((res,rej)=>{ const r=new FileRe
 const IMG_RE=/\.(jpe?g|png|webp|gif|bmp)$/i;
 const isImageFile=f=> (f.type&&f.type.startsWith('image/'))||IMG_RE.test(f.name);
 const isHwp=f=> /\.hwp$/i.test(f.name);
-async function imageToPdfBytes(file){
+async function imageToPdfBytes(file, rot){
+  rot=((rot||0)%360+360)%360;
   const img=await loadImage(await readAsDataURL(file));
   const iw=img.naturalWidth||img.width, ih=img.naturalHeight||img.height;
-  const c=document.createElement('canvas'); c.width=iw; c.height=ih; c.getContext('2d').drawImage(img,0,0,iw,ih);
+  const swap = (rot===90||rot===270);
+  const cw = swap?ih:iw, ch = swap?iw:ih;
+  const c=document.createElement('canvas'); c.width=cw; c.height=ch;
+  const ctx=c.getContext('2d');
+  ctx.translate(cw/2, ch/2); ctx.rotate(-rot*Math.PI/180); ctx.drawImage(img, -iw/2, -ih/2, iw, ih);
   const isPng=/\.png$/i.test(file.name)||file.type==='image/png', mime=isPng?'image/png':'image/jpeg';
   const blob=await new Promise(r=>c.toBlob(r,mime,0.92)); const bytes=new Uint8Array(await blob.arrayBuffer());
-  const {PDFDocument}=PDFLib; const pdf=await PDFDocument.create();
+  const {PDFDocument, rgb}=PDFLib; const pdf=await PDFDocument.create();
   const emb=isPng?await pdf.embedPng(bytes):await pdf.embedJpg(bytes);
-  const long=842; let pw,ph; if(iw>=ih){ pw=long; ph=Math.round(long*ih/iw); } else { ph=long; pw=Math.round(long*iw/ih); }
-  pdf.addPage([pw,ph]).drawImage(emb,{x:0,y:0,width:pw,height:ph}); return await pdf.save();
+  // 항상 A4 세로 페이지 (제출 규격). 회전은 위에서 이미 이미지에 적용됨.
+  const scale=Math.min(A4W_PT/cw, A4H_PT/ch);
+  const dw=cw*scale, dh=ch*scale, x=(A4W_PT-dw)/2, y=(A4H_PT-dh)/2;
+  const page=pdf.addPage([A4W_PT,A4H_PT]);
+  page.drawRectangle({x:0,y:0,width:A4W_PT,height:A4H_PT,color:rgb(1,1,1)});
+  page.drawImage(emb,{x,y,width:dw,height:dh});
+  return await pdf.save();
+}
+// 업로드된 PDF의 모든 페이지를 A4 세로로 통일. rot(0/90/180/270)만큼 내용 회전.
+async function normalizeToA4(srcBytes, rot){
+  rot=((rot||0)%360+360)%360;
+  const {PDFDocument, rgb, degrees}=PDFLib;
+  try{
+    const src=await PDFDocument.load(srcBytes, {ignoreEncryption:true});
+    const n=src.getPageCount(); if(!n) return srcBytes;
+    const out=await PDFDocument.create();
+    const embs=await out.embedPdf(src, Array.from({length:n},(_,i)=>i));
+    for(let i=0;i<n;i++){
+      const e=embs[i]; const sw=e.width, sh=e.height;
+      const srcRot=((src.getPage(i).getRotation().angle%360)+360)%360;  // 원본 /Rotate(시계방향)
+      const total=(((360-srcRot)%360)+rot)%360;                          // 뷰어와 동일하게 반영 + 사용자 회전
+      const swap=(total===90||total===270);
+      const ew=swap?sh:sw, eh=swap?sw:sh;              // 회전 후 외곽 크기
+      const scale=Math.min(A4W_PT/ew, A4H_PT/eh);
+      const box_w=ew*scale, box_h=eh*scale;
+      const ox=(A4W_PT-box_w)/2, oy=(A4H_PT-box_h)/2;   // A4 내 중앙 배치용 외곽 좌하단
+      const page=out.addPage([A4W_PT,A4H_PT]);
+      page.drawRectangle({x:0,y:0,width:A4W_PT,height:A4H_PT,color:rgb(1,1,1)});
+      let ax=ox, ay=oy;
+      if(total===90){ ax=ox+box_w; ay=oy; }
+      else if(total===180){ ax=ox+box_w; ay=oy+box_h; }
+      else if(total===270){ ax=ox; ay=oy+box_h; }
+      page.drawPage(e,{x:ax, y:ay, xScale:scale, yScale:scale, rotate:degrees(total)});
+    }
+    return await out.save();
+  }catch(err){ console.warn('A4 정규화 실패, 원본 유지:', err); return srcBytes; }
 }
 
 /* ===== HWP 파서 ===== */
@@ -554,10 +598,11 @@ async function addFiles(fileLike){
   for(const f of docs){
     try{
       const img=isImageFile(f);
-      const bytes=img? await imageToPdfBytes(f) : await f.arrayBuffer();
+      const srcPdf = img? null : await f.arrayBuffer();
+      const bytes=img? await imageToPdfBytes(f,0) : await normalizeToA4(srcPdf,0);
       const doc=await pdfjsLib.getDocument({data:bytes.slice(0)}).promise;
       const name=img? f.name.replace(IMG_RE,'')+'.pdf' : f.name;
-      const nf={ id:_uid++, name, origName:f.name, kind:img?'image':'pdf', bytes, pdfjsDoc:doc, numPages:doc.numPages, num1:'', num2:'' };
+      const nf={ id:_uid++, name, origName:f.name, kind:img?'image':'pdf', bytes, pdfjsDoc:doc, numPages:doc.numPages, num1:'', num2:'', rot:0, srcFile:img?f:null, srcPdfBytes:srcPdf };
       state.files.push(nf);
       if(state.template) autoAssign(nf);   // 소장 모드면 빈 슬롯에 자동 연결
     }catch(err){ console.error(err); showToast(`'${f.name}' 을(를) 열지 못했습니다.`); }
@@ -598,10 +643,11 @@ async function dropFilesToSlot(slot, fileLike){
   const f=arr[0];
   try{
     const img=isImageFile(f);
-    const bytes=img? await imageToPdfBytes(f) : await f.arrayBuffer();
+    const srcPdf = img? null : await f.arrayBuffer();
+    const bytes=img? await imageToPdfBytes(f,0) : await normalizeToA4(srcPdf,0);
     const doc=await pdfjsLib.getDocument({data:bytes.slice(0)}).promise;
     const name=img? f.name.replace(IMG_RE,'')+'.pdf' : f.name;
-    const nf={ id:_uid++, name, origName:f.name, kind:img?'image':'pdf', bytes, pdfjsDoc:doc, numPages:doc.numPages, num1:'', num2:'' };
+    const nf={ id:_uid++, name, origName:f.name, kind:img?'image':'pdf', bytes, pdfjsDoc:doc, numPages:doc.numPages, num1:'', num2:'', rot:0, srcFile:img?f:null, srcPdfBytes:srcPdf };
     state.files.push(nf);
     state.slots.forEach(s=>{ if(s.fileId===nf.id) s.fileId=null; });
     slot.fileId=nf.id; state.activeId=nf.id;
@@ -784,13 +830,31 @@ async function renderPage(){
   const ordTxt = idx>=0 ? (idx+1) : '·';
   const meta=metaForFile(f);
   const labelTxt = meta ? labelFor(meta.kind, meta.num1, meta.num2) : '미배정';
-  stageBar.innerHTML=`<span class="ord">${ordTxt}</span><span class="fn">${escapeHtml(f.name)} · <b style="color:var(--seal)">${escapeHtml(labelTxt)}</b></span>`;
+  stageBar.innerHTML=`<span class="ord">${ordTxt}</span><span class="fn">${escapeHtml(f.name)} · <b style="color:var(--seal)">${escapeHtml(labelTxt)}</b></span><button type="button" class="rotate-btn" id="rotateBtn" title="90° 회전 (제출용 세로는 유지)">↻ 회전</button>`;
+  const rb=document.getElementById('rotateBtn'); if(rb) rb.addEventListener('click',rotateActive);
   rotateWarn.classList.toggle('show',(page.rotate%360)!==0);
   if(!state.defaultOffset){ const s1=page.getViewport({scale:1}); state.defaultOffset={rightPt:s1.width*0.045, bottomPt:s1.width*0.045}; }
   wireStageClick(canvas); refreshStamp();
 }
 function clearStage(){ const c=stage.querySelector('canvas.page'); if(c) c.remove(); const o=stage.querySelector('.stamp-ov'); if(o) o.remove();
   stagePlaceholder.style.display=''; stageBar.innerHTML=''; rotateWarn.classList.remove('show'); }
+// 회전값(f.rot)으로 파일의 A4 PDF를 다시 생성
+async function rebuildFile(f){
+  const bytes = f.kind==='image' ? await imageToPdfBytes(f.srcFile, f.rot) : await normalizeToA4(f.srcPdfBytes, f.rot);
+  f.bytes=bytes;
+  try{ if(f.pdfjsDoc && f.pdfjsDoc.destroy) f.pdfjsDoc.destroy(); }catch(e){}
+  f.pdfjsDoc=await pdfjsLib.getDocument({data:bytes.slice(0)}).promise;
+  f.numPages=f.pdfjsDoc.numPages;
+}
+// 현재 미리보기 서류를 90°씩 회전 (제출용 A4 세로는 유지, 내용만 회전)
+let _rotating=false;
+async function rotateActive(){
+  const f=activeFile(); if(!f||_rotating) return;
+  _rotating=true;
+  try{ f.rot=((f.rot||0)+90)%360; await rebuildFile(f); await renderPage(); }
+  catch(err){ console.error(err); showToast('회전 중 문제가 발생했습니다.'); }
+  finally{ _rotating=false; }
+}
 function stampCss(){ const canvas=stage.querySelector('canvas.page'); if(!canvas||!state.viewport) return {w:40,h:200,S:1,factor:1,wpt:28,hpt:142};
   const S=state.viewport.scale, factor=canvas.width/canvas.clientWidth;
   const wpt=STAMP_W_MM*MM2PT*state.sizePct/100, hpt=STAMP_H_MM*MM2PT*state.sizePct/100; return {w:wpt*S/factor,h:hpt*S/factor,S,factor,wpt,hpt}; }
