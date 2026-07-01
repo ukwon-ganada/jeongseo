@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>법무법인 정서</title>
+<!-- 카톡·문자 링크 미리보기 (회사 로고가 뜨도록) -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="법무법인 정서">
+<meta property="og:description" content="여기를 눌러 서명 링크를 확인하세요.">
+<meta property="og:image" content="https://ukwon-ganada.github.io/jeongseo/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:url" content="https://ukwon-ganada.github.io/jeongseo/">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
@@ -793,6 +801,10 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
 .sd-sign-section{margin-top:18px;padding-top:14px;border-top:1px dashed var(--border);}
 .sd-sign-label{font-size:12px;color:var(--gray-700);font-weight:600;margin-bottom:8px;}
 .sd-sign-img{max-width:160px;height:auto;border:1px solid var(--border);border-radius:8px;background:#fff;}
+.sign-consent-section{background:#fff;border-radius:var(--r-lg);padding:16px 18px;box-shadow:0 1px 8px rgba(0,0,0,0.06);margin-bottom:14px;}
+.sign-consent{display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13.5px;line-height:1.6;color:var(--gray-700);}
+.sign-consent input{width:20px;height:20px;flex-shrink:0;margin-top:1px;accent-color:#1a2740;cursor:pointer;}
+.sign-consent b{color:var(--black);font-weight:700;}
 .sign-pad-section{background:#fff;border-radius:var(--r-lg);padding:18px;box-shadow:0 1px 8px rgba(0,0,0,0.06);margin-bottom:18px;}
 .sign-pad-label{font-size:14px;font-weight:600;margin-bottom:12px;text-align:center;color:var(--black);}
 .sign-pad-box{border:2px dashed var(--border);border-radius:12px;background:var(--gray-50);display:flex;align-items:center;justify-content:center;overflow:hidden;}
@@ -949,6 +961,12 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
     <div class="sign-doc-wrap">
       <div id="signDocView"></div>
     </div>
+    <div class="sign-consent-section">
+      <label class="sign-consent">
+        <input type="checkbox" id="cpConsentChk" onchange="updateSubmitState()">
+        <span>본인은 위 계약 내용을 모두 확인하였으며, 이에 <b>동의하여 전자서명</b>합니다.</span>
+      </label>
+    </div>
     <div class="sign-pad-section">
       <div class="sign-pad-label">아래 칸에 서명해 주세요</div>
       <div class="sign-pad-box">
@@ -957,8 +975,8 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
       <button class="sign-pad-clear" onclick="clearCpSign()">다시 서명</button>
     </div>
     <div class="sign-submit-bar">
-      <button id="cpSubmitBtn" class="sign-submit-btn" onclick="submitCounterpartySign()">서명 제출</button>
-      <div class="sign-submit-note">제출하면 변호사에게 서명이 전달됩니다.</div>
+      <button id="cpSubmitBtn" class="sign-submit-btn" onclick="submitCounterpartySign()" disabled>서명 제출</button>
+      <div class="sign-submit-note">위 내용에 동의하고 서명하시면 활성화됩니다.<br>제출 시점의 계약서 내용이 그대로 고정·보관됩니다.</div>
     </div>
   </div>
 </div>
@@ -1109,7 +1127,7 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
       <button class="cts-btn" onclick="saveToListBtn()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>목록에 저장
       </button>
-      <button class="cts-btn cts-sign" onclick="createSignRequest()">
+      <button class="cts-btn cts-sign" onclick="openRecipientSheet()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>서명요청
       </button>
       <div class="cts-div"></div>
@@ -1137,7 +1155,7 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
     <button class="ab-share" onclick="openActionSheet()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>공유
     </button>
-    <button class="ab-sign" onclick="createSignRequest()">
+    <button class="ab-sign" onclick="openRecipientSheet()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>서명
     </button>
   </div>
@@ -1806,6 +1824,23 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
 </div>
 
 <!-- 통합 입력 폼 -->
+<!-- 받는 분 정보 시트 (서명요청 전 단계) -->
+<div class="sl-overlay" id="recipientSheet" onclick="if(event.target===this)closeRecipientSheet()">
+  <div class="sl-box">
+    <div class="sl-title">받는 분 정보</div>
+    <div class="sl-desc">이 서명 링크를 <b>누구에게 보내는지</b> 기록해 둡니다. 나중에 "언제·누구에게 보냈고, 그 링크로 서명되었다"는 증빙이 됩니다.</div>
+    <input type="text" class="sl-input" id="recipNameInput" placeholder="받는 분 성함 (예: 홍길동)" style="margin-bottom:8px;">
+    <input type="text" class="sl-input" id="recipPhoneInput" placeholder="휴대폰 번호 (예: 010-1234-5678)" inputmode="tel">
+    <div class="sl-btns" style="margin-top:14px;">
+      <button class="sl-btn primary" onclick="proceedCreateSign()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
+        서명 링크 만들기
+      </button>
+    </div>
+    <button class="sl-close" onclick="closeRecipientSheet()">취소</button>
+  </div>
+</div>
+
 <!-- 서명 링크 시트 -->
 <div class="sl-overlay" id="signLinkSheet" onclick="if(event.target===this)closeSignLinkSheet()">
   <div class="sl-box">
@@ -2508,6 +2543,11 @@ async function saveToCloud(explicit){
         var existing=await client.from('contracts').select('counterparty_signature,sign_status,sign_token,sign_expires_at').eq('id',currentEditId).limit(1);
         if(existing&&existing.data&&existing.data[0]){
           var ex=existing.data[0];
+          // ── 무결성 잠금: 이미 서명 완료된 계약서는 내용 수정 저장을 차단 ──
+          if(ex.sign_status==='signed'){
+            if(explicit)showToast('서명이 완료된 계약서는 내용을 수정할 수 없습니다');
+            return false;
+          }
           if(ex.counterparty_signature)payload.counterparty_signature=ex.counterparty_signature;
           if(ex.sign_status)payload.sign_status=ex.sign_status;
           if(ex.sign_token)payload.sign_token=ex.sign_token;
@@ -2537,6 +2577,40 @@ async function saveToListBtn(){
   hideLoading();
 }
 
+/* ═══ 전자서명 무결성: 스냅샷 정규화 + SHA-256 해시 ═══ */
+/* 키 순서에 무관하게 항상 동일한 문자열을 만드는 안정적 stringify.
+   → 같은 내용이면 언제 계산해도 같은 해시가 나오도록 보장 */
+function stableStringify(obj){
+  if(obj===null||typeof obj!=='object')return JSON.stringify(obj);
+  if(Array.isArray(obj))return '['+obj.map(stableStringify).join(',')+']';
+  var keys=Object.keys(obj).sort();
+  return '{'+keys.map(function(k){return JSON.stringify(k)+':'+stableStringify(obj[k]);}).join(',')+'}';
+}
+/* 서명 대상 문서의 지문(fingerprint)을 만든다.
+   doc_type·사건정보·form_data를 묶어 정규화 → 이 문자열이 곧 "서명한 내용" */
+function buildSignPayloadForHash(rec, formData){
+  return stableStringify({
+    doc_type: rec.doc_type||'',
+    case_num: rec.case_num||'',
+    case_name: rec.case_name||'',
+    court: rec.court||'',
+    client_name: rec.client_name||'',
+    form_data: formData||{}
+  });
+}
+/* Web Crypto로 SHA-256 계산 → 16진수 문자열.
+   crypto.subtle은 https(또는 localhost)에서만 동작 → github.io 배포본에서 정상 작동 */
+async function sha256Hex(str){
+  try{
+    var enc=new TextEncoder().encode(str);
+    var buf=await crypto.subtle.digest('SHA-256', enc);
+    var bytes=new Uint8Array(buf);
+    var hex='';
+    for(var i=0;i<bytes.length;i++){hex+=bytes[i].toString(16).padStart(2,'0');}
+    return hex;
+  }catch(e){return '';}
+}
+
 /* ═══ 서명 요청 링크 생성 ═══ */
 function genToken(){
   // 32자리 랜덤 토큰
@@ -2561,7 +2635,41 @@ function getSignBaseUrl(){
   }
   return FIXED_BASE;
 }
-async function createSignRequest(){
+/* 받는 분 정보 시트 열고/닫기 */
+function openRecipientSheet(){
+  var nm=document.getElementById('recipNameInput');
+  var ph=document.getElementById('recipPhoneInput');
+  // ① 계약서에 입력해 둔 의뢰인 이름·연락처를 그대로 자동 입력
+  var preName=(data.name||'').trim();
+  var prePhone=(data.tel||'').trim();
+  // ② 이 계약서로 이미 서명요청한 적이 있으면, 그때 받는 분 정보를 우선 사용
+  if(currentRecord){
+    if(currentRecord.recipient_name)preName=currentRecord.recipient_name;
+    if(currentRecord.recipient_phone)prePhone=currentRecord.recipient_phone;
+  }
+  nm.value=preName;
+  ph.value=prePhone;
+  ph.oninput=function(){applyLiveFormat(ph,formatPhone);};
+  document.getElementById('recipientSheet').classList.add('active');
+  // 비어 있는 칸에만 커서를 둠 (둘 다 채워졌으면 바로 버튼만 누르면 됨)
+  setTimeout(function(){
+    if(!preName)nm.focus();
+    else if(!prePhone)ph.focus();
+  },100);
+}
+function closeRecipientSheet(){
+  document.getElementById('recipientSheet').classList.remove('active');
+}
+function proceedCreateSign(){
+  var name=(document.getElementById('recipNameInput').value||'').trim();
+  var phone=(document.getElementById('recipPhoneInput').value||'').trim();
+  if(!phone){ showToast('받는 분 휴대폰 번호를 입력해 주세요'); return; }
+  closeRecipientSheet();
+  createSignRequest({recipient_name:name, recipient_phone:phone});
+}
+
+async function createSignRequest(recipient){
+  recipient=recipient||{};
   showLoading('서명 요청 링크 만드는 중...');
   var client=getSB();
   if(!client){
@@ -2582,6 +2690,8 @@ async function createSignRequest(){
     sign_token:token,
     sign_expires_at:expires,
     sign_status:'requested',
+    recipient_name:recipient.recipient_name||'',
+    recipient_phone:recipient.recipient_phone||'',
     updated_at:new Date().toISOString()
   };
   try{
@@ -2594,6 +2704,8 @@ async function createSignRequest(){
       if(res&&res.data&&res.data[0])currentEditId=res.data[0].id;
     }
     var link=getSignBaseUrl()+'?sign='+token;
+    // 방금 만든 링크의 토큰을 기억 → 공유·복사 시 "보낸 시각" 기록에 사용
+    window._lastSignToken=token;
     hideLoading();
     showSignLinkSheet(link);
   }catch(e){
@@ -2608,6 +2720,23 @@ function showSignLinkSheet(link){
 function closeSignLinkSheet(){
   document.getElementById('signLinkSheet').classList.remove('active');
 }
+/* 링크를 보낸 사실(시각·방법)을 기록 → "이 링크를 이때 이 방법으로 보냈다"는 증빙 */
+async function markSignSent(method){
+  var token=window._lastSignToken;
+  if(!token)return;
+  var client=getSB();if(!client)return;
+  try{
+    var now=new Date().toISOString();
+    // 기존 audit 보존하며 발송정보 병합
+    var cur=await client.from('contracts').select('audit').eq('sign_token',token).limit(1);
+    var audit={};
+    if(cur&&cur.data&&cur.data[0]&&cur.data[0].audit)audit=cur.data[0].audit;
+    audit.sent_at=now;
+    audit.sent_method=method;
+    audit.sent_ua=(navigator.userAgent||'').slice(0,300);
+    await client.from('contracts').update({sent_at:now, audit:audit}).eq('sign_token',token);
+  }catch(e){/* 기록 실패해도 링크 자체는 유효 */}
+}
 function copySignLink(){
   var inp=document.getElementById('signLinkInput');
   var link=inp.value;
@@ -2619,6 +2748,7 @@ function copySignLink(){
       document.execCommand('copy');
       showToast('링크가 복사되었습니다');
     }
+    markSignSent('copy');
   }catch(e){
     inp.select();
     showToast('링크를 길게 눌러 복사해 주세요');
@@ -2631,6 +2761,7 @@ async function shareSignLink(){
   if(navigator.share){
     try{
       await navigator.share({title:'송무위임계약서 서명 요청',text:msg});
+      markSignSent('share');
     }catch(e){/* 사용자 취소 */}
   }else{
     copySignLink();
@@ -2671,6 +2802,16 @@ async function initSignMode(token){
       setSignState('done','이미 서명이 완료되었습니다.\n감사합니다.');return;
     }
     signModeRecord=rec;
+    // 최초 접속 시각 기록 (한 번만) → "이 링크로 언제 처음 열람했다"는 증빙
+    if(!rec.accessed_at){
+      try{
+        var audit=rec.audit||{};
+        audit.accessed_ua=(navigator.userAgent||'').slice(0,300);
+        client.from('contracts').update({
+          accessed_at:new Date().toISOString(), audit:audit
+        }).eq('sign_token',token).then(function(){},function(){});
+      }catch(e){}
+    }
     renderSignContract(rec);
     setSignState('ready','');
     setTimeout(initCpSignCanvas,100);
@@ -2808,6 +2949,9 @@ function fmtNum(v){
 }
 async function submitCounterpartySign(){
   if(!signModeRecord){showToast('오류: 다시 시도해 주세요');return;}
+  // 동의 확인
+  var chk=document.getElementById('cpConsentChk');
+  if(!chk||!chk.checked){showToast('계약 내용 동의에 체크해 주세요');return;}
   var cv=document.getElementById('cpSigCanvas');
   if(!window._cpHasSig){showToast('서명을 입력해 주세요');return;}
   var sigData='';
@@ -2833,11 +2977,38 @@ async function submitCounterpartySign(){
     var email=gv3('sf-email');if(email!==undefined)newFd.data.email=email;
     var payer=gv3('sf-payer');if(payer!==undefined)newFd.data.payer=payer;
     var receipt=rv3('sf-receipt');if(receipt!==undefined)newFd.receipt=receipt;
+
+    // ── 무결성: 서명 시점 문서 스냅샷 + SHA-256 해시 고정 ──
+    var signedAt=new Date().toISOString();
+    var snapshot={
+      doc_type:signModeRecord.doc_type||'',
+      case_num:signModeRecord.case_num||'',
+      case_name:signModeRecord.case_name||'',
+      court:signModeRecord.court||'',
+      client_name:signModeRecord.client_name||'',
+      form_data:newFd,
+      signed_at:signedAt
+    };
+    var hashSource=buildSignPayloadForHash(signModeRecord, newFd);
+    var docHash=await sha256Hex(hashSource);
+
+    // ── 감사정보 병합 (발송·접속 기록 보존) ──
+    var audit=signModeRecord.audit||{};
+    audit.signed_at=signedAt;
+    audit.signed_ua=(navigator.userAgent||'').slice(0,300);
+    audit.consent=true;
+    audit.hash_algo='SHA-256';
+
     var ur=await client.from('contracts').update({
       counterparty_signature:sigData,
       sign_status:'signed',
       form_data:newFd,
-      updated_at:new Date().toISOString()
+      signed_snapshot:snapshot,
+      signed_hash:docHash,
+      signed_at:signedAt,
+      consent_agreed:true,
+      audit:audit,
+      updated_at:signedAt
     }).eq('sign_token',signModeRecord.sign_token);
     if(ur.error)throw ur.error;
     setSignState('done','서명이 제출되었습니다.\n감사합니다.');
@@ -2845,6 +3016,12 @@ async function submitCounterpartySign(){
     btn.disabled=false;btn.textContent='서명 제출';
     showToast('제출 실패: '+((e&&e.message)?e.message:'다시 시도'));
   }
+}
+/* 동의 체크 여부에 따라 제출 버튼 활성/비활성 */
+function updateSubmitState(){
+  var chk=document.getElementById('cpConsentChk');
+  var btn=document.getElementById('cpSubmitBtn');
+  if(btn)btn.disabled=!(chk&&chk.checked);
 }
 /* 상대방(의뢰인) 서명 캔버스 설정값 */
 var CP_SIGPAD={canvasId:'cpSigCanvas',ctxKey:'_cpSigCtx',hasKey:'_cpHasSig',lineWidth:2.2,strokeStyle:'#111',fitResolution:true};
@@ -2935,7 +3112,11 @@ function openContractDetail(id){
     if(it.counterparty_signature){
       restoreSignatureByType(it.counterparty_signature,dt);
       setTimeout(function(){
-        showToast('상대방 서명이 포함된 계약서입니다');
+        if(it.sign_status==='signed'){
+          showToast('🔒 서명 완료된 계약서입니다 (내용 잠김 · 수정 불가)');
+        }else{
+          showToast('상대방 서명이 포함된 계약서입니다');
+        }
       },300);
     }
   },80);
