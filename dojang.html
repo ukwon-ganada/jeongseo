@@ -248,7 +248,7 @@
     <div class="preview-col">
       <div class="stage-bar" id="stageBar"></div>
       <div class="stage" id="stage">
-        <div class="placeholder" id="stagePlaceholder">오른쪽에서 PDF·사진·소장(.hwp)을 추가하면<br>여기에서 도장 위치를 잡을 수 있습니다.</div>
+        <div class="placeholder" id="stagePlaceholder">오른쪽에서 PDF·사진·소장(.hwp/.hwpx)을 추가하면<br>여기에서 도장 위치를 잡을 수 있습니다.</div>
       </div>
       <div class="warn" id="rotateWarn">이 앞면은 회전되어 저장돼 있어 도장이 약간 어긋날 수 있습니다.</div>
       <div class="actions">
@@ -260,9 +260,9 @@
 
     <div class="side-col">
       <div class="drop" id="drop">
-        <div class="big">＋ PDF · 사진 · 소장(.hwp) 추가</div>
+        <div class="big">＋ PDF · 사진 · 소장(.hwp/.hwpx) 추가</div>
         <div class="sub">소장을 같이 올리면 제출서류 목록을 자동 인식합니다</div>
-        <input type="file" id="fileInput" accept=".hwp,application/pdf,image/*" multiple hidden>
+        <input type="file" id="fileInput" accept=".hwp,.hwpx,application/pdf,image/*" multiple hidden>
       </div>
 
       <div id="modeA">
@@ -345,6 +345,8 @@ function readAsDataURL(file){ return new Promise((res,rej)=>{ const r=new FileRe
 const IMG_RE=/\.(jpe?g|png|webp|gif|bmp)$/i;
 const isImageFile=f=> (f.type&&f.type.startsWith('image/'))||IMG_RE.test(f.name);
 const isHwp=f=> /\.hwp$/i.test(f.name);
+const isHwpx=f=> /\.hwpx$/i.test(f.name);
+const isSojang=f=> isHwp(f)||isHwpx(f);   // 소장(.hwp/.hwpx) 통합 판정
 async function imageToPdfBytes(file, rot){
   rot=((rot||0)%360+360)%360;
   const img=await loadImage(await readAsDataURL(file));
@@ -432,6 +434,43 @@ function parseHwpEvidence(arrayBuffer){
     const bdv=new DataView(body.buffer,body.byteOffset,body.byteLength); let i=0;
     while(i<body.length-4){ const h=bdv.getUint32(i,true); const tag=h&0x3ff; let size=(h>>>20)&0xfff; i+=4; if(size===0xfff){ size=bdv.getUint32(i,true); i+=4; }
       if(tag===67){ let s=''; for(let j=0;j+1<size;j+=2){ const c=bdv.getUint16(i+j,true); s+=(c>=32||c===10)?String.fromCharCode(c):' '; } paras.push(s.replace(/\s+/g,' ').trim()); } i+=size; } }
+  return parseEvidenceFromParas(paras);
+}
+
+/* ===== HWPX 파서 (ZIP+XML) =====
+   .hwp(OLE 바이너리)보다 훨씬 단순하다. .hwpx는 ZIP 압축이라 JSZip으로 풀고,
+   Contents/section0.xml ... 안의 <hp:p>(문단)에서 <hp:t>(글자)만 이어붙이면 끝. */
+async function parseHwpxEvidence(arrayBuffer){
+  if(!window.JSZip) throw new Error('압축 해제 도구(JSZip)를 불러오지 못했습니다');
+  const zip=await JSZip.loadAsync(arrayBuffer);
+  const names=Object.keys(zip.files)
+    .filter(n=> /(^|\/)Contents\/section\d+\.xml$/i.test(n) || /(^|\/)section\d+\.xml$/i.test(n))
+    .sort((a,b)=> a.localeCompare(b,undefined,{numeric:true}));   // section0, section1 … 순서 보장
+  if(!names.length) throw new Error('본문(section) XML을 찾지 못했습니다 (.hwpx 형식 확인)');
+  const decodeXml=s=> s
+    .replace(/<[^>]+>/g,'')                       // hp:t 안에 섞인 마크업 태그 제거(본문의 <,>는 엔티티라 안전)
+    .replace(/&lt;/g,'<').replace(/&gt;/g,'>')
+    .replace(/&quot;/g,'"').replace(/&apos;/g,"'")
+    .replace(/&#x([0-9a-fA-F]+);/g,(_,h)=>String.fromCodePoint(parseInt(h,16)))
+    .replace(/&#(\d+);/g,(_,d)=>String.fromCodePoint(+d))
+    .replace(/&amp;/g,'&');                        // &amp; 는 맨 마지막(이중 해제 방지)
+  const paras=[];
+  for(const nm of names){
+    const xml=await zip.files[nm].async('string');
+    const pRe=/<hp:p\b[^>]*>([\s\S]*?)<\/hp:p>/g;  // 문단 단위. \b로 hp:pageBreak 등 유사태그 배제
+    let pm;
+    while((pm=pRe.exec(xml))){
+      const tRe=/<hp:t\b[^>]*>([\s\S]*?)<\/hp:t>/g;
+      let tm, s='';
+      while((tm=tRe.exec(pm[1]))){ s+=decodeXml(tm[1]); }
+      paras.push(s.replace(/\s+/g,' ').trim());
+    }
+  }
+  return parseEvidenceFromParas(paras);
+}
+
+/* ===== 문단 목록 → 입증방법·참고자료·첨부서류 해석 (hwp·hwpx 공용) ===== */
+function parseEvidenceFromParas(paras){
   // 섹션 헤더 + 호증 표기 다양성 처리
   const nn=s=>s.replace(/[^0-9A-Za-z가-힣]/g,'');
   const HJ_A=/(소?[갑을병정증])\s*제\s*(\d+)\s*호증(?:의\s*(\d+))?\s*(.*)$/;          // 정식: 갑 제1호증(의 1)
@@ -592,9 +631,9 @@ function wireUpload(){
 }
 async function addFiles(fileLike){
   const all=[...fileLike];
-  const hwps=all.filter(isHwp);
-  const docs=all.filter(f=> !isHwp(f) && (f.type==='application/pdf'||/\.pdf$/i.test(f.name)||isImageFile(f)));
-  if(!docs.length && !hwps.length){ showToast('PDF·사진·소장(.hwp)만 올릴 수 있습니다.'); return; }
+  const hwps=all.filter(isSojang);
+  const docs=all.filter(f=> !isSojang(f) && (f.type==='application/pdf'||/\.pdf$/i.test(f.name)||isImageFile(f)));
+  if(!docs.length && !hwps.length){ showToast('PDF·사진·소장(.hwp/.hwpx)만 올릴 수 있습니다.'); return; }
   for(const f of docs){
     try{
       const img=isImageFile(f);
@@ -617,7 +656,8 @@ async function addFiles(fileLike){
 /* ===== 소장 ===== */
 async function handleSojang(file){
   try{
-    const list=parseHwpEvidence(await file.arrayBuffer());
+    const buf=await file.arrayBuffer();
+    const list = isHwpx(file) ? await parseHwpxEvidence(buf) : parseHwpEvidence(buf);   // 확장자로 파서 분기
     if(!list.length){ showToast('입증방법 목록을 찾지 못했습니다.'); return; }
     state.template=true;
     state.slots=list.map(it=>({ id:_uid++, kind:it.kind, title:it.title, num1:it.num1, num2:it.num2, fileId:null }));
@@ -628,7 +668,7 @@ async function handleSojang(file){
     for(const p of pairs){ if(state.slots[p.si].fileId||used.has(p.r.id)) continue; state.slots[p.si].fileId=p.r.id; used.add(p.r.id); }
     const first=state.slots.find(s=>s.fileId); state.activeId=first?first.fileId:(state.files[0]?state.files[0].id:null);
     showToast(`입증방법 ${list.length}건 인식 · 자동 연결 ${used.size}건`);
-  }catch(err){ console.error(err); showToast('소장을 읽지 못했습니다. (HWP 5.0 .hwp 파일인지 확인)'); }
+  }catch(err){ console.error(err); showToast('소장을 읽지 못했습니다. (.hwp/.hwpx 파일인지 확인)'); }
 }
 function autoAssign(nf){
   let best=null, bs=0;
