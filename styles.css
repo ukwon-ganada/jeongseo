@@ -12,16 +12,17 @@
 
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 :root{
+  /* 회색: Apple iOS 27 정확값(밝은 단계) + 텍스트용 진회색 유지 */
   --black:#1a1a1a;
   --gray-900:#222;
   --gray-700:#444;
-  --gray-500:#888;
-  --gray-400:#aaa;
-  --gray-300:#ccc;
-  --gray-200:#e4e4e4;
-  --gray-100:#f2f2f2;
-  --gray-50:#f9f9f9;
-  --border:#e8e8e8;
+  --gray-500:#8E8E93;
+  --gray-400:#AEAEB2;
+  --gray-300:#C7C7CC;
+  --gray-200:#D1D1D6;
+  --gray-100:#F2F2F7;
+  --gray-50:#FAFAFA;
+  --border:#E5E5EA;
   /* ── 브랜드·의미 색 (이 값만 바꾸면 전체 반영) ── */
   --brand:#1a2740;
   /* 홈 벤토 강조: 브랜드 네이비 (검정 역할을 대신) */
@@ -29,9 +30,9 @@
   --danger:#c0392b;
   --success:#1a7f3c;
   --info:#1a4ea2;
-  --font:'Pretendard Variable','Pretendard','Malgun Gothic','맑은 고딕','Apple SD Gothic Neo','Noto Sans KR',sans-serif;
-  /* 모서리: 샤프하게 (수상급 미니멀 방향) — pill은 CTA 강조용이라 그대로 유지 */
-  --r:8px;--r-lg:10px;--r-xl:12px;--r-pill:999px;
+  --font:-apple-system,BlinkMacSystemFont,'Pretendard Variable','Pretendard',system-ui,'Apple SD Gothic Neo','Malgun Gothic','맑은 고딕','Noto Sans KR',sans-serif;
+  /* 모서리: Apple iOS 27 (sm8 / md12=버튼·입력 / lg16=카드 / xl20=시트) */
+  --r:8px;--r-lg:12px;--r-xl:16px;--r-2xl:20px;--r-pill:999px;
   /* 간격 스케일: 4px 기반 (2단계 여백 정리 때 사용할 자) */
   --space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-5:24px;--space-6:32px;--space-8:48px;--space-10:64px;
 }
@@ -65,7 +66,7 @@ html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black)
     padding:0;position:sticky;top:0;height:100vh;
   }
   .sb-brand{padding:30px 22px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:flex-start;gap:12px;}
-  .sb-logo{width:38px;height:38px;border-radius:9px;flex-shrink:0;box-shadow:0 1px 3px rgba(0,0,0,0.12);}
+  .sb-logo{width:38px;height:38px;border-radius:9px;flex-shrink:0;}
   .sb-brand-name{font-size:19px;font-weight:700;color:var(--black);letter-spacing:-0.01em;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .sb-nav{padding:16px 12px;}
   .sb-label{font-size:10px;font-weight:600;color:var(--gray-400);letter-spacing:0.1em;text-transform:uppercase;padding:0 10px;margin-bottom:6px;}
