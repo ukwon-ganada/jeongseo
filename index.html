@@ -2490,7 +2490,7 @@ function resetContract(){
 }
 
 /* ═══ Supabase 연동 ═══ */
-var APP_VERSION='v51';
+var APP_VERSION='v53';
 var SUPABASE_URL='https://nyjyemjsperpakrrgzcc.supabase.co';
 var SUPABASE_KEY='sb_publishable_QKl9MIt2_MflYnpN41VRvg_cNIAbYhU';
 var sb=null;
@@ -4436,16 +4436,10 @@ function openGyeongyu(){
   var birth=gyExtractBirth(first.ssn);
   var caseType=(seonimMode==='민가사')?'민사·가사':'형사';
 
-  var rows=[
-    {label:'관할기관', value:s.agency||''},
-    {label:'사건번호', value:s.casenum||''},
-    {label:'사건명',   value:s.casename||''},
-    {label:'위임인 (성명)', value:wijminName},
-    {label:'위임인 생년월일', value:birth},
-    {label:'상대방', value:s.opp||''},
-    {label:'사용일', value:gyToday()},
-    {label:'수임일', value:s.date||''}
-  ];
+  var vals={
+    agency:s.agency||'', casenum:s.casenum||'', casename:s.casename||'',
+    role:s.role||'', wijmin:wijminName, birth:birth, opp:s.opp||''
+  };
 
   var W=screen.availWidth||window.innerWidth;
   var H=screen.availHeight||window.innerHeight;
@@ -4457,62 +4451,123 @@ function openGyeongyu(){
   var panel=window.open('', 'gyeongyu_panel', leftFeat);
   if(!panel){ alert('팝업이 차단되었습니다.\n브라우저 주소창 우측의 팝업 차단 아이콘을 눌러 이 사이트의 팝업을 허용해 주세요.'); return; }
   panel.document.open();
-  panel.document.write(gyPanelHTML(rows, caseType, half, W, H));
+  panel.document.write(gyPanelHTML(vals, caseType, half, W, H));
   panel.document.close();
 
   /* 2) 우측 인천변호사회 창 */
   try{ window.open('https://via.incheonbar.or.kr/pageManageView.php?pageIndex=sheet_input', 'incheonbar_via', rightFeat); }catch(e){}
   try{ panel.focus(); }catch(e){}
 }
-function gyPanelHTML(rows, caseType, half, W, H){
-  var manual=[
-    {label:'증표번호', note:'좌측 목록에서 증표 선택'},
-    {label:'증표 구입일', note:'증표 선택 시 자동'},
-    {label:'사건유형', note:'선임계 기준: '+caseType}
-  ];
-  var body='';
-  manual.forEach(function(m){
-    body+='<tr class="gy-manual"><th>'+gyEsc(m.label)+'</th><td class="gy-note">'+gyEsc(m.note)+'</td><td></td></tr>';
-  });
-  rows.forEach(function(r){
-    var v=r.value, has=v&&(''+v).trim();
-    var cell=has?'<span class="gy-val">'+gyEsc(v)+'</span>':'<span class="gy-empty">값 없음</span>';
-    var btn=has?'<button class="gy-copy" data-v="'+gyEsc(v)+'">복사</button>':'<button class="gy-copy" disabled>—</button>';
-    body+='<tr><th>'+gyEsc(r.label)+'</th><td>'+cell+'</td><td>'+btn+'</td></tr>';
-  });
+function gyField(val, opt){
+  opt=opt||{};
+  var has=val&&(''+val).trim();
+  var cls='gy-input'+(has?' filled':' empty')+(opt.wide?' wide':'');
+  if(has){
+    return '<div class="'+cls+'" data-v="'+gyEsc(val)+'" title="클릭하면 복사됩니다">'
+         +'<span class="gy-txt">'+gyEsc(val)+'</span>'
+         +'<span class="gy-badge">복사됨 ✓</span></div>';
+  }
+  return '<div class="'+cls+'">'+gyEsc(opt.emptyText||'값 없음')+'</div>';
+}
+function gyPanelHTML(v, caseType, half, W, H){
   var reopenFeat="left="+half+",top=0,width="+(W-half)+",height="+H;
+
+  /* 사건유형 라디오: 선임계 기준으로 골라야 할 값 강조 */
+  var pick=(caseType==='민사·가사')?['민사','가사']:['형사'];
+  var radios='';
+  ['민사','형사','가사','행정','특허'].forEach(function(t){
+    var on=pick.indexOf(t)>=0;
+    radios+='<span class="gy-radio'+(on?' pick':'')+'"><span class="gy-dot">'+(on?'◉':'○')+'</span>'+gyEsc(t)+'</span>';
+  });
+
+  var rowsHTML=''
+   +'<tr>'
+     +'<td class="gy-lbl">증표번호</td>'
+     +'<td class="gy-field"><div class="gy-input note">좌측 목록에서 증표 선택</div></td>'
+     +'<td class="gy-lbl">증표 구입일</td>'
+     +'<td class="gy-field"><div class="gy-input note">증표 선택 시 자동</div></td>'
+   +'</tr>'
+   +'<tr>'
+     +'<td class="gy-lbl">사건유형<span class="gy-req">(*)</span></td>'
+     +'<td class="gy-field" colspan="3"><div class="gy-radios">'+radios+'</div>'
+       +'<div class="gy-hint">선임계 기준 <b>'+gyEsc(caseType)+'</b> — 위에서 골라 선택하세요</div></td>'
+   +'</tr>'
+   +'<tr><td class="gy-lbl">관할기관<span class="gy-req">(*)</span></td>'
+     +'<td class="gy-field" colspan="3">'+gyField(v.agency)+'</td></tr>'
+   +'<tr><td class="gy-lbl">사건번호</td>'
+     +'<td class="gy-field" colspan="3">'+gyField(v.casenum)+'</td></tr>'
+   +'<tr><td class="gy-lbl">사건명<span class="gy-req">(*)</span></td>'
+     +'<td class="gy-field" colspan="3">'+gyField(v.casename,{wide:true})
+       +'<div class="gy-check"><span class="gy-box">☐</span> 사건명 미정</div></td></tr>'
+   +'<tr><td class="gy-lbl">위임인<span class="gy-req">(*)</span></td>'
+     +'<td class="gy-field" colspan="3">'
+       +'<div class="gy-wijmin"><div class="gy-select">'+gyEsc(v.role||'선택')+' <span class="gy-caret">▾</span></div>'+gyField(v.wijmin)+'</div>'
+       +'<div class="gy-hint">노란 칸(<b>'+gyEsc(v.role||'지위')+'</b>)을 실제 창 드롭다운에서 그대로 선택하세요</div>'
+       +'<div class="gy-orange">위임인은 2회 수정이 가능하니 정확히 입력해 주세요.<br>'
+       +"위임인이 다수이거나 글자수를 초과한 경우, 위임인 란에 '외'로 표시하여 입력이 가능합니다. (예: 홍길동 외 28)"
+       +'</div></td></tr>'
+   +'<tr><td class="gy-lbl">위임인 생년월일<br><span class="gy-sub">(사업자번호)</span></td>'
+     +'<td class="gy-field" colspan="3">'+gyField(v.birth)+'</td></tr>'
+   +'<tr><td class="gy-lbl">상대방</td>'
+     +'<td class="gy-field" colspan="3">'+gyField(v.opp)+'</td></tr>';
+
   return '<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">'
    +'<meta name="viewport" content="width=device-width, initial-scale=1.0">'
    +'<title>경유증 작성 도우미</title><style>'
    +'*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}'
-   +'body{margin:0;font-family:-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;background:#f4f5f7;color:#1f2430}'
-   +'.gy-head{position:sticky;top:0;background:#2b3a67;color:#fff;padding:14px 16px;z-index:5}'
-   +'.gy-head h1{margin:0;font-size:16px;font-weight:700}'
-   +'.gy-head p{margin:6px 0 0;font-size:12px;line-height:1.5;color:#cdd6f0}'
-   +'.gy-reopen{margin:10px 12px 0;display:block;width:calc(100% - 24px);padding:10px;border:1px solid #2b3a67;background:#fff;color:#2b3a67;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}'
-   +'table{width:calc(100% - 24px);margin:14px 12px;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08)}'
-   +'th{width:120px;background:#eef1f6;text-align:left;padding:13px 12px;font-size:13px;font-weight:600;color:#3a4257;border-bottom:1px solid #e3e7ef;vertical-align:middle}'
-   +'td{padding:11px 12px;font-size:14px;border-bottom:1px solid #eef0f4;vertical-align:middle}'
-   +'td:last-child{width:76px;text-align:right}'
-   +'.gy-val{font-weight:600;word-break:break-all}'
-   +'.gy-empty{color:#aab;font-size:13px}'
-   +'.gy-note{color:#8a93a6;font-size:12.5px}'
-   +'.gy-manual th{background:#f7f8fb}.gy-manual td{color:#9aa3b5}'
-   +'.gy-copy{padding:7px 13px;border:0;border-radius:7px;background:#3858d6;color:#fff;font-size:13px;font-weight:600;cursor:pointer;min-width:56px}'
-   +'.gy-copy:disabled{background:#d6dae3;cursor:default}'
-   +'.gy-copy.done{background:#1ba672}'
-   +'.gy-foot{padding:4px 16px 22px;font-size:11.5px;color:#9aa3b5;line-height:1.6}'
+   +'body{margin:0;font-family:"Malgun Gothic","Apple SD Gothic Neo",-apple-system,sans-serif;background:#e9ebef;color:#222;font-size:14px}'
+   +'.gy-topbar{position:sticky;top:0;z-index:10;background:#2b3a67;color:#fff;padding:11px 14px;display:flex;align-items:center;gap:8px}'
+   +'.gy-topbar .t{font-size:14px;font-weight:700}'
+   +'.gy-topbar .d{font-size:11px;color:#cdd6f0;margin-left:auto;text-align:right;line-height:1.4}'
+   +'.gy-ic{width:15px;height:15px;vertical-align:-2px;margin-right:5px}'
+   +'.gy-reopen{display:block;margin:10px 12px 2px;width:calc(100% - 24px);padding:12px;border:0;background:#3858d6;color:#fff;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 1px 3px rgba(56,88,214,.3)}'
+   +'.gy-reopen:active{background:#2c46b0}'
+   +'.gy-site{margin:12px;background:#fff;border:1px solid #d0d3d9;border-radius:4px;overflow:hidden}'
+   +'table.gy-form{width:100%;border-collapse:collapse;table-layout:fixed}'
+   +'.gy-form td{border:1px solid #d5d7dd;padding:9px 10px;vertical-align:middle;word-break:break-all}'
+   +'.gy-lbl{width:92px;background:#f3f4f6;font-weight:700;color:#333;text-align:center;font-size:13px;line-height:1.3}'
+   +'.gy-req{color:#e23b3b;font-weight:700}'
+   +'.gy-sub{font-size:11px;color:#666;font-weight:400}'
+   +'.gy-input{border:1px dashed #b9bcc4;background:#f7f8fa;border-radius:3px;padding:9px 11px;min-height:38px;display:flex;align-items:center;position:relative;transition:.12s;font-size:14px}'
+   +'.gy-input.filled{cursor:pointer;color:#111;font-weight:600;background:#fff;border-color:#9aa0ac}'
+   +'.gy-input.filled:hover{border-color:#3858d6;background:#eef2ff}'
+   +'.gy-input.filled:active{background:#dfe6ff}'
+   +'.gy-input.empty{color:#b0b4bd;font-weight:400}'
+   +'.gy-input.note{color:#9aa0ac;font-size:13px}'
+   +'.gy-input.wide{min-height:44px}'
+   +'.gy-txt{flex:1}'
+   +'.gy-badge{position:absolute;right:9px;background:#1ba672;color:#fff;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;opacity:0;transform:scale(.8);transition:.15s;pointer-events:none}'
+   +'.gy-input.copied .gy-badge{opacity:1;transform:scale(1)}'
+   +'.gy-input.copied{background:#e7f8f1 !important;border-color:#1ba672 !important}'
+   +'.gy-radios{display:flex;flex-wrap:wrap;gap:6px}'
+   +'.gy-radio{display:inline-flex;align-items:center;gap:4px;padding:5px 11px;border-radius:20px;font-size:13.5px;color:#555;border:1px solid transparent}'
+   +'.gy-radio .gy-dot{font-size:13px}'
+   +'.gy-radio.pick{background:#fff6df;border-color:#f0c14b;color:#8a5a00;font-weight:700}'
+   +'.gy-radio.pick .gy-dot{color:#e6a417}'
+   +'.gy-wijmin{display:flex;gap:8px;align-items:stretch}'
+   +'.gy-select{flex:0 0 96px;border:1px solid #f0c14b;background:#fff6df;border-radius:3px;padding:9px 10px;display:flex;align-items:center;justify-content:space-between;color:#8a5a00;font-weight:700;font-size:13px}'
+   +'.gy-wijmin .gy-input{flex:1}'
+   +'.gy-caret{font-size:12px}'
+   +'.gy-check{margin-top:7px;font-size:13px;color:#555}'
+   +'.gy-box{font-size:15px}'
+   +'.gy-hint{margin-top:6px;font-size:12px;color:#8a93a6;line-height:1.5}'
+   +'.gy-hint b{color:#3858d6}'
+   +'.gy-orange{margin-top:9px;background:#fff9ef;border:1px solid #f0d9a8;border-radius:4px;padding:10px 12px;font-size:12px;color:#8a6d3b;line-height:1.6}'
+   +'.gy-foot{padding:2px 16px 22px;font-size:11.5px;color:#9aa3b5;line-height:1.6}'
    +'</style></head><body>'
-   +'<div class="gy-head"><h1>📋 경유증 작성 도우미</h1>'
-   +'<p>각 항목의 <b>[복사]</b>를 누른 뒤, 우측 인천변호사회 창의 해당 칸에 <b>붙여넣기(Ctrl+V)</b> 하세요.</p></div>'
-   +'<button class="gy-reopen" onclick="gyReopen()">우측 인천변호사회 창 다시 열기 ↗</button>'
-   +'<table><tbody>'+body+'</tbody></table>'
-   +'<div class="gy-foot">· 날짜 칸은 붙여넣기가 안 되면 달력에서 직접 선택하세요.<br>· 위임인이 여러 명이면 "○○○ 외 N" 형식으로 자동 입력됩니다.</div>'
+   +'<div class="gy-topbar"><span class="t"><svg class="gy-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="3" width="8" height="4" rx="1"/><path d="M9 5H6a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-3"/></svg>복사 전용 미리보기</span>'
+   +'<span class="d">채워진 칸을 <b>클릭</b>하면 복사됩니다<br>우측 실제 창의 같은 위치에 붙여넣기(Ctrl+V)</span></div>'
+   +'<button class="gy-reopen" onclick="gyReopen()">우측에 경유증표 창 열기</button>'
+   +'<div class="gy-site">'
+   +'<table class="gy-form"><tbody>'+rowsHTML+'</tbody></table>'
+   +'</div>'
+   +'<div class="gy-foot">· 회색 점선 칸은 실제 창에서 선택/자동 입력되는 항목입니다.<br>'
+   +'· 위임인이 여러 명이면 "○○○ 외 N" 형식으로 자동 표시됩니다.</div>'
    +'<script>'
-   +'function gyOk(btn){var o=btn.textContent;btn.textContent="복사됨";btn.classList.add("done");setTimeout(function(){btn.textContent=o;btn.classList.remove("done");},1200);}'
-   +'function gyFallback(v,btn){var t=document.createElement("textarea");t.value=v;t.style.position="fixed";t.style.opacity="0";document.body.appendChild(t);t.focus();t.select();try{document.execCommand("copy");gyOk(btn);}catch(e){prompt("아래 값을 직접 복사하세요(Ctrl+C):",v);}document.body.removeChild(t);}'
-   +'function gyCopy(btn){var v=btn.getAttribute("data-v")||"";if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(v).then(function(){gyOk(btn);},function(){gyFallback(v,btn);});}else{gyFallback(v,btn);}}'
-   +'document.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest(".gy-copy");if(b&&!b.disabled)gyCopy(b);});'
+   +'function gyOk(el){el.classList.add("copied");setTimeout(function(){el.classList.remove("copied");},1100);}'
+   +'function gyFallback(val,el){var t=document.createElement("textarea");t.value=val;t.style.position="fixed";t.style.opacity="0";document.body.appendChild(t);t.focus();t.select();try{document.execCommand("copy");gyOk(el);}catch(e){prompt("아래 값을 직접 복사하세요(Ctrl+C):",val);}document.body.removeChild(t);}'
+   +'function gyCopy(el){var val=el.getAttribute("data-v")||"";if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(val).then(function(){gyOk(el);},function(){gyFallback(val,el);});}else{gyFallback(val,el);}}'
+   +'document.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest(".gy-input.filled");if(b)gyCopy(b);});'
    +'function gyReopen(){window.open("https://via.incheonbar.or.kr/pageManageView.php?pageIndex=sheet_input","incheonbar_via","'+reopenFeat+'");}'
    +'<\/script></body></html>';
 }
