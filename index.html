@@ -231,27 +231,25 @@
 <div id="screen-contract" class="screen">
   <aside class="ct-sidebar">
     <div class="cts-head">
-      <nav class="cts-crumb">
-        <span class="crumb-link" onclick="goHome()">홈</span>
-        <svg class="crumb-sep" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-        <span class="crumb-link" onclick="openContractList()">계약서 목록</span>
-      </nav>
+      <div class="cts-back" onclick="openContractList()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>계약서 목록
+      </div>
       <div class="cts-title">송무위임계약서</div>
       <div class="cts-sub" id="cts-sub">형사</div>
     </div>
     <div class="cts-actions">
+      <button class="cts-btn cts-sign" onclick="createSignRequest()">
+        <svg class="ic-normal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg><svg class="ic-locked" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg><span class="txt-normal">서명요청</span><span class="txt-locked">서명완료</span>
+      </button>
+      <button class="cts-btn cts-outline" onclick="doAction('share')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>공유하기
+      </button>
+      <div class="cts-div"></div>
       <button class="cts-btn js-info-btn" onclick="openFormSheet()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>정보 입력
       </button>
       <button class="cts-btn" onclick="saveToListBtn()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg><span class="txt-normal">목록에 저장</span><span class="txt-locked">저장</span>
-      </button>
-      <button class="cts-btn cts-sign" onclick="createSignRequest()">
-        <svg class="ic-normal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg><svg class="ic-locked" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg><span class="txt-normal">서명요청</span><span class="txt-locked">서명완료</span>
-      </button>
-      <div class="cts-div"></div>
-      <button class="cts-btn cts-outline" onclick="doAction('share')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>공유하기
       </button>
       <div class="cts-div"></div>
       <button class="cts-btn" onclick="doAction('print')">
@@ -1419,7 +1417,7 @@ function resetContract(){
 }
 
 /* ═══ Supabase 연동 ═══ */
-var APP_VERSION='v74';
+var APP_VERSION='v75';
 var SUPABASE_URL='https://nyjyemjsperpakrrgzcc.supabase.co';
 var SUPABASE_KEY='sb_publishable_QKl9MIt2_MflYnpN41VRvg_cNIAbYhU';
 var sb=null;
