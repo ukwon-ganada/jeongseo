@@ -1419,7 +1419,7 @@ function resetContract(){
 }
 
 /* ═══ Supabase 연동 ═══ */
-var APP_VERSION='v73';
+var APP_VERSION='v74';
 var SUPABASE_URL='https://nyjyemjsperpakrrgzcc.supabase.co';
 var SUPABASE_KEY='sb_publishable_QKl9MIt2_MflYnpN41VRvg_cNIAbYhU';
 var sb=null;
@@ -3994,9 +3994,9 @@ document.getElementById('ap-host').addEventListener('click',function(e){
 <!-- 항소장 도장 선택 시트 (body 직속) -->
 <div id="apSealSheet" class="ap-seal-sheet" style="display:none" onclick="if(event.target===this)closeSealSheet()">
   <div class="ap-seal-card">
-    <h4>서고은 변호사 날인 선택</h4>
-    <button class="ap-seal-opt" onclick="setAppealSeal('seogoeun')"><img id="apSealThumbSeo" alt="">서고은 변호사 도장</button>
-    <button class="ap-seal-opt" onclick="setAppealSeal('firm')"><img id="apSealThumbFirm" alt="">법무법인 정서 직인</button>
+    <h4>날인 선택</h4>
+    <button class="ap-seal-opt" style="justify-content:center" onclick="setAppealSeal('seogoeun')"><img id="apSealThumbSeo" alt="서고은 변호사 도장"></button>
+    <button class="ap-seal-opt" style="justify-content:center" onclick="setAppealSeal('firm')"><img id="apSealThumbFirm" alt="법무법인 정서 직인"></button>
     <button class="ap-seal-opt" style="justify-content:center" onclick="setAppealSeal('none')">도장 없음</button>
     <button class="ap-seal-cancel" onclick="closeSealSheet()">닫기</button>
   </div>

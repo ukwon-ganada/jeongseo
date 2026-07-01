@@ -917,7 +917,7 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
 .ap-seal-card h4{margin:0 0 14px;font-size:17px;text-align:center;color:var(--black);}
 .ap-seal-opt{display:flex;align-items:center;gap:12px;width:100%;border:1px solid var(--border);border-radius:var(--r-lg);padding:10px 12px;margin-bottom:10px;background:var(--gray-50);font-size:15px;cursor:pointer;color:var(--black);text-align:left;}
 .ap-seal-opt:hover{background:var(--gray-50);border-color:var(--gray-300);}
-.ap-seal-opt img{width:36px;height:36px;object-fit:contain;flex:0 0 auto;}
+.ap-seal-opt img{width:44px;height:44px;object-fit:contain;flex:0 0 auto;}
 .ap-seal-cancel{width:100%;border:none;border-radius:var(--r-lg);padding:10px;background:var(--gray-100);font-size:15px;cursor:pointer;color:var(--gray-700);}
 
 /* 제출법원 + 귀중 */
