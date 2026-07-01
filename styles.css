@@ -226,7 +226,7 @@ html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black)
     padding:0 14px;height:52px;position:sticky;top:0;z-index:100;background:#fff;
   }
 
-  .ab-label{flex:1;font-size:17px;font-weight:600;}
+  .ab-label{flex:1;min-width:0;font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .ab-share{height:32px;padding:0 12px;background:var(--black);color:#fff;border:none;border-radius:var(--r-pill);font-size:12.5px;font-weight:600;cursor:pointer;font-family:var(--font);display:flex;align-items:center;gap:4px;}
 .ab-share svg{width:14px;height:14px;}
 .ab-sign{height:32px;padding:0 12px;background:var(--danger);color:#fff;border:none;border-radius:var(--r-pill);font-size:12.5px;font-weight:600;cursor:pointer;font-family:var(--font);display:flex;align-items:center;gap:4px;margin-left:6px;}
