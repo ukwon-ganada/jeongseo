@@ -637,7 +637,7 @@ body.print-emulate td.js-case-edit{background:transparent!important;box-shadow:n
 #mgForm{display:none;position:fixed;inset:0;z-index:1100;background:#fff;flex-direction:column;}
 #mgForm.active{display:flex;}
 #screen-seonim .party{font-size:12pt;}
-#screen-seonim .party-lbl{font-weight:700;letter-spacing:.22em;margin-right:1.1em;}
+#screen-seonim .party-lbl{display:inline-block;min-width:5.6em;font-weight:700;letter-spacing:.18em;margin-right:.5em;}
 #screen-seonim .mg-intro{font-size:11pt;padding:7pt 12pt;line-height:1.6;}
 #screen-seonim .sj td.mg-suim{position:relative;padding:4pt 14pt;vertical-align:middle;}
 #screen-seonim .mg-firm-wrap{padding-right:0;line-height:1.15;}
@@ -879,7 +879,29 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
 
 
 .att-chips{display:flex;flex-wrap:wrap;gap:6px;}.att-chip-del{display:inline-block;margin-left:7px;font-size:11px;opacity:.65;cursor:pointer;}.att-chip-del:hover{opacity:1;}.att-add-row{display:flex;gap:6px;margin-top:8px;}.att-add-input{flex:1;padding:9px 11px;border:1px solid #d0d4dc;border-radius:9px;font-size:13px;}.att-add-btn{padding:9px 14px;border:1px solid #1a2740;background:#1a2740;color:#fff;border-radius:9px;font-size:13px;white-space:nowrap;cursor:pointer;}
-.sj-editable{cursor:pointer;outline:1px dashed rgba(20,60,120,0.30);outline-offset:-2px;}.sj-editable:active{outline-color:#1a4ea2;outline-width:1.5px;}.sjm-label{display:block;font-size:12px;font-weight:600;color:#555;margin:12px 0 5px;}.sjm-label:first-child{margin-top:0;}#sjModalBody .cl-card{margin-bottom:10px;}#sjModalBody .fs-chips{margin:2px 0 4px;}
+.sj-editable{cursor:pointer;outline:1px dashed rgba(20,60,120,0.30);outline-offset:-2px;}
+/* ── 민가사 확장: 개인/법인 카드·제3자·위임인 블록 ── */
+.mg-kind{margin-bottom:10px;}
+.mg-noaddr{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--gray-700);cursor:pointer;margin-top:2px;user-select:none;}
+.mg-noaddr input{width:16px;height:16px;flex:none;}
+.mc-rep-row{display:flex;gap:8px;margin-bottom:8px;align-items:center;}
+.mc-rep-row .fs-input{margin-bottom:0;}
+.mc-rep-del{width:34px;height:44px;flex:none;background:#fff;border:1px solid var(--border);border-radius:var(--r-lg);cursor:pointer;color:var(--gray-500);font-size:16px;line-height:1;}
+.mc-rep-add{width:100%;height:40px;border:1px dashed var(--gray-300);background:#fff;border-radius:var(--r-lg);font-size:13px;font-weight:600;color:var(--gray-700);cursor:pointer;margin-top:2px;}
+.mc-rep-add:active{background:var(--gray-100);}
+.th-card{padding-top:32px;}
+#mg-third-add{margin-top:2px;}
+/* 위임장 위임인 블록 */
+#screen-seonim .mg-wiimin .wi-block{margin-bottom:3.5mm;}
+#screen-seonim .mg-wiimin .wi-block:last-child{margin-bottom:0;}
+#screen-seonim .wi-corpname{font-size:12pt;margin-bottom:1mm;}
+#screen-seonim .wi-line{position:relative;display:flex;align-items:center;min-height:15mm;}
+#screen-seonim .wi-name{white-space:nowrap;}
+#screen-seonim .wi-tpad{visibility:hidden;}
+#screen-seonim .wi-seal{position:relative;margin-left:6mm;min-width:12mm;height:15mm;}
+#screen-seonim .wi-seal .ins{position:relative;top:50%;transform:translateY(-50%);display:inline-block;}
+#screen-seonim .wi-seal .wi-sealimg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:10mm;height:15mm;}
+#screen-seonim .wi-addr{font-size:11pt;margin-top:0.5mm;line-height:1.4;}.sj-editable:active{outline-color:#1a4ea2;outline-width:1.5px;}.sjm-label{display:block;font-size:12px;font-weight:600;color:#555;margin:12px 0 5px;}.sjm-label:first-child{margin-top:0;}#sjModalBody .cl-card{margin-bottom:10px;}#sjModalBody .fs-chips{margin:2px 0 4px;}
 /* ═══════════ 항소장 (형사) ═══════════ */
 #appealForm{display:none;position:fixed;inset:0;z-index:1100;background:#fff;flex-direction:column;}
 #appealForm.active{display:flex;}
@@ -2160,7 +2182,14 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
     <div class="fs-title">소송위임장 작성 (민·가사)</div>
   </div>
   <div class="fs-body">
-    <div class="fs-section">의뢰인 지위</div>
+    <div class="fs-section">당사자 유형</div>
+    <div class="fs-field"><div class="fs-chips" id="mg-ptype">
+      <div class="fs-chip on" data-ptype="wongo">원고 · 피고</div>
+      <div class="fs-chip" data-ptype="sincheong">신청인 · 피신청인</div>
+      <div class="fs-chip" data-ptype="chaegwon">채권자 · 채무자</div>
+    </div></div>
+
+    <div class="fs-section">우리 측(의뢰인) 지위</div>
     <div class="fs-field"><div class="fs-chips" id="mg-role">
       <div class="fs-chip on" data-role="원고">원고</div>
       <div class="fs-chip" data-role="피고">피고</div>
@@ -2172,10 +2201,14 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
 
     <div class="fs-section">의뢰인(위임인) — 여러 명 추가 가능</div>
     <div id="mg-cl-list"></div>
-    <button class="cl-add" onclick="addClient('mg-cl-list')">＋ 의뢰인 추가</button>
+    <button class="cl-add" onclick="addMgClient()">＋ 의뢰인 추가</button>
 
     <div class="fs-section">상대방</div>
     <div class="fs-field"><label class="fs-label" id="mg-opp-label">상대방(피고) 이름</label><input type="text" class="fs-input" id="mg-opp" placeholder="상대방 성명"></div>
+
+    <div class="fs-section" id="mg-third-section" style="display:none">제3채무자 · 제3채권자</div>
+    <div id="mg-third-list" style="display:none"></div>
+    <button class="cl-add" id="mg-third-add" onclick="addThird()" style="display:none">＋ 제3자 추가</button>
 
     <div class="fs-section">작성 · 제출</div>
     <div class="fs-field"><label class="fs-label">작성일</label><input type="date" class="fs-input" id="mg-date"></div>
@@ -2457,7 +2490,7 @@ function resetContract(){
 }
 
 /* ═══ Supabase 연동 ═══ */
-var APP_VERSION='v49';
+var APP_VERSION='v50';
 var SUPABASE_URL='https://nyjyemjsperpakrrgzcc.supabase.co';
 var SUPABASE_KEY='sb_publishable_QKl9MIt2_MflYnpN41VRvg_cNIAbYhU';
 var sb=null;
@@ -4196,7 +4229,7 @@ function removeAttChip(e,el){
 }
 var seonimState = {role:'피의자',casenum:'',casename:'',date:'',agency:'',attorneys:ALL_ATTORNEYS.slice(),clients:[]};
 var seonimMode='형사';
-var mingasaState={role:'원고',casenum:'',casename:'',opp:'',date:'',agency:'',attorneys:ALL_ATTORNEYS.slice(),clients:[]};
+var mingasaState={partyType:'wongo',role:'원고',casenum:'',casename:'',opp:'',date:'',agency:'',attorneys:ALL_ATTORNEYS.slice(),clients:[],thirds:[]};
 
 function sjEsc(v){return v==null?'':escapeHtml(v);} /* null 가드 유지 + escapeHtml 위임 (따옴표까지 안전 처리) */
 function sjFmtSSN(v){return formatSSN(v);} /* formatSSN과 동일 — 중복 제거 후 위임 */
@@ -4485,6 +4518,7 @@ function gyPanelHTML(rows, caseType, half, W, H){
 }
 
 function sjmPickRole(el){el.parentNode.querySelectorAll('.fs-chip').forEach(function(x){x.classList.remove('on');});el.classList.add('on');}
+function sjmPickTh(el){el.parentNode.querySelectorAll('.fs-chip').forEach(function(x){x.classList.remove('on');});el.classList.add('on');}
 function closeSjModal(){document.getElementById('sjModalOverlay').classList.remove('active');}
 function sjModalOutside(e){if(e.target===document.getElementById('sjModalOverlay'))closeSjModal();}
 function openSjEdit(type){
@@ -4497,17 +4531,31 @@ function openSjEdit(type){
   } else if(type==='agency'){
     title='제출기관'; html='<input type="text" class="modal-input" id="sjm-agency" value="'+escapeHtml(s.agency||'')+'">';
   } else if(type==='opp'){
-    title=(s.role==='원고'?'상대방(피고)':'상대방(원고)'); html='<input type="text" class="modal-input" id="sjm-opp" value="'+escapeHtml(s.opp||'')+'">';
+    var _od=MG_PARTY_TYPES[s.partyType||'wongo']||MG_PARTY_TYPES.wongo;
+    var _ol=(s.role===_od.front)?_od.back:_od.front;
+    title='상대방('+_ol+')'; html='<input type="text" class="modal-input" id="sjm-opp" value="'+escapeHtml(s.opp||'')+'">';
   } else if(type==='date'){
     title='작성일'; html='<input type="date" class="modal-input" id="sjm-date" value="'+escapeHtml(s.date||'')+'">';
   } else if(type==='role'){
-    title='역할'; var roles=mg?['원고','피고']:SJ_ROLES_FORM;
+    title='역할'; var roles;
+    if(mg){var _rd=MG_PARTY_TYPES[s.partyType||'wongo']||MG_PARTY_TYPES.wongo; roles=[_rd.front,_rd.back];}
+    else roles=SJ_ROLES_FORM;
     html='<div class="fs-chips" id="sjm-role">'+roles.map(function(r){return '<div class="fs-chip'+(r===s.role?' on':'')+'" data-role="'+escapeHtml(r)+'" onclick="sjmPickRole(this)">'+escapeHtml(r)+'</div>';}).join('')+'</div>';
   } else if(type==='att'){
     title='담당변호사';
     html='<div class="fs-chips att-chips" id="sjm-att"></div><div class="att-add-row"><input type="text" class="att-add-input" id="sjm-att-new" placeholder="추가할 변호사 이름"><button type="button" class="att-add-btn" onclick="addAttorney(\'sjm\')">＋ 추가</button></div>';
   } else if(type==='clients'){
-    title='의뢰인'; html='<div id="sjm-cl-list"></div><button type="button" class="att-add-btn" style="width:100%;margin-top:8px" onclick="addClient(\'sjm-cl-list\')">＋ 의뢰인 추가</button>';
+    title='의뢰인'; var _addfn=mg?'addMgClient':'addClient';
+    html='<div id="sjm-cl-list"></div><button type="button" class="att-add-btn" style="width:100%;margin-top:8px" onclick="'+_addfn+'(\'sjm-cl-list\')">＋ 의뢰인 추가</button>';
+  } else if(type&&type.indexOf('third:')===0){
+    var _ti=parseInt(type.split(':')[1],10);
+    var _t3=(s.thirds&&s.thirds[_ti])||{label:'제3채무자',name:''};
+    title='제3자';
+    html='<div class="fs-chips" id="sjm-thlabel" style="margin-bottom:10px">'
+      +'<div class="fs-chip'+(_t3.label==='제3채무자'?' on':'')+'" data-thlabel="제3채무자" onclick="sjmPickTh(this)">제3채무자</div>'
+      +'<div class="fs-chip'+(_t3.label==='제3채권자'?' on':'')+'" data-thlabel="제3채권자" onclick="sjmPickTh(this)">제3채권자</div>'
+      +'</div>'
+      +'<label class="sjm-label">이름</label><input type="text" class="modal-input" id="sjm-thname" value="'+escapeHtml(_t3.name||'')+'">';
   }
   document.getElementById('sjModalTitle').textContent=title;
   document.getElementById('sjModalBody').innerHTML=html;
@@ -4518,21 +4566,30 @@ function openSjEdit(type){
   }
   if(type==='clients'){
     var list=document.getElementById('sjm-cl-list');
-    var arr=(s.clients&&s.clients.length)?s.clients:[{name:'',ssn:''}];
-    arr.forEach(function(c,i){list.insertAdjacentHTML('beforeend', clientCardHTML(i,c.name,c.ssn));});
+    if(mg){
+      var arr=(s.clients&&s.clients.length)?s.clients:[{kind:'person'}];
+      arr.forEach(function(c,i){list.insertAdjacentHTML('beforeend', mgClientCardHTML(i,c));});
+    }else{
+      var arr=(s.clients&&s.clients.length)?s.clients:[{name:'',ssn:''}];
+      arr.forEach(function(c,i){list.insertAdjacentHTML('beforeend', clientCardHTML(i,c.name,c.ssn));});
+    }
   }
   document.getElementById('sjModalOverlay').classList.add('active');
   setTimeout(function(){var f=document.querySelector('#sjModalBody input.modal-input');if(f&&type!=='date')f.focus();},80);
 }
 function saveSjModal(){
-  var s=sjState(), t=sjEditCtx;
+  var s=sjState(), t=sjEditCtx, mg=(seonimMode==='민가사');
   if(t==='case'){s.casenum=document.getElementById('sjm-casenum').value.trim();s.casename=document.getElementById('sjm-casename').value.trim();}
   else if(t==='agency'){s.agency=document.getElementById('sjm-agency').value.trim();}
   else if(t==='opp'){s.opp=document.getElementById('sjm-opp').value.trim();}
   else if(t==='date'){s.date=document.getElementById('sjm-date').value;}
   else if(t==='role'){var on=document.querySelector('#sjm-role .fs-chip.on');if(on)s.role=on.dataset.role;}
   else if(t==='att'){var a=[];document.querySelectorAll('#sjm-att .fs-chip.on').forEach(function(c){a.push(c.dataset.att);});if(!a.length)a=['서고은'];s.attorneys=a;}
-  else if(t==='clients'){var arr=[];document.querySelectorAll('#sjm-cl-list .cl-card').forEach(function(card){var n=card.querySelector('.cl-name').value.trim();var ss=card.querySelector('.cl-ssn').value.trim();if(n||ss)arr.push({name:n,ssn:ss});});if(!arr.length)arr=[{name:'',ssn:''}];s.clients=arr;}
+  else if(t==='clients'){
+    if(mg){s.clients=collectMgClients('#sjm-cl-list');if(!s.clients.length)s.clients=[{kind:'person',name:''}];}
+    else{var arr=[];document.querySelectorAll('#sjm-cl-list .cl-card').forEach(function(card){var n=card.querySelector('.cl-name').value.trim();var ss=card.querySelector('.cl-ssn').value.trim();if(n||ss)arr.push({name:n,ssn:ss});});if(!arr.length)arr=[{name:'',ssn:''}];s.clients=arr;}
+  }
+  else if(t&&t.indexOf('third:')===0){var _ti=parseInt(t.split(':')[1],10);var _lon=document.querySelector('#sjm-thlabel .fs-chip.on');var _lab=_lon?_lon.dataset.thlabel:'제3채무자';var _nm=document.getElementById('sjm-thname').value.trim();if(!s.thirds)s.thirds=[];s.thirds[_ti]={label:_lab,name:_nm};}
   sjRerender(); closeSjModal();
 }
 function renderSeonim(){
@@ -4571,16 +4628,161 @@ function renderSeonim(){
 }
 
 /* ═══════════ 민·가사 소송위임장 로직 ═══════════ */
+/* 당사자 유형: front(앞)·back(뒤)·hasThird(제3자 사용) */
+var MG_PARTY_TYPES={
+  wongo:    {front:'원고',   back:'피고',    hasThird:false},
+  sincheong:{front:'신청인', back:'피신청인', hasThird:true},
+  chaegwon: {front:'채권자', back:'채무자',  hasThird:true}
+};
+
 function closeMgForm(){document.getElementById('mgForm').classList.remove('active');}
+
+/* 상대방 라벨(유형·우리측 지위 반영) */
 function updateMgOppLabel(){
+  var pon=document.querySelector('#mg-ptype .fs-chip.on');
+  var def=MG_PARTY_TYPES[pon?pon.dataset.ptype:'wongo']||MG_PARTY_TYPES.wongo;
   var on=document.querySelector('#mg-role .fs-chip.on');
-  var role=on?on.dataset.role:'원고';
-  document.getElementById('mg-opp-label').textContent=(role==='원고'?'상대방(피고) 이름':'상대방(원고) 이름');
+  var role=on?on.dataset.role:def.front;
+  var oppLabel=(role===def.front)?def.back:def.front;
+  document.getElementById('mg-opp-label').textContent='상대방('+oppLabel+') 이름';
 }
+
+/* 당사자 유형 변경 시: 우리측 지위 칩 라벨·제3자 섹션 갱신 */
+function mgUpdatePartyUI(){
+  var pon=document.querySelector('#mg-ptype .fs-chip.on');
+  var def=MG_PARTY_TYPES[pon?pon.dataset.ptype:'wongo']||MG_PARTY_TYPES.wongo;
+  var roleChips=document.querySelectorAll('#mg-role .fs-chip');
+  var curIdx=0; roleChips.forEach(function(c,i){if(c.classList.contains('on'))curIdx=i;});
+  roleChips[0].dataset.role=def.front; roleChips[0].textContent=def.front;
+  roleChips[1].dataset.role=def.back;  roleChips[1].textContent=def.back;
+  roleChips.forEach(function(c,i){c.classList.toggle('on',i===curIdx);});
+  updateMgOppLabel();
+  var show=def.hasThird;
+  document.getElementById('mg-third-section').style.display=show?'':'none';
+  document.getElementById('mg-third-list').style.display=show?'':'none';
+  document.getElementById('mg-third-add').style.display=show?'':'none';
+}
+
+/* 민가사 의뢰인 정규화(기존 형사식 {name,ssn} 데이터 호환) */
+function normalizeMgClient(c){
+  c=c||{};
+  if(c.kind==='corp')return {kind:'corp',corpName:c.corpName||'',title:c.title||'대표이사',reps:(c.reps&&c.reps.length)?c.reps:[{name:''}],addr:c.addr||''};
+  return {kind:'person',name:c.name||'',addr:c.addr||'',ssn:c.ssn||'',noAddr:(c.noAddr!==undefined)?c.noAddr:(!c.addr&&!!c.ssn)};
+}
+function mgPersonFields(c){
+  var noAddr=!!c.noAddr;
+  return '<div class="mg-person-fields"'+((c.kind==='corp')?' style="display:none"':'')+'>'
+    +'<div class="fs-field"><label class="fs-label">의뢰인명</label><input type="text" class="fs-input mp-name" maxlength="20" placeholder="홍길동" value="'+sjEsc(c.name||'')+'"></div>'
+    +'<div class="fs-field mp-addr-field"'+(noAddr?' style="display:none"':'')+'><label class="fs-label">주소</label><input type="text" class="fs-input mp-addr" placeholder="인천 미추홀구 ..." value="'+sjEsc(c.addr||'')+'"></div>'
+    +'<div class="fs-field mp-ssn-field"'+(noAddr?'':' style="display:none"')+'><label class="fs-label">주민등록번호</label><input type="text" class="fs-input mp-ssn" inputmode="numeric" placeholder="000000-0000000" value="'+sjEsc(c.ssn||'')+'" oninput="this.value=sjFmtSSN(this.value)"></div>'
+    +'<label class="mg-noaddr"><input type="checkbox" class="mp-noaddr"'+(noAddr?' checked':'')+' onchange="mgToggleNoAddr(this)"> 주소를 몰라요 (주민번호로 입력)</label>'
+    +'</div>';
+}
+function mgCorpFields(c){
+  var reps=(c.reps&&c.reps.length)?c.reps:[{name:''}];
+  var repInputs=reps.map(function(r,ri){
+    return '<div class="mc-rep-row"><input type="text" class="fs-input mc-rep" maxlength="20" placeholder="대표자 성명" value="'+sjEsc(r.name||'')+'">'
+      +(ri>0?'<button type="button" class="mc-rep-del" onclick="mgDelRep(this)">×</button>':'')+'</div>';
+  }).join('');
+  return '<div class="mg-corp-fields"'+((c.kind==='corp')?'':' style="display:none"')+'>'
+    +'<div class="fs-field"><label class="fs-label">법인명</label><input type="text" class="fs-input mc-name" placeholder="주식회사 ○○" value="'+sjEsc(c.corpName||'')+'"></div>'
+    +'<div class="fs-field"><label class="fs-label">대표자 직함</label><input type="text" class="fs-input mc-title" placeholder="대표이사" value="'+sjEsc(c.title||'대표이사')+'"></div>'
+    +'<div class="fs-field"><label class="fs-label">대표자 성명 (공동대표는 추가)</label><div class="mc-rep-list">'+repInputs+'</div>'
+    +'<button type="button" class="mc-rep-add" onclick="mgAddRep(this)">＋ 대표자 추가</button></div>'
+    +'<div class="fs-field"><label class="fs-label">주소</label><input type="text" class="fs-input mc-addr" placeholder="등기부상 주소" value="'+sjEsc(c.addr||'')+'"></div>'
+    +'</div>';
+}
+function mgClientCardHTML(idx,c){
+  c=normalizeMgClient(c);
+  var kind=c.kind||'person';
+  var num='의뢰인 '+(idx+1)+(idx===0?' (대표)':'');
+  var del=idx>0?'<button type="button" class="cl-del" onclick="removeMgClient(this)">×</button>':'';
+  var kt='<div class="fs-chips mg-kind">'
+    +'<div class="fs-chip'+(kind==='person'?' on':'')+'" data-kind="person" onclick="mgSetKind(this,\'person\')">개인</div>'
+    +'<div class="fs-chip'+(kind==='corp'?' on':'')+'" data-kind="corp" onclick="mgSetKind(this,\'corp\')">법인</div>'
+    +'</div>';
+  return '<div class="cl-card mg-cl-card" data-kind="'+kind+'">'
+    +'<div class="cl-num">'+num+'</div>'+del+kt+mgPersonFields(c)+mgCorpFields(c)+'</div>';
+}
+function mgSetKind(el,kind){
+  var card=el.closest('.cl-card');
+  card.querySelectorAll('.mg-kind .fs-chip').forEach(function(x){x.classList.toggle('on',x.dataset.kind===kind);});
+  card.dataset.kind=kind;
+  card.querySelector('.mg-person-fields').style.display=(kind==='person')?'':'none';
+  card.querySelector('.mg-corp-fields').style.display=(kind==='corp')?'':'none';
+}
+function mgToggleNoAddr(cb){
+  var card=cb.closest('.cl-card');
+  card.querySelector('.mp-addr-field').style.display=cb.checked?'none':'';
+  card.querySelector('.mp-ssn-field').style.display=cb.checked?'':'none';
+}
+function mgAddRep(btn){
+  var wrap=btn.closest('.fs-field').querySelector('.mc-rep-list');
+  wrap.insertAdjacentHTML('beforeend','<div class="mc-rep-row"><input type="text" class="fs-input mc-rep" maxlength="20" placeholder="대표자 성명"><button type="button" class="mc-rep-del" onclick="mgDelRep(this)">×</button></div>');
+}
+function mgDelRep(btn){var row=btn.closest('.mc-rep-row');row.parentNode.removeChild(row);}
+function addMgClient(listId){var l=document.getElementById(listId||'mg-cl-list');l.insertAdjacentHTML('beforeend',mgClientCardHTML(l.children.length,{kind:'person'}));}
+function removeMgClient(btn){var card=btn.closest('.cl-card');var list=card.parentNode;card.parentNode.removeChild(card);renumberMgClients(list);}
+function renumberMgClients(list){
+  var cards=list.children;
+  for(var i=0;i<cards.length;i++){
+    cards[i].querySelector('.cl-num').textContent='의뢰인 '+(i+1)+(i===0?' (대표)':'');
+    var del=cards[i].querySelector('.cl-del');
+    if(i===0&&del){del.parentNode.removeChild(del);}
+  }
+}
+function collectMgClients(sel){
+  var out=[];
+  document.querySelectorAll(sel+' .cl-card').forEach(function(card){
+    var kind=card.dataset.kind||'person';
+    if(kind==='corp'){
+      var corpName=card.querySelector('.mc-name').value.trim();
+      var title=card.querySelector('.mc-title').value.trim()||'대표이사';
+      var reps=[]; card.querySelectorAll('.mc-rep').forEach(function(inp){var v=inp.value.trim();if(v)reps.push({name:v});});
+      var addr=card.querySelector('.mc-addr').value.trim();
+      if(corpName||reps.length)out.push({kind:'corp',corpName:corpName,title:title,reps:reps,addr:addr});
+    }else{
+      var name=card.querySelector('.mp-name').value.trim();
+      var noAddr=card.querySelector('.mp-noaddr').checked;
+      var addr=card.querySelector('.mp-addr').value.trim();
+      var ssn=card.querySelector('.mp-ssn').value.trim();
+      if(name)out.push({kind:'person',name:name,addr:noAddr?'':addr,ssn:noAddr?ssn:'',noAddr:noAddr});
+    }
+  });
+  return out;
+}
+
+/* 제3자(제3채무자/제3채권자) — 이름만 */
+function thirdCardHTML(idx,t){
+  t=t||{}; var label=t.label||'제3채무자';
+  return '<div class="cl-card th-card">'
+    +'<button type="button" class="cl-del" onclick="removeThird(this)">×</button>'
+    +'<div class="fs-chips" style="margin-bottom:10px">'
+      +'<div class="fs-chip'+(label==='제3채무자'?' on':'')+'" data-thlabel="제3채무자" onclick="thPickLabel(this)">제3채무자</div>'
+      +'<div class="fs-chip'+(label==='제3채권자'?' on':'')+'" data-thlabel="제3채권자" onclick="thPickLabel(this)">제3채권자</div>'
+    +'</div>'
+    +'<div class="fs-field" style="margin-bottom:0"><label class="fs-label">이름</label><input type="text" class="fs-input th-name" placeholder="성명 또는 법인명" value="'+sjEsc(t.name||'')+'"></div>'
+    +'</div>';
+}
+function thPickLabel(el){el.parentNode.querySelectorAll('.fs-chip').forEach(function(x){x.classList.remove('on');});el.classList.add('on');}
+function addThird(listId){var l=document.getElementById(listId||'mg-third-list');l.insertAdjacentHTML('beforeend',thirdCardHTML(l.children.length,{label:'제3채무자'}));}
+function removeThird(btn){var card=btn.closest('.cl-card');card.parentNode.removeChild(card);}
+function collectThirds(sel){
+  var out=[];
+  document.querySelectorAll(sel+' .th-card').forEach(function(card){
+    var lon=card.querySelector('.fs-chip.on');
+    var label=lon?lon.dataset.thlabel:'제3채무자';
+    var name=card.querySelector('.th-name').value.trim();
+    if(name)out.push({label:label,name:name});
+  });
+  return out;
+}
+
 function openMgForm(){
   closeSeonimType();
-  document.getElementById('mg-role').querySelectorAll('.fs-chip').forEach(function(c,i){c.classList.toggle('on',i===0);});
-  updateMgOppLabel();
+  document.querySelectorAll('#mg-ptype .fs-chip').forEach(function(c,i){c.classList.toggle('on',i===0);});
+  document.querySelectorAll('#mg-role .fs-chip').forEach(function(c,i){c.classList.toggle('on',i===0);});
+  mgUpdatePartyUI();
   document.getElementById('mg-casenum').value='';
   document.getElementById('mg-casename').value='';
   document.getElementById('mg-opp').value='';
@@ -4588,18 +4790,30 @@ function openMgForm(){
   renderAttChips('mg', ALL_ATTORNEYS.slice());
   var t=new Date();
   document.getElementById('mg-date').value=t.getFullYear()+'-'+('0'+(t.getMonth()+1)).slice(-2)+'-'+('0'+t.getDate()).slice(-2);
-  document.getElementById('mg-cl-list').innerHTML=''; addClient('mg-cl-list');
+  document.getElementById('mg-cl-list').innerHTML=''; addMgClient();
+  document.getElementById('mg-third-list').innerHTML='';
   document.getElementById('mgForm').classList.add('active');
 }
+document.getElementById('mg-ptype').addEventListener('click',function(e){
+  var c=e.target.closest('.fs-chip'); if(!c)return;
+  this.querySelectorAll('.fs-chip').forEach(function(x){x.classList.remove('on');});
+  c.classList.add('on'); mgUpdatePartyUI();
+});
 document.getElementById('mg-role').addEventListener('click',function(e){
   var c=e.target.closest('.fs-chip'); if(!c)return;
   this.querySelectorAll('.fs-chip').forEach(function(x){x.classList.remove('on');});
   c.classList.add('on'); updateMgOppLabel();
 });
 document.getElementById('mg-att').addEventListener('click',function(e){ attChipClick(e,'mg'); });
+
 function editMingasa(){
   var s=mingasaState;
-  document.getElementById('mg-role').querySelectorAll('.fs-chip').forEach(function(c){c.classList.toggle('on',c.dataset.role===s.role);});
+  var pt=s.partyType||'wongo';
+  document.querySelectorAll('#mg-ptype .fs-chip').forEach(function(c){c.classList.toggle('on',c.dataset.ptype===pt);});
+  mgUpdatePartyUI();
+  var def=MG_PARTY_TYPES[pt]||MG_PARTY_TYPES.wongo;
+  var roleVal=s.role||def.front;
+  document.querySelectorAll('#mg-role .fs-chip').forEach(function(c){c.classList.toggle('on',c.dataset.role===roleVal);});
   updateMgOppLabel();
   document.getElementById('mg-casenum').value=s.casenum||'';
   document.getElementById('mg-casename').value=s.casename||'';
@@ -4608,30 +4822,33 @@ function editMingasa(){
   document.getElementById('mg-date').value=s.date||'';
   renderAttChips('mg', s.attorneys);
   var list=document.getElementById('mg-cl-list'); list.innerHTML='';
-  var arr=(s.clients&&s.clients.length)?s.clients:[{name:'',ssn:''}];
-  arr.forEach(function(c,i){list.insertAdjacentHTML('beforeend',clientCardHTML(i,c.name,c.ssn));});
+  var arr=(s.clients&&s.clients.length)?s.clients:[{kind:'person'}];
+  arr.forEach(function(c,i){list.insertAdjacentHTML('beforeend',mgClientCardHTML(i,c));});
+  var tl=document.getElementById('mg-third-list'); tl.innerHTML='';
+  (s.thirds||[]).forEach(function(t,i){tl.insertAdjacentHTML('beforeend',thirdCardHTML(i,t));});
   document.getElementById('mgForm').classList.add('active');
 }
 function applyMgForm(){
-  var clients=[]; var cards=document.querySelectorAll('#mg-cl-list .cl-card');
-  for(var i=0;i<cards.length;i++){
-    var nm=cards[i].querySelector('.cl-name').value.trim();
-    var sn=cards[i].querySelector('.cl-ssn').value.trim();
-    if(nm) clients.push({name:nm,ssn:sn});
-  }
+  var clients=collectMgClients('#mg-cl-list');
+  var thirds=collectThirds('#mg-third-list');
+  var pon=document.querySelector('#mg-ptype .fs-chip.on');
+  var pt=pon?pon.dataset.ptype:'wongo';
+  var def=MG_PARTY_TYPES[pt]||MG_PARTY_TYPES.wongo;
   var roleOn=document.querySelector('#mg-role .fs-chip.on');
   var atts=[];
   document.querySelectorAll('#mg-att .fs-chip.on').forEach(function(c){atts.push(c.dataset.att);});
   if(!atts.length)atts=['서고은'];
   mingasaState={
-    role: roleOn?roleOn.dataset.role:'원고',
+    partyType: pt,
+    role: roleOn?roleOn.dataset.role:def.front,
     casenum: document.getElementById('mg-casenum').value.trim(),
     casename: document.getElementById('mg-casename').value.trim(),
     opp: document.getElementById('mg-opp').value.trim(),
     date: document.getElementById('mg-date').value,
     agency: document.getElementById('mg-agency').value.trim(),
     attorneys: atts,
-    clients: clients
+    clients: clients,
+    thirds: def.hasThird?thirds:[]
   };
   seonimMode='민가사';
   closeMgForm();
@@ -4649,27 +4866,54 @@ function mgPowerHTML(){
    +'<div class="pw-full">10. 담보권행사 최고신청, 담보취소신청, 등 신청에 대한 동의, 담보취소결정정본의 수령, 등 취소결정에 대한 항고권포기</div>'
    +'<div class="pw-row"><span class="pw-l">11. 배당금의 수령</span><span class="pw-r">12. 배당이의 신청</span></div>';
 }
+/* 위임인 블록(개인/법인, 주소·주민번호) */
+function mgWiimanBlock(c){
+  if(c.kind==='corp'){
+    var reps=(c.reps&&c.reps.length)?c.reps:[{name:''}];
+    var title=sjEsc(c.title||'대표이사');
+    var lines=reps.map(function(r,ri){
+      var seal=makeOvalSeal(r.name);
+      var titleHtml=(ri===0)?(title+' '):('<span class="wi-tpad">'+title+' </span>');
+      return '<div class="wi-line"><span class="wi-name">'+titleHtml+sjEsc(r.name)+'</span>'
+        +'<span class="wi-seal"><span class="ins">(인)</span>'+(seal?'<img class="wi-sealimg" src="'+seal+'">':'')+'</span></div>';
+    }).join('');
+    return '<div class="wi-block">'
+      +'<div class="wi-corpname">'+sjEsc(c.corpName)+'</div>'+lines
+      +(c.addr?'<div class="wi-addr">('+sjEsc(c.addr)+')</div>':'')+'</div>';
+  }
+  var seal=makeOvalSeal(c.name);
+  var hasAddr=c.addr&&!c.noAddr;
+  var nameHtml=sjEsc(c.name)+((!hasAddr&&c.ssn)?'('+sjEsc(c.ssn)+')':'');
+  return '<div class="wi-block">'
+    +'<div class="wi-line"><span class="wi-name">'+nameHtml+'</span>'
+    +'<span class="wi-seal"><span class="ins">(인)</span>'+(seal?'<img class="wi-sealimg" src="'+seal+'">':'')+'</span></div>'
+    +(hasAddr?'<div class="wi-addr">('+sjEsc(c.addr)+')</div>':'')+'</div>';
+}
 function renderMingasa(){
   var s=mingasaState;
-  var clients=s.clients.filter(function(c){return c.name.trim();});
-  var ourNames=clients.map(function(c){return sjEsc(c.name);}).join(', ');
-  var wongo, pigo;
-  var wongoClick=s.role==='원고'?"clients":"opp";
-  var pigoClick=s.role==='원고'?"opp":"clients";
-  if(s.role==='원고'){ wongo=ourNames; pigo=sjEsc(s.opp); }
-  else { wongo=sjEsc(s.opp); pigo=ourNames; }
-  var multi=clients.length>=2;
-  var rows=clients.map(function(c){
-    var ssn=c.ssn?'('+sjEsc(c.ssn)+')':'';
-    var seal=makeOvalSeal(c.name);
-    return '<div class="sunim-row"><span class="sn-id">'+sjEsc(c.name)+'&nbsp;&nbsp;'+ssn+'</span>'
-      +'<span class="seal-wrap"><span class="ins">(인)</span>'+(seal?'<img class="name-seal" src="'+seal+'">':'')+'</span></div>';
-  }).join('');
+  var def=MG_PARTY_TYPES[s.partyType||'wongo']||MG_PARTY_TYPES.wongo;
+  var clients=(s.clients||[]).map(normalizeMgClient).filter(function(c){return (c.kind==='corp')?(c.corpName||(c.reps&&c.reps.some(function(r){return r.name&&r.name.trim();}))):(c.name&&c.name.trim());});
+  var ourNames=clients.map(function(c){return (c.kind==='corp')?sjEsc(c.corpName):sjEsc(c.name);}).join(', ');
+  var role=s.role||def.front;
+  var oursFront=(role===def.front);
+  var frontName=oursFront?ourNames:sjEsc(s.opp);
+  var backName=oursFront?sjEsc(s.opp):ourNames;
+  var frontClick=oursFront?'clients':'opp';
+  var backClick=oursFront?'opp':'clients';
+  var thirds=(def.hasThird&&s.thirds)?s.thirds:[];
+  var totalRows=2+thirds.length;
+  var partyRows='<tr style="height:9.9mm"><td class="lbl" rowspan="'+totalRows+'">당사자</td>'
+    +'<td class="party sj-editable" data-edit="'+frontClick+'"><span class="party-lbl">'+sjEsc(def.front)+'</span>'+frontName+'</td></tr>'
+    +'<tr style="height:9.9mm"><td class="party sj-editable" data-edit="'+backClick+'"><span class="party-lbl">'+sjEsc(def.back)+'</span>'+backName+'</td></tr>';
+  thirds.forEach(function(t,ti){
+    partyRows+='<tr style="height:9.9mm"><td class="party sj-editable" data-edit="third:'+ti+'"><span class="party-lbl">'+sjEsc(t.label)+'</span>'+sjEsc(t.name)+'</td></tr>';
+  });
+  var multi=clients.length>=2||clients.some(function(c){return c.kind==='corp'||(c.addr&&!c.noAddr);});
+  var wiBlocks=clients.map(mgWiimanBlock).join('');
   var html='<table class="sj"><colgroup><col style="width:20.9mm"><col style="width:148.1mm"></colgroup>'
    +'<tr style="height:15mm"><td class="title" colspan="2">소송위임장</td></tr>'
    +'<tr style="height:9.9mm"><td class="lbl">사건</td><td class="val sj-editable" data-edit="case">'+sjEsc(s.casenum)+' '+sjEsc(s.casename)+'</td></tr>'
-   +'<tr style="height:9.9mm"><td class="lbl" rowspan="2">당사자</td><td class="party sj-editable" data-edit="'+wongoClick+'"><span class="party-lbl">원 고</span>'+wongo+'</td></tr>'
-   +'<tr style="height:9.9mm"><td class="party sj-editable" data-edit="'+pigoClick+'"><span class="party-lbl">피 고</span>'+pigo+'</td></tr>'
+   +partyRows
    +'<tr style="height:11.2mm"><td class="mg-intro" colspan="2">위 당사자 간의 사건에 관하여 다음 표시 수임인을 소송대리인으로 선임하고, 다음 표시 권한을 수여한다.</td></tr>'
    +'<tr style="height:35.1mm"><td class="lbl">수임인</td><td class="mg-suim">'
      +'<div class="mg-firm">법무법인 정서</div>'
@@ -4679,7 +4923,7 @@ function renderMingasa(){
      +'<img class="firm-seal-mg" src="'+SEONIM_FIRM_SEAL+'">'
    +'</td></tr>'
    +'<tr style="height:51.5mm"><td class="lbl lbl-v">수<br>권<br>사<br>항</td><td class="mg-power">'+mgPowerHTML()+'</td></tr>'
-   +'<tr style="height:47.9mm"><td class="lbl">위임인</td><td class="mg-wiimin sj-editable '+(multi?'multi':'single')+'" data-edit="clients"><div class="mg-date sj-editable" data-edit="date">'+sjEsc(sjFmtDate(s.date))+'</div>'+rows+'</td></tr>'
+   +'<tr style="height:47.9mm"><td class="lbl">위임인</td><td class="mg-wiimin sj-editable '+(multi?'multi':'single')+'" data-edit="clients"><div class="mg-date sj-editable" data-edit="date">'+sjEsc(sjFmtDate(s.date))+'</div>'+wiBlocks+'</td></tr>'
    +'<tr style="height:9.8mm"><td class="subhead" colspan="2">담당변호사 지정서</td></tr>'
    +'<tr style="height:16.2mm"><td class="desig" colspan="2">위 사건에 관하여 당 법인은 <span class="v-role-em sj-editable" data-edit="role">'+sjEsc(s.role)+'</span>의 소송대리인으로서 변호사법 제50조 제1항에 의거하여 그 업무를 담당할 변호사를 아래와 같이 지정합니다.</td></tr>'
    +'<tr style="height:12.2mm"><td class="attorneys sj-editable" colspan="2" data-edit="att">담당변호사 : '+sjEsc(s.attorneys.join(', '))+'</td></tr>'
