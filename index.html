@@ -606,14 +606,16 @@ body.on-dojang #heartCanvas{ display:none!important; }   /* 도장 화면은 ifr
   #screen-contract{display:block!important;}
   #screen-contract .ct-content{padding:0!important;margin:0!important;background:#fff!important;display:block!important;}
   #screen-contract .page{
-    width:210mm!important;height:287mm!important;min-height:287mm!important;max-height:287mm!important;
+    width:210mm!important;min-height:287mm!important;
     box-sizing:border-box!important;
     box-shadow:none!important;margin:0 auto!important;padding:11mm 16mm 9mm!important;
-    page-break-after:always;break-after:page;border-radius:0!important;
+    page-break-after:always;break-after:page;
+    page-break-inside:avoid;break-inside:avoid;
+    border-radius:0!important;
     border:1px solid #bbbbbb!important;
     -webkit-print-color-adjust:exact;print-color-adjust:exact;
     transform:none!important;
-    overflow:hidden!important;
+    overflow:visible!important;
   }
   /* 숨겨진(다른 타입) 페이지는 인쇄에서 완전 제외 */
   #screen-contract .page[style*="display:none"],
@@ -646,6 +648,42 @@ body.on-dojang #heartCanvas{ display:none!important; }   /* 도장 화면은 ifr
   #special-extra{border:none!important;resize:none;-webkit-appearance:none;max-height:none;}
   @page{size:A4 portrait;margin:0;}
 }
+
+/* ── 이미지·PDF 저장(html2canvas 캡처) 시 프린터 출력과 동일한 레이아웃 적용 ──
+   @media print 은 화면 캡처(html2canvas)에는 적용되지 않으므로, 동일 규칙을
+   body.print-emulate 스코프로 복제해 캡처 직전에만 켠다. (프린터 출력 CSS와 동기화 유지 필요) */
+body.print-emulate #screen-contract .ct-content{padding:0!important;margin:0!important;background:#fff!important;display:block!important;}
+body.print-emulate #screen-contract .page{
+  width:210mm!important;min-height:287mm!important;
+  box-sizing:border-box!important;
+  box-shadow:none!important;margin:0 auto!important;padding:11mm 16mm 9mm!important;
+  border-radius:0!important;border:1px solid #bbbbbb!important;
+  transform:none!important;overflow:visible!important;
+}
+body.print-emulate #screen-contract .page[style*="display:none"],
+body.print-emulate #screen-contract .page[style*="display: none"]{display:none!important;}
+body.print-emulate #screen-contract .article-block,body.print-emulate #screen-contract .article-indent,body.print-emulate #screen-contract .article-indent2{line-height:1.5!important;}
+body.print-emulate #screen-contract .account-select{border:none!important;background:transparent!important;-webkit-appearance:none!important;appearance:none!important;padding:0!important;}
+body.print-emulate #screen-contract .civil-page .article-block,body.print-emulate #screen-contract .family-page .article-block{line-height:1.5!important;margin-bottom:3px!important;}
+body.print-emulate #screen-contract .civil-page .article-indent,body.print-emulate #screen-contract .family-page .article-indent{line-height:1.5!important;}
+body.print-emulate #screen-contract .civil-page .article-indent2,body.print-emulate #screen-contract .family-page .article-indent2{line-height:1.46!important;}
+body.print-emulate #screen-contract .civil-page .contract-intro,body.print-emulate #screen-contract .family-page .contract-intro{line-height:1.5!important;margin:4px 0!important;}
+body.print-emulate #screen-contract .civil-page .article-title,body.print-emulate #screen-contract .family-page .article-title{line-height:1.4!important;}
+body.print-emulate #screen-contract #civil-page2 .article-block,body.print-emulate #screen-contract #family-page2 .article-block{line-height:1.42!important;margin-bottom:2px!important;}
+body.print-emulate #screen-contract #civil-page2 .article-indent,body.print-emulate #screen-contract #family-page2 .article-indent{line-height:1.42!important;}
+body.print-emulate #screen-contract #civil-page2 .article-indent2,body.print-emulate #screen-contract #family-page2 .article-indent2{line-height:1.4!important;}
+body.print-emulate #screen-contract .civil-footnote{font-size:6.5pt!important;line-height:1.25!important;padding-top:5px!important;}
+body.print-emulate #screen-contract .civil-page,body.print-emulate #screen-contract .family-page{padding:11mm 16mm 9mm!important;}
+body.print-emulate #screen-contract .article-block{margin-bottom:4px!important;}
+body.print-emulate #screen-contract .info-table td,body.print-emulate #screen-contract .th-cell,body.print-emulate #screen-contract .th-sub{font-size:9pt!important;}
+body.print-emulate #screen-contract .scope-item,body.print-emulate #screen-contract .fee-row td,body.print-emulate #screen-contract .receipt-row{font-size:9pt!important;}
+body.print-emulate #screen-contract .contract-intro,body.print-emulate #screen-contract .article-block,body.print-emulate #screen-contract .article-indent,body.print-emulate #screen-contract .article-indent2,body.print-emulate #screen-contract .special-note,body.print-emulate #screen-contract .special-body{font-size:9pt!important;}
+body.print-emulate #screen-contract .doc-title{font-size:17.5pt!important;}
+body.print-emulate #screen-contract .sign-date{font-size:9pt!important;}
+body.print-emulate #screen-contract .date-input{font-size:9pt!important;width:24px!important;}
+body.print-emulate .sign-stamp-circle{border:none!important;}
+body.print-emulate .sign-clear-btn{display:none!important;}
+body.print-emulate #special-extra{border:none!important;resize:none;-webkit-appearance:none;max-height:none;}
 
 /* ── 모달 ── */
 .modal-overlay{
@@ -3176,6 +3214,8 @@ function buildFileName(){
 }
 async function capturePages(){
   var pages=Array.prototype.slice.call(document.querySelectorAll('#ctContent .page')).filter(function(p){return p.style.display!=='none';});
+  // 프린터 출력과 동일한 압축 레이아웃을 캡처에 적용 (잘림·모양차이 해결)
+  document.body.classList.add('print-emulate');
   var canvases=[];
   var MM=3.7795275591;
   var W=Math.round(210*MM);
@@ -3195,24 +3235,51 @@ async function capturePages(){
   var wraps=Array.prototype.slice.call(document.querySelectorAll('.info-table-wrap'));
   var wrapPrev=wraps.map(function(w){return {ox:w.style.overflowX,sl:w.scrollLeft};});
   wraps.forEach(function(w){w.style.overflowX='visible';w.scrollLeft=0;});
-  // 입금계좌 select 박스 - 캡처 시 테두리/화살표 숨기고 텍스트만 (출력물 깔끔하게)
+  // 입금계좌 select 박스 - 캡처 시 html2canvas가 select 텍스트 하단을 잘라먹는 문제 우회:
+  // select를 숨기고 같은 자리에 선택된 텍스트를 span으로 임시 삽입
   var selects=Array.prototype.slice.call(document.querySelectorAll('.account-select'));
-  var selPrev=selects.map(function(s){return {border:s.style.border,bg:s.style.background,appearance:s.style.webkitAppearance,padding:s.style.padding};});
-  selects.forEach(function(s){
-    s.style.border='none';
-    s.style.background='transparent';
-    s.style.webkitAppearance='none';
-    s.style.appearance='none';
-    s.style.padding='0';
+  var selSpans=selects.map(function(s){
+    var opt=s.options[s.selectedIndex];
+    var span=document.createElement('span');
+    span.textContent=opt?opt.text:(s.value||'');
+    span.setAttribute('data-account-print','1');
+    span.style.cssText='font-size:8.5pt;font-family:var(--font-body);color:#111;white-space:nowrap;display:inline-block;vertical-align:middle;line-height:1.5;';
+    s.style.display='none';
+    s.parentNode.insertBefore(span, s.nextSibling);
+    return span;
+  });
+  // 밑줄 입력칸(input) - 캡처 시 html2canvas가 input 글자를 아래로 쏠리게 그려 하단이 잘리는 문제 우회:
+  // input을 숨기고 같은 자리에 같은 값·같은 밑줄의 텍스트 span으로 임시 교체
+  var inputs=Array.prototype.slice.call(document.querySelectorAll('#ctContent input[type="text"]'));
+  var inputSpans=inputs.map(function(inp){
+    var cs=window.getComputedStyle(inp);
+    var txt=inp.value||'';
+    var isPh=false;
+    if(!txt && inp.placeholder){ txt=inp.placeholder; isPh=true; }
+    var span=document.createElement('span');
+    span.textContent=txt;
+    span.setAttribute('data-input-print','1');
+    span.style.cssText='display:inline-block;box-sizing:border-box;vertical-align:baseline;'
+      +'width:'+cs.width+';min-width:'+cs.width+';'
+      +'font-size:'+cs.fontSize+';font-family:'+cs.fontFamily+';font-weight:'+cs.fontWeight+';'
+      +'text-align:'+cs.textAlign+';line-height:1.35;'
+      +'color:'+(isPh?'#9aa0a6':'#111')+';'
+      +'border-bottom:'+cs.borderBottomWidth+' '+cs.borderBottomStyle+' '+cs.borderBottomColor+';'
+      +'white-space:nowrap;overflow:visible;';
+    inp.style.display='none';
+    inp.parentNode.insertBefore(span, inp.nextSibling);
+    return span;
   });
   for(var i=0;i<pages.length;i++){
     var page=pages[i];
     var prev={width:page.style.width,height:page.style.height,minHeight:page.style.minHeight,padding:page.style.padding};
     page.style.width=W+'px';
-    page.style.height=H+'px';
+    page.style.height='auto';
     page.style.minHeight=H+'px';
     page.style.padding=Math.round(11*MM)+'px '+Math.round(18*MM)+'px '+Math.round(9*MM)+'px';
-    var c=await html2canvas(page,{scale:2,useCORS:true,allowTaint:true,backgroundColor:'#ffffff',logging:false,width:W,height:H,windowWidth:W,windowHeight:H});
+    // 실제 콘텐츠 높이 측정: A4 높이를 넘치면 넘치는 만큼 전부 캡처(아래 잘림 방지)
+    var capH=Math.max(H, Math.ceil(page.scrollHeight));
+    var c=await html2canvas(page,{scale:2,useCORS:true,allowTaint:true,backgroundColor:'#ffffff',logging:false,width:W,height:capH,windowWidth:W,windowHeight:capH});
     page.style.width=prev.width;
     page.style.height=prev.height;
     page.style.minHeight=prev.minHeight;
@@ -3224,7 +3291,15 @@ async function capturePages(){
   stamps.forEach(function(s,idx){s.style.border=stampPrev[idx];});
   clrBtns.forEach(function(b,idx){b.style.display=clrPrev[idx];});
   wraps.forEach(function(w,idx){w.style.overflowX=wrapPrev[idx].ox;w.scrollLeft=wrapPrev[idx].sl;});
-  selects.forEach(function(s,idx){s.style.border=selPrev[idx].border;s.style.background=selPrev[idx].bg;s.style.webkitAppearance=selPrev[idx].appearance;s.style.appearance=selPrev[idx].appearance;s.style.padding=selPrev[idx].padding;});
+  selSpans.forEach(function(span,idx){
+    if(span&&span.parentNode)span.parentNode.removeChild(span);
+    if(selects[idx])selects[idx].style.display='';
+  });
+  inputSpans.forEach(function(span,idx){
+    if(span&&span.parentNode)span.parentNode.removeChild(span);
+    if(inputs[idx])inputs[idx].style.display='';
+  });
+  document.body.classList.remove('print-emulate');
   return canvases;
 }
 async function doAction(type){
@@ -3274,7 +3349,12 @@ async function doAction(type){
         var cv=canvases[j];
         var imgData=cv.toDataURL('image/png');
         if(j>0)pdf.addPage();
-        pdf.addImage(imgData,'PNG',0,0,pw,ph,undefined,'FAST');
+        // A4 한 장에 비율 유지하며 전부 들어가게 배치(넘치면 살짝 축소, 평소엔 꽉 참)
+        var cw=cv.width, ch=cv.height;
+        var s=Math.min(pw/cw, ph/ch);
+        var dw=cw*s, dh=ch*s;
+        var dx=(pw-dw)/2, dy=(ph-dh)/2;
+        pdf.addImage(imgData,'PNG',dx,dy,dw,dh,undefined,'FAST');
       }
       pdf.save(buildFileName()+'.pdf');
       hideLoading();
@@ -3300,7 +3380,12 @@ async function doAction(type){
       }else{fallbackDownload(blob,fileName);}
       saveToCloud();
     }
-  }catch(err){hideLoading();alert('오류가 발생했습니다.\n'+err.message);}
+  }catch(err){
+    document.body.classList.remove('print-emulate');
+    Array.prototype.forEach.call(document.querySelectorAll('[data-account-print],[data-input-print]'),function(el){el.remove();});
+    Array.prototype.forEach.call(document.querySelectorAll('.account-select, #ctContent input[type="text"]'),function(s){s.style.display='';});
+    hideLoading();alert('오류가 발생했습니다.\n'+err.message);
+  }
 }
 function fallbackDownload(blob,fileName){
   var url=URL.createObjectURL(blob);
