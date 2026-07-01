@@ -46,7 +46,7 @@
     <input type="password" id="lockInput" placeholder="비밀번호" autocomplete="off"
       style="width:100%;height:52px;border:1px solid #bbbbbb;border-radius:999px;padding:0 20px;font-size:15px;font-family:inherit;outline:none;background:#f9f9f9;text-align:center;"
       onkeydown="if(event.key==='Enter')tryUnlock()">
-    <div id="lockError" style="font-size:12px;color:#cc3333;margin-top:10px;height:16px;"></div>
+    <div id="lockError" style="font-size:12px;color:#c0392b;margin-top:10px;height:16px;"></div>
     <button onclick="tryUnlock()"
       style="width:100%;height:52px;margin-top:14px;background:#1a1a1a;color:#fff;border:none;border-radius:999px;font-size:15px;font-weight:600;font-family:inherit;cursor:pointer;">
       입장하기
@@ -123,8 +123,8 @@
         합의서 작성<span class="sb-badge">준비중</span>
       </div>
       <div class="sb-item" onclick="openDojang()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg>
-        도장찍기
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        형사서면 출력
       </div>
     </nav>
     <div class="sb-foot">인천광역시 미추홀구<br>한나루로 436, 501호<br>032-868-7171</div>
@@ -132,70 +132,71 @@
 
   <div class="home-main">
     <div class="hm-hi">법률문서 작성</div>
-    <div class="hm-title">법무법인 정서</div>
+    <div class="hm-title">문서 작성</div>
     <div class="hm-desc">작성할 문서를 선택하세요</div>
     <div class="doc-grid">
-      <div class="doc-card" onclick="openTypeSheet()">
-        <div class="dc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg></div>
-        <div class="dc-name">계약서 작성</div>
-        <div class="dc-desc">송무위임계약서<br>형사·민사·가사</div>
-      </div>
-      <div class="doc-card" onclick="openSeonimType()">
-        <div class="dc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg></div>
+      <div class="doc-card dc-hero" onclick="openSeonimType()">
+        <div class="dc-watermark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg></div>
+        <div class="dc-main-tag">MAIN</div>
         <div class="dc-name">선임계 작성</div>
         <div class="dc-desc">변호인 선임신고서</div>
+        <div class="dc-cta">시작하기 →</div>
       </div>
-      <div class="doc-card" onclick="goAppeal()">
+      <div class="doc-card dc-wide dc-accent" onclick="openDojang()">
+        <div class="dc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></div>
+        <div class="dc-body"><div class="dc-name">형사서면 출력</div><div class="dc-desc">증거·참고자료 서면 출력</div></div>
+      </div>
+      <div class="doc-card dc-small" onclick="openTypeSheet()">
+        <div class="dc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg></div>
+        <div class="dc-name">계약서 작성</div>
+      </div>
+      <div class="doc-card dc-small" onclick="goAppeal()">
         <div class="dc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
-        <div class="dc-name">항소장 작성</div>
-        <div class="dc-desc">형사 항소장</div>
+        <div class="dc-name">항소장</div>
       </div>
-      <div class="doc-card disabled">
+      <div class="doc-card dc-wide disabled">
         <div class="dc-badge">준비중</div>
         <div class="dc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div>
-        <div class="dc-name">합의서 작성</div>
-        <div class="dc-desc">형사·민사 합의서</div>
+        <div class="dc-body"><div class="dc-name">합의서 작성</div><div class="dc-desc">형사·민사 합의서</div></div>
       </div>
-      <div class="doc-card" onclick="openDojang()">
-        <div class="dc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg></div>
-        <div class="dc-name">도장찍기</div>
-        <div class="dc-desc">증거·참고자료<br>도장 날인</div>
+      <div class="doc-card dc-wide" onclick="openContractList()">
+        <div class="dc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div>
+        <div class="dc-body"><div class="dc-name">계약서 목록</div><div class="dc-desc">저장된 계약서를 날짜별로 확인</div></div>
       </div>
     </div>
 
     <div class="hm-mobile">
-      <div class="hmh"><div><div class="hmh-hi">법률문서 작성</div><div class="hmh-name">법무법인 정서</div></div></div>
+      <div class="hmh"><div><div class="hmh-hi">법률문서 작성</div><div class="hmh-name">문서 작성</div></div></div>
       <div class="hm-seclabel">문서 선택</div>
       <div class="hm-list">
-        <div class="hm-item" onclick="openTypeSheet()">
-          <div class="hmi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg></div>
-          <div class="hmi-body"><div class="hmi-name">계약서 작성</div><div class="hmi-desc">송무위임계약서 형사·민사·가사</div></div>
-          <div class="hmi-arrow">›</div>
+        <div class="hm-item hi-hero" onclick="openTypeSheet()">
+          <div class="hmi-watermark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg></div>
+          <div class="hmi-tag">MAIN</div>
+          <div class="hmi-name">계약서 작성</div>
+          <div class="hmi-desc">송무위임계약서 · 형사·민사·가사</div>
+          <div class="hmi-cta">시작하기 →</div>
         </div>
-        <div class="hm-item" onclick="openContractList()">
+        <div class="hm-item hi-wide" onclick="openContractList()">
           <div class="hmi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div>
           <div class="hmi-body"><div class="hmi-name">계약서 목록</div><div class="hmi-desc">저장된 계약서를 날짜별로 확인</div></div>
           <div class="hmi-arrow">›</div>
         </div>
         <div class="hm-item" onclick="openSeonimType()">
           <div class="hmi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg></div>
-          <div class="hmi-body"><div class="hmi-name">선임계 작성</div><div class="hmi-desc">변호인 선임신고서</div></div>
-          <div class="hmi-arrow">›</div>
+          <div class="hmi-name">선임계 작성</div>
         </div>
         <div class="hm-item" onclick="goAppeal()">
           <div class="hmi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
-          <div class="hmi-body"><div class="hmi-name">항소장 작성</div><div class="hmi-desc">형사 항소장</div></div>
-          <div class="hmi-arrow">›</div>
+          <div class="hmi-name">항소장</div>
+        </div>
+        <div class="hm-item" onclick="openDojang()">
+          <div class="hmi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></div>
+          <div class="hmi-name">형사서면 출력</div>
         </div>
         <div class="hm-item disabled">
           <div class="hmi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div>
-          <div class="hmi-body"><div class="hmi-name">합의서 작성</div><div class="hmi-desc">형사·민사 합의서</div></div>
+          <div class="hmi-name">합의서 작성</div>
           <div class="hmi-badge">준비중</div>
-        </div>
-        <div class="hm-item" onclick="openDojang()">
-          <div class="hmi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg></div>
-          <div class="hmi-body"><div class="hmi-name">도장찍기</div><div class="hmi-desc">증거·참고자료 도장 날인</div></div>
-          <div class="hmi-arrow">›</div>
         </div>
       </div>
       <div class="hm-foot">법무법인 정서 · 인천광역시 미추홀구</div>
@@ -1298,9 +1299,9 @@
 <div id="screen-dojang" class="screen">
   <div class="sj-appbar no-print">
     <button class="sj-back" onclick="showScreen('screen-home')">‹ 처음으로</button>
-    <div class="sj-title">도장찍기</div>
+    <div class="sj-title">형사서면 출력</div>
   </div>
-  <iframe id="dojangFrame" class="dj-frame" title="도장찍기"></iframe>
+  <iframe id="dojangFrame" class="dj-frame" title="형사서면 출력"></iframe>
 </div>
 
 
@@ -1418,7 +1419,7 @@ function resetContract(){
 }
 
 /* ═══ Supabase 연동 ═══ */
-var APP_VERSION='v58';
+var APP_VERSION='v64';
 var SUPABASE_URL='https://nyjyemjsperpakrrgzcc.supabase.co';
 var SUPABASE_KEY='sb_publishable_QKl9MIt2_MflYnpN41VRvg_cNIAbYhU';
 var sb=null;
