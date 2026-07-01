@@ -10,11 +10,11 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
 <style>
   :root{
-    --black:#1a1a1a; --gray-900:#222; --gray-700:#444; --gray-500:#888; --gray-400:#aaa;
-    --gray-300:#ccc; --gray-200:#e4e4e4; --gray-100:#f2f2f2; --gray-50:#f9f9f9;
-    --border:#e8e8e8; --seal:#B23A2E;
-    --r:12px; --r-lg:18px; --r-xl:24px; --r-pill:999px;
-    --font:'Malgun Gothic','맑은 고딕','Apple SD Gothic Neo','Noto Sans KR',sans-serif;
+    --black:#1a1a1a; --gray-900:#222; --gray-700:#444; --gray-500:#8E8E93; --gray-400:#AEAEB2;
+    --gray-300:#C7C7CC; --gray-200:#D1D1D6; --gray-100:#F2F2F7; --gray-50:#FAFAFA;
+    --border:#E5E5EA; --seal:#B23A2E;
+    --r:8px; --r-lg:12px; --r-xl:16px; --r-2xl:20px; --r-pill:999px;
+    --font:-apple-system,BlinkMacSystemFont,'Pretendard Variable','Pretendard',system-ui,'Apple SD Gothic Neo','Malgun Gothic','맑은 고딕','Noto Sans KR',sans-serif;
   }
   
 
@@ -69,7 +69,7 @@
 
   /* 미리보기 */
   .stage-bar{ display:flex; align-items:center; gap:8px; margin-bottom:10px; min-height:22px; }
-  .stage-bar .ord{ background:var(--black); color:#fff; border-radius:6px; font-size:11px; font-weight:600; padding:2px 8px; }
+  .stage-bar .ord{ background:var(--black); color:#fff; border-radius:8px; font-size:11px; font-weight:600; padding:2px 8px; }
   .stage-bar .fn{ font-size:13px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .stage-bar .rotate-btn{ margin-left:auto; flex:none; border:1px solid var(--gray-300); background:#fff; color:var(--gray-700);
     border-radius:var(--r); font-size:12px; font-weight:600; padding:5px 12px; cursor:pointer; font-family:inherit; white-space:nowrap; transition:.15s; }
@@ -106,7 +106,7 @@
   .frow.dragging{ opacity:.7; border-color:var(--black); box-shadow:0 8px 20px rgba(0,0,0,.12); }
   .frow .l1{ display:flex; align-items:center; gap:8px; }
   .frow .ord{ flex:none; width:21px; height:21px; border-radius:50%; background:var(--black); color:#fff; font-size:11px; font-weight:600; display:grid; place-items:center; }
-  .frow .nameInp{ flex:1; min-width:0; border:none; background:transparent; font-size:12.5px; font-family:inherit; color:var(--black); padding:2px 3px; border-radius:5px; }
+  .frow .nameInp{ flex:1; min-width:0; border:none; background:transparent; font-size:12.5px; font-family:inherit; color:var(--black); padding:2px 3px; border-radius:8px; }
   .frow .nameInp:focus{ outline:none; background:var(--gray-100); }
   .frow .conn{ font-size:11px; color:var(--gray-400); flex:none; }
   .frow .del{ border:none; background:none; color:var(--gray-400); cursor:pointer; font-size:15px; line-height:1; padding:0 2px; flex:none; }
@@ -114,7 +114,7 @@
   .frow .l2{ display:flex; align-items:center; gap:6px; margin-top:7px; padding-left:29px; flex-wrap:wrap; }
   .frow .l2 .tag{ font-size:11px; color:var(--gray-400); }
   .frow .l2 .stamp-lab{ font-size:12px; font-weight:700; color:var(--black); }
-  .frow .l2 input{ width:42px; padding:4px 6px; border:1px solid var(--gray-300); border-radius:7px; font-size:12px; text-align:center; font-family:inherit; }
+  .frow .l2 input{ width:42px; padding:4px 6px; border:1px solid var(--gray-300); border-radius:8px; font-size:12px; text-align:center; font-family:inherit; }
   .frow .l2 input:focus{ outline:none; border-color:var(--black); }
 
   /* 슬롯 (모드 B) */
@@ -141,7 +141,7 @@
   .pcard .nm{ font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; }
   .pcard .conn{ font-size:10.5px; color:var(--gray-400); }
   .pool-empty{ color:var(--gray-400); font-size:12px; text-align:center; padding:10px; border:1px dashed var(--gray-300); border-radius:var(--r); }
-  .drag-ghost{ position:fixed; z-index:90; pointer-events:none; background:var(--black); color:#fff; font-size:12px; padding:7px 11px; border-radius:9px; box-shadow:0 10px 26px rgba(0,0,0,.3); max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .drag-ghost{ position:fixed; z-index:90; pointer-events:none; background:var(--black); color:#fff; font-size:12px; padding:7px 11px; border-radius:8px; box-shadow:0 10px 26px rgba(0,0,0,.3); max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
   /* 토스트 */
   .toast{ position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(18px); background:var(--black); color:#fff;
