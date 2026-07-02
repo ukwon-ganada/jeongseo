@@ -459,17 +459,21 @@ function parseEvidenceFromParas(paras){
       cj++; items.push({kind:'jeung', num1:String(cj), num2:'', title:jt});
     } else {
       const t=p.trim();
+      // "제목 ― 설명" 형태(상고이유서 등 무번호·설명형): 대시 앞의 '제목'만 항목으로 사용
+      const DASH=/\s*[―—–]\s*|\s+-\s+/;
+      const dm=t.split(DASH);
+      const head=(dm.length>1? dm[0] : t).trim();   // 판정·제목 추출은 head 기준(대시 없으면 원문 그대로)
       const labelStart=/^(참고자료|첨부서류)\s*\d+\s*[.\)]/.test(t);
       const hasBullet=/^\d+[.\)]|^[•\-▢□○]/.test(t);
       const hasQty=/\s(각\s*)?\d+\s*(통|부|권|매|점|개|장|책|첩)\s*$/.test(t);
-      const isAbout=/(에\s*관하여|에\s*대하여|관련하여)\s*\.?\s*$/.test(t);
-      const isSentence=/[다요음함까죠오라]\.\s*$/.test(t) || /(니다|세요|바랍니다)\s*$/.test(t);
+      const isAbout=/(에\s*관하여|에\s*대하여|관련하여)\s*\.?\s*$/.test(head);
+      const isSentence=/[다요음함까죠오라]\.\s*$/.test(head) || /(니다|세요|바랍니다)\s*$/.test(head);
       const startsParen=/^[\(（]/.test(t);
       // 끝부분 헤더 이후 구간이므로, 라벨·번호·수량이 없어도 '한글 포함 짧은 명사 줄'이면 항목으로 인정
-      const looksItem=!isSentence && !isAbout && !startsParen && t.length>=1 && t.length<=40 && !/^[\d.\s]+$/.test(t) && /[가-힣]/.test(t);
+      const looksItem=!isSentence && !isAbout && !startsParen && head.length>=1 && head.length<=40 && !/^[\d.\s]+$/.test(head) && /[가-힣]/.test(head);
       if(isAbout || isSentence) continue;                          // "…에 관하여" 소제목·안내 문장 제외
       if(!labelStart && !hasBullet && !hasQty && !looksItem) continue;
-      let title=t.replace(/^(참고자료|첨부서류)\s*\d+\s*[.\):\-]?\s*/,'')
+      let title=head.replace(/^(참고자료|첨부서류)\s*\d+\s*[.\):\-]?\s*/,'')
                  .replace(/^\d+[.\)]\s*/,'').replace(/^[•\-▢□○]\s*/,'')
                  .replace(/\s*(각\s*)?\d+\s*(통|부|권|매|점|개|장|책|첩)\s*$/,'')
                  .replace(/^[^가-힣0-9A-Za-z(（]+/,'')                // 라벨 뒤 자동번호 자리의 제어·특수문자 제거
