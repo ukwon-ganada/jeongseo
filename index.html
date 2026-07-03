@@ -176,43 +176,68 @@
       <div class="hmh"><div><div class="hmh-hi">법률문서 작성</div><div class="hmh-name">문서 작성</div></div></div>
       <div class="hm-seclabel">문서 선택</div>
       <div class="hm-list">
-        <div class="hm-item hi-hero" onclick="openSeonimType()">
-          <div class="hmi-watermark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg></div>
+        <!-- 폰 1순위: 계약서 작성 (MAIN) -->
+        <div class="hm-item hi-hero" onclick="openTypeSheet()">
+          <div class="hmi-watermark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg></div>
           <div class="hmi-tag">MAIN</div>
-          <div class="hmi-name">선임계 작성</div>
-          <div class="hmi-desc">변호인 선임신고서</div>
+          <div class="hmi-name">계약서 작성</div>
+          <div class="hmi-desc">송무위임계약서</div>
           <div class="hmi-cta">시작하기 →</div>
         </div>
-        <div class="hm-item hi-wide hi-accent" onclick="openDojang()">
-          <div class="hmi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></div>
-          <div class="hmi-body"><div class="hmi-name">형사서면 출력</div><div class="hmi-desc">증거·참고자료 서면 출력</div></div>
-          <div class="hmi-arrow">›</div>
-        </div>
-        <div class="hm-item hi-wide hi-accent" onclick="goYeollam()">
-          <div class="hmi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></div>
-          <div class="hmi-body"><div class="hmi-name">열람·복사</div><div class="hmi-desc">재판기록 열람·복사 신청서</div></div>
-          <div class="hmi-arrow">›</div>
-        </div>
-        <div class="hm-item" onclick="openTypeSheet()">
-          <div class="hmi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg></div>
-          <div class="hmi-name">계약서 작성</div>
-        </div>
-        <div class="hm-item" onclick="openContractList()">
+        <!-- 폰 2순위: 계약서 목록 (붉은 강조) -->
+        <div class="hm-item hi-wide hi-red" onclick="openContractList()">
           <div class="hmi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div>
-          <div class="hmi-name">계약서 목록</div>
+          <div class="hmi-body"><div class="hmi-name">계약서 목록</div><div class="hmi-desc">저장된 계약서 관리</div></div>
+          <div class="hmi-arrow">›</div>
         </div>
-        <div class="hm-item" onclick="goAppeal()">
-          <div class="hmi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
-          <div class="hmi-name">항소장</div>
-        </div>
-        <div class="hm-item disabled">
+        <!-- 폰 3순위: 합의서 작성 (준비중 · 곧 나옴) -->
+        <div class="hm-item hi-wide disabled">
           <div class="hmi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div>
-          <div class="hmi-name">합의서 작성</div>
-          <div class="hmi-badge">준비중</div>
+          <div class="hmi-body"><div class="hmi-name">합의서 작성</div><div class="hmi-badge">준비중</div></div>
+        </div>
+        <!-- 전체 기능 보기 → 별도 화면 (선임계·항소장·열람복사·형사서면) -->
+        <div class="hm-item hi-more" onclick="showScreen('screen-more')">
+          <div class="hmi-more-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></div>
+          <div class="hmi-name">전체 기능 보기</div>
+          <div class="hmi-arrow">›</div>
         </div>
       </div>
       <div class="hm-foot">법무법인 정서 · 인천광역시 미추홀구</div>
     </div>
+  </div>
+</div>
+
+<!-- ═══ 전체 기능 화면 (폰 '전체 기능 보기'로 진입 · 앞으로 서비스 추가 시 여기 목록에 한 줄씩) ═══ -->
+<div id="screen-more" class="screen">
+  <div class="more-appbar">
+    <button class="more-back" onclick="showScreen('screen-home')" aria-label="홈으로">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="22" height="22"><polyline points="15,18 9,12 15,6"/></svg>홈
+    </button>
+    <div class="more-title">전체 기능</div>
+  </div>
+  <div class="more-body">
+    <div class="more-seclabel">문서 작성</div>
+    <div class="more-item" onclick="openSeonimType()">
+      <div class="more-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg></div>
+      <div class="more-body-txt"><div class="more-name">선임계 작성</div><div class="more-desc">변호인 선임신고서</div></div>
+      <div class="more-arrow">›</div>
+    </div>
+    <div class="more-item" onclick="goAppeal()">
+      <div class="more-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
+      <div class="more-body-txt"><div class="more-name">항소장 작성</div><div class="more-desc">항소이유서</div></div>
+      <div class="more-arrow">›</div>
+    </div>
+    <div class="more-item" onclick="goYeollam()">
+      <div class="more-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></div>
+      <div class="more-body-txt"><div class="more-name">열람·복사 신청서</div><div class="more-desc">재판기록 열람·복사</div></div>
+      <div class="more-arrow">›</div>
+    </div>
+    <div class="more-item" onclick="openDojang()">
+      <div class="more-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></div>
+      <div class="more-body-txt"><div class="more-name">형사서면 출력</div><div class="more-desc">증거·참고자료 서면 출력</div></div>
+      <div class="more-arrow">›</div>
+    </div>
+    <div class="more-soon">앞으로 새로운 서비스가 추가될 예정입니다</div>
   </div>
 </div>
 
@@ -1427,7 +1452,7 @@ function resetContract(){
 }
 
 /* ═══ Supabase 연동 ═══ */
-var APP_VERSION='v96';
+var APP_VERSION='v97';
 var SUPABASE_URL='https://nyjyemjsperpakrrgzcc.supabase.co';
 var SUPABASE_KEY='sb_publishable_QKl9MIt2_MflYnpN41VRvg_cNIAbYhU';
 var sb=null;

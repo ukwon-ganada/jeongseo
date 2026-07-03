@@ -30,6 +30,9 @@
   --danger:#c0392b;
   --success:#1a7f3c;
   --info:#1a4ea2;
+  /* 계약서 목록 강조(폰 전용): 옅은 붉은 틴트 — 아이콘만 진한 빨강, 나머지는 은은하게 */
+  --list-red-bg:#fbecea;--list-red-border:#eecac4;--list-red-ico:#c0392b;
+  --list-red-name:#8f2a20;--list-red-desc:#b06054;--list-red-arrow:#d09489;
   --font:-apple-system,BlinkMacSystemFont,'Pretendard Variable','Pretendard',system-ui,'Apple SD Gothic Neo','Malgun Gothic','맑은 고딕','Noto Sans KR',sans-serif;
   /* 모서리: Apple iOS 27 (sm8 / md12=버튼·입력 / lg16=카드 / xl20=시트) */
   --r:8px;--r-lg:12px;--r-xl:16px;--r-2xl:20px;--r-pill:999px;
@@ -180,7 +183,41 @@ html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black)
   .hmi-arrow{color:var(--gray-300);font-size:20px;margin-left:auto;}
   .hm-item:not(.hi-wide) .hmi-arrow{display:none;}
   .hm-foot{margin-top:auto;padding:24px 22px;border-top:1px solid var(--border);font-size:11px;color:var(--gray-400);text-align:center;}
+  /* ── 계약서 목록: 옅은 붉은 강조 (폰 전용) ── */
+  .hm-item.hi-red{background:var(--list-red-bg);border-color:var(--list-red-border);box-shadow:0 4px 16px rgba(192,57,43,0.08);}
+  .hm-item.hi-red:active{background:#f7e2df;}
+  .hm-item.hi-red .hmi-ico{background:var(--list-red-ico);border-color:var(--list-red-ico);}
+  .hm-item.hi-red .hmi-ico svg{stroke:#fff;}
+  .hm-item.hi-red .hmi-name{color:var(--list-red-name);}
+  .hm-item.hi-red .hmi-desc{color:var(--list-red-desc);}
+  .hm-item.hi-red .hmi-arrow{color:var(--list-red-arrow);}
+  /* ── 전체 기능 보기 진입 버튼 (폰 전용) ── */
+  .hm-item.hi-more{grid-column:span 2;flex-direction:row;align-items:center;justify-content:center;gap:8px;background:transparent;border:1.5px dashed var(--gray-300);box-shadow:none;padding:14px;}
+  .hm-item.hi-more:active{background:rgba(0,0,0,0.02);}
+  .hm-item.hi-more .hmi-more-ico{width:20px;height:20px;display:flex;align-items:center;justify-content:center;}
+  .hm-item.hi-more .hmi-more-ico svg{width:18px;height:18px;stroke:var(--gray-500);}
+  .hm-item.hi-more .hmi-name{font-size:14px;font-weight:600;color:var(--gray-700);}
+  .hm-item.hi-more .hmi-arrow{color:var(--gray-400);font-size:18px;margin-left:2px;display:block;}
 }
+
+/* ════ 전체 기능 화면 (폰에서 '전체 기능 보기'로 진입) ════ */
+#screen-more{background:var(--gray-100);min-height:100vh;}
+#screen-more.active{display:flex;flex-direction:column;}
+.more-appbar{display:flex;align-items:center;gap:6px;padding:44px 12px 12px;background:#fff;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:5;}
+.more-back{display:flex;align-items:center;gap:2px;background:none;border:none;font-family:var(--font);font-size:16px;color:var(--gray-700);cursor:pointer;padding:6px 8px;border-radius:var(--r-lg);}
+.more-back:active{background:var(--gray-100);}
+.more-title{font-size:18px;font-weight:700;letter-spacing:-0.01em;margin-left:2px;}
+.more-body{padding:16px;display:flex;flex-direction:column;gap:10px;max-width:560px;width:100%;margin:0 auto;}
+.more-seclabel{font-size:13px;color:var(--gray-400);padding:4px 4px 2px;}
+.more-item{display:flex;align-items:center;gap:12px;background:#fff;border:1px solid transparent;border-radius:14px;padding:16px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.06);transition:background 0.15s;}
+.more-item:active{background:var(--gray-50);}
+.more-item .more-ico{width:44px;height:44px;flex-shrink:0;background:#fff;border:1.5px solid var(--gray-300);border-radius:12px;display:flex;align-items:center;justify-content:center;}
+.more-item .more-ico svg{width:20px;height:20px;stroke:var(--gray-700);}
+.more-item .more-body-txt{flex:1;}
+.more-item .more-name{font-size:15px;font-weight:600;}
+.more-item .more-desc{font-size:12px;color:var(--gray-500);margin-top:2px;}
+.more-item .more-arrow{color:var(--gray-300);font-size:20px;margin-left:auto;}
+.more-soon{margin-top:6px;padding:16px;border:1.5px dashed var(--gray-300);border-radius:14px;font-size:12px;color:var(--gray-400);text-align:center;}
 
 /* ════ 계약서 화면 ════ */
 #screen-contract.active{display:flex;min-height:100vh;}
