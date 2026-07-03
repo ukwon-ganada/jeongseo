@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>도장찍기</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+<style>
+  :root{
+    --black:#1a1a1a; --gray-900:#222; --gray-700:#444; --gray-500:#8E8E93; --gray-400:#AEAEB2;
+    --gray-300:#C7C7CC; --gray-200:#D1D1D6; --gray-100:#F2F2F7; --gray-50:#FAFAFA;
+    --border:#E5E5EA; --seal:#B23A2E;
+    --r:8px; --r-lg:12px; --r-xl:16px; --r-2xl:20px; --r-pill:999px;
+    --font:-apple-system,BlinkMacSystemFont,'Pretendard Variable','Pretendard',system-ui,'Apple SD Gothic Neo','Malgun Gothic','맑은 고딕','Noto Sans KR',sans-serif;
+  }
+  
+
+  html,body{ margin:0; height:auto; }
+  body{ background:#fff; color:var(--black); line-height:1.5; font-family:var(--font); -webkit-font-smoothing:antialiased; }
+  .wrap{ max-width:1120px; margin:0 auto; padding:16px 16px 60px; position:relative; z-index:1; }
+
+  /* 전체 카드 */
+  .app-card{ border:1px solid var(--border); border-radius:var(--r-xl); background:#fff; overflow:hidden; }
+
+  /* 헤더 */
+  .app-head{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:18px 20px; border-bottom:1px solid var(--border); }
+  .app-head .ttl{ display:flex; align-items:baseline; gap:10px; min-width:0; }
+  .app-head h1{ font-size:18px; font-weight:700; margin:0; letter-spacing:-.01em; }
+  .app-head .sub{ font-size:12px; color:var(--gray-400); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .app-head .head-tools{ display:flex; align-items:center; gap:10px; flex:none; }
+
+  /* 툴바 */
+  .toolbar{ display:flex; flex-wrap:wrap; align-items:center; gap:12px 20px; padding:12px 20px; border-bottom:1px solid var(--border); }
+  .tool-field{ display:inline-flex; align-items:center; gap:10px; }
+  .tool-label{ font-size:10px; font-weight:700; color:var(--gray-400); letter-spacing:.1em; text-transform:uppercase; }
+
+  /* 종류 세그먼트 */
+  .kind-seg{ display:inline-flex; border:1px solid var(--gray-300); border-radius:var(--r-pill); overflow:hidden; }
+  .kind-seg button{ border:none; background:#fff; padding:6px 15px; font-size:12.5px; cursor:pointer; color:var(--gray-500); font-family:inherit; transition:.15s; }
+  .kind-seg button + button{ border-left:1px solid var(--border); }
+  .kind-seg button:hover{ background:var(--gray-50); }
+  .kind-seg button.on{ background:var(--black); color:#fff; }
+
+  /* 색 스와치 */
+  .color-swatches{ display:inline-flex; align-items:center; gap:9px; }
+  .swatch{ width:19px; height:19px; border-radius:50%; cursor:pointer; padding:0; border:1px solid rgba(0,0,0,.14); transition:transform .12s, box-shadow .12s; }
+  .swatch:hover{ transform:scale(1.12); }
+  .swatch.on{ box-shadow:0 0 0 2px #fff, 0 0 0 3.5px var(--black); }
+
+  /* 크기 슬라이더 */
+  input[type=range]{ width:110px; accent-color:var(--black); }
+  .range-val{ font-variant-numeric:tabular-nums; min-width:38px; font-size:12.5px; }
+
+  /* 초기화 버튼 */
+  .mini-btn{ border:1px solid var(--gray-300); background:#fff; border-radius:var(--r-pill); padding:7px 14px; font-size:12.5px; cursor:pointer; color:var(--gray-500); font-family:inherit; transition:.15s; }
+  .mini-btn:hover{ border-color:var(--black); color:var(--black); }
+
+  /* 본문 2단: 미리보기 | 구분선 | 작업대 */
+  .body-cols{ display:grid; grid-template-columns:minmax(0,1.55fr) 1px minmax(0,1fr); align-items:stretch; }
+  @media(max-width:860px){ .body-cols{ grid-template-columns:1fr; } .col-divider{ display:none; } }
+  .col-divider{ background:var(--border); }
+  .previewlane{ padding:16px 20px; min-width:0; }
+  .worklane{ padding:16px 20px; background:var(--gray-50); display:flex; flex-direction:column; gap:12px; min-width:0; }
+  @media(max-width:860px){ .worklane{ border-top:1px solid var(--border); } }
+  .lane-label{ font-size:10px; font-weight:700; color:var(--gray-400); letter-spacing:.12em; text-transform:uppercase; margin-bottom:12px; }
+
+  /* 미리보기 */
+  .stage-bar{ display:flex; align-items:center; gap:8px; margin-bottom:10px; min-height:22px; }
+  .stage-bar .ord{ background:var(--black); color:#fff; border-radius:8px; font-size:11px; font-weight:600; padding:2px 8px; }
+  .stage-bar .fn{ font-size:13px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .stage-bar .rotate-btn{ margin-left:auto; flex:none; border:1px solid var(--gray-300); background:#fff; color:var(--gray-700);
+    border-radius:var(--r); font-size:12px; font-weight:600; padding:5px 12px; cursor:pointer; font-family:inherit; white-space:nowrap; transition:.15s; }
+  .stage-bar .rotate-btn:hover{ border-color:var(--black); color:var(--black); }
+  .stage-bar .rotate-btn:active{ transform:translateY(1px); }
+  .stage{ position:relative; line-height:0; max-width:460px; margin:0 auto; touch-action:none; }
+  .stage canvas.page{ width:100%; height:auto; border:1px solid var(--border); border-radius:8px; cursor:crosshair; display:block; }
+  .stamp-ov{ position:absolute; left:0; top:0; cursor:grab; touch-action:none; filter:drop-shadow(0 2px 5px rgba(0,0,0,.18)); user-select:none; }
+  .stamp-ov img{ width:100%; height:100%; display:block; pointer-events:none; }
+  .stamp-ov .handle{ position:absolute; right:-7px; bottom:-7px; width:16px; height:16px; background:#fff; border:1.5px solid var(--black); border-radius:50%; cursor:nwse-resize; }
+  .placeholder{ color:var(--gray-400); font-size:13px; text-align:center; padding:52px 20px; line-height:1.7; }
+  .warn{ display:none; background:var(--gray-50); border:1px solid var(--gray-200); color:var(--gray-700); border-radius:var(--r); padding:8px 11px; font-size:12px; margin-top:10px; }
+  .warn.show{ display:block; }
+  .actions{ display:flex; flex-wrap:wrap; gap:9px; margin-top:14px; justify-content:center; }
+  .btn{ border:none; border-radius:var(--r); padding:11px 17px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; transition:.15s; }
+  .btn.primary{ background:var(--black); color:#fff; } .btn.primary:hover{ background:var(--gray-900); }
+  .btn.ghost{ background:#fff; color:var(--black); border:1px solid var(--gray-300); } .btn.ghost:hover{ border-color:var(--black); }
+  .btn:disabled{ opacity:.4; cursor:default; }
+  .btn.primary:disabled:hover{ background:var(--black); } .btn.ghost:disabled:hover{ border-color:var(--gray-300); }
+
+  /* 작업대 */
+  .drop{ border:1.5px dashed var(--gray-300); border-radius:var(--r); background:#fff; padding:16px 14px; text-align:center; cursor:pointer; transition:.15s; }
+  .drop:hover,.drop.over{ border-color:var(--black); }
+  .drop .big{ font-size:13px; font-weight:600; }
+  .drop .sub{ color:var(--gray-400); font-size:11px; margin-top:3px; }
+  .side-title{ font-size:10px; color:var(--gray-400); font-weight:700; letter-spacing:.08em; margin:2px 2px 0; display:flex; align-items:center; gap:8px; }
+  .side-title .badge{ background:var(--gray-100); color:var(--gray-500); border-radius:var(--r-pill); padding:1px 8px; font-size:10px; font-weight:600; letter-spacing:0; }
+
+  /* 파일 리스트 */
+  .filelist{ display:flex; flex-direction:column; gap:8px; }
+  .frow{ background:#fff; border:1px solid var(--border); border-radius:var(--r); padding:9px 10px; cursor:grab; transition:transform .08s, border-color .12s; touch-action:none; }
+  .frow:active{ cursor:grabbing; }
+  .frow.active{ border-color:var(--black); }
+  .frow.dragging{ opacity:.7; border-color:var(--black); box-shadow:0 8px 20px rgba(0,0,0,.12); }
+  .frow .l1{ display:flex; align-items:center; gap:8px; }
+  .frow .ord{ flex:none; width:21px; height:21px; border-radius:50%; background:var(--black); color:#fff; font-size:11px; font-weight:600; display:grid; place-items:center; }
+  .frow .nameInp{ flex:1; min-width:0; border:none; background:transparent; font-size:12.5px; font-family:inherit; color:var(--black); padding:2px 3px; border-radius:8px; }
+  .frow .nameInp:focus{ outline:none; background:var(--gray-100); }
+  .frow .conn{ font-size:11px; color:var(--gray-400); flex:none; }
+  .frow .del{ border:none; background:none; color:var(--gray-400); cursor:pointer; font-size:15px; line-height:1; padding:0 2px; flex:none; }
+  .frow .del:hover{ color:var(--black); }
+  .frow .l2{ display:flex; align-items:center; gap:6px; margin-top:7px; padding-left:29px; flex-wrap:wrap; }
+  .frow .l2 .tag{ font-size:11px; color:var(--gray-400); }
+  .frow .l2 .stamp-lab{ font-size:12px; font-weight:700; color:var(--black); }
+  .frow .l2 input{ width:42px; padding:4px 6px; border:1px solid var(--gray-300); border-radius:8px; font-size:12px; text-align:center; font-family:inherit; }
+  .frow .l2 input:focus{ outline:none; border-color:var(--black); }
+
+  /* 슬롯 (모드 B) */
+  .slotlist{ display:flex; flex-direction:column; gap:7px; }
+  .slot{ background:#fff; border:1px solid var(--border); border-radius:var(--r); padding:8px 10px; cursor:pointer; transition:transform .1s, border-color .12s; }
+  .slot.active{ border-color:var(--black); }
+  .slot.dropok{ transform:scale(1.03); border-color:var(--black); box-shadow:0 6px 18px rgba(0,0,0,.14); }
+  .slot .s1{ display:flex; align-items:center; gap:8px; }
+  .slot .ord{ flex:none; width:21px; height:21px; border-radius:50%; background:var(--black); color:#fff; font-size:11px; font-weight:600; display:grid; place-items:center; }
+  .slot .lab{ font-size:12.5px; font-weight:700; color:var(--black); flex:none; }
+  .slot .title{ font-size:12.5px; color:var(--gray-700); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; }
+  .slot .s2{ margin-top:6px; padding-left:29px; font-size:11.5px; }
+  .slot .filled{ color:var(--black); }
+  .slot .filled .un{ border:none; background:none; color:var(--gray-400); cursor:pointer; font-size:13px; margin-left:6px; }
+  .slot .empty{ color:var(--gray-400); font-style:italic; }
+  .slot.empty-slot{ border-style:dashed; background:var(--gray-50); }
+
+  /* 풀 */
+  .pool{ display:flex; flex-direction:column; gap:7px; min-height:30px; }
+  .pcard{ background:#fff; border:1px solid var(--border); border-radius:var(--r); padding:8px 10px; cursor:grab; display:flex; align-items:center; gap:8px; touch-action:none; }
+  .pcard:active{ cursor:grabbing; }
+  .pcard.active{ border-color:var(--black); }
+  .pcard.ghosting{ opacity:.4; }
+  .pcard .nm{ font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; }
+  .pcard .conn{ font-size:10.5px; color:var(--gray-400); }
+  .pool-empty{ color:var(--gray-400); font-size:12px; text-align:center; padding:10px; border:1px dashed var(--gray-300); border-radius:var(--r); }
+  .drag-ghost{ position:fixed; z-index:90; pointer-events:none; background:var(--black); color:#fff; font-size:12px; padding:7px 11px; border-radius:8px; box-shadow:0 10px 26px rgba(0,0,0,.3); max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+  /* 토스트 */
+  .toast{ position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(18px); background:var(--black); color:#fff;
+    padding:11px 18px; border-radius:var(--r); font-size:13px; opacity:0; pointer-events:none; transition:.25s; z-index:95; box-shadow:0 8px 30px rgba(0,0,0,.25); }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="app-card">
+
+    <div class="app-head">
+      <div class="ttl">
+        <h1>형사서면 출력</h1>
+        <span class="sub">서류에 도장을 찍고 순서대로 병합·저장</span>
+      </div>
+      <div class="head-tools">
+        <button class="mini-btn" id="resetBtn">전체 초기화</button>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <div class="tool-field">
+        <span class="tool-label">종류</span>
+        <div class="kind-seg" id="kindSeg">
+          <button type="button" data-kind="chamgo" class="on">참고</button>
+          <button type="button" data-kind="cheombu">첨부</button>
+          <button type="button" data-kind="jeung">증</button>
+        </div>
+      </div>
+      <div class="tool-field">
+        <span class="tool-label">색</span>
+        <div class="color-swatches" id="colorSwatches">
+          <button type="button" class="swatch on" data-c="#1A1F2B" title="먹색" aria-label="먹색" style="background:#1A1F2B"></button>
+          <button type="button" class="swatch" data-c="#332968" title="남색" aria-label="남색" style="background:#332968"></button>
+          <button type="button" class="swatch" data-c="#B23A2E" title="빨강" aria-label="빨강" style="background:#B23A2E"></button>
+        </div>
+      </div>
+      <div class="tool-field" style="margin-left:auto">
+        <span class="tool-label">크기</span>
+        <input type="range" id="sizeRange" min="50" max="200" value="100">
+        <span class="range-val" id="sizeVal">100%</span>
+      </div>
+    </div>
+
+    <div class="body-cols">
+      <div class="previewlane">
+        <div class="lane-label">미리보기</div>
+        <div class="stage-bar" id="stageBar"></div>
+        <div class="stage" id="stage">
+          <div class="placeholder" id="stagePlaceholder">오른쪽 작업대에서 PDF·사진·소장(.hwp/.hwpx)을 추가하면<br>여기에서 도장 위치를 잡을 수 있습니다.</div>
+        </div>
+        <div class="warn" id="rotateWarn">이 앞면은 회전되어 저장돼 있어 도장이 약간 어긋날 수 있습니다.</div>
+        <div class="actions">
+          <button class="btn primary" id="printAll" disabled>출력 (순서대로 병합)</button>
+          <button class="btn ghost" id="saveAll" disabled>전체 저장</button>
+          <button class="btn ghost" id="saveOne" disabled>이 서류만 저장</button>
+        </div>
+      </div>
+
+      <div class="col-divider"></div>
+
+      <div class="worklane">
+        <div class="lane-label">서류 작업</div>
+        <div class="drop" id="drop">
+          <div class="big">＋ PDF · 사진 · 소장(.hwp/.hwpx) 추가</div>
+          <div class="sub">소장을 같이 올리면 제출서류 목록을 자동 인식합니다</div>
+          <input type="file" id="fileInput" accept=".hwp,.hwpx,application/pdf,image/*" multiple hidden>
+        </div>
+
+        <div id="modeA">
+          <div class="side-title" id="titleA" style="display:none">제출 순서 <span class="badge">끌어서 변경</span></div>
+          <div class="filelist" id="fileList"></div>
+        </div>
+
+        <div id="modeB" style="display:none">
+          <div class="side-title">소장 목록 <span class="badge" id="slotBadge">0건</span></div>
+          <div class="slotlist" id="slotList"></div>
+          <div class="side-title" id="poolTitle">미배정 서류 — 위 목록으로 끌어다 놓기</div>
+          <div class="pool" id="poolList"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<iframe id="printFrame" style="position:fixed; width:0; height:0; border:0; visibility:hidden" title="print"></iframe>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+
+/* ===== 도장 4종 ===== */
+const STAMPS = {
+  chamgo:  { id:'chamgo',  name:'참고자료', chars:['참','고','자','료'], box:true },
+  cheombu: { id:'cheombu', name:'첨부서류', chars:['첨','부','서','류'], box:true },
+  jeung_h: { id:'jeung_h', name:'증 제○호증',  top:['증','제'], bottom:['호','증'] },
+  jeung_hu:{ id:'jeung_hu',name:'증 제○호증의', top:['증','제'], bottom:['호','증','의'], sub:true },
+};
+const PICKS = [
+  { kind:'chamgo',  label:'참고자료',     stampId:'chamgo' },
+  { kind:'cheombu', label:'첨부서류',     stampId:'cheombu' },
+  { kind:'jeung',   label:'증 제○호증',   stampId:'jeung_h' },
+];
+const MM2PT=2.8346457, STAMP_W_MM=10, STAMP_H_MM=50;
+const A4W_PT=595.276, A4H_PT=841.890;   // A4 세로 (pt) — 모든 페이지를 이 크기로 통일
+function stampIdFor(kind, num2){ return kind==='jeung' ? (String(num2||'').trim()?'jeung_hu':'jeung_h') : kind; }
+
+/* ===== 도장 캔버스 ===== */
+function renderStampCanvas(stamp, opts){
+  opts=opts||{};
+  const color=opts.color||'#1A1F2B';
+  const n1=(opts.number||'').trim(), n2=(opts.number2||'').trim();
+  const dpr=opts.dpr||4, scale=(opts.heightPx||600)/STAMP_H_MM;
+  const W=Math.round(STAMP_W_MM*scale), H=Math.round(STAMP_H_MM*scale);
+  const cv=document.createElement('canvas'); cv.width=W*dpr; cv.height=H*dpr;
+  const ctx=cv.getContext('2d'); ctx.scale(dpr,dpr);
+  const bw=Math.max(1.4,W*0.045); ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=bw;
+  const inset=bw/2+1.2; ctx.strokeRect(inset,inset,W-2*inset,H-2*inset);
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  const cx=W/2, fam=`"Batang","바탕","Apple Myungjo","AppleMyungjo","Nanum Myeongjo","Noto Serif KR",serif`;
+  const fs=W*0.47, lh=fs*1.13, pad=H*0.05, setFont=s=>ctx.font=`${s}px ${fam}`;
+  if(stamp.box){
+    setFont(fs); const n=stamp.chars.length, dividerY=H*0.78, top=pad, bottom=dividerY-pad*0.6, step=(bottom-top)/n;
+    stamp.chars.forEach((ch,i)=>ctx.fillText(ch,cx,top+step*(i+0.5)));
+    ctx.lineWidth=Math.max(1,bw*0.7); ctx.beginPath(); ctx.moveTo(inset,dividerY); ctx.lineTo(W-inset,dividerY); ctx.stroke();
+    if(n1){ setFont(fs*0.95); ctx.fillText(n1,cx,(dividerY+(H-inset))/2); }
+  }else{
+    setFont(fs); const top=stamp.top, bottom=stamp.bottom, bn=bottom.length;
+    top.forEach((ch,i)=>ctx.fillText(ch,cx,pad+lh*(i+0.5)));
+    let baseBottom=H-pad;
+    if(stamp.sub){ if(n2){ setFont(fs); ctx.fillText(n2,cx,H-pad-lh*0.5); } baseBottom=H-pad-lh; }
+    setFont(fs); bottom.forEach((ch,i)=>ctx.fillText(ch,cx,baseBottom-lh*(bn-i-0.5)));
+    if(n1){ const gTop=pad+lh*top.length, gBot=baseBottom-lh*bn; setFont(fs*0.95); ctx.fillText(n1,cx,(gTop+gBot)/2); }
+  }
+  return cv;
+}
+function canvasToBytes(cv){ return new Promise(res=> cv.toBlob(b=>b.arrayBuffer().then(a=>res(new Uint8Array(a))),'image/png')); }
+function loadImage(src){ return new Promise((res,rej)=>{ const im=new Image(); im.onload=()=>res(im); im.onerror=rej; im.src=src; }); }
+function readAsDataURL(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(file); }); }
+const IMG_RE=/\.(jpe?g|png|webp|gif|bmp)$/i;
+const isImageFile=f=> (f.type&&f.type.startsWith('image/'))||IMG_RE.test(f.name);
+const isHwp=f=> /\.hwp$/i.test(f.name);
+const isHwpx=f=> /\.hwpx$/i.test(f.name);
+const isSojang=f=> isHwp(f)||isHwpx(f);   // 소장(.hwp/.hwpx) 통합 판정
+async function imageToPdfBytes(file, rot){
+  rot=((rot||0)%360+360)%360;
+  const img=await loadImage(await readAsDataURL(file));
+  const iw=img.naturalWidth||img.width, ih=img.naturalHeight||img.height;
+  const swap = (rot===90||rot===270);
+  const cw = swap?ih:iw, ch = swap?iw:ih;
+  const c=document.createElement('canvas'); c.width=cw; c.height=ch;
+  const ctx=c.getContext('2d');
+  ctx.translate(cw/2, ch/2); ctx.rotate(-rot*Math.PI/180); ctx.drawImage(img, -iw/2, -ih/2, iw, ih);
+  const isPng=/\.png$/i.test(file.name)||file.type==='image/png', mime=isPng?'image/png':'image/jpeg';
+  const blob=await new Promise(r=>c.toBlob(r,mime,0.92)); const bytes=new Uint8Array(await blob.arrayBuffer());
+  const {PDFDocument, rgb}=PDFLib; const pdf=await PDFDocument.create();
+  const emb=isPng?await pdf.embedPng(bytes):await pdf.embedJpg(bytes);
+  // 항상 A4 세로 페이지 (제출 규격). 회전은 위에서 이미 이미지에 적용됨.
+  const scale=Math.min(A4W_PT/cw, A4H_PT/ch);
+  const dw=cw*scale, dh=ch*scale, x=(A4W_PT-dw)/2, y=(A4H_PT-dh)/2;
+  const page=pdf.addPage([A4W_PT,A4H_PT]);
+  page.drawRectangle({x:0,y:0,width:A4W_PT,height:A4H_PT,color:rgb(1,1,1)});
+  page.drawImage(emb,{x,y,width:dw,height:dh});
+  return await pdf.save();
+}
+// 업로드된 PDF의 모든 페이지를 A4 세로로 통일. rot(0/90/180/270)만큼 내용 회전.
+async function normalizeToA4(srcBytes, rot){
+  rot=((rot||0)%360+360)%360;
+  const {PDFDocument, rgb, degrees}=PDFLib;
+  try{
+    const src=await PDFDocument.load(srcBytes, {ignoreEncryption:true});
+    const n=src.getPageCount(); if(!n) return srcBytes;
+    const out=await PDFDocument.create();
+    const embs=await out.embedPdf(src, Array.from({length:n},(_,i)=>i));
+    for(let i=0;i<n;i++){
+      const e=embs[i]; const sw=e.width, sh=e.height;
+      const srcRot=((src.getPage(i).getRotation().angle%360)+360)%360;  // 원본 /Rotate(시계방향)
+      const total=(((360-srcRot)%360)+rot)%360;                          // 뷰어와 동일하게 반영 + 사용자 회전
+      const swap=(total===90||total===270);
+      const ew=swap?sh:sw, eh=swap?sw:sh;              // 회전 후 외곽 크기
+      const scale=Math.min(A4W_PT/ew, A4H_PT/eh);
+      const box_w=ew*scale, box_h=eh*scale;
+      const ox=(A4W_PT-box_w)/2, oy=(A4H_PT-box_h)/2;   // A4 내 중앙 배치용 외곽 좌하단
+      const page=out.addPage([A4W_PT,A4H_PT]);
+      page.drawRectangle({x:0,y:0,width:A4W_PT,height:A4H_PT,color:rgb(1,1,1)});
+      let ax=ox, ay=oy;
+      if(total===90){ ax=ox+box_w; ay=oy; }
+      else if(total===180){ ax=ox+box_w; ay=oy+box_h; }
+      else if(total===270){ ax=ox; ay=oy+box_h; }
+      page.drawPage(e,{x:ax, y:ay, xScale:scale, yScale:scale, rotate:degrees(total)});
+    }
+    return await out.save();
+  }catch(err){ console.warn('A4 정규화 실패, 원본 유지:', err); return srcBytes; }
+}
+
+/* ===== HWP 파서 ===== */
+function parseHwpEvidence(arrayBuffer){
+  const dv=new DataView(arrayBuffer), u8=new Uint8Array(arrayBuffer);
+  const sig=[0xD0,0xCF,0x11,0xE0,0xA1,0xB1,0x1A,0xE1];
+  for(let i=0;i<8;i++) if(u8[i]!==sig[i]) throw new Error('HWP 5.0(.hwp) 형식이 아닙니다');
+  const sectorSize=1<<dv.getUint16(30,true), miniSize=1<<dv.getUint16(32,true);
+  const dirStart=dv.getUint32(48,true), miniCutoff=dv.getUint32(56,true);
+  const miniFatStart=dv.getUint32(60,true), numMiniFat=dv.getUint32(64,true), difStart=dv.getUint32(68,true);
+  const END=0xFFFFFFFE, FREE=0xFFFFFFFF, secOff=s=>(s+1)*sectorSize;
+  const fatSectors=[];
+  for(let i=0;i<109;i++){ const v=dv.getUint32(76+i*4,true); if(v!==FREE&&v!==END) fatSectors.push(v); }
+  let dif=difStart,g=0;
+  while(dif!==END&&dif!==FREE&&g++<100000){ const b=secOff(dif), c=(sectorSize/4)-1;
+    for(let i=0;i<c;i++){ const v=dv.getUint32(b+i*4,true); if(v!==FREE&&v!==END) fatSectors.push(v); } dif=dv.getUint32(b+sectorSize-4,true); }
+  const fat=[]; for(const f of fatSectors){ const b=secOff(f); for(let i=0;i<sectorSize/4;i++) fat.push(dv.getUint32(b+i*4,true)); }
+  const chain=s=>{ const o=[]; let c=s,gg=0; while(c!==END&&c!==FREE&&gg++<1000000){ o.push(c); c=fat[c]; } return o; };
+  const readChain=s=>{ const ss=chain(s), buf=new Uint8Array(ss.length*sectorSize); ss.forEach((x,i)=>buf.set(u8.subarray(secOff(x),secOff(x)+sectorSize),i*sectorSize)); return buf; };
+  const dirBuf=readChain(dirStart), ddv=new DataView(dirBuf.buffer,dirBuf.byteOffset,dirBuf.byteLength), entries=[];
+  for(let i=0;i<Math.floor(dirBuf.length/128);i++){ const o=i*128, nl=ddv.getUint16(o+64,true); let nm='';
+    for(let j=0;j<Math.max(0,nl/2-1);j++) nm+=String.fromCharCode(ddv.getUint16(o+j*2,true));
+    entries.push({ name:nm, left:ddv.getInt32(o+68,true), right:ddv.getInt32(o+72,true), child:ddv.getInt32(o+76,true), start:ddv.getUint32(o+116,true), size:ddv.getUint32(o+120,true) }); }
+  const root=entries[0], miniStream=readChain(root.start), miniFat=[];
+  if(numMiniFat>0){ const mb=readChain(miniFatStart), mdv=new DataView(mb.buffer,mb.byteOffset,mb.byteLength); for(let i=0;i<mb.length/4;i++) miniFat.push(mdv.getUint32(i*4,true)); }
+  const miniCh=s=>{ const o=[]; let c=s,gg=0; while(c!==END&&c!==FREE&&gg++<1000000){ o.push(c); c=miniFat[c]; } return o; };
+  const readStream=e=>{ if(e.size>=miniCutoff) return readChain(e.start).subarray(0,e.size);
+    const ss=miniCh(e.start), buf=new Uint8Array(ss.length*miniSize); ss.forEach((x,i)=>buf.set(miniStream.subarray(x*miniSize,x*miniSize+miniSize),i*miniSize)); return buf.subarray(0,e.size); };
+  const childrenOf=e=>{ const out=[]; const visit=id=>{ if(id<0||id>=entries.length) return; const x=entries[id]; visit(x.left); out.push(x); visit(x.right); }; visit(e.child); return out; };
+  const top=childrenOf(root), bt=top.find(x=>x.name==='BodyText'); if(!bt) throw new Error('본문(BodyText)을 찾지 못했습니다');
+  const sections=childrenOf(bt).filter(x=>/^Section\d+$/.test(x.name)).sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
+  const fh=top.find(x=>x.name==='FileHeader'); let compressed=true; if(fh){ const b=readStream(fh); compressed=(b[36]&1)===1; }
+  const paras=[];
+  for(const sec of sections){ let raw=readStream(sec), body;
+    if(compressed){ try{ body=pako.inflateRaw(raw); }catch(e){ try{ body=pako.inflate(raw);}catch(_){ body=raw; } } } else body=raw;
+    const bdv=new DataView(body.buffer,body.byteOffset,body.byteLength); let i=0;
+    while(i<body.length-4){ const h=bdv.getUint32(i,true); const tag=h&0x3ff; let size=(h>>>20)&0xfff; i+=4; if(size===0xfff){ size=bdv.getUint32(i,true); i+=4; }
+      if(tag===67){ let s=''; for(let j=0;j+1<size;j+=2){ const c=bdv.getUint16(i+j,true); s+=(c>=32||c===10)?String.fromCharCode(c):' '; } paras.push(s.replace(/\s+/g,' ').trim()); } i+=size; } }
+  return parseEvidenceFromParas(paras);
+}
+
+/* ===== HWPX 파서 (ZIP+XML) =====
+   .hwp(OLE 바이너리)보다 훨씬 단순하다. .hwpx는 ZIP 압축이라 JSZip으로 풀고,
+   Contents/section0.xml ... 안의 <hp:p>(문단)에서 <hp:t>(글자)만 이어붙이면 끝. */
+async function parseHwpxEvidence(arrayBuffer){
+  if(!window.JSZip) throw new Error('압축 해제 도구(JSZip)를 불러오지 못했습니다');
+  const zip=await JSZip.loadAsync(arrayBuffer);
+  const names=Object.keys(zip.files)
+    .filter(n=> /(^|\/)Contents\/section\d+\.xml$/i.test(n) || /(^|\/)section\d+\.xml$/i.test(n))
+    .sort((a,b)=> a.localeCompare(b,undefined,{numeric:true}));   // section0, section1 … 순서 보장
+  if(!names.length) throw new Error('본문(section) XML을 찾지 못했습니다 (.hwpx 형식 확인)');
+  const decodeXml=s=> s
+    .replace(/<[^>]+>/g,'')                       // hp:t 안에 섞인 마크업 태그 제거(본문의 <,>는 엔티티라 안전)
+    .replace(/&lt;/g,'<').replace(/&gt;/g,'>')
+    .replace(/&quot;/g,'"').replace(/&apos;/g,"'")
+    .replace(/&#x([0-9a-fA-F]+);/g,(_,h)=>String.fromCodePoint(parseInt(h,16)))
+    .replace(/&#(\d+);/g,(_,d)=>String.fromCodePoint(+d))
+    .replace(/&amp;/g,'&');                        // &amp; 는 맨 마지막(이중 해제 방지)
+  const paras=[];
+  for(const nm of names){
+    const xml=await zip.files[nm].async('string');
+    const pRe=/<hp:p\b[^>]*>([\s\S]*?)<\/hp:p>/g;  // 문단 단위. \b로 hp:pageBreak 등 유사태그 배제
+    let pm;
+    while((pm=pRe.exec(xml))){
+      const tRe=/<hp:t\b[^>]*>([\s\S]*?)<\/hp:t>/g;
+      let tm, s='';
+      while((tm=tRe.exec(pm[1]))){ s+=decodeXml(tm[1]); }
+      paras.push(s.replace(/\s+/g,' ').trim());
+    }
+  }
+  return parseEvidenceFromParas(paras);
+}
+
+/* ===== 문단 목록 → 입증방법·참고자료·첨부서류 해석 (hwp·hwpx 공용) ===== */
+function parseEvidenceFromParas(paras){
+  // 섹션 헤더 + 호증 표기 다양성 처리
+  const nn=s=>s.replace(/[^0-9A-Za-z가-힣]/g,'');
+  const HJ_A=/(소?[갑을병정증])\s*제\s*(\d+)\s*호증(?:의\s*(\d+))?\s*(.*)$/;          // 정식: 갑 제1호증(의 1)
+  const HJ_B=/^(소?[갑을병정증])\s*제?\s*(\d+)(?:\s*[-의]\s*(\d+))?\s*\.?\s*(.+)$/;     // 약식: 증제 1-1. / 증제 3.
+  const clean=s=>(s||'').trim().replace(/^[\.\)\]:]+/,'').replace(/[\[\(]+$/,'').trim();
+  const isEnd=t=> /^\d{4}[.\s]/.test(t) || /(법무법인|귀중|담당변호사|소송대리인|변호인|위\s*신청인|위\s*원고|위\s*피고|위\s*고소인)/.test(t) || /[☑☐□■◻◼✓✔]/.test(t) || /(중복\s*고소|관련\s*형사사건|관련\s*민사소송|수사\s*유무|제출할\s*증거|관련사건의\s*수사)/.test(t);
+  const isHeader=n=> !/관하여|대하여|관련/.test(n) && n.length<=6 && (n.startsWith('입증')||n.startsWith('증거')||n.startsWith('증명')||n.startsWith('참고')||n.startsWith('첨부'));
+  // 헤더는 문서 끝부분에 있다는 전제: 긴 문서(≥18문단)는 뒤쪽 35% 이내에 모인 헤더들 중 '가장 앞' 헤더부터 시작
+  // (끝부분에 증거자료+참고자료 등 여러 섹션이 연달아 있어도 모두 살리기 위함). 앞쪽 제목·중간 소제목은 제외.
+  let startIdx=0;
+  { const cands=[]; for(let k=0;k<paras.length;k++){ if(isHeader(nn(paras[k]))) cands.push(k); }
+    if(cands.length){ let pick=cands[cands.length-1];
+      if(paras.length>=18){ const tail=paras.length*0.65; const back=cands.filter(k=>k>=tail); if(back.length) pick=back[0]; }
+      else { pick=cands[0]; }
+      startIdx=pick; } }
+  const items=[]; let mode=null, cc=0, ce=0, cj=0;
+  for(let pi=startIdx; pi<paras.length; pi++){
+    const p=paras[pi];
+    const n=nn(p);
+    const noAbout=!/관하여|대하여|관련/.test(n);
+    if(noAbout && n.length<=6){
+      if(n.startsWith('입증')||n.startsWith('증거')||n.startsWith('증명')){ mode='jeung'; continue; }
+      if(n.startsWith('참고')){ mode='chamgo'; continue; }
+      if(n.startsWith('첨부')){ mode='cheombu'; continue; }
+    }
+    if(!mode) continue;
+    if(isEnd(p)){ mode=null; continue; }
+    if(mode==='jeung'){
+      let m=p.match(HJ_A), num1, num2, title;
+      if(m){ num1=+m[2]; num2=m[3]?+m[3]:''; title=clean(m[4]); }
+      else { m=p.match(HJ_B); if(m){ num1=+m[2]; num2=m[3]?+m[3]:''; title=clean(m[4]); } }
+      if(m && title && title.length<=60){ items.push({kind:'jeung', num1:String(num1), num2:num2!==''?String(num2):'', title}); continue; }
+      // "증 제N호증" 형식이 아닌 번호목록형 증거자료(예: "1. 거래내역 정리표")만 받음 (무번호 양식 문구는 제외)
+      const t=p.trim();
+      if(!/^\d+[.\)]/.test(t)) continue;
+      const isAbout=/(에\s*관하여|에\s*대하여|관련하여)\s*\.?\s*$/.test(t);
+      const isSentence=/[다요음함까죠오라]\.\s*$/.test(t) || /(니다|세요|바랍니다)\s*$/.test(t);
+      if(isAbout || isSentence) continue;
+      let jt=t.replace(/^\d+[.\)]\s*/,'')
+              .replace(/\s*(각\s*)?\d+\s*(통|부|권|매|점|개|장|책|첩)\s*$/,'')
+              .replace(/^[^가-힣0-9A-Za-z(（]+/,'').trim();
+      if(!jt || jt.length>60 || /^[\d.\s]+$/.test(jt)) continue;
+      cj++; items.push({kind:'jeung', num1:String(cj), num2:'', title:jt});
+    } else {
+      const t=p.trim();
+      // "제목 ― 설명" 형태(상고이유서 등 무번호·설명형): 대시 앞의 '제목'만 항목으로 사용
+      const DASH=/\s*[―—–]\s*|\s+-\s+/;
+      const dm=t.split(DASH);
+      const head=(dm.length>1? dm[0] : t).trim();   // 판정·제목 추출은 head 기준(대시 없으면 원문 그대로)
+      const labelStart=/^(참고자료|첨부서류)\s*\d+\s*[.\)]/.test(t);
+      const hasBullet=/^\d+[.\)]|^[•\-▢□○]/.test(t);
+      const hasQty=/\s(각\s*)?\d+\s*(통|부|권|매|점|개|장|책|첩)\s*$/.test(t);
+      const isAbout=/(에\s*관하여|에\s*대하여|관련하여)\s*\.?\s*$/.test(head);
+      const isSentence=/[다요음함까죠오라]\.\s*$/.test(head) || /(니다|세요|바랍니다)\s*$/.test(head);
+      const startsParen=/^[\(（]/.test(t);
+      // 끝부분 헤더 이후 구간이므로, 라벨·번호·수량이 없어도 '한글 포함 짧은 명사 줄'이면 항목으로 인정
+      const looksItem=!isSentence && !isAbout && !startsParen && head.length>=1 && head.length<=40 && !/^[\d.\s]+$/.test(head) && /[가-힣]/.test(head);
+      if(isAbout || isSentence) continue;                          // "…에 관하여" 소제목·안내 문장 제외
+      if(!labelStart && !hasBullet && !hasQty && !looksItem) continue;
+      let title=head.replace(/^(참고자료|첨부서류)\s*\d+\s*[.\):\-]?\s*/,'')
+                 .replace(/^\d+[.\)]\s*/,'').replace(/^[•\-▢□○]\s*/,'')
+                 .replace(/\s*(각\s*)?\d+\s*(통|부|권|매|점|개|장|책|첩)\s*$/,'')
+                 .replace(/^[^가-힣0-9A-Za-z(（]+/,'')                // 라벨 뒤 자동번호 자리의 제어·특수문자 제거
+                 .trim();
+      if(!title || title.length>60 || /^[\d.\s]+$/.test(title)) continue;
+      if(mode==='chamgo'){ cc++; items.push({kind:'chamgo', num1:String(cc), num2:'', title}); }
+      else { ce++; items.push({kind:'cheombu', num1:String(ce), num2:'', title}); }
+    }
+  }
+  return items;
+}
+function normName(s){ return (s||'').toLowerCase().replace(/[^0-9a-z가-힣]/g,''); }
+function matchScore(title, filename){
+  const t=normName(title), f=normName(filename); if(!t||!f) return 0;
+  if(f.includes(t)||t.includes(f)) return 1;
+  const toks=(title.match(/[가-힣]{2,}/g)||[]).map(normName).filter(Boolean); if(!toks.length) return 0;
+  let hit=0; for(const tk of toks) if(f.includes(tk)) hit++; return hit/toks.length;
+}
+
+/* ===== 상태 ===== */
+let _uid=1;
+const state={
+  files:[],        // {id,name,origName,kind,bytes,pdfjsDoc,numPages, num1,num2}
+  slots:[],        // 모드B: {id,title,num1,num2,fileId}
+  template:false,
+  activeId:null,
+  stampKind:'chamgo',   // 모드A 전역 종류: chamgo|cheombu|jeung
+  color:'#1A1F2B', sizePct:100, viewport:null, defaultOffset:null,
+};
+const fileById=id=> state.files.find(f=>f.id===id);
+const activeFile=()=> fileById(state.activeId);
+const slotOfFile=id=> state.slots.find(s=>s.fileId===id);
+function poolFiles(){ const taken=new Set(state.slots.map(s=>s.fileId).filter(Boolean)); return state.files.filter(f=>!taken.has(f.id)); }
+
+/* 도장 위치: 서류마다 독립. 옮기지 않은 서류는 공통 기본 위치를 사용 */
+function effOffset(f){ return (f && f.offset) ? f.offset : state.defaultOffset; }
+function curOffset(){ return effOffset(activeFile()); }
+function setActiveOffset(o){ const f=activeFile(); if(f) f.offset=o; }
+
+/* 미리보기/출력에서 쓰는 도장 정보 */
+function metaForFile(f){
+  if(state.template){ const s=slotOfFile(f.id); return s? {kind:s.kind, stampId: stampIdFor(s.kind, s.num2), num1:s.num1, num2:s.num2, title:s.title} : null; }
+  return { kind:state.stampKind, stampId: stampIdFor(state.stampKind, f.num2), num1:f.num1, num2:f.num2, title:f.name };
+}
+
+/* ===== DOM ===== */
+const $=s=>document.querySelector(s);
+const drop=$('#drop'), fileInput=$('#fileInput');
+const fileListEl=$('#fileList'), slotListEl=$('#slotList'), poolListEl=$('#poolList');
+const modeAEl=$('#modeA'), modeBEl=$('#modeB'), titleA=$('#titleA'), slotBadge=$('#slotBadge'), poolTitle=$('#poolTitle');
+const kindSeg=$('#kindSeg'), colorSwatches=$('#colorSwatches'), sizeRange=$('#sizeRange'), sizeVal=$('#sizeVal');
+const stage=$('#stage'), stagePlaceholder=$('#stagePlaceholder'), stageBar=$('#stageBar'), rotateWarn=$('#rotateWarn');
+const saveAll=$('#saveAll'), saveOne=$('#saveOne'), printAllBtn=$('#printAll'), printFrame=$('#printFrame'), resetBtn=$('#resetBtn');
+const toast=$('#toast');
+function showToast(m){ toast.textContent=m; toast.classList.add('show'); clearTimeout(showToast._t); showToast._t=setTimeout(()=>toast.classList.remove('show'),2300); }
+function escapeHtml(s){ return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* ===== 시작 ===== */
+function whenReady(cb){ const ok=()=>window.pdfjsLib&&window.PDFLib&&window.JSZip&&window.pako; if(ok())return cb();
+  let t=0; const id=setInterval(()=>{ if(ok()){clearInterval(id);cb();} else if(++t>150){clearInterval(id); showToast('라이브러리를 불러오지 못했습니다. 새로고침 해주세요.');} },100); }
+whenReady(()=>{
+  pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  updateKindSeg(); wireUpload(); wireToolbar(); wireActions();
+});
+
+/* ===== 종류 세그먼트 (참고·첨부·증) ===== */
+function updateKindSeg(){
+  kindSeg.querySelectorAll('button').forEach(b=> b.classList.toggle('on', b.dataset.kind===state.stampKind));
+}
+
+/* ===== 업로드 ===== */
+function wireUpload(){
+  document.addEventListener('dragover',e=>{ if(e.dataTransfer&&[...e.dataTransfer.types].includes('Files')) e.preventDefault(); });
+  document.addEventListener('drop',e=>{ if(e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files.length) e.preventDefault(); });
+  drop.addEventListener('click',()=>fileInput.click());
+  fileInput.addEventListener('change',e=>addFiles(e.target.files));
+  ['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
+  ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
+  drop.addEventListener('drop',e=>addFiles(e.dataTransfer.files));
+}
+async function addFiles(fileLike){
+  const all=[...fileLike];
+  const hwps=all.filter(isSojang);
+  const docs=all.filter(f=> !isSojang(f) && (f.type==='application/pdf'||/\.pdf$/i.test(f.name)||isImageFile(f)));
+  if(!docs.length && !hwps.length){ showToast('PDF·사진·소장(.hwp/.hwpx)만 올릴 수 있습니다.'); return; }
+  for(const f of docs){
+    try{
+      const img=isImageFile(f);
+      const srcPdf = img? null : await f.arrayBuffer();
+      const bytes=img? await imageToPdfBytes(f,0) : await normalizeToA4(srcPdf,0);
+      const doc=await pdfjsLib.getDocument({data:bytes.slice(0)}).promise;
+      const name=img? f.name.replace(IMG_RE,'')+'.pdf' : f.name;
+      const nf={ id:_uid++, name, origName:f.name, kind:img?'image':'pdf', bytes, pdfjsDoc:doc, numPages:doc.numPages, num1:'', num2:'', rot:0, srcFile:img?f:null, srcPdfBytes:srcPdf };
+      state.files.push(nf);
+      if(state.template) autoAssign(nf);   // 소장 모드면 빈 슬롯에 자동 연결
+    }catch(err){ console.error(err); showToast(`'${f.name}' 을(를) 열지 못했습니다.`); }
+  }
+  if(!state.template) recalcAuto();
+  if(hwps.length){ await handleSojang(hwps[hwps.length-1]); }
+  if(state.activeId===null){ const f=state.files[0]; if(f) state.activeId=f.id; }
+  renderRight(); state.activeId?renderPage():clearStage();
+  fileInput.value='';
+}
+
+/* ===== 소장 ===== */
+async function handleSojang(file){
+  try{
+    const buf=await file.arrayBuffer();
+    const list = isHwpx(file) ? await parseHwpxEvidence(buf) : parseHwpEvidence(buf);   // 확장자로 파서 분기
+    if(!list.length){ showToast('입증방법 목록을 찾지 못했습니다.'); return; }
+    state.template=true;
+    state.slots=list.map(it=>({ id:_uid++, kind:it.kind, title:it.title, num1:it.num1, num2:it.num2, fileId:null }));
+    // 기존 파일 자동 매칭
+    const reals=[...state.files], used=new Set(), pairs=[];
+    state.slots.forEach((s,si)=> reals.forEach(r=>{ const sc=matchScore(s.title,r.name); if(sc>=0.5) pairs.push({si,r,sc}); }));
+    pairs.sort((a,b)=>b.sc-a.sc);
+    for(const p of pairs){ if(state.slots[p.si].fileId||used.has(p.r.id)) continue; state.slots[p.si].fileId=p.r.id; used.add(p.r.id); }
+    const first=state.slots.find(s=>s.fileId); state.activeId=first?first.fileId:(state.files[0]?state.files[0].id:null);
+    showToast(`입증방법 ${list.length}건 인식 · 자동 연결 ${used.size}건`);
+  }catch(err){ console.error(err); showToast('소장을 읽지 못했습니다. (.hwp/.hwpx 파일인지 확인)'); }
+}
+function autoAssign(nf){
+  let best=null, bs=0;
+  for(const s of state.slots){ if(!s.fileId){ const sc=matchScore(s.title,nf.name); if(sc>bs){ bs=sc; best=s; } } }
+  if(best && bs>=0.5) best.fileId=nf.id;
+}
+/* 컴퓨터 파일을 특정 슬롯에 직접 드롭 → 업로드 후 연결 */
+async function dropFilesToSlot(slot, fileLike){
+  const arr=[...fileLike].filter(f=> f.type==='application/pdf'||/\.pdf$/i.test(f.name)||isImageFile(f));
+  if(!arr.length){ showToast('PDF·사진 파일만 슬롯에 넣을 수 있습니다.'); return; }
+  if(arr.length>1) showToast('슬롯에는 한 파일만 연결됩니다. 첫 파일만 넣습니다.');
+  const f=arr[0];
+  try{
+    const img=isImageFile(f);
+    const srcPdf = img? null : await f.arrayBuffer();
+    const bytes=img? await imageToPdfBytes(f,0) : await normalizeToA4(srcPdf,0);
+    const doc=await pdfjsLib.getDocument({data:bytes.slice(0)}).promise;
+    const name=img? f.name.replace(IMG_RE,'')+'.pdf' : f.name;
+    const nf={ id:_uid++, name, origName:f.name, kind:img?'image':'pdf', bytes, pdfjsDoc:doc, numPages:doc.numPages, num1:'', num2:'', rot:0, srcFile:img?f:null, srcPdfBytes:srcPdf };
+    state.files.push(nf);
+    state.slots.forEach(s=>{ if(s.fileId===nf.id) s.fileId=null; });
+    slot.fileId=nf.id; state.activeId=nf.id;
+    renderRight(); renderPage();
+    showToast(`${labelFor(slot.kind,slot.num1,slot.num2)}에 연결`);
+  }catch(err){ console.error(err); showToast(`'${f.name}' 을(를) 열지 못했습니다.`); }
+}
+
+/* ===== 모드 A 자동 번호 ===== */
+function recalcAuto(){
+  state.files.forEach((f,i)=>{ if(!f._touched){ f.num1=String(i+1); if(state.stampKind!=='jeung') f.num2=''; } });
+}
+
+/* ===== 오른쪽 패널 ===== */
+function renderRight(){
+  if(state.template){ modeAEl.style.display='none'; modeBEl.style.display=''; renderSlots(); renderPool(); }
+  else{ modeBEl.style.display='none'; modeAEl.style.display=''; renderFileList(); }
+  refreshActionState();
+}
+function refreshActionState(){
+  const items=getItems();
+  const has=items.length>0;
+  saveAll.disabled=printAllBtn.disabled=!has;
+  const af=activeFile(); saveOne.disabled = !af || !metaForFile(af);
+}
+
+/* ----- 모드 A ----- */
+function labelFor(kind, num1, num2){
+  if(kind==='chamgo') return `참고자료 ${num1||''}`.trim();
+  if(kind==='cheombu') return `첨부서류 ${num1||''}`.trim();
+  return `증 제${num1||''}호증${String(num2||'').trim()?'의 '+num2:''}`;
+}
+function renderFileList(){
+  titleA.style.display = state.files.length? 'flex':'none';
+  fileListEl.innerHTML='';
+  state.files.forEach((f,i)=>{
+    const row=document.createElement('div'); row.className='frow'+(f.id===state.activeId?' active':''); row.dataset.id=f.id;
+    const l1=document.createElement('div'); l1.className='l1';
+    const ord=document.createElement('span'); ord.className='ord'; ord.textContent=i+1;
+    const nameInp=document.createElement('input'); nameInp.className='nameInp'; nameInp.value=f.name;
+    nameInp.addEventListener('input',e=>{ f.name=e.target.value; });
+    nameInp.addEventListener('pointerdown',e=>e.stopPropagation());
+    l1.append(ord,nameInp);
+    if(f.kind==='image'){ const k=document.createElement('span'); k.className='conn'; k.textContent='사진'; l1.appendChild(k); }
+    const del=document.createElement('button'); del.className='del'; del.textContent='×'; del.title='제거';
+    del.addEventListener('click',e=>{ e.stopPropagation(); removeFile(f.id); });
+    del.addEventListener('pointerdown',e=>e.stopPropagation());
+    l1.appendChild(del);
+    const l2=document.createElement('div'); l2.className='l2';
+    const lab=document.createElement('span'); lab.className='tag stamp-lab'; lab.textContent=labelFor(state.stampKind,f.num1,f.num2);
+    l2.appendChild(lab);
+    if(state.stampKind==='jeung'){
+      l2.appendChild(numField(f,'num1','호증', lab));
+      l2.appendChild(small('호증의'));
+      l2.appendChild(numField(f,'num2','의', lab));
+    } else {
+      l2.appendChild(numField(f,'num1','번호', lab));
+    }
+    row.append(l1,l2);
+    row.addEventListener('click',e=>{ if(e.target.tagName==='INPUT'||e.target.tagName==='BUTTON') return;
+      if(f.id!==state.activeId){ state.activeId=f.id; renderRight(); renderPage(); } });
+    row.addEventListener('pointerdown',e=>{ if(e.target.tagName==='INPUT'||e.target.tagName==='BUTTON') return; startRowDrag(e,row); });
+    fileListEl.appendChild(row);
+  });
+}
+function small(t){ const s=document.createElement('span'); s.className='tag'; s.textContent=t; return s; }
+function numField(f,key,ph,lab){
+  const inp=document.createElement('input'); inp.type='text'; inp.inputMode='numeric'; inp.placeholder=ph; inp.value=f[key];
+  inp.addEventListener('input',e=>{ f[key]=e.target.value; f._touched=true; lab.textContent=labelFor(state.stampKind,f.num1,f.num2);
+    if(f.id===state.activeId) refreshStamp(); refreshActionState(); });
+  if(key==='num1'){
+    // 호증번호를 고치면 그 아래 행 번호가 자동으로 이어짐 (예: 1·2·3·4·5 → 2번을 3으로 → 1·3·4·5·6)
+    inp.addEventListener('change',e=>{
+      const n=parseInt(e.target.value,10); if(isNaN(n)) return;
+      const i=state.files.indexOf(f);
+      f.num1=String(n); f._touched=true;
+      let nx=n;
+      for(let j=i+1;j<state.files.length;j++){ nx++; state.files[j].num1=String(nx); state.files[j]._touched=true; }
+      renderFileList(); if(activeFile()) refreshStamp();
+    });
+  }
+  inp.addEventListener('pointerdown',e=>e.stopPropagation());
+  inp.addEventListener('click',e=>e.stopPropagation());
+  return inp;
+}
+function removeFile(id){
+  const i=state.files.findIndex(f=>f.id===id); if(i<0) return;
+  state.files.splice(i,1);
+  state.slots.forEach(s=>{ if(s.fileId===id) s.fileId=null; });
+  if(state.activeId===id){ const n=state.files[0]; state.activeId=n?n.id:null; }
+  if(!state.template) recalcAuto();
+  renderRight(); state.activeId?renderPage():clearStage();
+}
+
+/* 행 전체 드래그(순서 변경) */
+function startRowDrag(e,row){
+  const sx=e.clientX, sy=e.clientY; let dragging=false;
+  const move=ev=>{
+    if(!dragging){ if(Math.abs(ev.clientX-sx)+Math.abs(ev.clientY-sy)<6) return; dragging=true; row.classList.add('dragging'); document.body.style.userSelect='none'; }
+    const rows=[...fileListEl.querySelectorAll('.frow')]; const y=ev.clientY; let after=null;
+    for(const r of rows){ if(r===row) continue; const b=r.getBoundingClientRect(); if(y<b.top+b.height/2){ after=r; break; } }
+    if(after){ if(row.nextSibling!==after) fileListEl.insertBefore(row,after); } else if(fileListEl.lastChild!==row){ fileListEl.appendChild(row); } };
+  const up=()=>{ window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up); document.body.style.userSelect='';
+    if(!dragging) return;                                   // 단순 탭 → 선택은 click이 처리
+    row.classList.remove('dragging');
+    const order=[...fileListEl.querySelectorAll('.frow')].map(r=>+r.dataset.id);
+    state.files.sort((a,b)=>order.indexOf(a.id)-order.indexOf(b.id));
+    recalcAuto(); renderRight(); refreshStamp(); };
+  window.addEventListener('pointermove',move); window.addEventListener('pointerup',up);
+}
+
+/* ----- 모드 B ----- */
+function renderSlots(){
+  const cj=state.slots.filter(s=>s.kind==='jeung').length, cc=state.slots.filter(s=>s.kind==='chamgo').length, ce=state.slots.filter(s=>s.kind==='cheombu').length;
+  slotBadge.textContent=[cj&&`입증 ${cj}`, cc&&`참고 ${cc}`, ce&&`첨부 ${ce}`].filter(Boolean).join(' · ')||`${state.slots.length}건`;
+  slotListEl.innerHTML='';
+  state.slots.forEach((s,i)=>{
+    const f=s.fileId?fileById(s.fileId):null;
+    const el=document.createElement('div'); el.className='slot'+(f&&f.id===state.activeId?' active':'')+(f?'':' empty-slot'); el.dataset.slot=s.id;
+    const s1=document.createElement('div'); s1.className='s1';
+    s1.innerHTML=`<span class="ord">${i+1}</span><span class="lab">${escapeHtml(labelFor(s.kind,s.num1,s.num2))}</span><span class="title">${escapeHtml(s.title)}</span>`;
+    const s2=document.createElement('div'); s2.className='s2';
+    if(f){ s2.innerHTML=`<span class="filled">📎 ${escapeHtml(f.name)}<button class="un" title="연결 해제">해제 ×</button></span>`; }
+    else { s2.innerHTML=`<span class="empty">여기로 서류를 끌어다 놓기</span>`; }
+    el.append(s1,s2);
+    el.addEventListener('click',e=>{ if(e.target.classList.contains('un')){ e.stopPropagation(); s.fileId=null; renderRight(); if(state.activeId===(f&&f.id)) renderPage(); return; }
+      if(f){ state.activeId=f.id; renderRight(); renderPage(); } });
+    // 컴퓨터의 파일을 슬롯 위로 직접 끌어다 놓기
+    el.addEventListener('dragover',e=>{ if(e.dataTransfer&&[...e.dataTransfer.types].includes('Files')){ e.preventDefault(); e.stopPropagation(); el.classList.add('dropok'); } });
+    el.addEventListener('dragleave',e=>{ if(!el.contains(e.relatedTarget)) el.classList.remove('dropok'); });
+    el.addEventListener('drop',e=>{ const fl=e.dataTransfer&&e.dataTransfer.files; if(fl&&fl.length){ e.preventDefault(); e.stopPropagation(); el.classList.remove('dropok'); dropFilesToSlot(s,fl); } });
+    slotListEl.appendChild(el);
+  });
+}
+function renderPool(){
+  const pool=poolFiles();
+  poolTitle.style.display = state.files.length? 'flex':'none';
+  poolListEl.innerHTML='';
+  if(!pool.length){ const e=document.createElement('div'); e.className='pool-empty'; e.textContent = state.files.length? '모든 서류가 연결되었습니다':'아직 올린 서류가 없습니다'; poolListEl.appendChild(e); return; }
+  pool.forEach(f=>{
+    const c=document.createElement('div'); c.className='pcard'+(f.id===state.activeId?' active':''); c.dataset.id=f.id;
+    c.innerHTML=`<span class="nm">${escapeHtml(f.name)}</span>`+(f.kind==='image'?`<span class="conn">사진</span>`:'');
+    c.addEventListener('click',()=>{ state.activeId=f.id; renderRight(); renderPage(); });
+    c.addEventListener('pointerdown',e=>startPoolDrag(e,f,c));
+    poolListEl.appendChild(c);
+  });
+}
+/* 풀 카드 → 슬롯 드래그 매칭 */
+function startPoolDrag(e,f,card){
+  e.preventDefault();
+  const ghost=document.createElement('div'); ghost.className='drag-ghost'; ghost.textContent=f.name; document.body.appendChild(ghost);
+  card.classList.add('ghosting');
+  const moveGhost=ev=>{ ghost.style.left=(ev.clientX+12)+'px'; ghost.style.top=(ev.clientY+12)+'px'; };
+  moveGhost(e);
+  let hoverEl=null;
+  const move=ev=>{ moveGhost(ev);
+    const el=document.elementFromPoint(ev.clientX,ev.clientY); const slotEl=el&&el.closest?el.closest('.slot'):null;
+    if(slotEl!==hoverEl){ if(hoverEl) hoverEl.classList.remove('dropok'); hoverEl=slotEl; if(hoverEl) hoverEl.classList.add('dropok'); } };
+  const up=ev=>{ window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up);
+    ghost.remove(); card.classList.remove('ghosting');
+    if(hoverEl){ hoverEl.classList.remove('dropok'); const sid=+hoverEl.dataset.slot; const slot=state.slots.find(s=>s.id===sid);
+      if(slot){ // 다른 슬롯에 있던 연결 해제 후 이 슬롯에 연결
+        state.slots.forEach(s=>{ if(s.fileId===f.id) s.fileId=null; });
+        slot.fileId=f.id; state.activeId=f.id; renderRight(); renderPage(); showToast(`${labelFor(slot.kind,slot.num1,slot.num2)}에 연결`); return;
+      } }
+    renderRight(); };
+  window.addEventListener('pointermove',move); window.addEventListener('pointerup',up);
+}
+
+/* ===== 미리보기 ===== */
+async function renderPage(){
+  const f=activeFile(); if(!f||!f.pdfjsDoc){ return clearStage(); }
+  stagePlaceholder.style.display='none';
+  const page=await f.pdfjsDoc.getPage(1);
+  const base=page.getViewport({scale:1}), scale=Math.min(1300/base.width,3), viewport=page.getViewport({scale}); state.viewport=viewport;
+  let canvas=stage.querySelector('canvas.page'); if(!canvas){ canvas=document.createElement('canvas'); canvas.className='page'; stage.appendChild(canvas); }
+  canvas.width=Math.round(viewport.width); canvas.height=Math.round(viewport.height);
+  await page.render({canvasContext:canvas.getContext('2d'), viewport}).promise;
+  const idx = state.template ? (state.slots.findIndex(s=>s.fileId===f.id)) : state.files.findIndex(x=>x.id===f.id);
+  const ordTxt = idx>=0 ? (idx+1) : '·';
+  const meta=metaForFile(f);
+  const labelTxt = meta ? labelFor(meta.kind, meta.num1, meta.num2) : '미배정';
+  stageBar.innerHTML=`<span class="ord">${ordTxt}</span><span class="fn">${escapeHtml(f.name)} · <b style="color:var(--seal)">${escapeHtml(labelTxt)}</b></span><button type="button" class="rotate-btn" id="rotateBtn" title="90° 회전 (제출용 세로는 유지)">↻ 회전</button>`;
+  const rb=document.getElementById('rotateBtn'); if(rb) rb.addEventListener('click',rotateActive);
+  rotateWarn.classList.toggle('show',(page.rotate%360)!==0);
+  if(!state.defaultOffset){ const s1=page.getViewport({scale:1}); state.defaultOffset={rightPt:s1.width*0.045, bottomPt:s1.width*0.045}; }
+  wireStageClick(canvas); refreshStamp();
+}
+function clearStage(){ const c=stage.querySelector('canvas.page'); if(c) c.remove(); const o=stage.querySelector('.stamp-ov'); if(o) o.remove();
+  stagePlaceholder.style.display=''; stageBar.innerHTML=''; rotateWarn.classList.remove('show'); }
+// 회전값(f.rot)으로 파일의 A4 PDF를 다시 생성
+async function rebuildFile(f){
+  const bytes = f.kind==='image' ? await imageToPdfBytes(f.srcFile, f.rot) : await normalizeToA4(f.srcPdfBytes, f.rot);
+  f.bytes=bytes;
+  try{ if(f.pdfjsDoc && f.pdfjsDoc.destroy) f.pdfjsDoc.destroy(); }catch(e){}
+  f.pdfjsDoc=await pdfjsLib.getDocument({data:bytes.slice(0)}).promise;
+  f.numPages=f.pdfjsDoc.numPages;
+}
+// 현재 미리보기 서류를 90°씩 회전 (제출용 A4 세로는 유지, 내용만 회전)
+let _rotating=false;
+async function rotateActive(){
+  const f=activeFile(); if(!f||_rotating) return;
+  _rotating=true;
+  try{ f.rot=((f.rot||0)+90)%360; await rebuildFile(f); await renderPage(); }
+  catch(err){ console.error(err); showToast('회전 중 문제가 발생했습니다.'); }
+  finally{ _rotating=false; }
+}
+function stampCss(){ const canvas=stage.querySelector('canvas.page'); if(!canvas||!state.viewport) return {w:40,h:200,S:1,factor:1,wpt:28,hpt:142};
+  const S=state.viewport.scale, factor=canvas.width/canvas.clientWidth;
+  const wpt=STAMP_W_MM*MM2PT*state.sizePct/100, hpt=STAMP_H_MM*MM2PT*state.sizePct/100; return {w:wpt*S/factor,h:hpt*S/factor,S,factor,wpt,hpt}; }
+function offsetToCss(){ const canvas=stage.querySelector('canvas.page'); const {w,h,S,factor}=stampCss(); const cw=canvas.clientWidth,ch=canvas.clientHeight,o=effOffset(activeFile());
+  return {left:(cw-o.rightPt*S/factor)-w, top:(ch-o.bottomPt*S/factor)-h, w, h}; }
+function cssToOffset(left,top){ const canvas=stage.querySelector('canvas.page'); const {w,h,S,factor}=stampCss(); const cw=canvas.clientWidth,ch=canvas.clientHeight;
+  return {rightPt:Math.max(0,(cw-(left+w))*factor/S), bottomPt:Math.max(0,(ch-(top+h))*factor/S)}; }
+function refreshStamp(){
+  const canvas=stage.querySelector('canvas.page'); const f=activeFile(); if(!canvas||!f||!effOffset(f)) return;
+  const meta=metaForFile(f); let ov=stage.querySelector('.stamp-ov');
+  if(!meta){ if(ov) ov.remove(); return; }
+  if(!ov){ ov=document.createElement('div'); ov.className='stamp-ov'; ov.appendChild(document.createElement('img'));
+    const handle=document.createElement('div'); handle.className='handle'; ov.appendChild(handle); stage.appendChild(ov); makeStampDraggable(ov,handle); }
+  const pos=offsetToCss(); ov.style.width=pos.w+'px'; ov.style.height=pos.h+'px'; ov.style.left=pos.left+'px'; ov.style.top=pos.top+'px';
+  const cv=renderStampCanvas(STAMPS[meta.stampId],{color:state.color,number:meta.num1,number2:meta.num2,heightPx:600});
+  ov.querySelector('img').src=cv.toDataURL('image/png');
+}
+function wireStageClick(canvas){ canvas.onclick=e=>{ const af=activeFile(); if(!af||!metaForFile(af)) return; const r=canvas.getBoundingClientRect(); const {w,h}=stampCss();
+  af.offset=cssToOffset(e.clientX-r.left-w/2, e.clientY-r.top-h/2); refreshStamp(); }; }
+function makeStampDraggable(ov,handle){
+  let mode=null,sx,sy,sl,st0,sw;
+  const down=(e,m)=>{ e.preventDefault(); e.stopPropagation(); mode=m; sx=e.clientX; sy=e.clientY; const p=offsetToCss(); sl=p.left; st0=p.top; sw=state.sizePct;
+    window.addEventListener('pointermove',move); window.addEventListener('pointerup',up); };
+  const move=e=>{ const dx=e.clientX-sx, dy=e.clientY-sy;
+    if(mode==='move'){ const af=activeFile(); if(af) af.offset=cssToOffset(sl+dx,st0+dy); refreshStamp(); }
+    else if(mode==='resize'){ const pct=Math.round(Math.min(200,Math.max(50,sw+dy*0.6))); state.sizePct=pct; sizeRange.value=pct; sizeVal.textContent=pct+'%'; refreshStamp(); } };
+  const up=()=>{ mode=null; window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up); };
+  ov.addEventListener('pointerdown',e=>down(e,'move')); handle.addEventListener('pointerdown',e=>down(e,'resize'));
+}
+
+/* ===== 도구바 ===== */
+function applyColorSwatch(b){
+  colorSwatches.querySelectorAll('.swatch').forEach(x=> x.classList.remove('on'));
+  b.classList.add('on'); state.color=b.dataset.c;
+}
+
+function wireToolbar(){
+  kindSeg.querySelectorAll('button').forEach(b=> b.addEventListener('click',()=>{
+    state.stampKind=b.dataset.kind; updateKindSeg();
+    if(!state.template){ renderRight(); }
+    refreshStamp();
+  }));
+  colorSwatches.querySelectorAll('.swatch').forEach(b=> b.addEventListener('click',()=>{ applyColorSwatch(b); refreshStamp(); }));
+  applyColorSwatch(colorSwatches.querySelector('.swatch.on') || colorSwatches.querySelector('.swatch'));
+  sizeRange.addEventListener('input',e=>{ state.sizePct=+e.target.value; sizeVal.textContent=state.sizePct+'%'; refreshStamp(); });
+}
+
+/* ===== 출력 대상 목록 ===== */
+function buildFileName(it){
+  // 라벨(참고자료 1 / 증 제1호증 …) + 제목 → "참고자료 1.  진술서.pdf"
+  const label=labelFor(it.kind||state.stampKind, it.num1, it.num2).trim();
+  let title=(it.title||'').trim();
+  // 모드A에서 행 이름이 파일명(확장자 포함)일 수 있으니 .pdf 등 확장자 제거
+  title=title.replace(/\.(pdf|png|jpe?g|webp|gif|hwp|hwpx)$/i,'').trim();
+  const base=(label + (title?('.  '+title):'')).replace(/[\\/:*?"<>|]/g,'_').replace(/\s+/g,' ').trim();
+  return base + '.pdf';
+}
+function getItems(){
+  if(state.template){
+    return state.slots.filter(s=>s.fileId).map(s=>({ file:fileById(s.fileId), stampId:stampIdFor(s.kind,s.num2), kind:s.kind, num1:s.num1, num2:s.num2,
+      title:s.title, name: labelFor(s.kind,s.num1,s.num2) }));
+  }
+  return state.files.map(f=>({ file:f, stampId:stampIdFor(state.stampKind,f.num2), kind:state.stampKind, num1:f.num1, num2:f.num2, title:f.name, name:f.name }));
+}
+async function stampItem(it){
+  const {PDFDocument}=PDFLib; const pdf=await PDFDocument.load(it.file.bytes.slice(0));
+  const cv=renderStampCanvas(STAMPS[it.stampId],{color:state.color,number:it.num1,number2:it.num2,heightPx:600,dpr:4});
+  const png=await pdf.embedPng(await canvasToBytes(cv)); const page=pdf.getPage(0); const {width,height}=page.getSize();
+  const wpt=STAMP_W_MM*MM2PT*state.sizePct/100, hpt=STAMP_H_MM*MM2PT*state.sizePct/100;
+  const po=effOffset(it.file) || {rightPt:width*0.045, bottomPt:width*0.045};
+  let x=width-po.rightPt-wpt, y=po.bottomPt;
+  x=Math.max(0,Math.min(x,width-wpt)); y=Math.max(0,Math.min(y,height-hpt));
+  page.drawImage(png,{x,y,width:wpt,height:hpt}); return await pdf.save();
+}
+function stampedName(it,i){ return buildFileName(it); }
+function wireActions(){ saveOne.addEventListener('click',saveSelected); saveAll.addEventListener('click',saveAllFiles); printAllBtn.addEventListener('click',printAll); resetBtn.addEventListener('click',resetAll); }
+function resetAll(){
+  if(state.files.length && !confirm('올린 서류와 소장 목록을 모두 비울까요?')) return;
+  state.files=[]; state.slots=[]; state.template=false; state.activeId=null; state.defaultOffset=null;
+  modeBEl.style.display='none'; modeAEl.style.display=''; fileInput.value='';
+  renderRight(); clearStage(); showToast('초기화했습니다.');
+}
+async function saveSelected(){
+  const f=activeFile(); const meta=f&&metaForFile(f); if(!f||!meta){ showToast('연결된 서류를 선택하세요.'); return; }
+  saveOne.disabled=true; const t=saveOne.textContent; saveOne.textContent='저장 중…';
+  try{ const it={file:f, stampId:meta.stampId, kind:meta.kind, num1:meta.num1, num2:meta.num2, title:meta.title, name:f.name };
+    const bytes=await stampItem(it);
+    downloadBlob(new Blob([bytes],{type:'application/pdf'}), buildFileName(it)); showToast('저장 완료'); }
+  catch(err){ console.error(err); showToast('저장 중 문제가 발생했습니다.'); }
+  saveOne.disabled=false; saveOne.textContent=t;
+}
+async function saveAllFiles(){
+  const items=getItems(); if(!items.length){ showToast('연결된 서류가 없습니다.'); return; }
+  saveAll.disabled=true; const t=saveAll.textContent; saveAll.textContent='저장 중…';
+  try{
+    for(let i=0;i<items.length;i++){
+      const bytes=await stampItem(items[i]);
+      downloadBlob(new Blob([bytes],{type:'application/pdf'}), stampedName(items[i],i));
+      await new Promise(r=>setTimeout(r,350));         // 브라우저 연속 다운로드 간격
+    }
+    const skip = state.template ? state.slots.filter(s=>!s.fileId).length : 0;
+    showToast(`${items.length}개 각각 저장${skip?` · 미연결 ${skip}건 제외`:''}`);
+  }catch(err){ console.error(err); showToast('저장 중 문제가 발생했습니다.'); }
+  saveAll.disabled=false; saveAll.textContent=t;
+}
+async function buildMergedPdf(){
+  const {PDFDocument}=PDFLib; const merged=await PDFDocument.create();
+  for(const it of getItems()){ const src=await PDFDocument.load(await stampItem(it)); const pages=await merged.copyPages(src,src.getPageIndices()); pages.forEach(p=>merged.addPage(p)); }
+  return await merged.save();
+}
+async function printAll(){
+  const items=getItems(); if(!items.length){ showToast('연결된 서류가 없습니다.'); return; }
+  printAllBtn.disabled=true; const t=printAllBtn.textContent; printAllBtn.textContent='병합 중…';
+  try{ const bytes=await buildMergedPdf(); const url=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
+    printFrame.onload=()=>{ setTimeout(()=>{ try{ printFrame.contentWindow.focus(); printFrame.contentWindow.print(); }catch(e){ window.open(url,'_blank'); } },350); };
+    printFrame.src=url; showToast('출력 화면을 준비했습니다.'); }
+  catch(err){ console.error(err); showToast('병합·출력 중 문제가 발생했습니다.'); }
+  printAllBtn.disabled=false; printAllBtn.textContent=t;
+}
+function downloadBlob(blob,name){ const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1500); }
+
+</script>
+</body>
+</html>
