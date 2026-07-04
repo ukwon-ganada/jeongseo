@@ -141,7 +141,7 @@ html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black)
   #screen-contract .info-table{min-width:0;}
   .ct-appbar{width:100%;left:0;right:0;}
   .home-sidebar{display:none;}
-  .hm-hi,.hm-title,.hm-desc,.doc-grid{display:none;}
+  .home-pc{display:none;}
   .home-main{display:flex;flex-direction:column;width:100%;}
   .hm-mobile{display:flex;flex-direction:column;flex:1;background:var(--gray-100);}
   .hmh{padding:44px 22px 8px;display:flex;align-items:flex-end;justify-content:space-between;gap:12px;}
