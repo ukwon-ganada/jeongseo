@@ -1443,7 +1443,7 @@ function resetContract(){
 }
 
 /* ═══ Supabase 연동 ═══ */
-var APP_VERSION='v112';
+var APP_VERSION='v113';
 var SUPABASE_URL='https://nyjyemjsperpakrrgzcc.supabase.co';
 var SUPABASE_KEY='sb_publishable_QKl9MIt2_MflYnpN41VRvg_cNIAbYhU';
 var sb=null;
@@ -2696,7 +2696,8 @@ function buildFileName(){
   var name2=parts.join('_');
   return name2.replace(/[\\\\/:*?"<>|]/g,'');
 }
-async function capturePages(){
+async function capturePages(trimToContent){
+  // trimToContent=true: 페이지를 A4 높이로 강제하지 않고 실제 내용 높이로만 캡처(이미지 저장 시 하단 여백 제거용)
   // 캡처 전 계약서 폰트 로드 완료 보장 (미로드 시 기기 기본폰트로 캡처되어 잘림 발생)
   try{ if(document.fonts){ await document.fonts.load("400 12pt 'Noto Sans KR'"); await document.fonts.load("700 12pt 'Noto Sans KR'"); if(document.fonts.ready){ await document.fonts.ready; } } }catch(e){}
   var pages=Array.prototype.slice.call(document.querySelectorAll('#ctContent .page')).filter(function(p){return p.style.display!=='none';});
@@ -2770,7 +2771,8 @@ async function capturePages(){
     page.style.minHeight=H+'px';
     page.style.padding=Math.round(11*MM)+'px '+Math.round(18*MM)+'px '+Math.round(9*MM)+'px';
     // 실제 콘텐츠 높이 측정: A4 높이를 넘치면 넘치는 만큼 전부 캡처(아래 잘림 방지)
-    var capH=Math.max(H, Math.ceil(page.scrollHeight));
+    // trimToContent면 A4 최소높이를 강제하지 않아, 내용이 짧은 페이지의 하단 여백이 사라짐(이미지 저장용)
+    var capH=trimToContent?Math.ceil(page.scrollHeight):Math.max(H, Math.ceil(page.scrollHeight));
     var c=await html2canvas(page,{scale:2,useCORS:true,allowTaint:true,backgroundColor:'#ffffff',logging:false,width:W,height:capH,windowWidth:W,windowHeight:capH});
     page.style.width=prev.width;
     page.style.height=prev.height;
@@ -2796,11 +2798,16 @@ async function capturePages(){
   return canvases;
 }
 async function doAction(type){
-  // PDF 저장도 '진짜 인쇄' 경로로 통일 (캡처 방식 제거): 인쇄창에서 'PDF로 저장'을 고르면 벡터 A4 PDF 생성
-  if(type==='print'||type==='pdf'){ try{ if(document.fonts){ await document.fonts.load("400 12pt 'Noto Sans KR'"); await document.fonts.load("700 12pt 'Noto Sans KR'"); if(document.fonts.ready){ await document.fonts.ready; } } }catch(e){} window.print(); return; }
-  showLoading('이미지 생성 중...');
+  // 아이폰/아이패드 판별: 설치앱(PWA)에서는 애플 제약으로 window.print()가 화면 반쪽만 인쇄됨
+  // (아이패드는 최신 iPadOS에서 'MacIntel'로 위장하므로 터치포인트로 추가 판별)
+  var _ua=navigator.userAgent||'';
+  var _isIOS=/iP(hone|ad|od)/.test(_ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  // 프린트는 항상 진짜 인쇄. PDF는 PC·안드로이드(비iOS)에서만 진짜 인쇄로, 아이폰은 아래 조립(캡처→A4 PDF) 경로로 처리.
+  if(type==='print'||(type==='pdf'&&!_isIOS)){ try{ if(document.fonts){ await document.fonts.load("400 12pt 'Noto Sans KR'"); await document.fonts.load("700 12pt 'Noto Sans KR'"); if(document.fonts.ready){ await document.fonts.ready; } } }catch(e){} window.print(); return; }
+  showLoading(type==='pdf'?'PDF 생성 중...':'이미지 생성 중...');
   try{
-    var canvases=await capturePages();
+    // 이미지 저장만 내용 높이로 잘라 하단 여백 제거. PDF·공유는 A4 온전한 페이지 유지.
+    var canvases=await capturePages(type==='image');
     var clientName=getClientName();
     if(type==='image'){
       if(canvases.length===1){
