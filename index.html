@@ -1335,7 +1335,6 @@ function showScreen(id){
   document.body.classList.toggle('mode-seonim', id==='screen-seonim');
   document.body.classList.toggle('mode-appeal', id==='screen-appeal');
   window.scrollTo(0,0);
-  if(id==='screen-contract'&&window._resetZoom){setTimeout(window._resetZoom,60);}
 }
 
 /* ═══ 비밀번호 잠금 (계약서 목록 진입 시에만) ═══ */
@@ -1435,7 +1434,7 @@ function resetContract(){
 }
 
 /* ═══ Supabase 연동 ═══ */
-var APP_VERSION='v104';
+var APP_VERSION='v103';
 var SUPABASE_URL='https://nyjyemjsperpakrrgzcc.supabase.co';
 var SUPABASE_KEY='sb_publishable_QKl9MIt2_MflYnpN41VRvg_cNIAbYhU';
 var sb=null;
@@ -2701,8 +2700,8 @@ async function capturePages(){
   var H=Math.round(297*MM);
   // 줌 상태 임시 초기화 (출력물은 원본 크기)
   var zoomPages=Array.prototype.slice.call(document.querySelectorAll('#ctContent .page'));
-  var zoomPrev=zoomPages.map(function(p){return {t:p.style.transform,o:p.style.transformOrigin,z:p.style.zoom};});
-  zoomPages.forEach(function(p){p.style.transform='';p.style.transformOrigin='';p.style.zoom='';});
+  var zoomPrev=zoomPages.map(function(p){return {t:p.style.transform,o:p.style.transformOrigin};});
+  zoomPages.forEach(function(p){p.style.transform='';p.style.transformOrigin='';});
   // 서명칸 테두리 + 서명지우기 버튼 임시 숨김 (출력물에 안 보이게)
   var stamps=Array.prototype.slice.call(document.querySelectorAll('.sign-stamp-circle'));
   var stampPrev=stamps.map(function(s){return s.style.border;});
@@ -2766,7 +2765,7 @@ async function capturePages(){
     canvases.push(c);
   }
   // 줌 + 테두리 + 버튼 복원
-  zoomPages.forEach(function(p,idx){p.style.transform=zoomPrev[idx].t;p.style.transformOrigin=zoomPrev[idx].o;p.style.zoom=zoomPrev[idx].z;});
+  zoomPages.forEach(function(p,idx){p.style.transform=zoomPrev[idx].t;p.style.transformOrigin=zoomPrev[idx].o;});
   stamps.forEach(function(s,idx){s.style.border=stampPrev[idx];});
   disabledEls.forEach(function(el){el.disabled=true;});
   clrBtns.forEach(function(b,idx){b.style.display=clrPrev[idx];});
@@ -3123,29 +3122,9 @@ document.addEventListener('DOMContentLoaded',function(){
     function applyScale(){
       var pages=ctContent.querySelectorAll('.page');
       for(var i=0;i<pages.length;i++){
-        pages[i].style.zoom=scale;
+        pages[i].style.transform='scale('+scale+')';
+        pages[i].style.transformOrigin='top left';
       }
-    }
-    function visibleFirstPage(){
-      var arr=Array.prototype.slice.call(ctContent.querySelectorAll('.page'));
-      for(var i=0;i<arr.length;i++){ if(arr[i].style.display!=='none') return arr[i]; }
-      return arr[0]||null;
-    }
-    function computeFitScale(){
-      var page=visibleFirstPage();
-      if(!page)return 1;
-      var pz=page.style.zoom; page.style.zoom='';
-      var pageW=page.getBoundingClientRect().width;
-      page.style.zoom=pz;
-      var availW=ctContent.clientWidth;
-      if(!pageW||!availW)return 1;
-      var fit=availW/pageW;
-      return fit<1?fit:1;
-    }
-    function refitZoom(){
-      var fit=computeFitScale();
-      minScale=fit; maxScale=fit*3; scale=fit;
-      applyScale();
     }
     ctContent.addEventListener('touchstart',function(e){
       if(e.touches.length===2){
@@ -3174,14 +3153,12 @@ document.addEventListener('DOMContentLoaded',function(){
     ctContent.addEventListener('touchend',function(e){
       var now=Date.now();
       if(now-lastTap<300&&e.touches.length===0&&!pinching){
-        if(scale!==minScale){scale=minScale;applyScale();}
+        if(scale!==1){scale=1;applyScale();}
       }
       lastTap=now;
     });
     // 새 계약서/불러오기 시 줌 초기화용 전역 함수
-    window._resetZoom=refitZoom;
-    var _rzTimer;
-    window.addEventListener('resize',function(){clearTimeout(_rzTimer);_rzTimer=setTimeout(refitZoom,200);});
+    window._resetZoom=function(){scale=1;applyScale();};
   })();
 });
 
