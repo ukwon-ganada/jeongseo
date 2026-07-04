@@ -699,7 +699,8 @@ body.print-emulate td.js-case-edit{background:transparent!important;box-shadow:n
   html,body{background:#fff!important;width:210mm;height:auto;margin:0;padding:0;}
   .home-sidebar,.ct-sidebar,.ct-appbar,.overlay,.loading,.no-print{display:none!important;}
   #screen-home{display:none!important;}
-  #screen-contract{display:block!important;}
+  /* 계약서 화면이 '활성'일 때만 인쇄에 표시 (다른 서면 출력 시 계약서가 딸려 나오던 문제 방지) */
+  #screen-contract.active{display:block!important;}
   #screen-contract .ct-content{padding:0!important;margin:0!important;background:#fff!important;display:block!important;}
   /* 핀치줌 래퍼(zoom-wrap)가 축소 크기(예:390px)로 고정돼 인쇄 시 계약서를 밀어내/잘리게 하던 문제 차단 */
   #screen-contract .zoom-wrap{
