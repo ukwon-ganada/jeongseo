@@ -443,7 +443,7 @@ body.print-emulate td.js-case-edit{background:transparent!important;box-shadow:n
 
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 :root{
-  --font-body:'Malgun Gothic','맑은 고딕','Apple SD Gothic Neo','Noto Sans KR',sans-serif;
+  --font-body:'Noto Sans KR','Malgun Gothic','맑은 고딕','Apple SD Gothic Neo',sans-serif;
   --page-pad-x:18mm;
   --page-pad-top:12mm;
   --page-pad-bottom:10mm;

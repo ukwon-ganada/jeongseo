@@ -20,6 +20,10 @@
 <meta name="apple-mobile-web-app-title" content="JEONGSEO">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#1a2740">
+<!-- 계약서 본문 전용 폰트를 앱에 고정: 모든 기기(아이폰·PC·안드로이드)에서 동일하게 렌더 → 화면·기기 무관 A4 고정 양식 -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -1443,7 +1447,7 @@ function resetContract(){
 }
 
 /* ═══ Supabase 연동 ═══ */
-var APP_VERSION='v108';
+var APP_VERSION='v109';
 var SUPABASE_URL='https://nyjyemjsperpakrrgzcc.supabase.co';
 var SUPABASE_KEY='sb_publishable_QKl9MIt2_MflYnpN41VRvg_cNIAbYhU';
 var sb=null;
@@ -2697,6 +2701,8 @@ function buildFileName(){
   return name2.replace(/[\\\\/:*?"<>|]/g,'');
 }
 async function capturePages(){
+  // 캡처 전 계약서 폰트 로드 완료 보장 (미로드 시 기기 기본폰트로 캡처되어 잘림 발생)
+  try{ if(document.fonts){ await document.fonts.load("400 12pt 'Noto Sans KR'"); await document.fonts.load("700 12pt 'Noto Sans KR'"); if(document.fonts.ready){ await document.fonts.ready; } } }catch(e){}
   var pages=Array.prototype.slice.call(document.querySelectorAll('#ctContent .page')).filter(function(p){return p.style.display!=='none';});
   // 프린터 출력과 동일한 압축 레이아웃을 캡처에 적용 (잘림·모양차이 해결)
   document.body.classList.add('print-emulate');
@@ -2794,7 +2800,7 @@ async function capturePages(){
   return canvases;
 }
 async function doAction(type){
-  if(type==='print'){window.print();return;}
+  if(type==='print'){ try{ if(document.fonts){ await document.fonts.load("400 12pt 'Noto Sans KR'"); await document.fonts.load("700 12pt 'Noto Sans KR'"); if(document.fonts.ready){ await document.fonts.ready; } } }catch(e){} window.print(); return; }
   showLoading('이미지 생성 중...');
   try{
     var canvases=await capturePages();
