@@ -1346,32 +1346,21 @@ function showScreen(id){
   if(id==='screen-contract'&&window._resetZoom){setTimeout(window._resetZoom,60);}
 }
 
-/* ═══ 비밀번호 잠금 (계약서 목록 진입 시에만) ═══ */
-var APP_PASSWORD='7171';
+/* ═══ 직원 인증 (Supabase Auth · auth.js) ═══
+   예전의 '7171' 클라이언트 비밀번호는 소스만 봐도 뚫려 실제 잠금이 아니었다.
+   이제 로그인은 auth.js가 담당하고, DB는 RLS로 막혀 로그인 없이는 데이터를 못 읽는다.
+   아래 함수들은 기존 호출부(openContractList 등)와의 호환을 위해 auth 세션으로 위임한다. */
 function isUnlocked(){
-  try{return sessionStorage.getItem('js_unlocked')==='1';}catch(e){return false;}
+  return !!(window.jsAuth && window.jsAuth.hasSession());
 }
 function promptUnlock(){
-  var ls=document.getElementById('lockScreen'); if(ls)ls.style.display='flex';
-  var le=document.getElementById('lockError'); if(le)le.textContent='';
-  var li=document.getElementById('lockInput'); if(li){li.value='';setTimeout(function(){li.focus();},100);}
+  if(window.jsAuth) window.jsAuth.showLogin();
 }
 function closeUnlock(){
   var ls=document.getElementById('lockScreen'); if(ls)ls.style.display='none';
-  var li=document.getElementById('lockInput'); if(li)li.value='';
-  var le=document.getElementById('lockError'); if(le)le.textContent='';
 }
-function tryUnlock(){
-  var val=document.getElementById('lockInput').value;
-  if(val===APP_PASSWORD){
-    try{sessionStorage.setItem('js_unlocked','1');}catch(e){}
-    closeUnlock();
-    openContractList();
-  }else{
-    document.getElementById('lockError').textContent='비밀번호가 올바르지 않습니다.';
-    document.getElementById('lockInput').value='';
-  }
-}
+/* 구 잠금화면(#lockScreen)의 인라인 핸들러 호환용 — 실제 로그인 화면으로 안내 */
+function tryUnlock(){ if(window.jsAuth) window.jsAuth.showLogin(); }
 function goHome(){showScreen('screen-home');}
 function goContract(type){
   closeTypeSheet();
@@ -1443,7 +1432,7 @@ function resetContract(){
 }
 
 /* ═══ Supabase 연동 ═══ */
-var APP_VERSION='v114';
+var APP_VERSION='v115';
 var SUPABASE_URL='https://nyjyemjsperpakrrgzcc.supabase.co';
 var SUPABASE_KEY='sb_publishable_QKl9MIt2_MflYnpN41VRvg_cNIAbYhU';
 var sb=null;
@@ -1861,31 +1850,24 @@ async function initSignMode(token){
   }
   if(!client){setSignState('error','연결에 실패했습니다.\n잠시 후 링크를 다시 열어 주세요.');return;}
   try{
-    var res=await client.from('contracts').select('*').eq('sign_token',token).limit(1);
+    // RLS로 테이블 직접 접근은 막혀 있다 → 토큰을 서버에서 검증하는 함수(RPC)로만 그 한 건을 받는다.
+    // (열람 시각 기록도 이 함수 안에서 서버가 처리)
+    var res=await client.rpc('sign_fetch',{p_token:token,p_ua:(navigator.userAgent||'').slice(0,300)});
     if(res.error)throw res.error;
-    if(!res.data||res.data.length===0){
-      setSignState('error','유효하지 않은 링크입니다.');return;
+    var rec=res.data||null;
+    if(!rec||!rec.ok){
+      var reason=rec?rec.reason:'notfound';
+      if(reason==='expired'){
+        setSignState('error','만료된 링크입니다.\n서명 요청이 만료되었습니다 (96시간 경과).\n변호사에게 새 링크를 요청해 주세요.');
+      }else if(reason==='signed'){
+        setSignState('done','이미 서명이 완료되었습니다.\n감사합니다.');
+      }else{
+        setSignState('error','유효하지 않은 링크입니다.');
+      }
+      return;
     }
-    var rec=res.data[0];
-    // 만료 확인
-    if(rec.sign_expires_at&&new Date(rec.sign_expires_at).getTime()<Date.now()){
-      setSignState('error','만료된 링크입니다.\n서명 요청이 만료되었습니다 (96시간 경과).\n변호사에게 새 링크를 요청해 주세요.');return;
-    }
-    // 이미 서명 완료된 경우
-    if(rec.sign_status==='signed'&&rec.counterparty_signature){
-      setSignState('done','이미 서명이 완료되었습니다.\n감사합니다.');return;
-    }
-    signModeRecord=rec;
-    // 최초 접속 시각 기록 (한 번만) → "이 링크로 언제 처음 열람했다"는 증빙
-    if(!rec.accessed_at){
-      try{
-        var audit=rec.audit||{};
-        audit.accessed_ua=(navigator.userAgent||'').slice(0,300);
-        client.from('contracts').update({
-          accessed_at:new Date().toISOString(), audit:audit
-        }).eq('sign_token',token).then(function(){},function(){});
-      }catch(e){}
-    }
+    signModeRecord=rec;   // {ok, doc_type, case_num, case_name, court, client_name, form_data, sign_status, sign_expires_at, recipient_name}
+    signModeRecord.sign_token=token;   // 제출 때 다시 필요
     renderSignContract(rec);
     setSignState('ready','');
     setTimeout(initCpSignCanvas,100);
@@ -2065,49 +2047,35 @@ async function submitCounterpartySign(){
     var payer=gv3('sf-payer');if(payer!==undefined)newFd.data.payer=payer;
     var receipt=rv3('sf-receipt');if(receipt!==undefined)newFd.receipt=receipt;
 
-    // ── 무결성: 서명 시점 문서 스냅샷 + SHA-256 해시 고정 ──
-    var signedAt=new Date().toISOString();
-    var snapshot={
-      doc_type:signModeRecord.doc_type||'',
-      case_num:signModeRecord.case_num||'',
-      case_name:signModeRecord.case_name||'',
-      court:signModeRecord.court||'',
-      client_name:signModeRecord.client_name||'',
-      form_data:newFd,
-      signed_at:signedAt
-    };
-    var hashSource=buildSignPayloadForHash(signModeRecord, newFd);
-    var docHash=await sha256Hex(hashSource);
-
-    // ── 감사정보 병합 (발송·접속 기록 보존) ──
-    var audit=signModeRecord.audit||{};
-    audit.signed_at=signedAt;
-    audit.signed_ua=(navigator.userAgent||'').slice(0,300);
-    audit.consent=true;
-    audit.hash_algo='SHA-256';
     // 서명자가 본인확인용으로 직접 기재한 정보 (주민번호는 마스킹하여 기록)
-    audit.signer_tel=telVal;
     var ssnDigits=ssnVal.replace(/[^0-9]/g,'');
-    audit.signer_ssn_masked=ssnDigits.slice(0,6)+'-'+ssnDigits.slice(6,7)+'******';
+    var ssnMasked=ssnDigits.slice(0,6)+'-'+ssnDigits.slice(6,7)+'******';
 
-    var ur=await client.from('contracts').update({
-      counterparty_signature:sigData,
-      sign_status:'signed',
-      form_data:newFd,
-      signed_snapshot:snapshot,
-      signed_hash:docHash,
-      signed_at:signedAt,
-      consent_agreed:true,
-      audit:audit,
-      updated_at:signedAt
-    }).eq('sign_token',signModeRecord.sign_token);
-    if(ur.error)throw ur.error;
-    // 완료 화면으로 넘어가기 전에, 화면의 계약서 표를 저장용으로 스냅샷
+    // ── 서명 제출은 서버 함수(RPC)로만 ──
+    //  · RLS로 테이블 직접 update는 막혀 있음(익명 위조 방지)
+    //  · signed_at·signed_hash(무결성 지문)는 서버가 확정 → 클라이언트가 손댈 수 없음
+    //  · 이미 서명됐거나 만료된 토큰이면 서버가 거부
+    var sres=await client.rpc('sign_submit',{
+      p_token:signModeRecord.sign_token,
+      p_signature:sigData,
+      p_form_data:newFd,
+      p_signer_tel:telVal,
+      p_signer_ssn_masked:ssnMasked,
+      p_consent:true
+    });
+    if(sres.error)throw sres.error;
+    var out=sres.data||{};
+    if(!out.ok){
+      var rmsg=(out.reason==='expired')?'만료된 링크입니다.':(out.reason==='signed')?'이미 서명이 완료되었습니다.':'제출할 수 없습니다. 링크를 다시 확인해 주세요.';
+      btn.disabled=false;btn.textContent='서명 제출';
+      showToast(rmsg);return;
+    }
+    // 완료 화면으로 넘어가기 전에, 화면의 계약서 표를 저장용으로 스냅샷 (해시·시각은 서버 값 사용)
     window._signedInfo={
       docType:signModeRecord.doc_type||'형사',
       clientName:signModeRecord.client_name||(newFd.data&&newFd.data.name)||'',
-      signedAt:signedAt,
-      hash:docHash,
+      signedAt:out.signed_at||new Date().toISOString(),
+      hash:out.signed_hash||'',
       sigData:sigData,
       formData:newFd,
       docHtml:snapshotSignDocHtml()
@@ -4142,5 +4110,6 @@ document.getElementById('ap-host').addEventListener('click',function(e){
 <script src="./autofill.js"></script>
 <script src="./yeollam.js"></script>
 <script src="./home.js"></script>
+<script src="./auth.js"></script>
 </body>
 </html>
