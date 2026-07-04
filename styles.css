@@ -705,6 +705,12 @@ body.print-emulate td.js-case-edit{background:transparent!important;box-shadow:n
   #screen-home{display:none!important;}
   #screen-contract{display:block!important;}
   #screen-contract .ct-content{padding:0!important;margin:0!important;background:#fff!important;display:block!important;}
+  /* 핀치줌 래퍼(zoom-wrap)가 축소 크기(예:390px)로 고정돼 인쇄 시 계약서를 밀어내/잘리게 하던 문제 차단 */
+  #screen-contract .zoom-wrap{
+    width:auto!important;height:auto!important;
+    overflow:visible!important;transform:none!important;
+    display:block!important;margin:0!important;padding:0!important;
+  }
   #screen-contract .page{
     width:210mm!important;min-height:287mm!important;
     box-sizing:border-box!important;
@@ -753,6 +759,7 @@ body.print-emulate td.js-case-edit{background:transparent!important;box-shadow:n
    @media print 은 화면 캡처(html2canvas)에는 적용되지 않으므로, 동일 규칙을
    body.print-emulate 스코프로 복제해 캡처 직전에만 켠다. (프린터 출력 CSS와 동기화 유지 필요) */
 body.print-emulate #screen-contract .ct-content{padding:0!important;margin:0!important;background:#fff!important;display:block!important;}
+body.print-emulate #screen-contract .zoom-wrap{width:auto!important;height:auto!important;overflow:visible!important;transform:none!important;display:block!important;margin:0!important;padding:0!important;}
 body.print-emulate #screen-contract .page{
   width:210mm!important;min-height:287mm!important;
   box-sizing:border-box!important;
