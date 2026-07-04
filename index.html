@@ -1410,7 +1410,7 @@ function resetContract(){
 }
 
 /* ═══ Supabase 연동 ═══ */
-var APP_VERSION='v121';
+var APP_VERSION='v122';
 var SUPABASE_URL='https://nyjyemjsperpakrrgzcc.supabase.co';
 var SUPABASE_KEY='sb_publishable_QKl9MIt2_MflYnpN41VRvg_cNIAbYhU';
 var sb=null;
@@ -2614,10 +2614,38 @@ function buildFileName(){
   var name2=parts.join('_');
   return name2.replace(/[\\\\/:*?"<>|]/g,'');
 }
+/* iOS Safari 대응: html2canvas는 아이폰에서 '파일'로 로드된 웹폰트를 캡처 시 제대로 못 써
+   폴백 폰트(더 큼)로 렌더 → 페이지가 A4보다 길게 잡히고 PDF가 여러 장으로 쪼개짐.
+   해결: 캐시된 woff2를 base64 data URI @font-face로 '캡처용'으로 한 번 주입 + 글리프 예열.
+   (앱 CSS는 계속 파일 폰트라 가벼움을 유지하고, 이 주입은 첫 출력 때 1회만) */
+var _captureFontReady=false;
+async function ensureCaptureFont(){
+  try{
+    if(!_captureFontReady){
+      var toURI=function(url){ return fetch(url).then(function(r){return r.blob();}).then(function(b){
+        return new Promise(function(res,rej){ var fr=new FileReader(); fr.onload=function(){res(fr.result);}; fr.onerror=rej; fr.readAsDataURL(b); });
+      }); };
+      var d=await Promise.all([toURI('./fonts/NotoSansKR-400.woff2'), toURI('./fonts/NotoSansKR-500.woff2')]);
+      var css="@font-face{font-family:'Noto Sans KR';font-style:normal;font-weight:400;font-display:swap;src:url('"+d[0]+"') format('woff2');}"
+             +"@font-face{font-family:'Noto Sans KR';font-style:normal;font-weight:500;font-display:swap;src:url('"+d[1]+"') format('woff2');}"
+             +"@font-face{font-family:'Noto Sans KR';font-style:normal;font-weight:700;font-display:swap;src:url('"+d[1]+"') format('woff2');}";
+      var s=document.createElement('style'); s.id='capture-font-inline'; s.textContent=css; document.head.appendChild(s);
+      _captureFontReady=true;
+    }
+    if(document.fonts){
+      await document.fonts.load("400 12pt 'Noto Sans KR'");
+      await document.fonts.load("700 12pt 'Noto Sans KR'");
+      if(document.fonts.ready) await document.fonts.ready;
+    }
+    // 글리프 캐시 예열 (iOS가 첫 렌더에서 폴백 쓰는 레이스 방지)
+    var warm=document.createElement('canvas'); warm.width=8; warm.height=8;
+    var wx=warm.getContext('2d'); wx.font="12pt 'Noto Sans KR'"; wx.fillText('법가나다',0,10); wx.font="700 12pt 'Noto Sans KR'"; wx.fillText('법가나다',0,10);
+  }catch(e){}
+}
 async function capturePages(trimToContent){
   // trimToContent=true: 페이지를 A4 높이로 강제하지 않고 실제 내용 높이로만 캡처(이미지 저장 시 하단 여백 제거용)
-  // 캡처 전 계약서 폰트 로드 완료 보장 (미로드 시 기기 기본폰트로 캡처되어 잘림 발생)
-  try{ if(document.fonts){ await document.fonts.load("400 12pt 'Noto Sans KR'"); await document.fonts.load("700 12pt 'Noto Sans KR'"); if(document.fonts.ready){ await document.fonts.ready; } } }catch(e){}
+  // 캡처 전 계약서 폰트 로드·주입 완료 보장 (미로드 시 기기 기본폰트로 캡처되어 잘림 발생)
+  await ensureCaptureFont();
   var pages=Array.prototype.slice.call(document.querySelectorAll('#ctContent .page')).filter(function(p){return p.style.display!=='none';});
   // 프린터 출력과 동일한 압축 레이아웃을 캡처에 적용 (잘림·모양차이 해결)
   document.body.classList.add('print-emulate');
