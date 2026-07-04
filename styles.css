@@ -1,6 +1,10 @@
 /* 법무법인 정서 PWA - 메인 스타일시트
    index.html에서 분리 (2단계 CSS 분리). 디자인 수정은 이 파일에서. */
 
+/* 계약서 본문 전용 폰트를 앱에 내장(오프라인 지원): 모든 기기에서 동일 렌더 → A4 고정 양식 */
+@font-face{font-family:'Noto Sans KR';font-style:normal;font-weight:400;font-display:swap;src:url('./fonts/NotoSansKR-Regular.woff2') format('woff2');}
+@font-face{font-family:'Noto Sans KR';font-style:normal;font-weight:500;font-display:swap;src:url('./fonts/NotoSansKR-Bold.woff2') format('woff2');}
+@font-face{font-family:'Noto Sans KR';font-style:normal;font-weight:700;font-display:swap;src:url('./fonts/NotoSansKR-Bold.woff2') format('woff2');}
 /* UI 폰트: Pretendard 가변폰트 (앱 내장·오프라인 지원). 서면(명조·바탕)과는 별개 */
 @font-face{
   font-family:'Pretendard Variable';
@@ -604,16 +608,7 @@ body.print-emulate td.js-case-edit{background:transparent!important;box-shadow:n
 .firm-lawyers{font-size:8pt;}
 
 /* ── 모바일 ── */
-@media screen and (max-width:740px){
-  
-  .page{width:100%;height:auto;min-height:100vh;box-shadow:none;padding:6vw 5vw 10vw;margin-bottom:0;}
-  .doc-title{font-size:5.2vw;}
-  .info-table td,.th-cell,.th-sub,.val-cell{font-size:2.8vw;}
-  .scope-item,.fee-row td,.receipt-row{font-size:2.8vw;}
-  .contract-intro,.article-block,.article-indent,.article-indent2,.special-note,.special-body{font-size:2.8vw;}
-  .sign-date{font-size:2.8vw;}
-  .date-input{font-size:2.8vw;width:6vw;}
-}
+/* 계약서는 화면 크기와 무관하게 항상 A4 고정. 화면에서는 zoom scale로 축소 표시(출력≠화면 분리) */
 
 /* ── 인쇄 ── */
 
