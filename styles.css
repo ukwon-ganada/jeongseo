@@ -1087,3 +1087,13 @@ body.contract-locked .ct-bb-sign{pointer-events:none;background:#e8f5ec!importan
 /* ═══ 계약서 화면맞춤: 창틀(wrapper) — 원본 서면은 그대로, 겉보기만 축소 (v104) ═══ */
 .zoom-wrap{overflow:hidden;margin:0 auto 12px;}
 .zoom-wrap>.page{margin:0!important;}
+
+/* ═══ 주소 검색 오버레이 (팝업 대신 앱 안에 삽입 · 닫기 버튼) (v106) ═══ */
+#addrSearchOverlay{display:none;position:fixed;inset:0;z-index:2000;background:#fff;flex-direction:column;}
+#addrSearchOverlay.active{display:flex;}
+.addr-head{display:flex;align-items:center;gap:10px;padding:0 12px;height:56px;border-bottom:0.5px solid var(--border);flex-shrink:0;}
+.addr-close{width:40px;height:40px;border:none;background:none;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:var(--r-pill);flex-shrink:0;}
+.addr-close:active{background:var(--gray-100);}
+.addr-close svg{width:24px;height:24px;stroke:var(--black);}
+.addr-title{font-size:17px;font-weight:600;}
+.addr-embed{flex:1;min-height:0;overflow:hidden;}

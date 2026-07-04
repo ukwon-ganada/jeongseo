@@ -950,6 +950,14 @@
   </div>
 </div>
 
+<div id="addrSearchOverlay" class="addr-overlay">
+  <div class="addr-head">
+    <button class="addr-close" onclick="closeAddrSearch()" aria-label="닫기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    <div class="addr-title">주소 검색</div>
+  </div>
+  <div id="addrSearchEmbed" class="addr-embed"></div>
+</div>
+
 <div id="formSheet">
   <div class="fs-head">
     <button class="fs-close" onclick="closeFormSheet()" aria-label="닫기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
@@ -1435,7 +1443,7 @@ function resetContract(){
 }
 
 /* ═══ Supabase 연동 ═══ */
-var APP_VERSION='v105';
+var APP_VERSION='v106';
 var SUPABASE_URL='https://nyjyemjsperpakrrgzcc.supabase.co';
 var SUPABASE_KEY='sb_publishable_QKl9MIt2_MflYnpN41VRvg_cNIAbYhU';
 var sb=null;
@@ -2961,11 +2969,21 @@ function applyLiveFormat(el,fmtFn){
 }
 
 /* 카카오 우편번호 주소 검색 */
+function closeAddrSearch(){
+  var ov=document.getElementById('addrSearchOverlay');
+  if(ov)ov.classList.remove('active');
+  var box=document.getElementById('addrSearchEmbed');
+  if(box)box.innerHTML='';
+}
 function openAddressSearch(targetInputId,onPicked){
   if(typeof daum==='undefined'||!daum.Postcode){
     showToast('주소 검색을 불러오는 중입니다. 잠시 후 다시 시도해 주세요');
     return;
   }
+  var ov=document.getElementById('addrSearchOverlay');
+  var box=document.getElementById('addrSearchEmbed');
+  box.innerHTML='';
+  ov.classList.add('active');
   new daum.Postcode({
     oncomplete:function(d){
       // 도로명 주소 우선, 없으면 지번
@@ -2976,8 +2994,11 @@ function openAddressSearch(targetInputId,onPicked){
       if(d.buildingName&&d.apartment==='Y')extra+=(extra?', ':'')+d.buildingName;
       if(extra)addr+=' ('+extra+')';
       onPicked(addr);
-    }
-  }).open();
+      closeAddrSearch();
+    },
+    width:'100%',
+    height:'100%'
+  }).embed(box);
 }
 
 /* 통합폼 주소 검색 */
