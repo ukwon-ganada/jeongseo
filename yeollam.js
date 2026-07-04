@@ -29,16 +29,9 @@
   ];
   var TARGET_DEFAULT = '증거기록, 소송기록 일체, 미디어파일 일체(CD 등)';
 
-  /* ── 작은 도우미 ──────────────────────────────────── */
-  function esc(v) {
-    return ('' + (v == null ? '' : v))
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  }
-  function todayISO() {
-    var t = new Date();
-    return t.getFullYear() + '-' + ('0' + (t.getMonth() + 1)).slice(-2) + '-' + ('0' + t.getDate()).slice(-2);
-  }
+  /* ── 작은 도우미 (공용 util.js 위임) ──────────────── */
+  function esc(v) { return JU.esc(v); }
+  function todayISO() { return JU.todayISO(); }
   // 'YYYY-MM-DD' → 'YYYY년 M월 D일'
   function fmtKDate(iso) {
     var m = ('' + (iso || '')).match(/(\d{4})-(\d{1,2})-(\d{1,2})/);

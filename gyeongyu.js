@@ -9,13 +9,9 @@ function gyExtractBirth(ssn){
   var d=(''+ssn).replace(/[^0-9]/g,'');
   return d.length>=6 ? d.slice(0,6) : d;
 }
-function gyToday(){
-  var t=new Date();
-  return t.getFullYear()+'-'+('0'+(t.getMonth()+1)).slice(-2)+'-'+('0'+t.getDate()).slice(-2);
-}
-function gyEsc(v){
-  return (''+(v==null?'':v)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
+/* 공용 util.js 위임 (중복 제거) */
+function gyToday(){ return JU.todayISO(); }
+function gyEsc(v){ return JU.esc(v); }
 function openGyeongyu(){
   var s=sjState();
   var clients=(s.clients||[]).filter(function(c){return c.name&&c.name.trim();});

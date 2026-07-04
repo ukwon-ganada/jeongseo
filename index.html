@@ -38,24 +38,7 @@
   </div>
 </div>
 
-<div id="lockScreen" style="position:fixed;inset:0;z-index:9999;background:#fff;display:none;flex-direction:column;align-items:center;justify-content:center;padding:24px;">
-  <div style="width:100%;max-width:320px;text-align:center;">
-    <div style="font-size:24px;font-weight:700;letter-spacing:-0.01em;margin-bottom:6px;">법무법인 정서</div>
-    <div style="font-size:13px;color:#aaa;margin-bottom:32px;">접근하려면 비밀번호를 입력하세요</div>
-    <input type="password" id="lockInput" placeholder="비밀번호" autocomplete="off"
-      style="width:100%;height:52px;border:1px solid #bbbbbb;border-radius:999px;padding:0 20px;font-size:15px;font-family:inherit;outline:none;background:#f9f9f9;text-align:center;"
-      onkeydown="if(event.key==='Enter')tryUnlock()">
-    <div id="lockError" style="font-size:12px;color:#c0392b;margin-top:10px;height:16px;"></div>
-    <button onclick="tryUnlock()"
-      style="width:100%;height:52px;margin-top:14px;background:#1a1a1a;color:#fff;border:none;border-radius:999px;font-size:15px;font-weight:600;font-family:inherit;cursor:pointer;">
-      입장하기
-    </button>
-    <button onclick="closeUnlock()"
-      style="width:100%;height:46px;margin-top:10px;background:transparent;color:#999;border:none;font-size:14px;font-family:inherit;cursor:pointer;">
-      취소
-    </button>
-  </div>
-</div>
+<!-- (옛 비밀번호 잠금화면 #lockScreen 제거됨 — 이제 로그인은 auth.js가 담당) -->
 
 <div id="signModeScreen" style="display:none;">
   <div class="sign-mode-header">
@@ -1356,11 +1339,6 @@ function isUnlocked(){
 function promptUnlock(){
   if(window.jsAuth) window.jsAuth.showLogin();
 }
-function closeUnlock(){
-  var ls=document.getElementById('lockScreen'); if(ls)ls.style.display='none';
-}
-/* 구 잠금화면(#lockScreen)의 인라인 핸들러 호환용 — 실제 로그인 화면으로 안내 */
-function tryUnlock(){ if(window.jsAuth) window.jsAuth.showLogin(); }
 function goHome(){showScreen('screen-home');}
 function goContract(type){
   closeTypeSheet();
@@ -1432,7 +1410,7 @@ function resetContract(){
 }
 
 /* ═══ Supabase 연동 ═══ */
-var APP_VERSION='v118';
+var APP_VERSION='v119';
 var SUPABASE_URL='https://nyjyemjsperpakrrgzcc.supabase.co';
 var SUPABASE_KEY='sb_publishable_QKl9MIt2_MflYnpN41VRvg_cNIAbYhU';
 var sb=null;
@@ -1811,8 +1789,7 @@ function getQueryParam(name){
 }
 var signModeRecord=null;
 async function initSignMode(token){
-  // 잠금화면 숨기고 서명 화면 컨테이너 표시
-  var lock=document.getElementById('lockScreen');if(lock)lock.style.display='none';
+  // 서명 화면 컨테이너 표시 (auth.js는 ?sign= 링크에선 로그인 화면을 띄우지 않음)
   document.getElementById('signModeScreen').style.display='flex';
   stampVersion();
   setSignState('loading','계약서를 불러오는 중입니다...');
@@ -4079,6 +4056,7 @@ document.getElementById('ap-host').addEventListener('click',function(e){
   </div>
 </div>
 
+<script src="./util.js"></script>
 <script src="./gyeongyu.js"></script>
 <script src="./autofill.js"></script>
 <script src="./yeollam.js"></script>
