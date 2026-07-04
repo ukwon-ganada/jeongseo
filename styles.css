@@ -872,6 +872,34 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
 .fs-addr-search svg{width:18px;height:18px;flex-shrink:0;color:var(--gray-500);}
 .fs-addr-search.filled{color:var(--black);background:#fff;border-color:var(--black);}
 
+/* ═══ 계약서 입력 폼 — iOS 설정 스타일 카드 그룹 ═══ */
+#formSheet .fs-body{background:var(--gray-100);}
+.fs-done-pill{flex-shrink:0;font-size:14px;font-weight:600;color:#fff;background:var(--hero);border:none;padding:8px 16px;border-radius:var(--r-pill);cursor:pointer;font-family:var(--font);}
+.fs-done-pill:active{opacity:0.85;}
+.fs-group{background:#fff;border-radius:14px;margin-bottom:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.04);}
+.fs-group .fs-field{margin-bottom:0;padding:12px 16px;border-bottom:0.5px solid var(--gray-100);}
+.fs-group .fs-field:last-child{border-bottom:none;}
+.fs-group .fs-row2{display:flex;gap:0;}
+.fs-group .fs-row2>.fs-field{flex:1;border-bottom:none;}
+.fs-group .fs-row2>.fs-field+.fs-field{border-left:0.5px solid var(--gray-100);}
+/* 어두운 의뢰인 구역 */
+.fs-client-zone{background:var(--gray-200);margin:26px -18px 0;padding:4px 18px 22px;}
+.fs-zone-cap{font-size:12px;color:var(--gray-500);font-weight:600;padding:18px 6px 2px;}
+.fs-client-zone .fs-group{background:#fbfbfd;border:0.5px solid #d0d0d6;box-shadow:none;}
+/* 착수금·2차보수 + VAT 한 줄 */
+.fs-fee-line{display:flex;align-items:center;gap:10px;margin-top:6px;}
+.fs-fee-line .fs-input{flex:1;margin:0;}
+/* VAT 토글 (포함=남색 / 별도=빨강) */
+.fs-radio.fs-vat{flex:0 0 auto;text-align:center;font-size:12px;font-weight:600;padding:9px 14px;border-radius:var(--r-pill);color:#fff;border:none;white-space:nowrap;cursor:pointer;transition:background 0.15s;}
+.fs-radio.fs-vat.vat-inc{background:var(--hero);}
+.fs-radio.fs-vat.vat-exc{background:var(--danger);}
+/* 심급 서브칩 (1·2·3심) */
+.fs-subchips{display:flex;gap:7px;}
+.fs-subchip{padding:6px 15px;border-radius:var(--r-pill);font-size:12.5px;background:#fff;border:1px solid var(--border);color:var(--hero);cursor:pointer;transition:all 0.15s;}
+.fs-subchip.on{background:var(--gray-100);border-color:var(--hero);font-weight:600;}
+/* 입금계좌 안 잘리게 */
+.fs-acct{width:100%;}
+
 /* ═══ 서명 링크 시트 ═══ */
 .sl-overlay{display:none;position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;padding:20px;}
 .sl-overlay.active{display:flex;}

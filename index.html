@@ -936,88 +936,74 @@
   <div class="fs-head">
     <button class="fs-close" onclick="closeFormSheet()" aria-label="닫기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     <div class="fs-title">계약서 정보 입력</div>
+    <button class="fs-done-pill" onclick="applyFormSheet()">완료</button>
   </div>
   <div class="fs-body">
-    <div class="fs-section">위임인 정보</div>
-    <div class="fs-field"><label class="fs-label">의뢰인명</label><input type="text" class="fs-input" id="f-name" placeholder="홍길동"></div>
-    <div class="fs-field"><label class="fs-label">연락처</label><input type="text" class="fs-input" id="f-tel" placeholder="010-0000-0000" inputmode="tel" oninput="applyLiveFormat(this,formatPhone)"></div>
-    <div class="fs-field"><label class="fs-label">주민등록번호</label><input type="text" class="fs-input" id="f-ssn" placeholder="000000-0000000" inputmode="numeric" oninput="applyLiveFormat(this,formatSSN)"></div>
-    <div class="fs-field"><label class="fs-label">주소</label>
-      <div class="fs-addr-search" onclick="searchAddrForm()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><span id="f-addr-road-label">도로명·건물명으로 주소 검색</span></div>
-      <input type="text" class="fs-input" id="f-addr-detail" placeholder="상세주소 (동·호수 등)" style="margin-top:8px;display:none;" oninput="combineAddrForm()">
-      <input type="hidden" id="f-addr-road">
-      <input type="hidden" id="f-addr">
+    <!-- ═══ 핵심 구역: 변호사가 발송 전 입력 (제목 없이 카드만) ═══ -->
+    <!-- 의뢰인명 + 사건명 (한 줄) -->
+    <div class="fs-group">
+      <div class="fs-row2">
+        <div class="fs-field"><label class="fs-label">의뢰인명</label><input type="text" class="fs-input" id="f-name" placeholder="홍길동"></div>
+        <div class="fs-field"><label class="fs-label">사건명</label><input type="text" class="fs-input" id="f-casename" placeholder="사기"></div>
       </div>
-    <div class="fs-field"><label class="fs-label">이메일</label><input type="text" class="fs-input" id="f-email" placeholder="email@example.com" inputmode="email"></div>
-      <div class="civil-only-field" style="display:none;">
-        <div class="fs-section-label" style="font-weight:700;font-size:12px;color:var(--gray-500);margin:14px 0 6px;">상대방 정보</div>
-        <div class="fs-field"><label class="fs-label">상대방 성명</label><input type="text" class="fs-input" id="f-oppName" placeholder="상대방 성명"></div>
-        <div class="fs-field"><label class="fs-label">상대방 연락처</label><input type="text" class="fs-input" id="f-oppTel" placeholder="010-0000-0000" inputmode="tel" oninput="applyLiveFormat(this,formatPhone)"></div>
-        <div class="fs-field"><label class="fs-label">상대방 주민번호</label><input type="text" class="fs-input" id="f-oppSsn" placeholder="000000-0000000" inputmode="numeric" oninput="applyLiveFormat(this,formatSSN)"></div>
-        <div class="fs-field"><label class="fs-label">상대방 주소</label>
-          <div class="fs-addr-search" onclick="searchOppAddrForm()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><span id="f-oppAddr-road-label">도로명·건물명으로 주소 검색</span></div>
-          <input type="text" class="fs-input" id="f-oppAddr-detail" placeholder="상세주소 (동·호수 등)" style="margin-top:8px;display:none;" oninput="combineOppAddrForm()">
-          <input type="hidden" id="f-oppAddr-road">
-          <input type="hidden" id="f-oppAddr">
+    </div>
+
+    <!-- 업무 범위 -->
+    <div class="fs-group">
+      <div class="fs-field criminal-scope-field">
+        <div class="fs-chips">
+          <div class="fs-chip" data-chip="police" onclick="toggleChip(this)">수사(경찰)</div>
+          <div class="fs-chip" data-chip="prosecution" onclick="toggleChip(this)">수사(검찰)</div>
+          <div class="fs-chip" data-chip="warrant" onclick="toggleChip(this)">영장심사</div>
+          <div class="fs-chip" data-chip="trial" onclick="toggleChip(this)">재판</div>
+          <div class="fs-chip" data-chip="other" onclick="toggleChip(this)">기타</div>
         </div>
       </div>
-
-    <div class="fs-section">사건 정보</div>
-    <div class="fs-row2">
-      <div class="fs-field"><label class="fs-label">사건번호</label><input type="text" class="fs-input" id="f-casenum" placeholder="2026고단1234"></div>
-      <div class="fs-field"><label class="fs-label">관할 법원</label><input type="text" class="fs-input" id="f-court" placeholder="인천지방법원"></div>
-    </div>
-    <div class="fs-field"><label class="fs-label">사건명</label><input type="text" class="fs-input" id="f-casename" placeholder="사기"></div>
-
-    <div class="fs-section">업무 범위</div>
-    <div class="fs-field criminal-scope-field">
-      <div class="fs-chips">
-        <div class="fs-chip" data-chip="police" onclick="toggleChip(this)">수사(경찰)</div>
-        <div class="fs-chip" data-chip="prosecution" onclick="toggleChip(this)">수사(검찰)</div>
-        <div class="fs-chip" data-chip="warrant" onclick="toggleChip(this)">영장심사</div>
-        <div class="fs-chip" data-chip="trial" onclick="toggleChip(this)">재판</div>
-        <div class="fs-chip" data-chip="other" onclick="toggleChip(this)">기타</div>
+      <div class="fs-field civil-scope-field" style="display:none;">
+        <div class="fs-chips">
+          <div class="fs-chip" data-chip="cvtrial" onclick="toggleChip(this)">본소 (심급)</div>
+          <div class="fs-chip" data-chip="cvmediation" onclick="toggleChip(this)">조정</div>
+          <div class="fs-chip" data-chip="cvpreserve" onclick="toggleChip(this)">보전처분</div>
+          <div class="fs-chip" data-chip="cvother" onclick="toggleChip(this)">기타</div>
+        </div>
       </div>
-    </div>
-    <div class="fs-field civil-scope-field" style="display:none;">
-      <div class="fs-chips">
-        <div class="fs-chip" data-chip="cvtrial" onclick="toggleChip(this)">본소 (심급)</div>
-        <div class="fs-chip" data-chip="cvmediation" onclick="toggleChip(this)">조정</div>
-        <div class="fs-chip" data-chip="cvpreserve" onclick="toggleChip(this)">보전처분</div>
-        <div class="fs-chip" data-chip="cvother" onclick="toggleChip(this)">기타</div>
+      <div class="fs-field family-scope-field" style="display:none;">
+        <div class="fs-chips">
+          <div class="fs-chip" data-chip="fmtrial" onclick="toggleChip(this)">본소(및 반소)</div>
+          <div class="fs-chip" data-chip="fmmediation" onclick="toggleChip(this)">조정</div>
+          <div class="fs-chip" data-chip="fmpresolve" onclick="toggleChip(this)">사전처분</div>
+          <div class="fs-chip" data-chip="fmpreserve" onclick="toggleChip(this)">보전처분</div>
+          <div class="fs-chip" data-chip="fmother" onclick="toggleChip(this)">기타</div>
+        </div>
       </div>
-    </div>
-    <div class="fs-field family-scope-field" style="display:none;">
-      <div class="fs-chips">
-        <div class="fs-chip" data-chip="fmtrial" onclick="toggleChip(this)">본소(및 반소)</div>
-        <div class="fs-chip" data-chip="fmmediation" onclick="toggleChip(this)">조정</div>
-        <div class="fs-chip" data-chip="fmpresolve" onclick="toggleChip(this)">사전처분</div>
-        <div class="fs-chip" data-chip="fmpreserve" onclick="toggleChip(this)">보전처분</div>
-        <div class="fs-chip" data-chip="fmother" onclick="toggleChip(this)">기타</div>
+      <!-- 재판 계열 선택 시 나타나는 1·2·3심 (선택값은 숨은 f-trial 에 저장) -->
+      <div class="fs-field fs-trial-field" id="fs-trial-field" style="display:none;margin-top:2px;">
+        <div class="fs-subchips">
+          <div class="fs-subchip" data-trial="1" onclick="pickTrial(this)">1심</div>
+          <div class="fs-subchip" data-trial="2" onclick="pickTrial(this)">2심</div>
+          <div class="fs-subchip" data-trial="3" onclick="pickTrial(this)">3심</div>
+        </div>
+        <input type="hidden" id="f-trial">
       </div>
-    </div>
-    <div class="fs-row2">
-      <div class="fs-field"><label class="fs-label">본소 심급</label><input type="text" class="fs-input" id="f-trial" placeholder="1"></div>
       <div class="fs-field"><label class="fs-label">기타 내용</label><input type="text" class="fs-input" id="f-other" placeholder="기타 업무"></div>
     </div>
 
-    <div class="fs-section">수임 조건</div>
-    <div class="fs-field">
-      <label class="fs-label">착수금 (만원)</label>
-      <input type="text" class="fs-input" id="f-fee1" placeholder="0" inputmode="numeric">
-      <div class="fs-radiogroup" style="margin-top:8px;">
-        <div class="fs-radio" data-radio="vat1" data-val="포함" onclick="pickRadio(this)">VAT 포함</div>
-        <div class="fs-radio" data-radio="vat1" data-val="별도" onclick="pickRadio(this)">VAT 별도</div>
+    <!-- 수임 조건 (착수금 · 2차보수 · 성공보수) -->
+    <div class="fs-group">
+      <div class="fs-field fs-fee-row">
+        <label class="fs-label">착수금 (만원)</label>
+        <div class="fs-fee-line">
+          <input type="text" class="fs-input" id="f-fee1" placeholder="0" inputmode="numeric">
+          <div class="fs-vat fs-radio on vat-inc" id="vat1-toggle" data-radio="vat1" data-val="포함" onclick="toggleVat(this)">VAT 포함</div>
+        </div>
       </div>
-    </div>
-    <div class="criminal-only-field"><div class="fs-field">
-      <label class="fs-label">2차 보수 (만원)</label>
-      <input type="text" class="fs-input" id="f-fee2" placeholder="0" inputmode="numeric">
-      <div class="fs-radiogroup" style="margin-top:8px;">
-        <div class="fs-radio" data-radio="vat2" data-val="포함" onclick="pickRadio(this)">VAT 포함</div>
-        <div class="fs-radio" data-radio="vat2" data-val="별도" onclick="pickRadio(this)">VAT 별도</div>
-      </div>
-    </div></div>
+      <div class="criminal-only-field"><div class="fs-field fs-fee-row">
+        <label class="fs-label">2차 보수 (만원)</label>
+        <div class="fs-fee-line">
+          <input type="text" class="fs-input" id="f-fee2" placeholder="0" inputmode="numeric">
+          <div class="fs-vat fs-radio on vat-inc" id="vat2-toggle" data-radio="vat2" data-val="포함" onclick="toggleVat(this)">VAT 포함</div>
+        </div>
+      </div></div>
       <div class="civil-only-field" style="display:none;">
         <div class="fs-field">
           <label class="fs-label">성공보수 (%)</label>
@@ -1025,33 +1011,86 @@
           <div class="fs-hint">경제적 이익가액의 몇 %인지 입력 (부가세 별도)</div>
         </div>
       </div>
+    </div>
 
-    <div class="fs-section">계산서 · 입금</div>
-    <div class="fs-field">
-      <label class="fs-label">계산서 발행</label>
-      <div class="fs-radiogroup">
-        <div class="fs-radio" data-radio="receipt" data-val="현금영수증" onclick="pickRadio(this)">현금영수증</div>
-        <div class="fs-radio" data-radio="receipt" data-val="세금계산서" onclick="pickRadio(this)">세금계산서</div>
+    <!-- 특약 -->
+    <div class="fs-group">
+      <div class="fs-field"><textarea class="fs-input" id="f-special" placeholder="특약사항이 있으면 입력하세요"></textarea></div>
+    </div>
+
+    <!-- 입금계좌 -->
+    <div class="fs-group">
+      <div class="fs-field">
+        <label class="fs-label">입금 계좌</label>
+        <select class="fs-input fs-acct" id="f-account">
+          <option value="smg">새마을금고 9002-2057-8814-5 (법무법인 정서)</option>
+          <option value="hana">하나은행 748-910745-40207 (서고은)</option>
+        </select>
       </div>
     </div>
-    <div class="fs-field"><label class="fs-label">입금자명</label><input type="text" class="fs-input" id="f-payer" placeholder="입금자명"></div>
-    <div class="fs-field">
-      <label class="fs-label">입금 계좌</label>
-      <select class="fs-input" id="f-account">
-        <option value="smg">새마을금고 9002-2057-8814-5 (법무법인 정서)</option>
-        <option value="hana">하나은행 748-910745-40207 (서고은)</option>
-      </select>
+
+    <!-- ═══ 어두운 구역: 의뢰인이 계약서 작성 시 채우는 정보 ═══ -->
+    <div class="fs-client-zone">
+      <div class="fs-zone-cap">사건 상세 · 위임인 정보</div>
+
+      <!-- 사건번호 + 관할 (한 줄) -->
+      <div class="fs-group">
+        <div class="fs-row2">
+          <div class="fs-field"><label class="fs-label">사건번호</label><input type="text" class="fs-input" id="f-casenum" placeholder="2026고단1234"></div>
+          <div class="fs-field"><label class="fs-label">관할</label><input type="text" class="fs-input" id="f-court" placeholder="인천지방법원"></div>
+        </div>
+      </div>
+
+      <!-- 위임인 정보 -->
+      <div class="fs-group">
+        <div class="fs-field"><label class="fs-label">연락처</label><input type="text" class="fs-input" id="f-tel" placeholder="010-0000-0000" inputmode="tel" oninput="applyLiveFormat(this,formatPhone)"></div>
+        <div class="fs-field"><label class="fs-label">주민등록번호</label><input type="text" class="fs-input" id="f-ssn" placeholder="000000-0000000" inputmode="numeric" oninput="applyLiveFormat(this,formatSSN)"></div>
+        <div class="fs-field"><label class="fs-label">주소</label>
+          <div class="fs-addr-search" onclick="searchAddrForm()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><span id="f-addr-road-label">도로명·건물명으로 주소 검색</span></div>
+          <input type="text" class="fs-input" id="f-addr-detail" placeholder="상세주소 (동·호수 등)" style="margin-top:8px;display:none;" oninput="combineAddrForm()">
+          <input type="hidden" id="f-addr-road">
+          <input type="hidden" id="f-addr">
+        </div>
+        <div class="fs-field"><label class="fs-label">이메일</label><input type="text" class="fs-input" id="f-email" placeholder="email@example.com" inputmode="email"></div>
+      </div>
+
+      <!-- 민사 전용: 상대방 정보 -->
+      <div class="civil-only-field" style="display:none;">
+        <div class="fs-group">
+          <div class="fs-field"><label class="fs-label">상대방 성명</label><input type="text" class="fs-input" id="f-oppName" placeholder="상대방 성명"></div>
+          <div class="fs-field"><label class="fs-label">상대방 연락처</label><input type="text" class="fs-input" id="f-oppTel" placeholder="010-0000-0000" inputmode="tel" oninput="applyLiveFormat(this,formatPhone)"></div>
+          <div class="fs-field"><label class="fs-label">상대방 주민번호</label><input type="text" class="fs-input" id="f-oppSsn" placeholder="000000-0000000" inputmode="numeric" oninput="applyLiveFormat(this,formatSSN)"></div>
+          <div class="fs-field"><label class="fs-label">상대방 주소</label>
+            <div class="fs-addr-search" onclick="searchOppAddrForm()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><span id="f-oppAddr-road-label">도로명·건물명으로 주소 검색</span></div>
+            <input type="text" class="fs-input" id="f-oppAddr-detail" placeholder="상세주소 (동·호수 등)" style="margin-top:8px;display:none;" oninput="combineOppAddrForm()">
+            <input type="hidden" id="f-oppAddr-road">
+            <input type="hidden" id="f-oppAddr">
+          </div>
+        </div>
+      </div>
+
+      <!-- 계산서 + 입금자 (한 줄) -->
+      <div class="fs-group">
+        <div class="fs-field">
+          <label class="fs-label">계산서 발행</label>
+          <div class="fs-radiogroup">
+            <div class="fs-radio" data-radio="receipt" data-val="현금영수증" onclick="pickRadio(this)">현금영수증</div>
+            <div class="fs-radio" data-radio="receipt" data-val="세금계산서" onclick="pickRadio(this)">세금계산서</div>
+          </div>
+        </div>
+        <div class="fs-field"><label class="fs-label">입금자명</label><input type="text" class="fs-input" id="f-payer" placeholder="입금자명"></div>
+      </div>
+
+      <!-- 작성일 -->
+      <div class="fs-group">
+        <div class="fs-row2">
+          <div class="fs-field"><label class="fs-label">월</label><input type="text" class="fs-input" id="f-month" inputmode="numeric"></div>
+          <div class="fs-field"><label class="fs-label">일</label><input type="text" class="fs-input" id="f-day" inputmode="numeric"></div>
+        </div>
+      </div>
     </div>
 
-    <div class="fs-section">기타 특약</div>
-    <div class="fs-field"><textarea class="fs-input" id="f-special" placeholder="특약사항이 있으면 입력하세요"></textarea></div>
-
-    <div class="fs-section">작성일</div>
-    <div class="fs-row2">
-      <div class="fs-field"><label class="fs-label">월</label><input type="text" class="fs-input" id="f-month" inputmode="numeric"></div>
-      <div class="fs-field"><label class="fs-label">일</label><input type="text" class="fs-input" id="f-day" inputmode="numeric"></div>
-    </div>
-    <div class="fs-hint">완료를 누르면 입력한 내용이 계약서에 채워집니다. 서명은 계약서 화면에서 직접 하시면 됩니다.</div>
+    <div class="fs-hint">위쪽 핵심 정보만 채우고 발송하면, 어두운 구역은 의뢰인이 계약서를 작성하며 입력합니다.</div>
   </div>
   <div class="fs-foot">
     <button class="fs-btn ghost" onclick="closeFormSheet()">취소</button>
@@ -1381,7 +1420,7 @@ function resetContract(){
 }
 
 /* ═══ Supabase 연동 ═══ */
-var APP_VERSION='v99';
+var APP_VERSION='v100';
 var SUPABASE_URL='https://nyjyemjsperpakrrgzcc.supabase.co';
 var SUPABASE_KEY='sb_publishable_QKl9MIt2_MflYnpN41VRvg_cNIAbYhU';
 var sb=null;
@@ -2449,6 +2488,10 @@ function openFormSheet(){
     setChipState('fmother',gvc('fm-chk-other'));
   }
   document.getElementById('f-trial').value=vv('inp-trial');
+  (function(){var tv=document.getElementById('f-trial').value;
+    document.querySelectorAll('.fs-subchip[data-trial]').forEach(function(s){s.classList.toggle('on',s.getAttribute('data-trial')===tv);});
+    if(typeof updateTrialVis==='function')updateTrialVis();
+  })();
   document.getElementById('f-other').value=vv('inp-other');
   // 수임조건
   document.getElementById('f-fee1').value=vv('inp-fee1');
@@ -2471,7 +2514,28 @@ function setChipState(chipKey,on){
   if(c){if(on)c.classList.add('on');else c.classList.remove('on');}
 }
 function gvc(id){var e=document.getElementById(id);return e?!!e.checked:false;}
-function toggleChip(el){el.classList.toggle('on');}
+function toggleChip(el){el.classList.toggle('on');updateTrialVis();}
+function updateTrialVis(){
+  var on=false;
+  ['trial','cvtrial','fmtrial'].forEach(function(c){
+    var chip=document.querySelector('.fs-chip[data-chip="'+c+'"]');
+    if(chip&&chip.classList.contains('on')&&chip.offsetParent!==null)on=true;
+  });
+  var tf=document.getElementById('fs-trial-field');
+  if(tf)tf.style.display=on?'':'none';
+}
+function pickTrial(el){
+  document.querySelectorAll('.fs-subchip[data-trial]').forEach(function(s){s.classList.remove('on');});
+  el.classList.add('on');
+  var t=document.getElementById('f-trial');if(t)t.value=el.getAttribute('data-trial');
+}
+function toggleVat(el){
+  var next=el.getAttribute('data-val')==='포함'?'별도':'포함';
+  el.setAttribute('data-val',next);
+  el.textContent='VAT '+next;
+  el.classList.toggle('vat-exc',next==='별도');
+  el.classList.toggle('vat-inc',next==='포함');
+}
 function pickRadio(el){
   var name=el.getAttribute('data-radio');
   document.querySelectorAll('.fs-radio[data-radio="'+name+'"]').forEach(function(r){r.classList.remove('on');});
@@ -2479,7 +2543,13 @@ function pickRadio(el){
 }
 function setRadioUI(name,val){
   document.querySelectorAll('.fs-radio[data-radio="'+name+'"]').forEach(function(r){
-    if(r.getAttribute('data-val')===val)r.classList.add('on');else r.classList.remove('on');
+    if(r.classList.contains('fs-vat')){
+      var v=(val==='별도')?'별도':'포함';
+      r.setAttribute('data-val',v);r.textContent='VAT '+v;r.classList.add('on');
+      r.classList.toggle('vat-exc',v==='별도');r.classList.toggle('vat-inc',v==='포함');
+    }else{
+      if(r.getAttribute('data-val')===val)r.classList.add('on');else r.classList.remove('on');
+    }
   });
 }
 function getRadioUI(name){
