@@ -198,6 +198,35 @@ html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black)
   .hm-item.hi-more .hmi-more-ico svg{width:18px;height:18px;stroke:var(--gray-500);}
   .hm-item.hi-more .hmi-name{font-size:14px;font-weight:600;color:var(--gray-700);}
   .hm-item.hi-more .hmi-arrow{color:var(--gray-400);font-size:18px;margin-left:2px;display:block;}
+
+  /* ═══ 폰 스와이프 홈 (계약서 카드) ═══ */
+  /* 테마 색은 여기 한 곳에서 관리 (화이트/블랙) */
+  .hm-mobile[data-theme=light]{--sw-bg:#f4f3f0;--sw-tab:#111;--sw-tab-off:#bdbbb3;--sw-tabborder:rgba(0,0,0,.1);--sw-toggle:#d8d6d0;--sw-knob:#fff;--sw-knob-ico:#333;}
+  .hm-mobile[data-theme=dark]{--sw-bg:#0d0d0d;--sw-tab:#fff;--sw-tab-off:rgba(255,255,255,.4);--sw-tabborder:rgba(255,255,255,.1);--sw-toggle:#333;--sw-knob:#0d0d0d;--sw-knob-ico:#eee;}
+  .hm-mobile{background:var(--sw-bg);transition:background .3s;}
+  .sw-top{display:flex;justify-content:flex-end;padding:46px 18px 6px;}
+  .sw-toggle{width:56px;height:30px;border-radius:999px;position:relative;cursor:pointer;background:var(--sw-toggle);transition:background .25s;flex-shrink:0;}
+  .sw-knob{position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:var(--sw-knob);display:flex;align-items:center;justify-content:center;transition:transform .25s,background .25s;}
+  .hm-mobile[data-theme=dark] .sw-knob{transform:translateX(26px);}
+  .sw-knob svg{width:14px;height:14px;stroke:var(--sw-knob-ico);fill:none;}
+  .sw-swipe{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding:6px 0 16px;-webkit-overflow-scrolling:touch;scrollbar-width:none;flex:1;align-items:center;}
+  .sw-swipe::-webkit-scrollbar{display:none;}
+  .sw-card{scroll-snap-align:center;flex:0 0 76%;height:min(64vh,470px);border-radius:22px;position:relative;overflow:hidden;cursor:pointer;background-size:cover;background-position:center;background-color:#1a1a1a;}
+  .sw-card::after{content:"";position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.05) 42%,rgba(0,0,0,.62));}
+  .sw-card:first-child{margin-left:12px;}
+  .sw-card:last-child{margin-right:12px;}
+  .sw-card-inner{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;justify-content:space-between;padding:18px;}
+  .sw-pill{align-self:flex-end;display:inline-flex;align-items:center;gap:5px;background:rgba(0,0,0,.35);color:#fff;font-size:14px;font-weight:600;padding:8px 14px;border-radius:999px;}
+  .sw-pill svg{width:15px;height:15px;}
+  .sw-ctitle{color:#fff;font-size:34px;font-weight:800;line-height:1.05;letter-spacing:-.5px;}
+  .sw-csub{color:rgba(255,255,255,.82);font-size:13px;margin-top:8px;}
+  .sw-tabbar{display:flex;justify-content:space-around;align-items:center;padding:14px 6px calc(16px + env(safe-area-inset-bottom));border-top:.5px solid var(--sw-tabborder);}
+  .sw-tab{position:relative;display:flex;cursor:pointer;color:var(--sw-tab-off);}
+  .sw-tab.sw-tab-on{color:var(--sw-tab);}
+  .sw-tab svg{width:25px;height:25px;}
+  .sw-devdot{position:absolute;top:-1px;right:-4px;width:6px;height:6px;border-radius:50%;background:var(--danger);}
+  .sw-toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:rgba(20,20,20,.92);color:#fff;font-size:13px;padding:11px 20px;border-radius:999px;opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap;z-index:60;}
+  .sw-toast.show{opacity:1;}
 }
 
 /* ════ 전체 기능 화면 (폰에서 '전체 기능 보기'로 진입) ════ */

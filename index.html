@@ -139,11 +139,18 @@
     <div class="hm-desc">작성할 문서를 선택하세요</div>
     <div class="doc-grid" id="doc-grid"></div>
 
-    <div class="hm-mobile">
-      <div class="hmh"><div><div class="hmh-hi">법률문서 작성</div><div class="hmh-name">문서 작성</div></div></div>
-      <div class="hm-seclabel">문서 선택</div>
-      <div class="hm-list" id="hm-list"></div>
-      <div class="hm-foot">법무법인 정서 · 인천광역시 미추홀구</div>
+    <div class="hm-mobile" data-theme="light">
+      <div class="sw-top">
+        <div class="sw-toggle" onclick="toggleHomeTheme()" role="switch" aria-label="화이트 블랙 테마 전환"><div class="sw-knob" id="sw-knob"></div></div>
+      </div>
+      <div class="sw-swipe" id="sw-swipe"></div>
+      <div class="sw-tabbar">
+        <div class="sw-tab sw-tab-on" aria-label="계약서 작성"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg></div>
+        <div class="sw-tab" onclick="openContractList()" aria-label="계약서 목록"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div>
+        <div class="sw-tab" onclick="homeDevToast()" aria-label="합의서 작성 준비중"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><span class="sw-devdot"></span></div>
+        <div class="sw-tab" onclick="showScreen('screen-more')" aria-label="기타 기능"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></div>
+      </div>
+      <div class="sw-toast" id="sw-toast">합의서 작성은 준비 중입니다</div>
     </div>
   </div>
 </div>
@@ -1374,7 +1381,7 @@ function resetContract(){
 }
 
 /* ═══ Supabase 연동 ═══ */
-var APP_VERSION='v98';
+var APP_VERSION='v99';
 var SUPABASE_URL='https://nyjyemjsperpakrrgzcc.supabase.co';
 var SUPABASE_KEY='sb_publishable_QKl9MIt2_MflYnpN41VRvg_cNIAbYhU';
 var sb=null;

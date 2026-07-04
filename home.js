@@ -50,11 +50,11 @@ var PC_ORDER = [
   { id: 'agreement',     size: 'small' }
 ];
 
-/* 폰 홈: 계약서 중심 벤토 (전체 기능 보기 버튼은 렌더가 자동으로 덧붙임) */
-var MOBILE_ORDER = [
-  { id: 'contractWrite', size: 'hero' },
-  { id: 'contractList',  size: 'wide', accent: 'red' },
-  { id: 'agreement',     size: 'wide' }
+/* 폰 홈: 계약서 종류 풀스크린 스와이프 카드 (민사–형사–가사, 형사가 가운데서 시작) */
+var CONTRACT_CARDS = [
+  { type: '민사', img: './civil.jpg',    sub: '민사사건 송무위임계약서' },
+  { type: '형사', img: './criminal.jpg', sub: '형사사건 송무위임계약서' },
+  { type: '가사', img: './family.jpg',   sub: '가사사건 송무위임계약서' }
 ];
 
 /* 전체 기능 화면: 폰 홈에 안 올린 나머지 (표기가 조금 다른 것은 name/desc 덮어씀) */
@@ -107,50 +107,64 @@ function renderPcGrid() {
   box.innerHTML = html;
 }
 
-/* ── ③-B 폰 리스트 렌더 ── */
-function renderMobileList() {
-  var box = document.getElementById('hm-list');
+/* ── ③-B 폰 스와이프 카드 렌더 (계약서 종류 선택) ── */
+function renderContractSwipe() {
+  var box = document.getElementById('sw-swipe');
   if (!box) return;
+  var chevron = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9,6 15,12 9,18"/></svg>';
   var html = '';
-  for (var i = 0; i < MOBILE_ORDER.length; i++) {
-    var item = MOBILE_ORDER[i], m = MENU[item.id];
-    var name = homeName(item, m), desc = homeDesc(item, m);
-    var click = m.soon ? '' : ' onclick="' + m.action + '"';
-    if (item.size === 'hero') {
-      html +=
-        '<div class="hm-item hi-hero"' + click + '>' +
-          '<div class="hmi-watermark">' + homeIcon(m.icon, '1.5') + '</div>' +
-          '<div class="hmi-tag">MAIN</div>' +
-          '<div class="hmi-name">' + name + '</div>' +
-          '<div class="hmi-desc">' + desc + '</div>' +
-          '<div class="hmi-cta">시작하기 →</div>' +
-        '</div>';
-    } else {
-      if (m.soon) {
-        html +=
-          '<div class="hm-item hi-wide disabled">' +
-            '<div class="hmi-ico">' + homeIcon(m.icon) + '</div>' +
-            '<div class="hmi-body"><div class="hmi-name">' + name + '</div><div class="hmi-badge">준비중</div></div>' +
-          '</div>';
-      } else {
-        var red = item.accent === 'red' ? ' hi-red' : '';
-        html +=
-          '<div class="hm-item hi-wide' + red + '"' + click + '>' +
-            '<div class="hmi-ico">' + homeIcon(m.icon) + '</div>' +
-            '<div class="hmi-body"><div class="hmi-name">' + name + '</div><div class="hmi-desc">' + desc + '</div></div>' +
-            '<div class="hmi-arrow">›</div>' +
-          '</div>';
-      }
-    }
+  for (var i = 0; i < CONTRACT_CARDS.length; i++) {
+    var c = CONTRACT_CARDS[i];
+    html +=
+      '<div class="sw-card" style="background-image:url(\'' + c.img + '\')" onclick="goContract(\'' + c.type + '\')">' +
+        '<div class="sw-card-inner">' +
+          '<div class="sw-pill">#' + c.type + ' ' + chevron + '</div>' +
+          '<div><div class="sw-ctitle">' + c.type + '<br>계약서</div><div class="sw-csub">' + c.sub + '</div></div>' +
+        '</div>' +
+      '</div>';
   }
-  html +=
-    '<div class="hm-item hi-more" onclick="showScreen(\'screen-more\')">' +
-      '<div class="hmi-more-ico">' + homeIcon('grid') + '</div>' +
-      '<div class="hmi-name">전체 기능 보기</div>' +
-      '<div class="hmi-arrow">›</div>' +
-    '</div>';
   box.innerHTML = html;
+  // 형사(가운데 카드)가 처음 보이도록 초기 스크롤
+  var mid = box.children[1];
+  if (mid) { box.scrollLeft = mid.offsetLeft - (box.clientWidth - mid.offsetWidth) / 2; }
 }
+
+/* ── 폰 홈 테마(화이트/블랙) — 선택을 기억 ── */
+function paintHomeKnob() {
+  var knob = document.getElementById('sw-knob');
+  if (!knob) return;
+  var m = document.querySelector('.hm-mobile');
+  var dark = m && m.getAttribute('data-theme') === 'dark';
+  var SUN = '<circle cx="12" cy="12" r="4"/><path d="M12 3v1.5M12 19.5V21M5.2 5.2l1 1M17.8 17.8l1 1M3 12h1.5M19.5 12H21M5.2 18.8l1-1M17.8 6.2l1-1"/>';
+  var MOON = '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>';
+  knob.innerHTML = '<svg viewBox="0 0 24 24" stroke-width="1.8">' + (dark ? SUN : MOON) + '</svg>';
+}
+function initHomeTheme() {
+  var m = document.querySelector('.hm-mobile');
+  if (!m) return;
+  var saved = 'light';
+  try { saved = localStorage.getItem('homeTheme') || 'light'; } catch (e) {}
+  m.setAttribute('data-theme', saved);
+  paintHomeKnob();
+}
+window.toggleHomeTheme = function () {
+  var m = document.querySelector('.hm-mobile');
+  if (!m) return;
+  var dark = m.getAttribute('data-theme') !== 'dark';
+  m.setAttribute('data-theme', dark ? 'dark' : 'light');
+  try { localStorage.setItem('homeTheme', dark ? 'dark' : 'light'); } catch (e) {}
+  paintHomeKnob();
+};
+
+/* ── 합의서(준비중) 안내 토스트 ── */
+var _homeToastTimer;
+window.homeDevToast = function () {
+  var t = document.getElementById('sw-toast');
+  if (!t) return;
+  t.classList.add('show');
+  clearTimeout(_homeToastTimer);
+  _homeToastTimer = setTimeout(function () { t.classList.remove('show'); }, 1600);
+};
 
 /* ── ③-C 전체 기능 화면 렌더 ── */
 function renderMoreScreen() {
@@ -173,8 +187,9 @@ function renderMoreScreen() {
 /* ── 실행: 홈 컨테이너가 있으면 그려 넣는다 ── */
 function renderHome() {
   renderPcGrid();
-  renderMobileList();
+  renderContractSwipe();
   renderMoreScreen();
+  initHomeTheme();
 }
 if (typeof document !== 'undefined') {
   if (document.readyState === 'loading') {
@@ -186,5 +201,5 @@ if (typeof document !== 'undefined') {
 
 /* node 검증용 (브라우저에선 무시됨) */
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { MENU: MENU, PC_ORDER: PC_ORDER, MOBILE_ORDER: MOBILE_ORDER, MORE_ORDER: MORE_ORDER, renderHome: renderHome };
+  module.exports = { MENU: MENU, PC_ORDER: PC_ORDER, CONTRACT_CARDS: CONTRACT_CARDS, MORE_ORDER: MORE_ORDER, renderHome: renderHome, renderContractSwipe: renderContractSwipe };
 }

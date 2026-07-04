@@ -1,8 +1,8 @@
 /* 법무법인 정서 - 서비스 워커
    목적: ① PWA 설치 요건(fetch 핸들러) 충족  ② 오프라인에서도 앱 열기
    전략: 같은 출처 파일만 캐시(네트워크 우선). 외부 API/CDN은 건드리지 않음. */
-const CACHE = 'jeongseo-v98';
-const ASSETS = ['./', './index.html', './styles.css', './dojang.html', './manifest.json', './favicon.png', './logo-sidebar.png', './icon-192.png', './icon-512.png', './watermark.png', './firm-stamp.png', './gyeongyu.js', './autofill.js', './yeollam.js', './home.js', './fonts/PretendardVariable.woff2'];
+const CACHE = 'jeongseo-v99';
+const ASSETS = ['./', './index.html', './styles.css', './dojang.html', './manifest.json', './favicon.png', './logo-sidebar.png', './icon-192.png', './icon-512.png', './watermark.png', './firm-stamp.png', './gyeongyu.js', './autofill.js', './yeollam.js', './home.js', './criminal.jpg', './civil.jpg', './family.jpg', './fonts/PretendardVariable.woff2'];
 
 self.addEventListener('install', function(e){
   e.waitUntil(
