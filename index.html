@@ -1443,7 +1443,7 @@ function resetContract(){
 }
 
 /* ═══ Supabase 연동 ═══ */
-var APP_VERSION='v110';
+var APP_VERSION='v111';
 var SUPABASE_URL='https://nyjyemjsperpakrrgzcc.supabase.co';
 var SUPABASE_KEY='sb_publishable_QKl9MIt2_MflYnpN41VRvg_cNIAbYhU';
 var sb=null;
@@ -2856,15 +2856,24 @@ async function doAction(type){
     }
     if(type==='share'){
       showLoading('공유 준비 중...');
-      var totalH=canvases.reduce(function(s,c){return s+c.height;},0);
-      var merged=document.createElement('canvas');
-      merged.width=canvases[0].width;merged.height=totalH;
-      var mctx=merged.getContext('2d');
-      var y=0;
-      canvases.forEach(function(c){mctx.drawImage(c,0,y);y+=c.height;});
-      var blob=await new Promise(function(r){merged.toBlob(r,'image/png');});
-      var fileName=buildFileName()+'.png';
-      var file=new File([blob],fileName,{type:'image/png'});
+      // 공유도 'PDF 저장'과 동일하게 A4 다중페이지 PDF로 생성 (긴 PNG → iOS 임의 절단 문제 해결)
+      var jsPDFCtorS=(window.jspdf&&window.jspdf.jsPDF)?window.jspdf.jsPDF:(window.jsPDF||null);
+      if(!jsPDFCtorS){ hideLoading(); alert('PDF 라이브러리를 불러오지 못했습니다.\n인터넷 연결을 확인해 주세요.'); return; }
+      var spdf=new jsPDFCtorS({orientation:'portrait',unit:'mm',format:'a4'});
+      var spw=210,sph=297;
+      for(var sj=0;sj<canvases.length;sj++){
+        var scv=canvases[sj];
+        var sImg=scv.toDataURL('image/png');
+        if(sj>0)spdf.addPage();
+        var scw=scv.width, sch=scv.height;
+        var sscale=Math.min(spw/scw, sph/sch);
+        var sdw=scw*sscale, sdh=sch*sscale;
+        var sdx=(spw-sdw)/2, sdy=(sph-sdh)/2;
+        spdf.addImage(sImg,'PNG',sdx,sdy,sdw,sdh,undefined,'FAST');
+      }
+      var blob=spdf.output('blob');
+      var fileName=buildFileName()+'.pdf';
+      var file=new File([blob],fileName,{type:'application/pdf'});
       hideLoading();
       if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
         try{
