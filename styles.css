@@ -132,7 +132,7 @@ html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black)
 
 /* 모바일 홈 */
 @media (max-width:767px){
-  #screen-contract.active{flex-direction:column!important;}
+  #screen-contract.active{flex-direction:column!important;height:100vh;height:100dvh;min-height:0;}
   .ct-content{display:block!important;padding:12px 0 40px;width:100%;overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y;}
   #screen-contract .page{width:210mm!important;max-width:none!important;min-width:210mm;margin:0 0 16px;display:block;border:1px solid #bbbbbb;}
   .ct-content::-webkit-scrollbar{height:5px;}
@@ -1076,12 +1076,12 @@ body.contract-locked .ct-bb-sign{pointer-events:none;background:#e8f5ec!importan
   #screen-contract .ct-content{flex:1;min-height:0;padding-top:0!important;}
   .ct-back-float{display:flex;align-items:center;justify-content:center;position:absolute;top:calc(10px + env(safe-area-inset-top,0px));left:12px;z-index:60;width:34px;height:34px;border-radius:var(--r-pill);border:none;cursor:pointer;background:rgba(0,0,0,0.42);}
   .ct-back-float svg{width:20px;height:20px;stroke:#fff;}
-  .ct-bottombar{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0;padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px));border-top:0.5px solid var(--border);background:#fff;}
+  .ct-bottombar{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0;padding:13px 14px calc(13px + env(safe-area-inset-bottom,0px));border-top:0.5px solid var(--border);background:#fff;}
   .ct-bb-group{display:flex;gap:6px;}
-  .ct-bb-btn{padding:8px 13px;border-radius:var(--r);background:#fff;border:1px solid var(--border);color:var(--gray-700);font-size:13px;font-family:var(--font);cursor:pointer;}
+  .ct-bb-btn{padding:11px 15px;border-radius:var(--r);background:#fff;border:1px solid var(--border);color:var(--gray-700);font-size:15px;font-family:var(--font);cursor:pointer;}
   .ct-bb-btn:active{background:var(--gray-100);}
-  .ct-bb-share{padding:8px 16px;border-radius:var(--r-pill);background:var(--black);border:none;color:#fff;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;}
-  .ct-bb-sign{padding:8px 16px;border-radius:var(--r-pill);background:var(--danger);border:none;color:#fff;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;}
+  .ct-bb-share{padding:11px 20px;border-radius:var(--r-pill);background:var(--black);border:none;color:#fff;font-size:15px;font-weight:600;font-family:var(--font);cursor:pointer;}
+  .ct-bb-sign{padding:11px 20px;border-radius:var(--r-pill);background:var(--danger);border:none;color:#fff;font-size:15px;font-weight:600;font-family:var(--font);cursor:pointer;}
 }
 
 /* ═══ 계약서 화면맞춤: 창틀(wrapper) — 원본 서면은 그대로, 겉보기만 축소 (v104) ═══ */
