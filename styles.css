@@ -11,7 +11,8 @@
   font-weight:45 920;
   font-style:normal;
   font-display:swap;
-  src:local('Pretendard Variable'),url('./fonts/PretendardVariable.woff2') format('woff2-variations');
+  /* 로컬에 설치된 경우에만 사용 (별도 폰트 파일 없음 → 없으면 아래 폰트 스택으로 자동 대체) */
+  src:local('Pretendard Variable'),local('Pretendard');
 }
 
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}

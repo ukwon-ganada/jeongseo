@@ -1432,14 +1432,17 @@ function resetContract(){
 }
 
 /* ═══ Supabase 연동 ═══ */
-var APP_VERSION='v115';
+var APP_VERSION='v116';
 var SUPABASE_URL='https://nyjyemjsperpakrrgzcc.supabase.co';
 var SUPABASE_KEY='sb_publishable_QKl9MIt2_MflYnpN41VRvg_cNIAbYhU';
 var sb=null;
 function getSB(){
   if(sb)return sb;
   if(window.supabase&&window.supabase.createClient){
-    sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+    // 세션을 브라우저에 저장·자동갱신 → 한 번 로그인하면 로그아웃 전까지 자동 로그인 유지
+    sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{
+      auth:{persistSession:true,autoRefreshToken:true,storageKey:'js_auth'}
+    });
     return sb;
   }
   return null;

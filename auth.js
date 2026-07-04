@@ -17,6 +17,7 @@
 
   var STYLE_ID = 'auth-style';
   var OVERLAY_ID = 'authScreen';
+  var LAST_EMAIL_KEY = 'js_last_email';   // 다음 방문 때 이메일 자동 채움용
   var _hasSession = false;
 
   // 서명 링크로 들어온 경우엔 로그인 관여 안 함
@@ -54,39 +55,59 @@
       + '.au-btn{width:100%;height:52px;margin-top:6px;background:#1a1a1a;color:#fff;border:none;'
       + 'border-radius:14px;font-size:15px;font-weight:600;font-family:inherit;cursor:pointer;}'
       + '.au-btn:disabled{opacity:.55;cursor:default;}'
+      + '.au-remember{display:flex;align-items:center;justify-content:center;gap:7px;'
+      + 'font-size:13px;color:#666;margin:6px 0 2px;cursor:pointer;user-select:none;}'
+      + '.au-remember input{width:16px;height:16px;accent-color:#1a1a1a;margin:0;cursor:pointer;}'
       + '.au-foot{font-size:11px;color:#cfd3d9;margin-top:22px;line-height:1.5;}';
     var s = document.createElement('style');
     s.id = STYLE_ID; s.textContent = css;
     document.head.appendChild(s);
   }
 
-  /* ── 로그인 화면 DOM 주입 ── */
+  /* ── 로그인 화면 DOM 주입 ──
+     · 진짜 <form> 이라 브라우저 비밀번호 관리자가 저장/자동채움을 제안한다.
+     · 이메일은 기억해 두었다가 다음 방문 때 자동으로 채운다. */
   function injectOverlay() {
     if (document.getElementById(OVERLAY_ID)) return;
     injectStyle();
+    var lastEmail = '';
+    try { lastEmail = localStorage.getItem(LAST_EMAIL_KEY) || ''; } catch (e) {}
+    var remembered = lastEmail !== '';
+
     var el = document.createElement('div');
     el.id = OVERLAY_ID;
     el.innerHTML =
-      '<div class="au-box">'
+      '<form class="au-box" id="au-form" autocomplete="on" action="#">'
       + '<div class="au-brand">법무법인 정서</div>'
       + '<div class="au-sub">직원 로그인</div>'
-      + '<input type="email" class="au-input" id="au-email" placeholder="이메일" '
-      + 'autocomplete="username" autocapitalize="none" spellcheck="false">'
-      + '<input type="password" class="au-input" id="au-pw" placeholder="비밀번호" '
+      + '<input type="email" name="email" class="au-input" id="au-email" placeholder="이메일" '
+      + 'autocomplete="username" autocapitalize="none" spellcheck="false" value="' + esc(lastEmail) + '">'
+      + '<input type="password" name="password" class="au-input" id="au-pw" placeholder="비밀번호" '
       + 'autocomplete="current-password">'
+      + '<label class="au-remember"><input type="checkbox" id="au-remember"' + (remembered ? ' checked' : '') + '>'
+      + '로그인 정보 기억하기</label>'
       + '<div class="au-err" id="au-err"></div>'
-      + '<button class="au-btn" id="au-btn">로그인</button>'
-      + '<div class="au-foot">법무법인 정서 내부용 · 승인된 직원만 이용</div>'
-      + '</div>';
+      + '<button type="submit" class="au-btn" id="au-btn">로그인</button>'
+      + '<div class="au-foot">법무법인 정서 내부용 · 승인된 직원만 이용<br>'
+      + '한 번 로그인하면 로그아웃 전까지 자동으로 로그인됩니다.</div>'
+      + '</form>';
     document.body.appendChild(el);
 
-    var email = el.querySelector('#au-email');
-    var pw = el.querySelector('#au-pw');
-    var btn = el.querySelector('#au-btn');
-    function onEnter(e) { if (e.key === 'Enter') doLogin(); }
-    email.addEventListener('keydown', onEnter);
-    pw.addEventListener('keydown', onEnter);
-    btn.addEventListener('click', doLogin);
+    // 첫 방문(기억된 이메일 없음)엔 기본 체크
+    var rem = el.querySelector('#au-remember');
+    if (rem && !remembered) rem.checked = true;
+
+    el.querySelector('#au-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      doLogin();
+    });
+  }
+
+  // 값 안전 삽입(이메일에 따옴표 등이 들어와도 속성이 깨지지 않게)
+  function esc(v) {
+    return String(v == null ? '' : v)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
   function setErr(msg) {
@@ -99,8 +120,13 @@
     var el = document.getElementById(OVERLAY_ID);
     if (el) {
       el.classList.add('show');
+      // 이메일이 이미 채워져 있으면 비밀번호로 바로 포커스
       var em = document.getElementById('au-email');
-      if (em && !em.value) setTimeout(function () { em.focus(); }, 80);
+      var pw = document.getElementById('au-pw');
+      setTimeout(function () {
+        if (em && !em.value) { em.focus(); }
+        else if (pw) { pw.focus(); }
+      }, 80);
     }
   }
   function hideOverlay() {
@@ -131,6 +157,13 @@
           return;
         }
         _hasSession = true;
+        // "로그인 정보 기억하기" 체크 시 이메일을 저장(다음 방문 자동 채움).
+        // 비밀번호 자체는 저장하지 않고, 브라우저 비밀번호 관리자와 세션 유지가 자동 로그인을 담당.
+        var remember = (document.getElementById('au-remember') || {}).checked;
+        try {
+          if (remember) localStorage.setItem(LAST_EMAIL_KEY, email);
+          else localStorage.removeItem(LAST_EMAIL_KEY);
+        } catch (e) {}
         var p2 = document.getElementById('au-pw'); if (p2) p2.value = '';
         hideOverlay();
       }, function () {
