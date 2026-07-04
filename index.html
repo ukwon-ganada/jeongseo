@@ -1135,7 +1135,7 @@
     </div>
     <div class="action-item" onclick="doActionAndClose('pdf')">
       <div class="action-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg></div>
-      <div class="action-body"><div class="action-name">PDF 저장</div><div class="action-desc">페이지별 이미지로 저장</div></div>
+      <div class="action-body"><div class="action-name">PDF 저장</div><div class="action-desc">인쇄창에서 'PDF로 저장' 선택</div></div>
     </div>
     <div class="action-item" onclick="doActionAndClose('image')">
       <div class="action-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg></div>
@@ -1443,7 +1443,7 @@ function resetContract(){
 }
 
 /* ═══ Supabase 연동 ═══ */
-var APP_VERSION='v111';
+var APP_VERSION='v112';
 var SUPABASE_URL='https://nyjyemjsperpakrrgzcc.supabase.co';
 var SUPABASE_KEY='sb_publishable_QKl9MIt2_MflYnpN41VRvg_cNIAbYhU';
 var sb=null;
@@ -2796,7 +2796,8 @@ async function capturePages(){
   return canvases;
 }
 async function doAction(type){
-  if(type==='print'){ try{ if(document.fonts){ await document.fonts.load("400 12pt 'Noto Sans KR'"); await document.fonts.load("700 12pt 'Noto Sans KR'"); if(document.fonts.ready){ await document.fonts.ready; } } }catch(e){} window.print(); return; }
+  // PDF 저장도 '진짜 인쇄' 경로로 통일 (캡처 방식 제거): 인쇄창에서 'PDF로 저장'을 고르면 벡터 A4 PDF 생성
+  if(type==='print'||type==='pdf'){ try{ if(document.fonts){ await document.fonts.load("400 12pt 'Noto Sans KR'"); await document.fonts.load("700 12pt 'Noto Sans KR'"); if(document.fonts.ready){ await document.fonts.ready; } } }catch(e){} window.print(); return; }
   showLoading('이미지 생성 중...');
   try{
     var canvases=await capturePages();
