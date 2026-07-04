@@ -169,7 +169,7 @@
       /* r13 : 영수 일시 / 영수인 */
       '<tr>' +
         '<td class="lbl" style="height:8.2mm">영 수 일 시</td>' +
-        '<td colspan="2">2026.&nbsp;&nbsp;&nbsp;.&nbsp;&nbsp;&nbsp;&nbsp;.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:</td>' +
+        '<td colspan="2">' + (new Date().getFullYear()) + '.&nbsp;&nbsp;&nbsp;.&nbsp;&nbsp;&nbsp;&nbsp;.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:</td>' +
         '<td class="lbl">영 수 인</td>' +
         '<td colspan="3" class="ctr">변호사&nbsp; ' + esc(v.attorney || '서고은') + '</td>' +
       '</tr>' +

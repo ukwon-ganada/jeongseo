@@ -1432,7 +1432,7 @@ function resetContract(){
 }
 
 /* ═══ Supabase 연동 ═══ */
-var APP_VERSION='v116';
+var APP_VERSION='v117';
 var SUPABASE_URL='https://nyjyemjsperpakrrgzcc.supabase.co';
 var SUPABASE_KEY='sb_publishable_QKl9MIt2_MflYnpN41VRvg_cNIAbYhU';
 var sb=null;
@@ -1666,39 +1666,9 @@ async function saveToListBtn(){
   hideLoading();
 }
 
-/* ═══ 전자서명 무결성: 스냅샷 정규화 + SHA-256 해시 ═══ */
-/* 키 순서에 무관하게 항상 동일한 문자열을 만드는 안정적 stringify.
-   → 같은 내용이면 언제 계산해도 같은 해시가 나오도록 보장 */
-function stableStringify(obj){
-  if(obj===null||typeof obj!=='object')return JSON.stringify(obj);
-  if(Array.isArray(obj))return '['+obj.map(stableStringify).join(',')+']';
-  var keys=Object.keys(obj).sort();
-  return '{'+keys.map(function(k){return JSON.stringify(k)+':'+stableStringify(obj[k]);}).join(',')+'}';
-}
-/* 서명 대상 문서의 지문(fingerprint)을 만든다.
-   doc_type·사건정보·form_data를 묶어 정규화 → 이 문자열이 곧 "서명한 내용" */
-function buildSignPayloadForHash(rec, formData){
-  return stableStringify({
-    doc_type: rec.doc_type||'',
-    case_num: rec.case_num||'',
-    case_name: rec.case_name||'',
-    court: rec.court||'',
-    client_name: rec.client_name||'',
-    form_data: formData||{}
-  });
-}
-/* Web Crypto로 SHA-256 계산 → 16진수 문자열.
-   crypto.subtle은 https(또는 localhost)에서만 동작 → github.io 배포본에서 정상 작동 */
-async function sha256Hex(str){
-  try{
-    var enc=new TextEncoder().encode(str);
-    var buf=await crypto.subtle.digest('SHA-256', enc);
-    var bytes=new Uint8Array(buf);
-    var hex='';
-    for(var i=0;i<bytes.length;i++){hex+=bytes[i].toString(16).padStart(2,'0');}
-    return hex;
-  }catch(e){return '';}
-}
+/* ═══ 전자서명 무결성 ═══
+   서명 시점 스냅샷 구성과 SHA-256 지문 계산은 이제 서버(sign_submit 함수)가 담당한다.
+   → 클라이언트가 해시를 만들지 않으므로 위조가 불가능하고, 관련 헬퍼는 제거됨. */
 
 /* ═══ 서명 요청 링크 생성 ═══ */
 function genToken(){
