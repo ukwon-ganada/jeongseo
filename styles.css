@@ -712,7 +712,7 @@ body.print-emulate td.js-case-edit{background:transparent!important;box-shadow:n
     display:block!important;margin:0!important;padding:0!important;
   }
   #screen-contract .page{
-    width:210mm!important;min-height:287mm!important;
+    width:210mm!important;min-height:283mm!important;
     box-sizing:border-box!important;
     box-shadow:none!important;margin:0 auto!important;padding:11mm 16mm 9mm!important;
     page-break-after:always;break-after:page;
@@ -723,6 +723,21 @@ body.print-emulate td.js-case-edit{background:transparent!important;box-shadow:n
     transform:none!important;
     overflow:visible!important;
   }
+
+  /* 형사 계약서: 민사·가사와 동일 수준 인쇄 압축 (제1~6조가 A4 1장에 들어가도록) */
+  #screen-contract .criminal-page .article-block,#screen-contract .civil-page .article-block,#screen-contract .family-page .article-block{line-height:1.38!important;margin-bottom:2px!important;}
+  #screen-contract .criminal-page .article-indent,#screen-contract .civil-page .article-indent,#screen-contract .family-page .article-indent{line-height:1.38!important;}
+  #screen-contract .criminal-page .article-indent2,#screen-contract .civil-page .article-indent2,#screen-contract .family-page .article-indent2{line-height:1.37!important;}
+  #screen-contract .criminal-page .contract-intro,#screen-contract .civil-page .contract-intro,#screen-contract .family-page .contract-intro{line-height:1.45!important;margin:3px 0!important;}
+  /* 잘림 방지: 페이지가 넘쳐도 내용이 사라지지 않고 다음 장으로 흐르게, 조항은 중간에 안 잘리게 */
+  #screen-contract .page{page-break-inside:auto!important;break-inside:auto!important;}
+  #screen-contract .article-block{page-break-inside:avoid!important;break-inside:avoid!important;}
+  #screen-contract .sign-table,#screen-contract .sign-date{page-break-inside:avoid!important;break-inside:avoid!important;}
+  /* 마지막 페이지 꼬리 여백 축소: 서명란 뒤 빈 공간이 종이를 넘겨 빈 페이지가 생기던 문제 방지 */
+  #screen-contract .page{padding-bottom:5mm!important;}
+  #screen-contract .sign-table{margin-bottom:0!important;}
+  #screen-contract .page-content{padding-bottom:0!important;margin-bottom:0!important;}
+
   /* 숨겨진(다른 타입) 페이지는 인쇄에서 완전 제외 */
   #screen-contract .page[style*="display:none"],
   #screen-contract .page[style*="display: none"]{display:none!important;page-break-after:auto!important;break-after:auto!important;}
@@ -740,7 +755,7 @@ body.print-emulate td.js-case-edit{background:transparent!important;box-shadow:n
   #screen-contract #civil-page2 .article-indent,#screen-contract #family-page2 .article-indent{line-height:1.42!important;}
   #screen-contract #civil-page2 .article-indent2,#screen-contract #family-page2 .article-indent2{line-height:1.4!important;}
   #screen-contract .civil-footnote{font-size:6.5pt!important;line-height:1.25!important;padding-top:5px!important;}
-  #screen-contract .civil-page,#screen-contract .family-page{padding:11mm 16mm 9mm!important;}
+  #screen-contract .civil-page,#screen-contract .family-page{padding:11mm 16mm 5mm!important;}
   #screen-contract .article-block{margin-bottom:4px!important;}
   #screen-contract .page:last-of-type{page-break-after:auto;}
   #screen-contract .info-table td,#screen-contract .th-cell,#screen-contract .th-sub{font-size:9pt!important;}
@@ -760,8 +775,22 @@ body.print-emulate td.js-case-edit{background:transparent!important;box-shadow:n
    body.print-emulate 스코프로 복제해 캡처 직전에만 켠다. (프린터 출력 CSS와 동기화 유지 필요) */
 body.print-emulate #screen-contract .ct-content{padding:0!important;margin:0!important;background:#fff!important;display:block!important;}
 body.print-emulate #screen-contract .zoom-wrap{width:auto!important;height:auto!important;overflow:visible!important;transform:none!important;display:block!important;margin:0!important;padding:0!important;}
+
+  /* 형사 계약서: 민사·가사와 동일 수준 인쇄 압축 (제1~6조가 A4 1장에 들어가도록) */
+  body.print-emulate #screen-contract .criminal-page .article-block,body.print-emulate #screen-contract .civil-page .article-block,body.print-emulate #screen-contract .family-page .article-block{line-height:1.38!important;margin-bottom:2px!important;}
+  body.print-emulate #screen-contract .criminal-page .article-indent,body.print-emulate #screen-contract .civil-page .article-indent,body.print-emulate #screen-contract .family-page .article-indent{line-height:1.38!important;}
+  body.print-emulate #screen-contract .criminal-page .article-indent2,body.print-emulate #screen-contract .civil-page .article-indent2,body.print-emulate #screen-contract .family-page .article-indent2{line-height:1.37!important;}
+  body.print-emulate #screen-contract .criminal-page .contract-intro,body.print-emulate #screen-contract .civil-page .contract-intro,body.print-emulate #screen-contract .family-page .contract-intro{line-height:1.45!important;margin:3px 0!important;}
+  /* 잘림 방지: 페이지가 넘쳐도 내용이 사라지지 않고 다음 장으로 흐르게, 조항은 중간에 안 잘리게 */
+  body.print-emulate #screen-contract .page{page-break-inside:auto!important;break-inside:auto!important;}
+  body.print-emulate #screen-contract .article-block{page-break-inside:avoid!important;break-inside:avoid!important;}
+  body.print-emulate #screen-contract .sign-table,body.print-emulate #screen-contract .sign-date{page-break-inside:avoid!important;break-inside:avoid!important;}
+  body.print-emulate #screen-contract .page{padding-bottom:5mm!important;}
+  body.print-emulate #screen-contract .sign-table{margin-bottom:0!important;}
+  body.print-emulate #screen-contract .page-content{padding-bottom:0!important;margin-bottom:0!important;}
+
 body.print-emulate #screen-contract .page{
-  width:210mm!important;min-height:287mm!important;
+  width:210mm!important;min-height:283mm!important;
   box-sizing:border-box!important;
   box-shadow:none!important;margin:0 auto!important;padding:11mm 16mm 9mm!important;
   border-radius:0!important;border:1px solid #bbbbbb!important;
@@ -780,7 +809,7 @@ body.print-emulate #screen-contract #civil-page2 .article-block,body.print-emula
 body.print-emulate #screen-contract #civil-page2 .article-indent,body.print-emulate #screen-contract #family-page2 .article-indent{line-height:1.42!important;}
 body.print-emulate #screen-contract #civil-page2 .article-indent2,body.print-emulate #screen-contract #family-page2 .article-indent2{line-height:1.4!important;}
 body.print-emulate #screen-contract .civil-footnote{font-size:6.5pt!important;line-height:1.25!important;padding-top:5px!important;}
-body.print-emulate #screen-contract .civil-page,body.print-emulate #screen-contract .family-page{padding:11mm 16mm 9mm!important;}
+body.print-emulate #screen-contract .civil-page,body.print-emulate #screen-contract .family-page{padding:11mm 16mm 5mm!important;}
 body.print-emulate #screen-contract .article-block{margin-bottom:4px!important;}
 body.print-emulate #screen-contract .info-table td,body.print-emulate #screen-contract .th-cell,body.print-emulate #screen-contract .th-sub{font-size:9pt!important;}
 body.print-emulate #screen-contract .scope-item,body.print-emulate #screen-contract .fee-row td,body.print-emulate #screen-contract .receipt-row{font-size:9pt!important;}
