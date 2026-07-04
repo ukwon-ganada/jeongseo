@@ -1410,7 +1410,7 @@ function resetContract(){
 }
 
 /* ═══ Supabase 연동 ═══ */
-var APP_VERSION='v120';
+var APP_VERSION='v121';
 var SUPABASE_URL='https://nyjyemjsperpakrrgzcc.supabase.co';
 var SUPABASE_KEY='sb_publishable_QKl9MIt2_MflYnpN41VRvg_cNIAbYhU';
 var sb=null;
@@ -2715,13 +2715,43 @@ async function capturePages(trimToContent){
   document.body.classList.remove('print-emulate');
   return canvases;
 }
+/* 캡처 이미지를 A4 PDF에 배치.
+   핵심: 항상 210mm '폭'에 맞춰 놓고, A4 높이를 넘치면 원본을 잘라 여러 장으로 이어붙인다.
+   (예전엔 긴 페이지를 A4 한 장에 '높이'로 축소해 넣어, 폭이 148mm로 좁아지고 세로로 찌그러졌음) */
+function addCanvasesToPdf(pdf, canvases, pw, ph){
+  var first=true;
+  for(var i=0;i<canvases.length;i++){
+    var cv=canvases[i];
+    var cw=cv.width, ch=cv.height;
+    if(!cw||!ch) continue;
+    var k=pw/cw;                    // 원본 px → mm (폭을 A4 폭에 맞춤)
+    var fullH=ch*k;                 // 이 페이지를 210mm 폭으로 놨을 때 높이(mm)
+    if(fullH<=ph+0.5){
+      // A4 한 장에 들어감 → 폭 꽉 채워 세로 가운데 배치
+      if(!first)pdf.addPage(); first=false;
+      pdf.addImage(cv.toDataURL('image/png'),'PNG',0,Math.max(0,(ph-fullH)/2),pw,fullH,undefined,'FAST');
+    }else{
+      // A4보다 긺 → 원본을 A4 높이만큼씩 잘라 여러 장으로 (폭·글자 크기 유지, 잘림 없음)
+      var pageHpx=Math.max(1,Math.floor(ph/k));   // A4 한 장에 해당하는 원본 픽셀 높이
+      var y=0;
+      while(y<ch){
+        var hpx=Math.min(pageHpx, ch-y);
+        var tmp=document.createElement('canvas');
+        tmp.width=cw; tmp.height=hpx;
+        var tctx=tmp.getContext('2d');
+        tctx.fillStyle='#ffffff'; tctx.fillRect(0,0,cw,hpx);
+        tctx.drawImage(cv,0,y,cw,hpx,0,0,cw,hpx);
+        if(!first)pdf.addPage(); first=false;
+        pdf.addImage(tmp.toDataURL('image/png'),'PNG',0,0,pw,hpx*k,undefined,'FAST');
+        y+=hpx;
+      }
+    }
+  }
+}
 async function doAction(type){
-  // 아이폰/아이패드 판별: 설치앱(PWA)에서는 애플 제약으로 window.print()가 화면 반쪽만 인쇄됨
-  // (아이패드는 최신 iPadOS에서 'MacIntel'로 위장하므로 터치포인트로 추가 판별)
-  var _ua=navigator.userAgent||'';
-  var _isIOS=/iP(hone|ad|od)/.test(_ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
-  // 프린트는 항상 진짜 인쇄. PDF는 PC·안드로이드(비iOS)에서만 진짜 인쇄로, 아이폰은 아래 조립(캡처→A4 PDF) 경로로 처리.
-  if(type==='print'||(type==='pdf'&&!_isIOS)){ try{ if(document.fonts){ await document.fonts.load("400 12pt 'Noto Sans KR'"); await document.fonts.load("700 12pt 'Noto Sans KR'"); if(document.fonts.ready){ await document.fonts.ready; } } }catch(e){} window.print(); return; }
+  // '출력'만 브라우저 네이티브 인쇄(window.print). 'PDF'는 모든 기기에서 캡처→A4 조립 경로로 통일.
+  // (아이폰은 window.print가 화면 반쪽만 인쇄되고, Mac은 보이는 화면만 PDF로 나오던 문제를 한 번에 제거)
+  if(type==='print'){ try{ if(document.fonts){ await document.fonts.load("400 12pt 'Noto Sans KR'"); await document.fonts.load("700 12pt 'Noto Sans KR'"); if(document.fonts.ready){ await document.fonts.ready; } } }catch(e){} window.print(); return; }
   showLoading(type==='pdf'?'PDF 생성 중...':'이미지 생성 중...');
   try{
     // 이미지 저장만 내용 높이로 잘라 하단 여백 제거. PDF·공유는 A4 온전한 페이지 유지.
@@ -2763,18 +2793,7 @@ async function doAction(type){
         return;
       }
       var pdf=new jsPDFCtor({orientation:'portrait',unit:'mm',format:'a4'});
-      var pw=210,ph=297;
-      for(var j=0;j<canvases.length;j++){
-        var cv=canvases[j];
-        var imgData=cv.toDataURL('image/png');
-        if(j>0)pdf.addPage();
-        // A4 한 장에 비율 유지하며 전부 들어가게 배치(넘치면 살짝 축소, 평소엔 꽉 참)
-        var cw=cv.width, ch=cv.height;
-        var s=Math.min(pw/cw, ph/ch);
-        var dw=cw*s, dh=ch*s;
-        var dx=(pw-dw)/2, dy=(ph-dh)/2;
-        pdf.addImage(imgData,'PNG',dx,dy,dw,dh,undefined,'FAST');
-      }
+      addCanvasesToPdf(pdf,canvases,210,297);
       pdf.save(buildFileName()+'.pdf');
       hideLoading();
       saveToCloud();
@@ -2786,17 +2805,7 @@ async function doAction(type){
       var jsPDFCtorS=(window.jspdf&&window.jspdf.jsPDF)?window.jspdf.jsPDF:(window.jsPDF||null);
       if(!jsPDFCtorS){ hideLoading(); alert('PDF 라이브러리를 불러오지 못했습니다.\n인터넷 연결을 확인해 주세요.'); return; }
       var spdf=new jsPDFCtorS({orientation:'portrait',unit:'mm',format:'a4'});
-      var spw=210,sph=297;
-      for(var sj=0;sj<canvases.length;sj++){
-        var scv=canvases[sj];
-        var sImg=scv.toDataURL('image/png');
-        if(sj>0)spdf.addPage();
-        var scw=scv.width, sch=scv.height;
-        var sscale=Math.min(spw/scw, sph/sch);
-        var sdw=scw*sscale, sdh=sch*sscale;
-        var sdx=(spw-sdw)/2, sdy=(sph-sdh)/2;
-        spdf.addImage(sImg,'PNG',sdx,sdy,sdw,sdh,undefined,'FAST');
-      }
+      addCanvasesToPdf(spdf,canvases,210,297);
       var blob=spdf.output('blob');
       var fileName=buildFileName()+'.pdf';
       var file=new File([blob],fileName,{type:'application/pdf'});
