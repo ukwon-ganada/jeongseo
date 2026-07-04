@@ -246,6 +246,7 @@
     </button>
   </div>
 
+  <button class="ct-back-float" onclick="goHome()" aria-label="뒤로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="15,18 9,12 15,6"/></svg></button>
   <div class="ct-content" id="ctContent">
 <div class="locked-banner" id="lockedBanner">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
@@ -937,6 +938,16 @@
 
 
   </div>
+  <div class="ct-bottombar">
+    <div class="ct-bb-group">
+      <button class="ct-bb-btn" onclick="saveToListBtn()">임시저장</button>
+      <button class="ct-bb-btn js-info-btn" onclick="openFormSheet()">수정</button>
+    </div>
+    <div class="ct-bb-group">
+      <button class="ct-bb-share" onclick="openActionSheet()">공유</button>
+      <button class="ct-bb-sign" onclick="createSignRequest()"><span class="txt-normal">서명</span><span class="txt-locked">완료</span></button>
+    </div>
+  </div>
 </div>
 
 <div id="formSheet">
@@ -1423,7 +1434,7 @@ function resetContract(){
 }
 
 /* ═══ Supabase 연동 ═══ */
-var APP_VERSION='v102';
+var APP_VERSION='v103';
 var SUPABASE_URL='https://nyjyemjsperpakrrgzcc.supabase.co';
 var SUPABASE_KEY='sb_publishable_QKl9MIt2_MflYnpN41VRvg_cNIAbYhU';
 var sb=null;
