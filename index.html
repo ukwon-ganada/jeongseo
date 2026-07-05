@@ -64,6 +64,16 @@
         <span>본인은 위 계약 내용을 모두 확인하였으며, 이에 <b>동의하여 전자서명</b>합니다.</span>
       </label>
     </div>
+    <div class="sign-otp-section" id="otpSection" style="display:none;">
+      <div class="otp-title">휴대폰 본인확인</div>
+      <div class="otp-desc" id="otpDesc">등록된 연락처로 인증번호를 보내 본인 확인을 진행합니다.</div>
+      <div class="otp-row">
+        <button type="button" class="otp-send-btn" id="otpSendBtn" onclick="sendSignOtp()">인증번호 받기</button>
+        <input type="text" class="otp-input" id="otpCode" inputmode="numeric" maxlength="6" placeholder="인증번호 6자리" autocomplete="one-time-code" disabled>
+        <button type="button" class="otp-verify-btn" id="otpVerifyBtn" onclick="verifySignOtp()" disabled>확인</button>
+      </div>
+      <div class="otp-msg" id="otpMsg"></div>
+    </div>
     <div class="sign-pad-section">
       <div class="sign-pad-label">아래 칸에 서명해 주세요</div>
       <div class="sign-pad-box">
@@ -1410,9 +1420,13 @@ function resetContract(){
 }
 
 /* ═══ Supabase 연동 ═══ */
-var APP_VERSION='v126';
+var APP_VERSION='v127';
 var SUPABASE_URL='https://nyjyemjsperpakrrgzcc.supabase.co';
 var SUPABASE_KEY='sb_publishable_QKl9MIt2_MflYnpN41VRvg_cNIAbYhU';
+/* SMS 본인확인(OTP) 스위치. 솔라피·Edge Function·OTP SQL 준비가 끝나면 true 로 바꾸고 재배포.
+   (false면 예전처럼 OTP 없이 서명 — 준비 전 안전 기본값) */
+var OTP_ENABLED=false;
+var _otpVerified=false;   // 이번 서명 세션에서 휴대폰 인증을 통과했는지
 var sb=null;
 function getSB(){
   if(sb)return sb;
@@ -1819,6 +1833,18 @@ async function initSignMode(token){
     signModeRecord=rec;   // {ok, doc_type, case_num, case_name, court, client_name, form_data, sign_status, sign_expires_at, recipient_name}
     signModeRecord.sign_token=token;   // 제출 때 다시 필요
     renderSignContract(rec);
+    // 휴대폰 본인확인(OTP) 초기화 — OTP_ENABLED일 때만 노출
+    _otpVerified=false;
+    var otpSec=document.getElementById('otpSection');
+    if(otpSec){
+      otpSec.style.display=OTP_ENABLED?'':'none';
+      otpSec.classList.remove('done');
+      setOtpMsg('','');
+      var oc=document.getElementById('otpCode'); if(oc){oc.value='';oc.disabled=true;}
+      var vb=document.getElementById('otpVerifyBtn'); if(vb)vb.disabled=true;
+      var sb2=document.getElementById('otpSendBtn'); if(sb2){sb2.disabled=false;sb2.textContent='인증번호 받기';}
+      if(_otpTimer){clearInterval(_otpTimer);_otpTimer=null;}
+    }
     setSignState('ready','');
     setTimeout(initCpSignCanvas,100);
   }catch(e){
@@ -1966,6 +1992,8 @@ async function submitCounterpartySign(){
   // 동의 확인
   var chk=document.getElementById('cpConsentChk');
   if(!chk||!chk.checked){showToast('계약 내용 동의에 체크해 주세요');return;}
+  // 휴대폰 본인확인(OTP) — 켜져 있으면 인증 완료 필수 (서버에서도 재검증)
+  if(OTP_ENABLED&&!_otpVerified){showToast('휴대폰 본인확인(인증번호)을 먼저 완료해 주세요');return;}
   // 본인확인 필수 입력 확인
   var telVal=((document.getElementById('sf-tel')||{}).value||'').trim();
   var ssnVal=((document.getElementById('sf-ssn')||{}).value||'').trim();
@@ -2016,7 +2044,7 @@ async function submitCounterpartySign(){
     if(sres.error)throw sres.error;
     var out=sres.data||{};
     if(!out.ok){
-      var rmsg=(out.reason==='expired')?'만료된 링크입니다.':(out.reason==='signed')?'이미 서명이 완료되었습니다.':'제출할 수 없습니다. 링크를 다시 확인해 주세요.';
+      var rmsg=(out.reason==='expired')?'만료된 링크입니다.':(out.reason==='signed')?'이미 서명이 완료되었습니다.':(out.reason==='otp_required')?'휴대폰 본인확인을 먼저 완료해 주세요.':'제출할 수 없습니다. 링크를 다시 확인해 주세요.';
       btn.disabled=false;btn.textContent='서명 제출';
       showToast(rmsg);return;
     }
@@ -2040,7 +2068,74 @@ async function submitCounterpartySign(){
 function updateSubmitState(){
   var chk=document.getElementById('cpConsentChk');
   var btn=document.getElementById('cpSubmitBtn');
-  if(btn)btn.disabled=!(chk&&chk.checked);
+  // 동의 + (OTP 켜져 있으면) 휴대폰 인증 완료 여야 제출 활성화
+  var ok=chk&&chk.checked&&(!OTP_ENABLED||_otpVerified);
+  if(btn)btn.disabled=!ok;
+}
+
+/* ═══ 휴대폰 본인확인(OTP) ═══ */
+function _otpFnUrl(name){ return (SUPABASE_URL||'')+'/functions/v1/'+name; }
+function setOtpMsg(text,cls){ var m=document.getElementById('otpMsg'); if(m){m.textContent=text||'';m.className='otp-msg'+(cls?(' '+cls):'');} }
+var _otpCooldown=0, _otpTimer=null;
+function _otpTick(){
+  var b=document.getElementById('otpSendBtn'); if(!b)return;
+  if(_otpCooldown>0){ b.disabled=true; b.textContent=_otpCooldown+'초 후 재발송'; _otpCooldown--; }
+  else{ clearInterval(_otpTimer); _otpTimer=null; b.disabled=false; b.textContent='인증번호 재발송'; }
+}
+function startOtpCooldown(sec){
+  _otpCooldown=sec; if(_otpTimer)clearInterval(_otpTimer); _otpTick(); _otpTimer=setInterval(_otpTick,1000);
+}
+async function sendSignOtp(){
+  if(!signModeRecord||!signModeRecord.sign_token){setOtpMsg('오류: 링크를 다시 열어 주세요','err');return;}
+  var b=document.getElementById('otpSendBtn'); if(b)b.disabled=true;
+  setOtpMsg('인증번호를 보내는 중…','');
+  try{
+    var res=await fetch(_otpFnUrl('otp-send'),{
+      method:'POST',headers:{'content-type':'application/json','apikey':SUPABASE_KEY},
+      body:JSON.stringify({token:signModeRecord.sign_token})
+    });
+    var d=await res.json().catch(function(){return{};});
+    if(d&&d.ok){
+      var codeEl=document.getElementById('otpCode'),vbtn=document.getElementById('otpVerifyBtn');
+      if(codeEl){codeEl.disabled=false;codeEl.focus();}
+      if(vbtn)vbtn.disabled=false;
+      setOtpMsg('인증번호를 '+(d.to||'등록된 번호')+' 로 보냈습니다. 문자를 확인해 주세요.','ok');
+      startOtpCooldown(60);
+    }else{
+      var rmap={nophone:'등록된 연락처가 없어 문자를 보낼 수 없습니다. 담당 변호사에게 문의해 주세요.',
+        toosoon:'방금 보냈습니다. 잠시 후 다시 시도해 주세요.',toomany:'발송 횟수를 초과했습니다. 담당 변호사에게 문의해 주세요.',
+        expired:'만료된 링크입니다.',signed:'이미 서명이 완료되었습니다.',notfound:'유효하지 않은 링크입니다.'};
+      setOtpMsg(rmap[d&&d.reason]||'문자 발송에 실패했습니다. 잠시 후 다시 시도해 주세요.','err');
+      if(b)b.disabled=false;
+    }
+  }catch(e){ setOtpMsg('발송 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.','err'); if(b)b.disabled=false; }
+}
+async function verifySignOtp(){
+  if(!signModeRecord||!signModeRecord.sign_token)return;
+  var code=((document.getElementById('otpCode')||{}).value||'').replace(/[^0-9]/g,'');
+  if(code.length!==6){setOtpMsg('인증번호 6자리를 입력해 주세요','err');return;}
+  var vbtn=document.getElementById('otpVerifyBtn'); if(vbtn)vbtn.disabled=true;
+  setOtpMsg('확인 중…','');
+  try{
+    var client=getSB();
+    var res=await client.rpc('sign_otp_verify',{p_token:signModeRecord.sign_token,p_code:code});
+    var d=(res&&res.data)||{};
+    if(d.ok){
+      _otpVerified=true;
+      var sec=document.getElementById('otpSection'); if(sec)sec.classList.add('done');
+      setOtpMsg('휴대폰 본인확인이 완료되었습니다 ✓','ok');
+      var codeEl=document.getElementById('otpCode'); if(codeEl)codeEl.disabled=true;
+      var sbtn=document.getElementById('otpSendBtn'); if(sbtn){sbtn.disabled=true;}
+      if(_otpTimer){clearInterval(_otpTimer);_otpTimer=null;}
+      updateSubmitState();
+    }else{
+      var rmap={wrong:'인증번호가 올바르지 않습니다'+(typeof d.remaining==='number'?' (남은 시도 '+d.remaining+'회)':''),
+        expired:'인증번호가 만료되었습니다. 재발송해 주세요.',locked:'시도 횟수를 초과했습니다. 재발송해 주세요.',
+        none:'먼저 인증번호를 받아 주세요.'};
+      setOtpMsg(rmap[d.reason]||'확인에 실패했습니다','err');
+      if(vbtn)vbtn.disabled=false;
+    }
+  }catch(e){ setOtpMsg('확인 중 오류가 발생했습니다','err'); if(vbtn)vbtn.disabled=false; }
 }
 /* 화면의 계약서 표를 읽기전용 HTML로 복제 (input을 입력값 텍스트로 치환) */
 function snapshotSignDocHtml(){
