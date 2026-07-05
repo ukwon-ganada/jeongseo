@@ -1420,7 +1420,7 @@ function resetContract(){
 }
 
 /* ═══ Supabase 연동 ═══ */
-var APP_VERSION='v127';
+var APP_VERSION='v128';
 var SUPABASE_URL='https://nyjyemjsperpakrrgzcc.supabase.co';
 var SUPABASE_KEY='sb_publishable_QKl9MIt2_MflYnpN41VRvg_cNIAbYhU';
 /* SMS 본인확인(OTP) 스위치. 솔라피·Edge Function·OTP SQL 준비가 끝나면 true 로 바꾸고 재배포.
@@ -2328,8 +2328,16 @@ function openHistorySheet(id){
   };
   rows+=step(IC.user,'받는 분', esc(it.recipient_name||it.client_name||'—'), it.recipient_phone?esc(it.recipient_phone):'');
   rows+=step(IC.send,'링크 발송', it.sent_at?fmtFull(it.sent_at):'', sentMethod);
-  rows+=step(IC.eye,'의뢰인 열람', it.accessed_at?fmtFull(it.accessed_at):'', '');
-  rows+=step(IC.pen,'서명 완료', it.signed_at?fmtFull(it.signed_at):'', it.consent_agreed?'계약 내용 동의함':'');
+  rows+=step(IC.eye,'의뢰인 열람', it.accessed_at?fmtFull(it.accessed_at):'', audit.accessed_ip?('IP '+esc(audit.accessed_ip)):'');
+  rows+=step(IC.pen,'서명 완료', it.signed_at?fmtFull(it.signed_at):'',
+    [it.consent_agreed?'계약 내용 동의함':'', audit.signed_ip?('IP '+esc(audit.signed_ip)):''].filter(Boolean).join(' · '));
+  // 휴대폰 본인확인(SMS OTP) 통과 기록
+  if(audit.phone_verified){
+    var pinfo=[];
+    if(audit.phone_verified_phone)pinfo.push(esc(audit.phone_verified_phone));
+    if(audit.phone_verified_ip)pinfo.push('IP '+esc(audit.phone_verified_ip));
+    rows+=step(IC.shield,'휴대폰 본인확인', audit.phone_verified_at?fmtFull(audit.phone_verified_at):'인증 완료', pinfo.join(' · '));
+  }
   // 서명자 본인확인 기재정보
   if(audit.signer_tel||audit.signer_ssn_masked){
     var vinfo=[];

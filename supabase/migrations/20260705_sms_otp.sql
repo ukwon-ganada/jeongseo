@@ -16,6 +16,20 @@
 -- ============================================================================
 create extension if not exists pgcrypto;
 
+-- 요청 헤더에서 클라이언트 IP 추출 (20260705_signing_ip.sql 과 동일 — 단독 실행 대비 재정의)
+create or replace function public._client_ip() returns text
+language plpgsql stable set search_path = public
+as $$
+declare h jsonb; xff text;
+begin
+  begin h := current_setting('request.headers', true)::jsonb; exception when others then return null; end;
+  if h is null then return null; end if;
+  xff := coalesce(h->>'x-forwarded-for', h->>'x-real-ip', h->>'cf-connecting-ip', h->>'fly-client-ip');
+  if xff is null or length(trim(xff)) = 0 then return null; end if;
+  return trim(split_part(xff, ',', 1));
+end;
+$$;
+
 -- ── OTP 상태 테이블 ─────────────────────────────────────────────────────────
 create table if not exists public.sign_otp (
   sign_token   text primary key,
@@ -26,8 +40,10 @@ create table if not exists public.sign_otp (
   sent_count   integer not null default 0,   -- 발송 횟수(문자폭탄 방지)
   last_sent_at timestamptz,
   verified_at  timestamptz,               -- 인증 성공 시각
+  verify_ip    text,                       -- 인증 성공 시 IP
   created_at   timestamptz not null default now()
 );
+alter table public.sign_otp add column if not exists verify_ip text;
 alter table public.sign_otp enable row level security;
 -- 정책을 만들지 않는다 → anon/authenticated는 직접 접근 불가.
 -- 발송 Edge Function은 service_role(RLS 우회)로, 검증/서명은 SECURITY DEFINER 함수로만 접근.
@@ -62,7 +78,7 @@ begin
     update public.sign_otp set attempts = attempts + 1 where sign_token = p_token;
     return jsonb_build_object('ok', false, 'reason', 'wrong', 'remaining', 5 - (o.attempts + 1));
   end if;
-  update public.sign_otp set verified_at = now() where sign_token = p_token;
+  update public.sign_otp set verified_at = now(), verify_ip = public._client_ip() where sign_token = p_token;
   return jsonb_build_object('ok', true);
 end;
 $$;
@@ -166,8 +182,10 @@ begin
                    'hash_computed_by',     'server',
                    'signer_tel',           p_signer_tel,
                    'signer_ssn_masked',    p_signer_ssn_masked,
+                   'signed_ip',            public._client_ip(),
                    'phone_verified',       true,
                    'phone_verified_phone', v_otp.phone,
+                   'phone_verified_ip',    v_otp.verify_ip,
                    'phone_verified_at',    to_char(v_otp.verified_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
                  )
    where sign_token = p_token;
