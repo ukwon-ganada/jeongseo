@@ -443,7 +443,7 @@ body.print-emulate td.js-case-edit{background:transparent!important;box-shadow:n
 .lc-del svg{width:15px;height:15px;stroke:var(--gray-400);}
 .list-empty{text-align:center;padding:60px 24px;color:var(--gray-400);font-size:13px;line-height:1.7;}
 .list-loading{display:flex;flex-direction:column;align-items:center;gap:12px;padding:60px 24px;color:var(--gray-400);font-size:13px;}
-.save-toast{position:fixed;left:50%;bottom:32px;transform:translateX(-50%);background:var(--black);color:#fff;font-size:13px;padding:11px 18px;border-radius:99px;z-index:700;opacity:0;transition:opacity 0.25s,transform 0.25s;pointer-events:none;white-space:nowrap;}
+.save-toast{position:fixed;left:50%;bottom:32px;transform:translateX(-50%);background:var(--black);color:#fff;font-size:13px;padding:11px 18px;border-radius:99px;z-index:9000;opacity:0;transition:opacity 0.25s,transform 0.25s;pointer-events:none;white-space:nowrap;max-width:88vw;text-align:center;}
 .save-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 .save-toast.hide-init{transform:translateX(-50%) translateY(10px);}
 
@@ -1001,6 +1001,8 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
 .sign-consent{display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13.5px;line-height:1.6;color:var(--gray-700);}
 .sign-consent input{width:20px;height:20px;flex-shrink:0;margin-top:1px;accent-color:var(--black);cursor:pointer;}
 .sign-consent b{color:var(--black);font-weight:700;}
+/* 미입력 필드 강조 (제출 시 어디를 채워야 하는지 표시) */
+.field-missing{outline:2px solid var(--danger)!important;outline-offset:1px;background:#fff5f4!important;border-radius:6px;transition:.15s;}
 /* 약관 동의 (금융앱식 전체동의 + 필수 항목) */
 .sign-agree{background:#fff;border-radius:var(--r-lg);padding:8px 6px;box-shadow:0 1px 8px rgba(0,0,0,0.06);margin-bottom:14px;}
 .agree-all{display:flex;align-items:center;gap:12px;width:100%;padding:14px 14px;background:none;border:none;font-family:inherit;cursor:pointer;text-align:left;border-radius:12px;}
@@ -1183,7 +1185,7 @@ body.contract-locked .ct-bb-sign{pointer-events:none;background:#e8f5ec!importan
 .zoom-wrap>.page{margin:0!important;}
 
 /* ═══ 주소 검색 오버레이 (팝업 대신 앱 안에 삽입 · 닫기 버튼) (v106) ═══ */
-#addrSearchOverlay{display:none;position:fixed;inset:0;z-index:2000;background:#fff;flex-direction:column;}
+#addrSearchOverlay{display:none;position:fixed;inset:0;z-index:5500;background:#fff;flex-direction:column;}
 #addrSearchOverlay.active{display:flex;}
 .addr-head{display:flex;align-items:center;gap:10px;padding:0 12px;height:56px;border-bottom:0.5px solid var(--border);flex-shrink:0;}
 .addr-close{width:40px;height:40px;border:none;background:none;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:var(--r-pill);flex-shrink:0;}

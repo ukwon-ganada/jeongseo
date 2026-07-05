@@ -1447,7 +1447,7 @@ function resetContract(){
 }
 
 /* ═══ Supabase 연동 ═══ */
-var APP_VERSION='v129';
+var APP_VERSION='v130';
 var SUPABASE_URL='https://nyjyemjsperpakrrgzcc.supabase.co';
 var SUPABASE_KEY='sb_publishable_QKl9MIt2_MflYnpN41VRvg_cNIAbYhU';
 /* SMS 본인확인(OTP) 스위치. 솔라피·Edge Function·OTP SQL 준비가 끝나면 true 로 바꾸고 재배포.
@@ -2017,17 +2017,25 @@ function fmtNum(v){
 }
 async function submitCounterpartySign(){
   if(!signModeRecord){showToast('오류: 다시 시도해 주세요');return;}
+  // 비어 있는 칸으로 스크롤·포커스 + 잠깐 강조 (어디를 채워야 하는지 바로 보이게)
+  var _hl=function(id){
+    var e=document.getElementById(id); if(!e)return;
+    try{e.scrollIntoView({behavior:'smooth',block:'center'});}catch(_){}
+    e.classList.add('field-missing');
+    setTimeout(function(){try{e.focus({preventScroll:true});}catch(_){}} ,250);
+    setTimeout(function(){e.classList.remove('field-missing');},2000);
+  };
   // 필수 약관 동의 확인
-  if(!consentAllAgreed()){showToast('필수 약관에 모두 동의해 주세요');return;}
+  if(!consentAllAgreed()){showToast('필수 약관에 모두 동의해 주세요');var ag=document.getElementById('signAgree');if(ag)ag.scrollIntoView({behavior:'smooth',block:'center'});return;}
   // 휴대폰 본인확인(OTP) — 켜져 있으면 인증 완료 필수 (서버에서도 재검증)
-  if(OTP_ENABLED&&!_otpVerified){showToast('휴대폰 본인확인(인증번호)을 먼저 완료해 주세요');return;}
+  if(OTP_ENABLED&&!_otpVerified){showToast('휴대폰 본인확인(인증번호)을 먼저 완료해 주세요');var os=document.getElementById('otpSection');if(os)os.scrollIntoView({behavior:'smooth',block:'center'});return;}
   // 본인확인 필수 입력 확인
   var telVal=((document.getElementById('sf-tel')||{}).value||'').trim();
   var ssnVal=((document.getElementById('sf-ssn')||{}).value||'').trim();
-  if(!telVal){showToast('본인 확인을 위해 연락처를 입력해 주세요');return;}
-  if(ssnVal.replace(/[^0-9]/g,'').length!==7){showToast('본인 확인을 위해 생년월일 6자리 + 성별 1자리를 입력해 주세요 (예: 900101-1)');return;}
+  if(!telVal){showToast('연락처를 입력해 주세요');_hl('sf-tel');return;}
+  if(ssnVal.replace(/[^0-9]/g,'').length!==7){showToast('생년월일 6자리 + 성별 1자리를 입력해 주세요 (예: 900101-1)');_hl('sf-ssn');return;}
   var cv=document.getElementById('cpSigCanvas');
-  if(!window._cpHasSig){showToast('서명을 입력해 주세요');return;}
+  if(!window._cpHasSig){showToast('아래 칸에 서명해 주세요');var ps=document.querySelector('.sign-pad-section');if(ps)ps.scrollIntoView({behavior:'smooth',block:'center'});return;}
   var sigData='';
   try{sigData=cv.toDataURL('image/png');}catch(e){showToast('서명 처리 오류');return;}
   var client=getSB();
