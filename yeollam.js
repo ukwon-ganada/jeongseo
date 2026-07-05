@@ -294,7 +294,7 @@
           '</div>' +
           '<div class="type-item" onclick="openYeollamForm(\'검찰\')">' +
             '<div class="yl-type-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 2.5v5.4c0 4.2-3 7.4-7 8.6-4-1.2-7-4.4-7-8.6V5.5z"/></svg></div>' +
-            '<div class="type-body"><div class="type-name">검찰</div><div class="type-desc">수사기록 열람·등사 신청 · 준비 중</div></div>' +
+            '<div class="type-body"><div class="type-name">검찰</div><div class="type-desc">열람·등사 신청서</div></div>' +
             '<div class="type-arrow">›</div>' +
           '</div>' +
           '<button class="sh-cancel" onclick="closeYeollamType()">취소</button>' +
@@ -380,8 +380,12 @@
   window.openYeollamForm = function (kind) {
     ensureUI();
     if (kind === '검찰') {
-      if (typeof showToast === 'function') showToast('검찰 서면은 준비 중입니다');
-      else alert('검찰 서면은 준비 중입니다.');
+      // 검찰 갈림길 → 별도 모듈(geomchal.js)로 위임
+      var _ts2 = document.getElementById('yeollamTypeSheet');
+      if (_ts2) _ts2.classList.remove('active');
+      if (typeof window.openGeomchalForm === 'function') { window.openGeomchalForm(); }
+      else if (typeof showToast === 'function') { showToast('검찰 서면 모듈을 불러오지 못했습니다'); }
+      else { alert('검찰 서면 모듈을 불러오지 못했습니다.'); }
       return;
     }
     // 법원: 선택 팝업 닫고 폼 열기
