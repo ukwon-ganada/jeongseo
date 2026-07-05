@@ -44,6 +44,9 @@
   /* 간격 스케일: 4px 기반 (2단계 여백 정리 때 사용할 자) */
   --space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-5:24px;--space-6:32px;--space-8:48px;--space-10:64px;
 }
+/* -webkit-text-size-adjust:100% : iOS Safari가 좁은 화면에서 텍스트를 자동 확대(text autosizing)하는 것을 막는다.
+   (없으면 PDF 캡처 시 210mm 폭 계약서 텍스트가 아이폰에서만 ~48% 부풀어 A4를 넘겨 여러 장으로 쪼개짐) */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%;}
 html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black);-webkit-font-smoothing:antialiased;overflow-x:hidden;}
 
 
@@ -792,7 +795,10 @@ body.print-emulate #screen-contract .page{
   box-shadow:none!important;margin:0 auto!important;padding:11mm 16mm 9mm!important;
   border-radius:0!important;border:1px solid #bbbbbb!important;
   transform:none!important;overflow:visible!important;
+  -webkit-text-size-adjust:100%!important;text-size-adjust:100%!important;
 }
+/* 캡처 중 모든 하위 텍스트에도 자동확대 방지 강제 (iOS text autosizing 차단) */
+body.print-emulate #screen-contract .page *{-webkit-text-size-adjust:100%!important;text-size-adjust:100%!important;}
 body.print-emulate #screen-contract .page[style*="display:none"],
 body.print-emulate #screen-contract .page[style*="display: none"]{display:none!important;}
 body.print-emulate #screen-contract .article-block,body.print-emulate #screen-contract .article-indent,body.print-emulate #screen-contract .article-indent2{line-height:1.5!important;}
