@@ -18,7 +18,7 @@ create extension if not exists pgcrypto;
 
 -- 요청 헤더에서 클라이언트 IP 추출 (20260705_signing_ip.sql 과 동일 — 단독 실행 대비 재정의)
 create or replace function public._client_ip() returns text
-language plpgsql stable set search_path = public
+language plpgsql stable set search_path = public, extensions
 as $$
 declare h jsonb; xff text;
 begin
@@ -53,7 +53,7 @@ create or replace function public.sign_otp_verify(p_token text, p_code text)
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   o public.sign_otp%rowtype;
@@ -99,7 +99,7 @@ create or replace function public.sign_submit(
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   r          public.contracts%rowtype;

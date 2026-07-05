@@ -12,7 +12,7 @@ create extension if not exists pgcrypto;
 -- 요청 헤더에서 클라이언트 IP 추출 (Supabase/프록시의 x-forwarded-for 첫 IP)
 create or replace function public._client_ip() returns text
 language plpgsql stable
-set search_path = public
+set search_path = public, extensions
 as $$
 declare h jsonb; xff text;
 begin
@@ -33,7 +33,7 @@ create or replace function public.sign_fetch(p_token text, p_ua text default '')
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   r public.contracts%rowtype;
@@ -78,7 +78,7 @@ create or replace function public.sign_submit(
   p_signer_tel text, p_signer_ssn_masked text, p_consent boolean
 )
 returns jsonb
-language plpgsql security definer set search_path = public
+language plpgsql security definer set search_path = public, extensions
 as $$
 declare
   r public.contracts%rowtype;

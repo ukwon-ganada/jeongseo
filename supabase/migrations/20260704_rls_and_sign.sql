@@ -56,7 +56,7 @@ create or replace function public.sign_fetch(p_token text, p_ua text default '')
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   r public.contracts%rowtype;
@@ -115,7 +115,7 @@ create or replace function public.sign_submit(
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   r          public.contracts%rowtype;
