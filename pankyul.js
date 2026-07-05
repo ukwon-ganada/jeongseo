@@ -23,7 +23,7 @@
   var ATTORNEYS_KEY = 'jeongseo_attorneys';   // 서면 공통 변호사 명단(localStorage)
   var COURT_DEFAULT = '인천지방법원';
   var COURTDIV_DEFAULT = '형사7단독';
-  var LAWYERTYPE_DEFAULT = '국선변호인';
+  var LAWYERTYPE_DEFAULT = '사선';   // 기본 사선 — '국선' 선택 시에만 "국선변호인" 문구 삽입
 
   /* ── 도우미 (공용 util.js 위임) ── */
   function esc(v) { return JU.esc(v); }
@@ -121,8 +121,8 @@
       /* r7 위 피고인의 변호인 / 국선변호인 변호사 */
       '<tr>' +
         '<td colspan="2" class="pk-val" style="height:10.5mm">위 피고인의 변호인</td>' +
-        '<td colspan="2" class="pk-val">' + esc(v.lawyerType || LAWYERTYPE_DEFAULT) +
-          '<br>변호사 ' + esc(attorney) + '</td>' +
+        '<td colspan="2" class="pk-val">' + (v.lawyerType === '국선' ? '국선변호인<br>' : '') +
+          '변호사 ' + esc(attorney) + '</td>' +
       '</tr>' +
 
       /* r8 청구 사유소명 / 사유 */
@@ -223,7 +223,8 @@
           '<div class="fs-field"><label class="fs-label">선고일 <span class="fs-hint">(사건번호로 자동 조회)</span></label><input type="date" class="fs-input" id="pk-sentdate"></div>' +
 
           '<div class="fs-section">청구인</div>' +
-          '<div class="fs-field"><label class="fs-label">변호인 구분</label><input type="text" class="fs-input" id="pk-lawyertype" value="' + esc(LAWYERTYPE_DEFAULT) + '" placeholder="국선변호인"></div>' +
+          '<div class="fs-field"><label class="fs-label">변호인 구분 <span class="fs-hint">(국선 선택 시에만 "국선변호인" 표기)</span></label>' +
+            '<select class="fs-input" id="pk-lawyertype"><option value="사선" selected>사선</option><option value="국선">국선</option></select></div>' +
           '<div class="fs-field"><label class="fs-label">변호사</label>' +
             '<select class="fs-input" id="pk-attorney"></select>' +
             '<div class="att-add-row"><input type="text" class="att-add-input" id="pk-attorney-new" placeholder="추가할 변호사 이름"><button type="button" class="att-add-btn" onclick="pkAddAttorney()">＋ 추가</button></div></div>' +

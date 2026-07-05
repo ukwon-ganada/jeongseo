@@ -49,7 +49,6 @@ var PC_ORDER = [
   { id: 'gukseon',       size: 'small' },
   { id: 'pankyul',       size: 'small' },
   { id: 'contractWrite', size: 'small' },
-  { id: 'contractList',  size: 'small' },
   { id: 'appeal',        size: 'small' },
   { id: 'agreement',     size: 'small' }
 ];
