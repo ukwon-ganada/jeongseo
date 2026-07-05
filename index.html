@@ -23,7 +23,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="https://t1.kakaocdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+<script id="daumPostcodeScript" src="https://t1.kakaocdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
 <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
@@ -100,6 +100,7 @@
       <button class="sign-pad-clear" onclick="clearCpSign()">다시 서명</button>
     </div>
     <div class="sign-submit-bar">
+      <div id="cpSubmitError" class="sign-submit-error" style="display:none;"></div>
       <button id="cpSubmitBtn" class="sign-submit-btn" onclick="submitCounterpartySign()" disabled>서명 제출</button>
       <div class="sign-submit-note">위 내용에 동의하고 서명하시면 활성화됩니다.<br>제출 시점의 계약서 내용이 그대로 고정·보관됩니다.</div>
       <div class="app-ver" style="text-align:center;font-size:10px;color:#cfd3d9;margin-top:12px;"></div>
@@ -1447,7 +1448,7 @@ function resetContract(){
 }
 
 /* ═══ Supabase 연동 ═══ */
-var APP_VERSION='v130';
+var APP_VERSION='v131';
 var SUPABASE_URL='https://nyjyemjsperpakrrgzcc.supabase.co';
 var SUPABASE_KEY='sb_publishable_QKl9MIt2_MflYnpN41VRvg_cNIAbYhU';
 /* SMS 본인확인(OTP) 스위치. 솔라피·Edge Function·OTP SQL 준비가 끝나면 true 로 바꾸고 재배포.
@@ -2015,8 +2016,14 @@ function fmtNum(v){
   if(!n)return '';
   return n.replace(/\B(?=(\d{3})+(?!\d))/g,',');
 }
+/* 제출 실패 사유를 버튼 위에 계속 보이게 (토스트는 사라지므로 놓치기 쉬움) */
+function setSubmitError(msg){
+  var b=document.getElementById('cpSubmitError');
+  if(b){ b.textContent=msg||''; b.style.display=msg?'block':'none'; }
+}
 async function submitCounterpartySign(){
   if(!signModeRecord){showToast('오류: 다시 시도해 주세요');return;}
+  setSubmitError('');
   // 비어 있는 칸으로 스크롤·포커스 + 잠깐 강조 (어디를 채워야 하는지 바로 보이게)
   var _hl=function(id){
     var e=document.getElementById(id); if(!e)return;
@@ -2025,17 +2032,18 @@ async function submitCounterpartySign(){
     setTimeout(function(){try{e.focus({preventScroll:true});}catch(_){}} ,250);
     setTimeout(function(){e.classList.remove('field-missing');},2000);
   };
+  var _fail=function(msg){ setSubmitError(msg); showToast(msg); };
   // 필수 약관 동의 확인
-  if(!consentAllAgreed()){showToast('필수 약관에 모두 동의해 주세요');var ag=document.getElementById('signAgree');if(ag)ag.scrollIntoView({behavior:'smooth',block:'center'});return;}
+  if(!consentAllAgreed()){_fail('필수 약관에 모두 동의해 주세요');var ag=document.getElementById('signAgree');if(ag)ag.scrollIntoView({behavior:'smooth',block:'center'});return;}
   // 휴대폰 본인확인(OTP) — 켜져 있으면 인증 완료 필수 (서버에서도 재검증)
-  if(OTP_ENABLED&&!_otpVerified){showToast('휴대폰 본인확인(인증번호)을 먼저 완료해 주세요');var os=document.getElementById('otpSection');if(os)os.scrollIntoView({behavior:'smooth',block:'center'});return;}
+  if(OTP_ENABLED&&!_otpVerified){_fail('휴대폰 본인확인(인증번호)을 먼저 완료해 주세요');var os=document.getElementById('otpSection');if(os)os.scrollIntoView({behavior:'smooth',block:'center'});return;}
   // 본인확인 필수 입력 확인
   var telVal=((document.getElementById('sf-tel')||{}).value||'').trim();
   var ssnVal=((document.getElementById('sf-ssn')||{}).value||'').trim();
-  if(!telVal){showToast('연락처를 입력해 주세요');_hl('sf-tel');return;}
-  if(ssnVal.replace(/[^0-9]/g,'').length!==7){showToast('생년월일 6자리 + 성별 1자리를 입력해 주세요 (예: 900101-1)');_hl('sf-ssn');return;}
+  if(!telVal){_fail('연락처를 입력해 주세요');_hl('sf-tel');return;}
+  if(ssnVal.replace(/[^0-9]/g,'').length!==7){_fail('생년월일 6자리 + 성별 1자리를 입력해 주세요 (예: 900101-1)');_hl('sf-ssn');return;}
   var cv=document.getElementById('cpSigCanvas');
-  if(!window._cpHasSig){showToast('아래 칸에 서명해 주세요');var ps=document.querySelector('.sign-pad-section');if(ps)ps.scrollIntoView({behavior:'smooth',block:'center'});return;}
+  if(!window._cpHasSig){_fail('아래 칸에 서명해 주세요');var ps=document.querySelector('.sign-pad-section');if(ps)ps.scrollIntoView({behavior:'smooth',block:'center'});return;}
   var sigData='';
   try{sigData=cv.toDataURL('image/png');}catch(e){showToast('서명 처리 오류');return;}
   var client=getSB();
@@ -2082,9 +2090,14 @@ async function submitCounterpartySign(){
     if(sres.error)throw sres.error;
     var out=sres.data||{};
     if(!out.ok){
-      var rmsg=(out.reason==='expired')?'만료된 링크입니다.':(out.reason==='signed')?'이미 서명이 완료되었습니다.':(out.reason==='otp_required')?'휴대폰 본인확인을 먼저 완료해 주세요.':'제출할 수 없습니다. 링크를 다시 확인해 주세요.';
+      var rmsg=(out.reason==='expired')?'만료된 링크입니다. 담당 변호사에게 문의해 주세요.'
+        :(out.reason==='signed')?'이미 서명이 완료된 계약서입니다.'
+        :(out.reason==='notfound')?'유효하지 않은 링크입니다. 담당 변호사에게 문의해 주세요.'
+        :(out.reason==='nosig')?'서명이 인식되지 않았습니다. 다시 서명해 주세요.'
+        :(out.reason==='otp_required')?'휴대폰 본인확인 절차가 필요합니다. 담당 변호사에게 문의해 주세요.'
+        :('제출할 수 없습니다'+(out.reason?(' ('+out.reason+')'):'')+'. 담당 변호사에게 문의해 주세요.');
       btn.disabled=false;btn.textContent='서명 제출';
-      showToast(rmsg);return;
+      setSubmitError(rmsg);showToast(rmsg);return;
     }
     // 완료 화면으로 넘어가기 전에, 화면의 계약서 표를 저장용으로 스냅샷 (해시·시각은 서버 값 사용)
     window._signedInfo={
@@ -2099,7 +2112,8 @@ async function submitCounterpartySign(){
     setSignState('done','서명이 제출되었습니다.\n감사합니다.');
   }catch(e){
     btn.disabled=false;btn.textContent='서명 제출';
-    showToast('제출 실패: '+((e&&e.message)?e.message:'다시 시도'));
+    var em='제출 실패: '+((e&&e.message)?e.message:'다시 시도해 주세요');
+    setSubmitError(em);showToast(em);
   }
 }
 /* 동의 체크 여부에 따라 제출 버튼 활성/비활성 */
@@ -3206,30 +3220,50 @@ function closeAddrSearch(){
   var box=document.getElementById('addrSearchEmbed');
   if(box)box.innerHTML='';
 }
+// 카카오 우편번호 스크립트가 아직/실패로 안 떠 있으면 다시 불러온다(느린 회선·일시적 차단 대비)
+function _ensurePostcode(cb){
+  if(typeof daum!=='undefined'&&daum.Postcode){cb(true);return;}
+  var s=document.getElementById('daumPostcodeScript');
+  if(s){ s.addEventListener('load',function(){cb(typeof daum!=='undefined'&&!!daum.Postcode);},{once:true});
+         s.addEventListener('error',function(){cb(false);},{once:true}); return; }
+  s=document.createElement('script');
+  s.id='daumPostcodeScript';
+  s.src='https://t1.kakaocdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
+  s.onload=function(){cb(typeof daum!=='undefined'&&!!daum.Postcode);};
+  s.onerror=function(){cb(false);};
+  document.head.appendChild(s);
+}
 function openAddressSearch(targetInputId,onPicked){
-  if(typeof daum==='undefined'||!daum.Postcode){
-    showToast('주소 검색을 불러오는 중입니다. 잠시 후 다시 시도해 주세요');
-    return;
-  }
   var ov=document.getElementById('addrSearchOverlay');
   var box=document.getElementById('addrSearchEmbed');
-  box.innerHTML='';
-  ov.classList.add('active');
-  new daum.Postcode({
-    oncomplete:function(d){
-      // 도로명 주소 우선, 없으면 지번
-      var addr=d.roadAddress||d.jibunAddress||d.address||'';
-      // 참고항목(건물명 등)
-      var extra='';
-      if(d.bname&&/[동|로|가]$/.test(d.bname))extra+=d.bname;
-      if(d.buildingName&&d.apartment==='Y')extra+=(extra?', ':'')+d.buildingName;
-      if(extra)addr+=' ('+extra+')';
-      onPicked(addr);
-      closeAddrSearch();
-    },
-    width:'100%',
-    height:'100%'
-  }).embed(box);
+  var render=function(){
+    box.innerHTML='';
+    ov.classList.add('active');
+    // iOS에서 flex 높이가 0으로 접히는 것 방지 — 화면 기준 실제 픽셀 높이를 지정
+    var h=(window.innerHeight||box.clientHeight||480)-56;
+    if(h>0)box.style.height=h+'px';
+    new daum.Postcode({
+      oncomplete:function(d){
+        // 도로명 주소 우선, 없으면 지번
+        var addr=d.roadAddress||d.jibunAddress||d.address||'';
+        // 참고항목(건물명 등)
+        var extra='';
+        if(d.bname&&/[동|로|가]$/.test(d.bname))extra+=d.bname;
+        if(d.buildingName&&d.apartment==='Y')extra+=(extra?', ':'')+d.buildingName;
+        if(extra)addr+=' ('+extra+')';
+        onPicked(addr);
+        closeAddrSearch();
+      },
+      width:'100%',
+      height:'100%'
+    }).embed(box);
+  };
+  if(typeof daum!=='undefined'&&daum.Postcode){render();return;}
+  showToast('주소 검색을 준비 중입니다...');
+  _ensurePostcode(function(ok){
+    if(ok){render();}
+    else{showToast('주소 검색을 불러오지 못했습니다. 인터넷 연결을 확인 후 다시 눌러 주세요');}
+  });
 }
 
 /* 통합폼 주소 검색 */
