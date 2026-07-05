@@ -1410,7 +1410,7 @@ function resetContract(){
 }
 
 /* ═══ Supabase 연동 ═══ */
-var APP_VERSION='v122';
+var APP_VERSION='v123';
 var SUPABASE_URL='https://nyjyemjsperpakrrgzcc.supabase.co';
 var SUPABASE_KEY='sb_publishable_QKl9MIt2_MflYnpN41VRvg_cNIAbYhU';
 var sb=null;
@@ -2709,6 +2709,26 @@ async function capturePages(trimToContent){
     inp.parentNode.insertBefore(span, inp.nextSibling);
     return span;
   });
+  // 체크박스·라디오 → 고정 12px 정적 마크 span
+  // (iOS html2canvas가 네이티브 컨트롤/:checked::after 를 부풀리거나 못 그려 페이지가 길어지는 문제 우회)
+  var checks=Array.prototype.slice.call(document.querySelectorAll('#ctContent input[type="checkbox"], #ctContent input[type="radio"]'));
+  var checkSpans=checks.map(function(el){
+    var isRadio=el.type==='radio';
+    var span=document.createElement('span');
+    span.setAttribute('data-check-print','1');
+    span.style.cssText='display:inline-block;box-sizing:border-box;width:12px;height:12px;'
+      +'border:1.5px solid #000;'+(isRadio?'border-radius:50%;':'border-radius:1px;')
+      +'position:relative;vertical-align:middle;margin:0 2px 1px 0;background:#fff;line-height:1;';
+    if(el.checked){
+      span.innerHTML = isRadio
+        ? '<span style="position:absolute;left:2.5px;top:2.5px;width:5px;height:5px;border-radius:50%;background:#000;"></span>'
+        : '<span style="position:absolute;left:1px;top:-3px;font-size:12px;font-weight:700;color:#000;line-height:1;font-family:sans-serif;">✓</span>';
+    }
+    el.style.display='none';
+    el.parentNode.insertBefore(span, el.nextSibling);
+    return span;
+  });
+  window._capHeights=[]; window._capTall=[];
   for(var i=0;i<pages.length;i++){
     var page=pages[i];
     var prev={width:page.style.width,height:page.style.height,minHeight:page.style.minHeight,padding:page.style.padding};
@@ -2719,6 +2739,18 @@ async function capturePages(trimToContent){
     // 실제 콘텐츠 높이 측정: A4 높이를 넘치면 넘치는 만큼 전부 캡처(아래 잘림 방지)
     // trimToContent면 A4 최소높이를 강제하지 않아, 내용이 짧은 페이지의 하단 여백이 사라짐(이미지 저장용)
     var capH=trimToContent?Math.ceil(page.scrollHeight):Math.max(H, Math.ceil(page.scrollHeight));
+    // 진단: 이 페이지 높이(mm)와, A4 초과 시 가장 키 큰 하위 블록 기록 (원인 추적용)
+    window._capHeights.push(Math.round(page.scrollHeight/MM));
+    try{
+      if(page.scrollHeight > H*1.03){
+        var tall=null, th=0;
+        Array.prototype.forEach.call(page.querySelectorAll('table,tr,.info-table,.scope-items,.page-content,.contract-intro,.article-block'),function(k){
+          var h=k.getBoundingClientRect().height;
+          if(h>th){th=h; tall=k;}
+        });
+        window._capTall.push('p'+(i+1)+':'+(tall?((tall.className||tall.tagName)+'='+Math.round(th/MM)+'mm'):'?'));
+      }
+    }catch(e){}
     var c=await html2canvas(page,{scale:2,useCORS:true,allowTaint:true,backgroundColor:'#ffffff',logging:false,width:W,height:capH,windowWidth:W,windowHeight:capH});
     page.style.width=prev.width;
     page.style.height=prev.height;
@@ -2735,6 +2767,10 @@ async function capturePages(trimToContent){
   selSpans.forEach(function(span,idx){
     if(span&&span.parentNode)span.parentNode.removeChild(span);
     if(selects[idx])selects[idx].style.display='';
+  });
+  checkSpans.forEach(function(span,idx){
+    if(span&&span.parentNode)span.parentNode.removeChild(span);
+    if(checks[idx])checks[idx].style.display='';
   });
   inputSpans.forEach(function(span,idx){
     if(span&&span.parentNode)span.parentNode.removeChild(span);
@@ -2784,6 +2820,13 @@ async function doAction(type){
   try{
     // 이미지 저장만 내용 높이로 잘라 하단 여백 제거. PDF·공유는 A4 온전한 페이지 유지.
     var canvases=await capturePages(type==='image');
+    // 진단(임시): 페이지가 A4(297mm)를 넘겨 나뉘면 그 높이를 알려줌 → 원인 추적용
+    try{
+      var _hs=window._capHeights||[];
+      if(_hs.some(function(h){return h>305;})){
+        showToast('진단 · 페이지높이 '+_hs.join('/')+'mm'+((window._capTall&&window._capTall.length)?' · '+window._capTall.join(', '):''));
+      }
+    }catch(e){}
     var clientName=getClientName();
     if(type==='image'){
       if(canvases.length===1){
@@ -2847,8 +2890,8 @@ async function doAction(type){
     }
   }catch(err){
     document.body.classList.remove('print-emulate');
-    Array.prototype.forEach.call(document.querySelectorAll('[data-account-print],[data-input-print]'),function(el){el.remove();});
-    Array.prototype.forEach.call(document.querySelectorAll('.account-select, #ctContent input[type="text"]'),function(s){s.style.display='';});
+    Array.prototype.forEach.call(document.querySelectorAll('[data-account-print],[data-input-print],[data-check-print]'),function(el){el.remove();});
+    Array.prototype.forEach.call(document.querySelectorAll('.account-select, #ctContent input[type="text"], #ctContent input[type="checkbox"], #ctContent input[type="radio"]'),function(s){s.style.display='';});
     hideLoading();alert('오류가 발생했습니다.\n'+err.message);
   }
 }
