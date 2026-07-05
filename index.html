@@ -255,7 +255,7 @@
       <td class="th-sub">연락처</td>
       <td class="val-cell editable" onclick="openModal('tel','연락처')"><span id="val-tel" class="placeholder">연락처</span></td>
       <td class="th-sub">주민번호</td>
-      <td class="val-cell editable" onclick="openModal('ssn','주민등록번호')"><span id="val-ssn" class="placeholder">주민등록번호</span></td>
+      <td class="val-cell editable" onclick="openModal('ssn','생년월일+성별')"><span id="val-ssn" class="placeholder">생년월일+성별</span></td>
     </tr>
     <tr>
       <td class="th-sub">사건번호</td>
@@ -476,7 +476,7 @@
       <td class="th-sub">연락처</td>
       <td class="val-cell editable" onclick="openModal('tel','연락처')"><span id="cv-val-tel" class="placeholder">연락처</span></td>
       <td class="th-sub">주민번호</td>
-      <td class="val-cell editable" onclick="openModal('ssn','주민등록번호')"><span id="cv-val-ssn" class="placeholder">주민등록번호</span></td>
+      <td class="val-cell editable" onclick="openModal('ssn','생년월일+성별')"><span id="cv-val-ssn" class="placeholder">생년월일+성별</span></td>
     </tr>
     <tr>
       <td class="th-sub">사건번호</td>
@@ -696,7 +696,7 @@
       <td class="th-sub">연락처</td>
       <td class="val-cell editable" onclick="openModal('tel','연락처')"><span id="fm-val-tel" class="placeholder">연락처</span></td>
       <td class="th-sub">주민번호</td>
-      <td class="val-cell editable" onclick="openModal('ssn','주민등록번호')"><span id="fm-val-ssn" class="placeholder">주민등록번호</span></td>
+      <td class="val-cell editable" onclick="openModal('ssn','생년월일+성별')"><span id="fm-val-ssn" class="placeholder">생년월일+성별</span></td>
     </tr>
     <tr>
       <td class="th-sub">사건번호</td>
@@ -1053,7 +1053,7 @@
       <!-- 위임인 정보 -->
       <div class="fs-group">
         <div class="fs-field"><label class="fs-label">연락처</label><input type="text" class="fs-input" id="f-tel" placeholder="010-0000-0000" inputmode="tel" oninput="applyLiveFormat(this,formatPhone)"></div>
-        <div class="fs-field"><label class="fs-label">주민등록번호</label><input type="text" class="fs-input" id="f-ssn" placeholder="000000-0000000" inputmode="numeric" oninput="applyLiveFormat(this,formatSSN)"></div>
+        <div class="fs-field"><label class="fs-label">생년월일+성별</label><input type="text" class="fs-input" id="f-ssn" placeholder="900101-1" inputmode="numeric" oninput="applyLiveFormat(this,formatBirth)"></div>
         <div class="fs-field"><label class="fs-label">주소</label>
           <div class="fs-addr-search" onclick="searchAddrForm()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><span id="f-addr-road-label">도로명·건물명으로 주소 검색</span></div>
           <input type="text" class="fs-input" id="f-addr-detail" placeholder="상세주소 (동·호수 등)" style="margin-top:8px;display:none;" oninput="combineAddrForm()">
@@ -1410,7 +1410,7 @@ function resetContract(){
 }
 
 /* ═══ Supabase 연동 ═══ */
-var APP_VERSION='v125';
+var APP_VERSION='v126';
 var SUPABASE_URL='https://nyjyemjsperpakrrgzcc.supabase.co';
 var SUPABASE_KEY='sb_publishable_QKl9MIt2_MflYnpN41VRvg_cNIAbYhU';
 var sb=null;
@@ -1878,13 +1878,13 @@ function renderSignContract(rec){
 
   var html='';
   html+='<div class="sd-doctitle">송무위임계약서 ('+docType+')</div>';
-  html+='<div class="sd-verify-hint">✔ <b>본인 확인</b>을 위해 아래 <b>연락처</b>와 <b>주민등록번호</b>를 정확히 입력해 주세요. 입력하신 정보는 서명과 함께 기록됩니다.</div>';
+  html+='<div class="sd-verify-hint">✔ <b>본인 확인</b>을 위해 아래 <b>연락처</b>와 <b>생년월일+성별</b>(예: 900101-1)을 정확히 입력해 주세요. 주민등록번호 뒷자리는 수집하지 않습니다. 입력하신 정보는 서명과 함께 기록됩니다.</div>';
   html+='<table class="sd-table">';
   // 성명: 읽기전용
   html+=roRow('성명',d.name||'');
-  // 연락처·주민번호: 본인확인 필수 입력
+  // 연락처·생년월일+성별: 본인확인 필수 입력 (주민번호 전체는 수집 안 함)
   html+=inputRow('연락처 *','sf-tel',d.tel||'','010-0000-0000','tel');
-  html+=inputRow('주민등록번호 *','sf-ssn',d.ssn||'','000000-0000000','ssn');
+  html+=inputRow('생년월일+성별 *','sf-ssn',d.ssn||'','900101-1','ssn');
   html+=addrRow('주소','sf-addr',d.addr||'');
   html+=inputRow('이메일','sf-email',d.email||'','email@example.com','email');
   // 사건정보: 읽기전용
@@ -1914,7 +1914,7 @@ function renderSignContract(rec){
 
   // 입력 필드에 자동 포맷 연결
   var telEl=document.getElementById('sf-tel');if(telEl)telEl.oninput=function(){applyLiveFormat(telEl,formatPhone);};
-  var ssnEl=document.getElementById('sf-ssn');if(ssnEl)ssnEl.oninput=function(){applyLiveFormat(ssnEl,formatSSN);};
+  var ssnEl=document.getElementById('sf-ssn');if(ssnEl)ssnEl.oninput=function(){applyLiveFormat(ssnEl,formatBirth);};
 
   function roRow(label,val){
     return '<tr><td class="sd-th">'+label+'</td><td class="sd-td">'+(val?escapeHtml(val):'<span class="sd-empty">-</span>')+'</td></tr>';
@@ -1970,7 +1970,7 @@ async function submitCounterpartySign(){
   var telVal=((document.getElementById('sf-tel')||{}).value||'').trim();
   var ssnVal=((document.getElementById('sf-ssn')||{}).value||'').trim();
   if(!telVal){showToast('본인 확인을 위해 연락처를 입력해 주세요');return;}
-  if(ssnVal.replace(/[^0-9]/g,'').length<7){showToast('본인 확인을 위해 주민등록번호를 정확히 입력해 주세요');return;}
+  if(ssnVal.replace(/[^0-9]/g,'').length!==7){showToast('본인 확인을 위해 생년월일 6자리 + 성별 1자리를 입력해 주세요 (예: 900101-1)');return;}
   var cv=document.getElementById('cpSigCanvas');
   if(!window._cpHasSig){showToast('서명을 입력해 주세요');return;}
   var sigData='';
@@ -1997,9 +1997,9 @@ async function submitCounterpartySign(){
     var payer=gv3('sf-payer');if(payer!==undefined)newFd.data.payer=payer;
     var receipt=rv3('sf-receipt');if(receipt!==undefined)newFd.receipt=receipt;
 
-    // 서명자가 본인확인용으로 직접 기재한 정보 (주민번호는 마스킹하여 기록)
-    var ssnDigits=ssnVal.replace(/[^0-9]/g,'');
-    var ssnMasked=ssnDigits.slice(0,6)+'-'+ssnDigits.slice(6,7)+'******';
+    // 서명자 본인확인 기재정보: 생년월일 6자리 + 성별 1자리만 (주민번호 뒷자리는 수집·저장 안 함)
+    var ssnDigits=ssnVal.replace(/[^0-9]/g,'').slice(0,7);
+    var ssnMasked=ssnDigits.slice(0,6)+'-'+ssnDigits.slice(6,7);
 
     // ── 서명 제출은 서버 함수(RPC)로만 ──
     //  · RLS로 테이블 직접 update는 막혀 있음(익명 위조 방지)
@@ -2239,7 +2239,7 @@ function openHistorySheet(id){
   if(audit.signer_tel||audit.signer_ssn_masked){
     var vinfo=[];
     if(audit.signer_tel)vinfo.push('연락처 '+esc(audit.signer_tel));
-    if(audit.signer_ssn_masked)vinfo.push('주민번호 '+esc(audit.signer_ssn_masked));
+    if(audit.signer_ssn_masked)vinfo.push('생년월일+성별 '+esc(audit.signer_ssn_masked));
     rows+=step(IC.idcard,'본인확인 기재', vinfo.join(' · '), '서명자가 직접 입력');
   }
   // 문서지문
@@ -2923,10 +2923,11 @@ function openModal(key,label){
   document.getElementById('modalTitle').textContent=label+' 입력';
   var inp=document.getElementById('modalInput');
   inp.value=data[key]||'';
-  // 전화/주민번호는 실시간 하이픈 포맷
-  inp.oninput=null;
+  // 전화/생년월일·주민번호는 실시간 하이픈 포맷
+  inp.oninput=null; inp.placeholder='';
   if(key==='tel'||key==='oppTel')inp.oninput=function(){applyLiveFormat(inp,formatPhone);};
-  else if(key==='ssn'||key==='oppSsn')inp.oninput=function(){applyLiveFormat(inp,formatSSN);};
+  else if(key==='ssn'){inp.oninput=function(){applyLiveFormat(inp,formatBirth);};inp.placeholder='900101-1 (생년월일+성별)';}   // 계약서 위임인: 생년월일+성별만
+  else if(key==='oppSsn'){inp.oninput=function(){applyLiveFormat(inp,formatSSN);};inp.placeholder='000000-0000000';}
   document.getElementById('modalOverlay').classList.add('active');
   setTimeout(function(){inp.focus();},80);
 }
@@ -2958,6 +2959,14 @@ function formatSSN(v){
   if(n.length>13)n=n.slice(0,13);
   if(n.length<7)return n;
   return n.slice(0,6)+'-'+n.slice(6);
+}
+/* 계약서 본인확인용: 주민번호 전체 대신 생년월일 6자리 + 뒷자리 앞 1자리(성별)만 (예: 900101-1)
+   개인정보보호법상 주민등록번호 수집을 피하기 위함 */
+function formatBirth(v){
+  var n=String(v).replace(/[^0-9]/g,'');
+  if(n.length>7)n=n.slice(0,7);
+  if(n.length<=6)return n;
+  return n.slice(0,6)+'-'+n.slice(6,7);
 }
 /* input 요소에 실시간 포맷 적용 (커서 위치 보존) */
 function applyLiveFormat(el,fmtFn){
