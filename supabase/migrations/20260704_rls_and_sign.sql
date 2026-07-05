@@ -122,6 +122,10 @@ declare
   v_now      timestamptz := now();
   v_snapshot jsonb;
   v_hash     text;
+  v_base     jsonb;   -- 변호사가 만든 원본 form_data (계약 본문 = 불변)
+  v_signer   jsonb;   -- 서명자가 보낸 data (신뢰하지 않음, 화이트리스트만 사용)
+  v_data     jsonb;   -- 원본 data + 서명자 허용필드 병합 결과
+  v_form     jsonb;   -- 서버가 확정한 최종 form_data (해시·저장 대상)
 begin
   if p_token is null or length(trim(p_token)) = 0 then
     return jsonb_build_object('ok', false, 'reason', 'invalid');
@@ -149,6 +153,27 @@ begin
     return jsonb_build_object('ok', false, 'reason', 'signed');
   end if;
 
+  -- ── 무결성 핵심 ──────────────────────────────────────────────
+  --  계약 본문(업무범위·수임료·계좌·특약·조항 등)은 '원본 row'(변호사 작성)에서만 취하고,
+  --  서명자에게선 '본인 식별정보'만 화이트리스트로 병합한다.
+  --  → 서명자가 토큰으로 수임료·업무범위 등을 바꿔 제출해도 서버가 무시하므로
+  --    "양 당사자가 동일 문서에 합의"가 보장되고, 그 내용에만 해시가 찍힌다.
+  v_base   := coalesce(r.form_data, '{}'::jsonb);
+  v_signer := coalesce(p_form_data -> 'data', '{}'::jsonb);
+  v_data   := coalesce(v_base -> 'data', '{}'::jsonb)
+              || jsonb_strip_nulls(jsonb_build_object(
+                   'tel',   v_signer ->> 'tel',      -- 연락처
+                   'ssn',   v_signer ->> 'ssn',      -- 주민등록번호(본인확인용)
+                   'addr',  v_signer ->> 'addr',     -- 주소
+                   'email', v_signer ->> 'email',    -- 이메일
+                   'payer', v_signer ->> 'payer'     -- 입금자명
+                 ));
+  v_form := jsonb_set(v_base, '{data}', v_data, true);
+  -- 계산서 발행방식(현금영수증/세금계산서)만 서명자 선택 허용
+  if p_form_data ? 'receipt' then
+    v_form := jsonb_set(v_form, '{receipt}', p_form_data -> 'receipt', true);
+  end if;
+
   -- 서명 시점 스냅샷을 서버에서 구성하고, 그 위에 해시를 계산 (무결성의 기준점)
   v_snapshot := jsonb_build_object(
     'doc_type',    r.doc_type,
@@ -156,7 +181,7 @@ begin
     'case_name',   r.case_name,
     'court',       r.court,
     'client_name', r.client_name,
-    'form_data',   coalesce(p_form_data, r.form_data),
+    'form_data',   v_form,
     'signed_at',   to_char(v_now at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
   );
   v_hash := encode(digest(convert_to(v_snapshot::text, 'UTF8'), 'sha256'), 'hex');
@@ -164,7 +189,7 @@ begin
   update public.contracts
      set counterparty_signature = p_signature,
          sign_status            = 'signed',
-         form_data              = coalesce(p_form_data, form_data),
+         form_data              = v_form,   -- 서버가 확정한 내용만 저장(클라 위조 반영 안 함)
          signed_snapshot        = v_snapshot,
          signed_hash            = v_hash,
          signed_at              = v_now,
