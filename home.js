@@ -30,6 +30,7 @@ var MENU = {
   seonim:        { name: '선임계 작성',   desc: '변호인 선임신고서',       icon: 'file',    action: 'openSeonimType()' },
   dojang:        { name: '형사서면 출력', desc: '증거·참고자료 서면 출력', icon: 'printer', action: 'openDojang()' },
   yeollam:       { name: '열람·복사',     desc: '재판기록 열람·복사 신청서', icon: 'copy',  action: 'goYeollam()' },
+  gukseon:       { name: '국선보수증액',   desc: '국선변호보수증액등신청서', icon: 'file',   action: 'goGukseon()' },
   contractWrite: { name: '계약서 작성',   desc: '송무위임계약서',         icon: 'doc',     action: 'openTypeSheet()' },
   contractList:  { name: '계약서 목록',   desc: '저장된 계약서 관리',     icon: 'list',    action: 'openContractList()' },
   appeal:        { name: '항소장',        desc: '항소이유서',             icon: 'check',   action: 'goAppeal()' },
@@ -44,6 +45,7 @@ var PC_ORDER = [
   { id: 'seonim',        size: 'hero' },
   { id: 'dojang',        size: 'wide' },
   { id: 'yeollam',       size: 'wide' },
+  { id: 'gukseon',       size: 'small' },
   { id: 'contractWrite', size: 'small' },
   { id: 'contractList',  size: 'small' },
   { id: 'appeal',        size: 'small' },
@@ -62,6 +64,7 @@ var MORE_ORDER = [
   { id: 'seonim' },
   { id: 'appeal',  name: '항소장 작성' },
   { id: 'yeollam', name: '열람·복사 신청서', desc: '재판기록 열람·복사' },
+  { id: 'gukseon', name: '국선보수증액 신청서', desc: '국선변호보수증액등' },
   { id: 'dojang' }
 ];
 
