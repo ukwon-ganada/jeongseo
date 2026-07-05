@@ -48,9 +48,9 @@
   <div id="signMsgBox" class="sign-msg-box">
     <div class="sign-msg-spinner"></div>
     <div class="sign-msg-text">불러오는 중...</div>
-    <div id="signDoneActions" style="display:none;margin-top:26px;width:100%;max-width:300px;">
-      <button class="sign-submit-btn" onclick="downloadSignedContract()">서명한 계약서 저장 (이미지)</button>
-      <div class="sign-submit-note" style="margin-top:10px;">서명이 완료된 계약서를<br>사진(이미지)으로 본인 기기에 저장합니다.</div>
+    <div id="signDoneActions" style="display:none;margin-top:26px;width:100%;max-width:320px;">
+      <button class="sign-submit-btn" onclick="saveSignedCopy()">계약서 저장 · 공유</button>
+      <div class="sign-submit-note" style="margin-top:10px;">서명본 계약서(PDF)를 기기에 저장하거나<br>카카오톡·파일 등으로 보관하세요.</div>
       <div class="app-ver" style="text-align:center;font-size:10px;color:#cfd3d9;margin-top:14px;"></div>
     </div>
   </div>
@@ -58,12 +58,30 @@
     <div class="sign-doc-wrap">
       <div id="signDocView"></div>
     </div>
-    <div class="sign-consent-section">
-      <label class="sign-consent">
-        <input type="checkbox" id="cpConsentChk" onchange="updateSubmitState()">
-        <span>본인은 위 계약 내용을 모두 확인하였으며, 이에 <b>동의하여 전자서명</b>합니다.</span>
-      </label>
+    <div class="sign-agree" id="signAgree">
+      <button type="button" class="agree-all" id="agreeAll" onclick="toggleAllConsent()">
+        <span class="agree-check"></span>
+        <span class="agree-all-txt">약관에 전체 동의합니다</span>
+      </button>
+      <div class="agree-list">
+        <div class="agree-item">
+          <button type="button" class="agree-chk" data-consent="js" onclick="toggleConsentItem('js')"><span class="agree-check"></span></button>
+          <span class="agree-label"><b class="agree-req">[필수]</b> 전자문서 및 전자서명 이용 동의</span>
+          <button type="button" class="agree-view" onclick="openTermsSheet('js')">보기</button>
+        </div>
+        <div class="agree-item">
+          <button type="button" class="agree-chk" data-consent="privacy" onclick="toggleConsentItem('privacy')"><span class="agree-check"></span></button>
+          <span class="agree-label"><b class="agree-req">[필수]</b> 개인정보 수집·이용 동의</span>
+          <button type="button" class="agree-view" onclick="openTermsSheet('privacy')">보기</button>
+        </div>
+        <div class="agree-item">
+          <button type="button" class="agree-chk" data-consent="contract" onclick="toggleConsentItem('contract')"><span class="agree-check"></span></button>
+          <span class="agree-label"><b class="agree-req">[필수]</b> 계약 내용 확인 및 전자서명 동의</span>
+          <button type="button" class="agree-view" onclick="openTermsSheet('contract')">보기</button>
+        </div>
+      </div>
     </div>
+    <input type="checkbox" id="cpConsentChk" style="display:none;"><!-- 하위호환: 전체동의 상태 미러 -->
     <div class="sign-otp-section" id="otpSection" style="display:none;">
       <div class="otp-title">휴대폰 본인확인</div>
       <div class="otp-desc" id="otpDesc">등록된 연락처로 인증번호를 보내 본인 확인을 진행합니다.</div>
@@ -85,6 +103,15 @@
       <button id="cpSubmitBtn" class="sign-submit-btn" onclick="submitCounterpartySign()" disabled>서명 제출</button>
       <div class="sign-submit-note">위 내용에 동의하고 서명하시면 활성화됩니다.<br>제출 시점의 계약서 내용이 그대로 고정·보관됩니다.</div>
       <div class="app-ver" style="text-align:center;font-size:10px;color:#cfd3d9;margin-top:12px;"></div>
+    </div>
+  </div>
+  <!-- 약관 전문 바텀시트 -->
+  <div class="terms-overlay" id="termsOverlay" onclick="if(event.target===this)closeTermsSheet()">
+    <div class="terms-sheet">
+      <div class="terms-handle"></div>
+      <div class="terms-title" id="termsTitle">약관</div>
+      <div class="terms-body" id="termsBody"></div>
+      <button class="terms-close" onclick="closeTermsSheet()">확인</button>
     </div>
   </div>
 </div>
@@ -1420,7 +1447,7 @@ function resetContract(){
 }
 
 /* ═══ Supabase 연동 ═══ */
-var APP_VERSION='v128';
+var APP_VERSION='v129';
 var SUPABASE_URL='https://nyjyemjsperpakrrgzcc.supabase.co';
 var SUPABASE_KEY='sb_publishable_QKl9MIt2_MflYnpN41VRvg_cNIAbYhU';
 /* SMS 본인확인(OTP) 스위치. 솔라피·Edge Function·OTP SQL 준비가 끝나면 true 로 바꾸고 재배포.
@@ -1833,6 +1860,7 @@ async function initSignMode(token){
     signModeRecord=rec;   // {ok, doc_type, case_num, case_name, court, client_name, form_data, sign_status, sign_expires_at, recipient_name}
     signModeRecord.sign_token=token;   // 제출 때 다시 필요
     renderSignContract(rec);
+    resetConsent();   // 약관 동의 초기화
     // 휴대폰 본인확인(OTP) 초기화 — OTP_ENABLED일 때만 노출
     _otpVerified=false;
     var otpSec=document.getElementById('otpSection');
@@ -1989,9 +2017,8 @@ function fmtNum(v){
 }
 async function submitCounterpartySign(){
   if(!signModeRecord){showToast('오류: 다시 시도해 주세요');return;}
-  // 동의 확인
-  var chk=document.getElementById('cpConsentChk');
-  if(!chk||!chk.checked){showToast('계약 내용 동의에 체크해 주세요');return;}
+  // 필수 약관 동의 확인
+  if(!consentAllAgreed()){showToast('필수 약관에 모두 동의해 주세요');return;}
   // 휴대폰 본인확인(OTP) — 켜져 있으면 인증 완료 필수 (서버에서도 재검증)
   if(OTP_ENABLED&&!_otpVerified){showToast('휴대폰 본인확인(인증번호)을 먼저 완료해 주세요');return;}
   // 본인확인 필수 입력 확인
@@ -2024,6 +2051,9 @@ async function submitCounterpartySign(){
     var email=gv3('sf-email');if(email!==undefined)newFd.data.email=email;
     var payer=gv3('sf-payer');if(payer!==undefined)newFd.data.payer=payer;
     var receipt=rv3('sf-receipt');if(receipt!==undefined)newFd.receipt=receipt;
+    // 동의 항목·시각 기록용 (서버가 audit로만 옮기고 계약본문엔 반영 안 함)
+    newFd.__consent={version:CONSENT_VERSION, at:new Date().toISOString(),
+      items:CONSENT_ITEMS.map(function(it){return it.title;})};
 
     // 서명자 본인확인 기재정보: 생년월일 6자리 + 성별 1자리만 (주민번호 뒷자리는 수집·저장 안 함)
     var ssnDigits=ssnVal.replace(/[^0-9]/g,'').slice(0,7);
@@ -2066,10 +2096,9 @@ async function submitCounterpartySign(){
 }
 /* 동의 체크 여부에 따라 제출 버튼 활성/비활성 */
 function updateSubmitState(){
-  var chk=document.getElementById('cpConsentChk');
   var btn=document.getElementById('cpSubmitBtn');
-  // 동의 + (OTP 켜져 있으면) 휴대폰 인증 완료 여야 제출 활성화
-  var ok=chk&&chk.checked&&(!OTP_ENABLED||_otpVerified);
+  // 필수 약관 전체 동의 + (OTP 켜져 있으면) 휴대폰 인증 완료 여야 제출 활성화
+  var ok=consentAllAgreed()&&(!OTP_ENABLED||_otpVerified);
   if(btn)btn.disabled=!ok;
 }
 
@@ -2137,6 +2166,45 @@ async function verifySignOtp(){
     }
   }catch(e){ setOtpMsg('확인 중 오류가 발생했습니다','err'); if(vbtn)vbtn.disabled=false; }
 }
+
+/* ═══ 약관 동의 (금융앱식: 전체동의 + 필수 3항목 + 약관보기) ═══ */
+var CONSENT_VERSION='2026-07-05';
+var CONSENT_ITEMS=[
+  {key:'js',      title:'전자문서 및 전자서명 이용 동의',
+   body:'본 서비스는 「전자문서 및 전자거래 기본법」과 「전자서명법」에 따라 전자적 방식으로 계약을 체결합니다.\n\n귀하가 화면에서 서명(전자서명)하고 제출하면, 서면에 자필 서명·날인한 것과 동일한 효력이 발생합니다.\n\n제출 시점의 계약 내용이 그대로 고정·보관되며, 위·변조 방지를 위해 문서 고유지문(SHA-256)이 생성됩니다. 열람·인증·서명 시각과 접속기록(IP)이 증빙으로 함께 보관됩니다.'},
+  {key:'privacy', title:'개인정보 수집·이용 동의',
+   body:'1. 수집 항목\n  · 성명, 연락처, 생년월일 및 성별(주민등록번호 뒷자리는 수집하지 않습니다), 주소, 이메일(선택), 서명 이미지, 접속기록(IP·일시)\n\n2. 수집·이용 목적\n  · 위임계약의 체결·이행 및 본인확인, 전자서명의 진정성·무결성 증빙\n\n3. 보유·이용 기간\n  · 위임사무 종료 후 관계법령(변호사법 등)에서 정한 기간까지 보관한 뒤 지체 없이 파기\n\n4. 동의 거부 권리\n  · 동의를 거부할 권리가 있으나, 미동의 시 전자서명을 통한 계약 체결이 제한됩니다.'},
+  {key:'contract',title:'계약 내용 확인 및 전자서명 동의',
+   body:'본인은 위 계약서(송무위임계약서)의 내용을 모두 확인하였으며, 그 내용에 동의하여 전자서명합니다.\n\n서명 제출 시점의 계약서 내용이 그대로 고정·보관되며, 이후 임의로 변경되지 않습니다.'}
+];
+var _consent={js:false,privacy:false,contract:false};
+function _paintConsent(){
+  CONSENT_ITEMS.forEach(function(it){
+    var b=document.querySelector('.agree-chk[data-consent="'+it.key+'"]');
+    if(b)b.classList.toggle('on',!!_consent[it.key]);
+  });
+  var all=CONSENT_ITEMS.every(function(it){return _consent[it.key];});
+  var ab=document.getElementById('agreeAll'); if(ab)ab.classList.toggle('on',all);
+  var mirror=document.getElementById('cpConsentChk'); if(mirror)mirror.checked=all;
+  updateSubmitState();
+}
+function toggleAllConsent(){
+  var all=CONSENT_ITEMS.every(function(it){return _consent[it.key];});
+  var next=!all;
+  CONSENT_ITEMS.forEach(function(it){_consent[it.key]=next;});
+  _paintConsent();
+}
+function toggleConsentItem(key){ _consent[key]=!_consent[key]; _paintConsent(); }
+function resetConsent(){ _consent={js:false,privacy:false,contract:false}; _paintConsent(); }
+function openTermsSheet(key){
+  var it=CONSENT_ITEMS.filter(function(x){return x.key===key;})[0]; if(!it)return;
+  document.getElementById('termsTitle').textContent=it.title;
+  document.getElementById('termsBody').textContent=it.body;
+  document.getElementById('termsOverlay').classList.add('active');
+}
+function closeTermsSheet(){ var o=document.getElementById('termsOverlay'); if(o)o.classList.remove('active'); }
+function consentAllAgreed(){ return CONSENT_ITEMS.every(function(it){return _consent[it.key];}); }
+
 /* 화면의 계약서 표를 읽기전용 HTML로 복제 (input을 입력값 텍스트로 치환) */
 function snapshotSignDocHtml(){
   var src=document.getElementById('signDocView');
@@ -2159,6 +2227,47 @@ function snapshotSignDocHtml(){
   return clone.innerHTML;
 }
 /* 서명한 '완성된 계약서'(정식 양식)를 이미지(PNG)로 저장 */
+/* F: 서명본 계약서를 PDF로 만들어 저장/공유(iOS 공유시트) */
+async function saveSignedCopy(){
+  var info=window._signedInfo;
+  if(!info){showToast('저장할 계약서 정보가 없습니다');return;}
+  var btn=document.querySelector('#signDoneActions .sign-submit-btn');
+  if(btn){btn.disabled=true;btn.textContent='계약서 만드는 중…';}
+  try{
+    var dt=info.docType||'형사';
+    currentDocType=dt;
+    showScreen('screen-contract'); switchContractType(dt);
+    restoreFormData(info.formData||{});
+    if(info.sigData)restoreSignatureByType(info.sigData, dt);
+    await new Promise(function(r){setTimeout(r,400);});
+    var canvases=await capturePages();
+    if(!canvases||!canvases.length)throw new Error('계약서 페이지를 찾지 못했습니다');
+    var d=new Date(info.signedAt||Date.now());var p=function(n){return (n<10?'0':'')+n;};
+    var fname='송무위임계약서(서명본)_'+(info.clientName||'의뢰인')+'_'+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate());
+    var jsPDFCtor=(window.jspdf&&window.jspdf.jsPDF)?window.jspdf.jsPDF:(window.jsPDF||null);
+    if(jsPDFCtor){
+      var pdf=new jsPDFCtor({orientation:'portrait',unit:'mm',format:'a4'});
+      addCanvasesToPdf(pdf,canvases,210,297);
+      var blob=pdf.output('blob');
+      var file=new File([blob],fname+'.pdf',{type:'application/pdf'});
+      if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
+        try{ await navigator.share({files:[file],title:'서명한 계약서',text:(info.clientName||'의뢰인')+' 님의 송무위임계약서(서명본)'}); }
+        catch(e){ if(e&&e.name!=='AbortError') fallbackDownload(blob,fname+'.pdf'); }
+      }else{ fallbackDownload(blob,fname+'.pdf'); }
+    }else{
+      // PDF 라이브러리 없으면 이미지로 폴백
+      var maxW=0,totH=0; canvases.forEach(function(c){if(c.width>maxW)maxW=c.width;totH+=c.height;});
+      var merged=document.createElement('canvas');merged.width=maxW;merged.height=totH;
+      var mctx=merged.getContext('2d');mctx.fillStyle='#fff';mctx.fillRect(0,0,maxW,totH);
+      var y=0;canvases.forEach(function(c){mctx.drawImage(c,0,y);y+=c.height;});
+      var a=document.createElement('a');a.download=fname+'.png';a.href=merged.toDataURL('image/png');a.click();
+    }
+  }catch(e){
+    showToast('저장 실패: '+((e&&e.message)?e.message:'다시 시도'));
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='계약서 저장 · 공유';}
+  }
+}
 async function downloadSignedContract(){
   var info=window._signedInfo;
   if(!info){showToast('저장할 계약서 정보가 없습니다');return;}
@@ -2337,6 +2446,11 @@ function openHistorySheet(id){
     if(audit.phone_verified_phone)pinfo.push(esc(audit.phone_verified_phone));
     if(audit.phone_verified_ip)pinfo.push('IP '+esc(audit.phone_verified_ip));
     rows+=step(IC.shield,'휴대폰 본인확인', audit.phone_verified_at?fmtFull(audit.phone_verified_at):'인증 완료', pinfo.join(' · '));
+  }
+  // 약관 동의 항목
+  if(audit.consent_detail&&audit.consent_detail.items){
+    var citems=(audit.consent_detail.items||[]).map(function(t){return '· '+esc(t);}).join('<br>');
+    rows+=step(IC.pen,'약관 동의', citems, (audit.consent_detail.at?fmtFull(audit.consent_detail.at):'')+(audit.consent_detail.version?(' · v'+esc(audit.consent_detail.version)):''));
   }
   // 서명자 본인확인 기재정보
   if(audit.signer_tel||audit.signer_ssn_masked){

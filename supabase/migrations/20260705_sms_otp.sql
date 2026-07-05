@@ -182,6 +182,7 @@ begin
                    'hash_computed_by',     'server',
                    'signer_tel',           p_signer_tel,
                    'signer_ssn_masked',    p_signer_ssn_masked,
+                   'consent_detail',       p_form_data -> '__consent',
                    'signed_ip',            public._client_ip(),
                    'phone_verified',       true,
                    'phone_verified_phone', v_otp.phone,

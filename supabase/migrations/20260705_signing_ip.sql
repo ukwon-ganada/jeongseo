@@ -118,7 +118,8 @@ begin
                    'signed_at', to_char(v_now at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
                    'consent', true, 'hash_algo', 'SHA-256', 'hash_computed_by', 'server',
                    'signer_tel', p_signer_tel, 'signer_ssn_masked', p_signer_ssn_masked,
-                   'signed_ip', public._client_ip())
+                   'signed_ip', public._client_ip(),
+                   'consent_detail', p_form_data -> '__consent')
    where sign_token = p_token;
 
   return jsonb_build_object('ok', true, 'signed_at', v_now, 'signed_hash', v_hash);
