@@ -253,7 +253,7 @@
         'padding:20mm 10mm 12mm 10mm;-webkit-print-color-adjust:exact;print-color-adjust:exact;' +
         "font-family:'함초롬바탕','HCR Batang','바탕',Batang,serif;color:#000;}" +
       /* 표: border-collapse 로 공유변 병합(원본 테두리 모델과 동일). 열너비는 colgroup 고정 */
-      '.gm-tbl{border-collapse:collapse;table-layout:fixed;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+      '.gm-tbl{border-collapse:collapse;table-layout:fixed;margin:0 auto;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
       '.gm-tbl td{padding:0.2mm 1mm;line-height:1.18;word-break:keep-all;vertical-align:middle;' +
         'font-size:10pt;overflow:hidden;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
       '.gm-tbl td>div{white-space:pre-wrap;}' +
@@ -265,13 +265,15 @@
       '@media print{.gm-doc-cell:focus{background:transparent;}}' +
       /* 3p 수수료 입력·계산 */
       '.gm-fee-qtywrap{white-space:nowrap;}' +
-      '.gm-fee-qty{width:5em;border:none;border-bottom:0.2mm solid #888;background:#eef4ff;' +
-        'font:inherit;text-align:center;padding:0 1px;-webkit-appearance:none;}' +
+      '.gm-fee-qty{width:2.2em;border:none;border-bottom:0.2mm solid #888;background:#eef4ff;' +
+        'font:inherit;text-align:center;padding:0;margin:0;-webkit-appearance:none;}' +
       '@media print{.gm-fee-qty{background:transparent;border-bottom:none;}}' +
       '.gm-fee-amt,.gm-fee-total{font-weight:600;}' +
       /* 서명란 클릭-날인 */
-      '.gm-sign-slot{cursor:pointer;}' +
-      '.gm-seal{width:12mm;height:12mm;vertical-align:middle;margin:0 1mm;}' +
+      '.gm-sign-slot{cursor:pointer;position:relative;}' +
+      /* 도장: 서명 슬롯 기준 절대배치로 이름 위에 겹쳐 찍음(칸/줄 안 늘림) */
+      '.gm-seal{width:12mm;height:12mm;position:absolute;left:-2em;top:50%;' +
+        'transform:translateY(-50%);z-index:5;pointer-events:none;}' +
       '@media print{.gm-sign-slot{cursor:auto;}}' +
       /* 입력폼 (오버레이) */
       '#geomchalForm{display:none;position:fixed;inset:0;z-index:1100;background:#fff;flex-direction:column;}' +
@@ -349,7 +351,7 @@
   /* ── 2p 서류 목록 · 3p 수수료 수량 (서면 위에서 편집, 렌더 간 유지) ── */
   var DOC_DEFAULT = ['증거기록', '소송기록 일체, 미디어파일 일체(CD 등)'];
   var docList = DOC_DEFAULT.slice();
-  var feeQty = [0, 0, 0, 0];   // 열람·등사·등본·초본
+  var feeQty = [0, 1, 0, 0];   // 열람·등사·등본·초본 (등사 기본 1건)
   var FEE_UNIT = [500, 500];   // 열람·등사 = 건당 500
 
   // 서류표목 편집 → 목록 갱신
@@ -400,7 +402,7 @@
 
   window.openGeomchalForm = function () {
     ensureUI();
-    docList = DOC_DEFAULT.slice(); feeQty = [0, 0, 0, 0];   // 새 문서 → 서류/수수료 초기화
+    docList = DOC_DEFAULT.slice(); feeQty = [0, 1, 0, 0];   // 새 문서 → 서류/수수료 초기화(등사 기본 1건)
     document.getElementById('gm-client').value = '';
     document.getElementById('gm-position').value = '';
     document.getElementById('gm-casenum').value = '';
@@ -419,12 +421,12 @@
   };
 
   /* ── 서명란 클릭 → 도장 날인(토글) ──
-     현재 담당변호사가 서고은이고 전역 직인(SEAL_SEOGOEUN)이 있으면 이름 뒤에 날인.
-     그 외 변호사는 실물 날인이므로 안내만. 다시 클릭하면 제거. */
+     실제 도장처럼 서명 위에 겹쳐 찍는다(절대배치 → 칸/줄 안 늘어남, 글자와 겹쳐도 무방).
+     담당변호사가 서고은이고 전역 직인(SEAL_SEOGOEUN)이 있을 때. 다시 클릭하면 제거. */
   window.gmStamp = function (el) {
     if (!el) return;
-    var exist = el.parentNode.querySelector('.gm-seal');
-    if (exist) { exist.parentNode.removeChild(exist); return; }
+    var exist = el.querySelector('.gm-seal');
+    if (exist) { exist.parentNode.removeChild(exist); return; }   // 토글 제거
     var att = state && state.attorney;
     var seal = (typeof SEAL_SEOGOEUN !== 'undefined') ? SEAL_SEOGOEUN : '';
     if (att !== '서고은' || !seal) {
@@ -433,7 +435,7 @@
     }
     var img = document.createElement('img');
     img.className = 'gm-seal'; img.src = seal; img.alt = '';
-    el.parentNode.insertBefore(img, el);
+    el.appendChild(img);   // 슬롯(position:relative) 기준 절대배치 → 이름 위에 겹쳐 찍힘
   };
 
   window.applyGeomchalForm = function () {
