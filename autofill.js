@@ -319,6 +319,7 @@
   /* 범용 진입점: anchorId는 폼 안의 정적 입력칸 id(이걸로 .fs-body를 찾는다)
      opts.courtDept: 재판부를 채울 칸 id (선택). data-af 표준 밖이라 여기서 서버 조회로 처리.
        → 사건 선택 시 fillByDataAttr 후, 같은 사건번호로 court-lookup을 불러 재판부만 채움.
+     opts.sentDate: 선고일(judgment_date)을 채울 칸 id (선택). 같은 court-lookup 결과 재사용.
        기존 호출 initAutofillFor('id') 는 opts 없이 그대로 동작(영향 없음). */
   window.initAutofillFor = function(anchorId, opts){
     injectStyle();
@@ -328,19 +329,20 @@
     if (!body) return;
     buildSearchCard(anchor, function(row){
       fillByDataAttr(body, row);
-      // 재판부 실시간 조회(선택) — 항소장과 동일한 fetchCourtDept·캐시 재사용
-      if (opts && opts.courtDept){
-        var deptEl = document.getElementById(opts.courtDept);
-        if (deptEl && row.l_num && row.l_code){
-          if (deptCache[row.l_num] !== undefined){
-            if (deptCache[row.l_num].court_dept) deptEl.value = deptCache[row.l_num].court_dept;
-          } else {
-            fetchCourtDept(row.l_code, row.l_num, function(res){
-              deptCache[row.l_num] = res;
-              if (res.court_dept) deptEl.value = res.court_dept;
-            });
+      // 재판부·선고일 실시간 조회(선택) — court-lookup 결과(캐시) 재사용
+      if (opts && (opts.courtDept || opts.sentDate) && row.l_num && row.l_code){
+        var applyLookup = function(res){
+          if (opts.courtDept && res.court_dept){
+            var dEl = document.getElementById(opts.courtDept);
+            if (dEl) dEl.value = res.court_dept;
           }
-        }
+          if (opts.sentDate && res.judgment_date){
+            var sEl = document.getElementById(opts.sentDate);
+            if (sEl) sEl.value = normalizeDate(res.judgment_date);
+          }
+        };
+        if (deptCache[row.l_num] !== undefined){ applyLookup(deptCache[row.l_num]); }
+        else { fetchCourtDept(row.l_code, row.l_num, function(res){ deptCache[row.l_num] = res; applyLookup(res); }); }
       }
     });
   };

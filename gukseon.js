@@ -21,7 +21,7 @@
 
   /* ── 상수 ─────────────────────────────────────────── */
   var ATTORNEYS_SEED = ['서고은', '양선화', '이예나'];
-  var ATTORNEYS_KEY = 'jeongseo_gukseon_attorneys';   // 추가 변호사 기억(localStorage)
+  var ATTORNEYS_KEY = 'jeongseo_attorneys';   // 추가 변호사 기억(localStorage) — 서면 공통
   var RRN_MAP = { '서고은': '840219-2079920' };        // 아는 주민번호만
   var COURT_DEFAULT = '인천지방법원';
   var COURTDIV_DEFAULT = '형사7단독';
