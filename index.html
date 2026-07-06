@@ -994,7 +994,9 @@
   <div id="addrSearchEmbed" class="addr-embed"></div>
 </div>
 
+<div id="fsBackdrop" onclick="closeFormSheet()"></div>
 <div id="formSheet">
+  <div class="fs-grabber" aria-hidden="true"></div>
   <div class="fs-head">
     <button class="fs-close" onclick="closeFormSheet()" aria-label="닫기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     <div class="fs-title">계약서 정보 입력</div>
@@ -2707,9 +2709,52 @@ function openFormSheet(){
   document.getElementById('f-special').value=isCivil?vv('cv-special-extra'):isFamily?vv('fm-special-extra'):vv('special-extra');
   document.getElementById('f-month').value=vv('inp-month');
   document.getElementById('f-day').value=vv('inp-day');
-  document.getElementById('formSheet').classList.add('active');
+  // 바텀시트 슬라이드업: 시작 위치(아래) 확정 후 .active 로 올림
+  var _fs=document.getElementById('formSheet');
+  _fs.style.transition='';_fs.style.transform='';
+  document.body.classList.add('formsheet-open');
+  void _fs.offsetWidth;              // reflow: translateY(100%) 를 시작 상태로 고정
+  _fs.classList.add('active');
 }
-function closeFormSheet(){document.getElementById('formSheet').classList.remove('active');}
+function closeFormSheet(){
+  var fs=document.getElementById('formSheet');
+  fs.classList.remove('active');     // 시트는 아래로 슬라이드다운(모바일) / 즉시 숨김(PC)
+  fs.style.transition='';fs.style.transform='';  // 드래그 인라인 스타일 정리
+  document.body.classList.remove('formsheet-open');
+}
+/* ── 바텀시트 그래버 드래그하여 닫기 (모바일 전용) ── */
+function initFormSheetDrag(){
+  var fs=document.getElementById('formSheet');
+  if(!fs)return;
+  var handle=fs.querySelector('.fs-grabber');
+  if(!handle)return;
+  var startY=0,curY=0,dragging=false,startT=0;
+  var isMobile=function(){return window.matchMedia('(max-width:767px)').matches;};
+  handle.addEventListener('touchstart',function(e){
+    if(!isMobile())return;
+    dragging=true;startY=e.touches[0].clientY;curY=0;startT=Date.now();
+    fs.style.transition='none';
+  },{passive:true});
+  handle.addEventListener('touchmove',function(e){
+    if(!dragging)return;
+    curY=e.touches[0].clientY-startY;
+    if(curY<0)curY=0;
+    fs.style.transform='translateY('+curY+'px)';
+    e.preventDefault();
+  },{passive:false});
+  var end=function(){
+    if(!dragging)return;
+    dragging=false;
+    fs.style.transition='';
+    var fast=(curY>60)&&((Date.now()-startT)<250);
+    if(curY>140||fast){closeFormSheet();}
+    else{fs.style.transform='';}   // 임계값 미만 → 제자리로 스냅
+  };
+  handle.addEventListener('touchend',end);
+  handle.addEventListener('touchcancel',end);
+}
+if(document.readyState!=='loading'){initFormSheetDrag();}
+else{document.addEventListener('DOMContentLoaded',initFormSheetDrag);}
 function setChip(chipKey,chkId){
   var c=document.querySelector('.fs-chip[data-chip="'+chipKey+'"]');
   var e=document.getElementById(chkId);
