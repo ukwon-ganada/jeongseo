@@ -911,6 +911,9 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
 .fs-chips{display:flex;flex-wrap:wrap;gap:8px;}
 .fs-chip{display:inline-flex;align-items:center;gap:6px;padding:9px 15px;border:1px solid var(--border);border-radius:var(--r-pill);font-size:13px;cursor:pointer;background:#fff;user-select:none;transition:all 0.15s;}
 .fs-chip.on{background:var(--black);color:#fff;border-color:var(--black);}
+/* 입금계좌 선택 알약 (업무범위 칩과 동일 언어, 탭 영역 넉넉히) */
+.fs-acct-chips{gap:8px;}
+.fs-acct-chip{padding:11px 20px;font-size:14px;font-weight:500;}
 /* 의뢰인 카드 미니멀·컴팩트 (v92) */
 .cl-head{display:flex;align-items:center;justify-content:space-between;margin:22px 2px 10px;}
 .cl-head:first-child{margin-top:4px;}

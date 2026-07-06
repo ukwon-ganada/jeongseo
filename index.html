@@ -1095,14 +1095,15 @@
       <div class="fs-field"><textarea class="fs-input" id="f-special" placeholder="특약사항이 있으면 입력하세요"></textarea></div>
     </div>
 
-    <!-- 입금계좌 -->
+    <!-- 입금계좌 (알약 버튼 선택 — 계약서에는 전체 계좌번호로 표시됨) -->
     <div class="fs-group">
       <div class="fs-field">
         <label class="fs-label">입금 계좌</label>
-        <select class="fs-input fs-acct" id="f-account">
-          <option value="smg">새마을금고 9002-2057-8814-5 (법무법인 정서)</option>
-          <option value="hana">하나은행 748-910745-40207 (서고은)</option>
-        </select>
+        <div class="fs-chips fs-acct-chips">
+          <div class="fs-chip fs-acct-chip" data-acct="smg" onclick="pickAccount(this)">새마을금고</div>
+          <div class="fs-chip fs-acct-chip" data-acct="hana" onclick="pickAccount(this)">하나은행</div>
+        </div>
+        <input type="hidden" id="f-account" value="smg">
       </div>
     </div>
 
@@ -2666,6 +2667,18 @@ async function deleteContract(id){
 function startNewContract(){currentEditId=null;currentRecord=null;}
 
 /* ═══ 통합 입력 폼 ═══ */
+/* 입금계좌 알약 선택 (단일 선택) — 히든 input#f-account 에 smg/hana 값 보관 */
+function setFormAccount(val){
+  if(val!=='hana')val='smg';
+  var inp=document.getElementById('f-account');
+  if(inp)inp.value=val;
+  var chips=document.querySelectorAll('.fs-acct-chip');
+  for(var i=0;i<chips.length;i++){
+    if(chips[i].getAttribute('data-acct')===val)chips[i].classList.add('on');
+    else chips[i].classList.remove('on');
+  }
+}
+function pickAccount(el){ setFormAccount(el.getAttribute('data-acct')); }
 function openFormSheet(){
   // 서명 완료된 계약서는 전체 정보 입력 폼을 열 수 없음 (사건정보만 계약서에서 직접 수정)
   if(window._lockedContract){
@@ -2768,7 +2781,8 @@ function openFormSheet(){
   else if(isFamily){var fmt=document.getElementById('fm-vat1-text');vat1Init=fmt?fmt.textContent.trim():'별도';}
   else{vat1Init=rv('vat1');}
   setRadioUI('vat1',vat1Init);setRadioUI('vat2',rv('vat2'));setRadioUI('receipt',rv('receipt'));
-  document.getElementById('f-account').value=vv('sel-account')||document.getElementById('f-account').options[0].value;
+  var _accId=isCivil?'cv-sel-account':isFamily?'fm-sel-account':'sel-account';
+  setFormAccount(vv(_accId)||'smg');
   document.getElementById('f-special').value=isCivil?vv('cv-special-extra'):isFamily?vv('fm-special-extra'):vv('special-extra');
   document.getElementById('f-month').value=vv('inp-month');
   document.getElementById('f-day').value=vv('inp-day');
@@ -2936,7 +2950,8 @@ function applyFormSheet(){
   var vat1Val=getRadioUI('vat1')||'별도';
   var cvVat=document.getElementById('cv-vat1-text');if(cvVat)cvVat.textContent=vat1Val;
   var fmVat=document.getElementById('fm-vat1-text');if(fmVat)fmVat.textContent=vat1Val;
-  sv('sel-account',document.getElementById('f-account').value);
+  var _accId2=(currentDocType==='민사')?'cv-sel-account':(currentDocType==='가사')?'fm-sel-account':'sel-account';
+  sv(_accId2,document.getElementById('f-account').value);
   var specialVal=document.getElementById('f-special').value;
   ['special-extra','cv-special-extra','fm-special-extra'].forEach(function(id){
     var t=document.getElementById(id);if(t){t.value=specialVal;autoResize(t);}
