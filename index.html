@@ -1962,24 +1962,16 @@ function renderSignContract(rec){
 
   var html='';
   html+='<div class="sd-doctitle">송무위임계약서 ('+docType+')</div>';
-  html+='<div class="sd-verify-hint">✔ <b>본인 확인</b>을 위해 아래 <b>연락처</b>와 <b>생년월일+성별</b>(예: 900101-1)을 정확히 입력해 주세요. 주민등록번호 뒷자리는 수집하지 않습니다. 입력하신 정보는 서명과 함께 기록됩니다.</div>';
-  html+='<table class="sd-table">';
-  // 성명: 읽기전용
-  html+=roRow('성명',d.name||'');
-  // 연락처·생년월일+성별: 본인확인 필수 입력 (주민번호 전체는 수집 안 함)
-  html+=inputRow('연락처 *','sf-tel',d.tel||'','010-0000-0000','tel');
-  html+=inputRow('생년월일+성별 *','sf-ssn',d.ssn||'','900101-1','ssn');
-  html+=addrRow('주소','sf-addr',d.addr||'');
-  html+=inputRow('이메일','sf-email',d.email||'','email@example.com','email');
-  // 사건정보: 읽기전용
-  html+=roRow('사건번호',d.casenum||'');
-  html+=roRow('관할법원',d.court||'');
+  html+='<div class="sd-lead">아래 <b>계약 내용</b>을 먼저 확인하신 뒤, <b>본인 정보 입력 → 서명</b> 순서로 진행됩니다.</div>';
+
+  /* ── ① 계약 핵심 내용 (읽기전용) — 의뢰인이 가장 먼저 확인할 업무범위·수임료·계좌 ── */
+  html+='<div class="sd-sec">';
+  html+='<div class="sd-sec-head"><span class="sd-sec-num">1</span>계약 핵심 내용</div>';
+  html+='<table class="sd-table sd-summary">';
   html+=roRow('사건명',d.casename||'');
-  // 상대방 (민사만)
-  if(docType==='민사'){
-    html+=roRow('상대방 성명',d.oppName||'');
-  }
-  // 업무범위·수임조건·입금계좌: 읽기전용
+  html+=roRow('관할법원',d.court||'');
+  html+=roRow('사건번호',d.casenum||'');
+  if(docType==='민사'){ html+=roRow('상대방 성명',d.oppName||''); }
   html+=roRow('업무범위',scope.join(', '));
   if(docType==='형사'){
     html+=roRow('착수금',fee1?fee1+' 만원'+(fd.fee.vat1?' (VAT '+fd.fee.vat1+')':''):'');
@@ -1989,10 +1981,32 @@ function renderSignContract(rec){
     if(fd.success)html+=roRow('성공보수',fd.success+' %');
   }
   html+=roRow('입금계좌',accountTxt);
-  // 계산서·입금자명: 입력 가능
+  html+='</table>';
+  html+='</div>';
+
+  /* ── ② 계약서 원본 전문 (접이식) — "원본이 어디 있냐"에 대한 답 ── */
+  html+='<div class="sd-sec">';
+  html+='<button type="button" class="sd-original-toggle" id="sdOriginalToggle" onclick="toggleSignOriginal()">';
+  html+='<span class="sd-orig-label"><svg class="sd-orig-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 3h11l5 5v13a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5M8 13h8M8 17h5"/></svg>계약서 원본 전문 보기</span>';
+  html+='<svg class="sd-orig-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 12 15 18 9"/></svg>';
+  html+='</button>';
+  html+='<div class="sd-original-body" id="sdOriginalBody" style="display:none;"></div>';
+  html+='</div>';
+
+  /* ── ③ 본인 정보 입력 — 계약 확인 후 마지막에 개인정보 입력 ── */
+  html+='<div class="sd-sec">';
+  html+='<div class="sd-sec-head"><span class="sd-sec-num">2</span>본인 정보 입력</div>';
+  html+='<div class="sd-verify-hint">✔ <b>본인 확인</b>을 위해 <b>연락처</b>와 <b>생년월일+성별</b>(예: 900101-1)을 정확히 입력해 주세요. 주민등록번호 뒷자리는 수집하지 않습니다. 입력하신 정보는 서명과 함께 기록됩니다.</div>';
+  html+='<table class="sd-table">';
+  html+=roRow('성명',d.name||'');
+  html+=inputRow('연락처 *','sf-tel',d.tel||'','010-0000-0000','tel');
+  html+=inputRow('생년월일+성별 *','sf-ssn',d.ssn||'','900101-1','ssn');
+  html+=addrRow('주소','sf-addr',d.addr||'');
+  html+=inputRow('이메일','sf-email',d.email||'','email@example.com','email');
   html+=receiptRow(fd.receipt||'현금영수증');
   html+=inputRow('입금자명','sf-payer',d.payer||'','입금자명','');
   html+='</table>';
+  html+='</div>';
   // 법무법인(을) 직인은 이미 계약서에 있음. 의뢰인 서명은 아래 캔버스에서.
   box.innerHTML=html;
 
@@ -2020,6 +2034,37 @@ function renderSignContract(rec){
       '<label><input type="radio" name="sf-receipt" value="세금계산서"'+(sel==='세금계산서'?' checked':'')+'> 세금계산서</label>'+
       '</div></td></tr>';
   }
+}
+/* 계약서 원본 전문 접이식 열기/닫기 (처음 열 때만 조항을 만들어 넣음) */
+function toggleSignOriginal(){
+  var body=document.getElementById('sdOriginalBody');
+  var btn=document.getElementById('sdOriginalToggle');
+  if(!body||!btn)return;
+  var isOpen=body.style.display!=='none';
+  if(isOpen){ body.style.display='none'; btn.classList.remove('open'); return; }
+  if(body.getAttribute('data-loaded')!=='1'){
+    var dt=(signModeRecord&&signModeRecord.doc_type)?signModeRecord.doc_type:'형사';
+    body.innerHTML=buildSignOriginalHtml(dt);
+    body.setAttribute('data-loaded','1');
+  }
+  body.style.display='block';
+  btn.classList.add('open');
+}
+/* 계약서 종류별 표준 조항 전문을 화면의 계약서 템플릿에서 그대로 가져와 읽기전용으로 구성 */
+function buildSignOriginalHtml(docType){
+  var cls=(docType==='민사')?'civil-page':(docType==='가사')?'family-page':'criminal-page';
+  var pages=document.querySelectorAll('.'+cls);
+  var wrap=document.createElement('div');
+  for(var i=0;i<pages.length;i++){
+    var nodes=pages[i].querySelectorAll('.contract-intro, .article-block');
+    for(var j=0;j<nodes.length;j++){ wrap.appendChild(nodes[j].cloneNode(true)); }
+  }
+  // 입력·버튼 등 폼 컨트롤 제거 → 읽기전용 조항만 남김
+  var ctrls=wrap.querySelectorAll('input,select,textarea,button');
+  for(var k=ctrls.length-1;k>=0;k--){ ctrls[k].parentNode.removeChild(ctrls[k]); }
+  var bodyHtml=wrap.innerHTML;
+  if(!bodyHtml||!bodyHtml.trim()){ bodyHtml='<div class="sd-orig-empty">원본 조항을 불러올 수 없습니다.</div>'; }
+  return '<div class="sd-orig-note">아래는 이 계약서의 <b>표준 조항 전문</b>입니다. 위임인·사건·보수 등 구체적 내용은 위 <b>「계약 핵심 내용」</b>의 값이 적용됩니다.</div>'+bodyHtml;
 }
 /* 서명 화면 주소 검색 */
 function searchSignAddr(){

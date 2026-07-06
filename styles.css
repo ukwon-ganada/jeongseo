@@ -1050,6 +1050,31 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
 .sign-consent-section{background:#fff;border-radius:var(--r-lg);padding:16px 18px;box-shadow:0 1px 8px rgba(0,0,0,0.06);margin-bottom:14px;}
 .sd-verify-hint{background:var(--gray-50);border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:14px;font-size:12.5px;line-height:1.6;color:var(--gray-700);}
 .sd-verify-hint b{color:var(--black);font-weight:700;}
+/* ═══ 서명 화면 섹션 분리 (① 계약 확인 → ② 본인정보 → 서명) ═══ */
+.sd-lead{font-size:13px;line-height:1.6;color:var(--gray-700);text-align:center;margin:-4px 0 18px;}
+.sd-lead b{color:var(--black);font-weight:700;}
+.sd-sec{margin-bottom:22px;}
+.sd-sec:last-child{margin-bottom:0;}
+.sd-sec-head{display:flex;align-items:center;gap:8px;font-size:14.5px;font-weight:700;color:var(--black);margin-bottom:11px;}
+.sd-sec-num{display:inline-flex;align-items:center;justify-content:center;width:21px;height:21px;border-radius:50%;background:var(--black);color:#fff;font-size:12px;font-weight:700;flex-shrink:0;}
+.sd-summary{border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.sd-summary tr:last-child{border-bottom:none;}
+/* 계약서 원본 전문 — 접이식 */
+.sd-original-toggle{width:100%;box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--gray-50);border:1px solid var(--border);border-radius:10px;padding:13px 14px;font-family:var(--font-body);font-size:13.5px;font-weight:600;color:var(--black);cursor:pointer;}
+.sd-original-toggle:active{background:var(--gray-100);}
+.sd-orig-label{display:flex;align-items:center;gap:8px;}
+.sd-orig-ico{width:17px;height:17px;flex-shrink:0;color:var(--gray-600);}
+.sd-orig-chev{width:18px;height:18px;flex-shrink:0;color:var(--gray-500);transition:transform .2s;}
+.sd-original-toggle.open .sd-orig-chev{transform:rotate(180deg);}
+.sd-original-body{margin-top:10px;border:1px solid var(--border);border-radius:10px;padding:14px;max-height:52vh;overflow-y:auto;-webkit-overflow-scrolling:touch;background:#fff;}
+.sd-orig-note{font-size:11.5px;line-height:1.6;color:var(--gray-500);background:var(--gray-50);border-radius:8px;padding:9px 11px;margin-bottom:13px;}
+.sd-orig-note b{color:var(--gray-700);}
+.sd-orig-empty{font-size:12.5px;color:var(--gray-400);}
+.sd-original-body .contract-intro{font-size:12.5px;line-height:1.6;color:var(--gray-700);margin:0 0 11px;}
+.sd-original-body .article-block{font-size:12.5px;line-height:1.62;color:var(--gray-700);margin-bottom:11px;letter-spacing:normal;}
+.sd-original-body .article-title{font-weight:700;color:var(--black);}
+.sd-original-body .article-indent{padding-left:10px;font-size:12.5px;line-height:1.62;margin-top:2px;letter-spacing:normal;}
+.sd-original-body .article-indent2{padding-left:20px;font-size:12.5px;line-height:1.62;margin-top:2px;letter-spacing:normal;}
 .sign-consent{display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13.5px;line-height:1.6;color:var(--gray-700);}
 .sign-consent input{width:20px;height:20px;flex-shrink:0;margin-top:1px;accent-color:var(--black);cursor:pointer;}
 .sign-consent b{color:var(--black);font-weight:700;}
