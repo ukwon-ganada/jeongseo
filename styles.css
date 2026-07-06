@@ -761,9 +761,12 @@ body.print-emulate td.js-case-edit{background:transparent!important;box-shadow:n
   #screen-contract .civil-page .contract-intro,#screen-contract .family-page .contract-intro{line-height:1.5!important;margin:4px 0!important;}
   #screen-contract .civil-page .article-title,#screen-contract .family-page .article-title{line-height:1.4!important;}
   /* 민사 2페이지는 각주 공간 확보 위해 약간 더 압축 */
-  #screen-contract #civil-page2 .article-block,#screen-contract #family-page2 .article-block{line-height:1.42!important;margin-bottom:2px!important;}
-  #screen-contract #civil-page2 .article-indent,#screen-contract #family-page2 .article-indent{line-height:1.42!important;}
-  #screen-contract #civil-page2 .article-indent2,#screen-contract #family-page2 .article-indent2{line-height:1.4!important;}
+  #screen-contract #civil-page2 .article-block,#screen-contract #family-page2 .article-block{line-height:1.3!important;margin-bottom:1px!important;}
+  #screen-contract #civil-page2 .article-indent,#screen-contract #family-page2 .article-indent{line-height:1.3!important;}
+  #screen-contract #civil-page2 .article-indent2,#screen-contract #family-page2 .article-indent2{line-height:1.28!important;}
+  #screen-contract #civil-page2 .article-title,#screen-contract #family-page2 .article-title{margin-top:1px!important;}
+  #screen-contract #civil-page2 .sign-date,#screen-contract #family-page2 .sign-date{margin:7px 0 5px!important;}
+  #screen-contract #civil-page2 .special-note,#screen-contract #family-page2 .special-note{margin-top:1px!important;margin-bottom:0!important;}
   #screen-contract .civil-footnote{font-size:6.5pt!important;line-height:1.25!important;padding-top:5px!important;}
   #screen-contract .civil-page,#screen-contract .family-page{padding:11mm 16mm 5mm!important;}
   #screen-contract .article-block{margin-bottom:4px!important;}
@@ -824,9 +827,12 @@ body.print-emulate #screen-contract .civil-page .article-indent,body.print-emula
 body.print-emulate #screen-contract .civil-page .article-indent2,body.print-emulate #screen-contract .family-page .article-indent2{line-height:1.46!important;}
 body.print-emulate #screen-contract .civil-page .contract-intro,body.print-emulate #screen-contract .family-page .contract-intro{line-height:1.5!important;margin:4px 0!important;}
 body.print-emulate #screen-contract .civil-page .article-title,body.print-emulate #screen-contract .family-page .article-title{line-height:1.4!important;}
-body.print-emulate #screen-contract #civil-page2 .article-block,body.print-emulate #screen-contract #family-page2 .article-block{line-height:1.42!important;margin-bottom:2px!important;}
-body.print-emulate #screen-contract #civil-page2 .article-indent,body.print-emulate #screen-contract #family-page2 .article-indent{line-height:1.42!important;}
-body.print-emulate #screen-contract #civil-page2 .article-indent2,body.print-emulate #screen-contract #family-page2 .article-indent2{line-height:1.4!important;}
+body.print-emulate #screen-contract #civil-page2 .article-block,body.print-emulate #screen-contract #family-page2 .article-block{line-height:1.3!important;margin-bottom:1px!important;}
+body.print-emulate #screen-contract #civil-page2 .article-indent,body.print-emulate #screen-contract #family-page2 .article-indent{line-height:1.3!important;}
+body.print-emulate #screen-contract #civil-page2 .article-indent2,body.print-emulate #screen-contract #family-page2 .article-indent2{line-height:1.28!important;}
+body.print-emulate #screen-contract #civil-page2 .article-title,body.print-emulate #screen-contract #family-page2 .article-title{margin-top:1px!important;}
+body.print-emulate #screen-contract #civil-page2 .sign-date,body.print-emulate #screen-contract #family-page2 .sign-date{margin:7px 0 5px!important;}
+body.print-emulate #screen-contract #civil-page2 .special-note,body.print-emulate #screen-contract #family-page2 .special-note{margin-top:1px!important;margin-bottom:0!important;}
 body.print-emulate #screen-contract .civil-footnote{font-size:6.5pt!important;line-height:1.25!important;padding-top:5px!important;}
 body.print-emulate #screen-contract .civil-page,body.print-emulate #screen-contract .family-page{padding:11mm 16mm 5mm!important;}
 body.print-emulate #screen-contract .article-block{margin-bottom:4px!important;}

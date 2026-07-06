@@ -49,8 +49,8 @@
     <div class="sign-msg-spinner"></div>
     <div class="sign-msg-text">불러오는 중...</div>
     <div id="signDoneActions" style="display:none;margin-top:26px;width:100%;max-width:320px;">
-      <button class="sign-submit-btn" onclick="saveSignedCopy()">계약서 저장 · 공유</button>
-      <div class="sign-submit-note" style="margin-top:10px;">서명본 계약서(PDF)를 기기에 저장하거나<br>카카오톡·파일 등으로 보관하세요.</div>
+      <button class="sign-submit-btn" onclick="saveSignedCopy()">계약서 이미지 저장</button>
+      <div class="sign-submit-note" style="margin-top:10px;">서명본 계약서를 사진(이미지)으로 저장하거나<br>카카오톡·파일 등으로 보관하세요.</div>
       <div class="app-ver" style="text-align:center;font-size:10px;color:#cfd3d9;margin-top:14px;"></div>
     </div>
   </div>
@@ -686,7 +686,7 @@
   이 계약으로 인하여 생기는 일체의 분쟁에 대하여는 그 준거법을 대한민국 법률로, 관할법원을 서울중앙지방법원으로 합의한다.</div>
 
   <div class="special-note">※ 기타 특약사항</div>
-  <textarea id="cv-special-extra" placeholder="추가 특약사항을 입력하세요&#10;예) 성공보수는 합의금의 10%로 한다." style="width:100%;min-height:48px;max-height:120px;font-size:9pt;font-family:var(--font-body);line-height:1.75;border:none;border-bottom:1px solid #bbb;outline:none;resize:vertical;background:transparent;padding:2px 0 4px;color:#111;overflow:hidden;" oninput="autoResize(this)" onfocus="this.style.borderBottomColor='#000'" onblur="this.style.borderBottomColor='#bbb'"></textarea>
+  <textarea id="cv-special-extra" placeholder="추가 특약사항을 입력하세요&#10;예) 성공보수는 합의금의 10%로 한다." style="width:100%;min-height:26px;max-height:120px;font-size:9pt;font-family:var(--font-body);line-height:1.6;border:none;border-bottom:1px solid #bbb;outline:none;resize:vertical;background:transparent;padding:1px 0 2px;color:#111;overflow:hidden;" oninput="autoResize(this)" onfocus="this.style.borderBottomColor='#000'" onblur="this.style.borderBottomColor='#bbb'"></textarea>
 
   <p class="contract-intro" style="margin-top:8px;">갑과 을은 이 계약서 체결을 증명하기 위해 계약서 1부를 작성하여 각자 기명날인한 후, 을이 그 원본을 보관하고 갑에게 사본을 1부 교부한다.</p>
 
@@ -896,7 +896,7 @@
   이 계약으로 인하여 생기는 일체의 분쟁에 대하여는 그 준거법을 대한민국 법률로, 관할법원을 서울중앙지방법원으로 합의한다.</div>
 
   <div class="special-note">※ 기타 특약사항</div>
-  <textarea id="fm-special-extra" placeholder="추가 특약사항을 입력하세요&#10;예) 성공보수는 합의금의 10%로 한다." style="width:100%;min-height:48px;max-height:120px;font-size:9pt;font-family:var(--font-body);line-height:1.75;border:none;border-bottom:1px solid #bbb;outline:none;resize:vertical;background:transparent;padding:2px 0 4px;color:#111;overflow:hidden;" oninput="autoResize(this)" onfocus="this.style.borderBottomColor='#000'" onblur="this.style.borderBottomColor='#bbb'"></textarea>
+  <textarea id="fm-special-extra" placeholder="추가 특약사항을 입력하세요&#10;예) 성공보수는 합의금의 10%로 한다." style="width:100%;min-height:26px;max-height:120px;font-size:9pt;font-family:var(--font-body);line-height:1.6;border:none;border-bottom:1px solid #bbb;outline:none;resize:vertical;background:transparent;padding:1px 0 2px;color:#111;overflow:hidden;" oninput="autoResize(this)" onfocus="this.style.borderBottomColor='#000'" onblur="this.style.borderBottomColor='#bbb'"></textarea>
 
   <p class="contract-intro" style="margin-top:8px;">갑과 을은 이 계약서 체결을 증명하기 위해 계약서 1부를 작성하여 각자 기명날인한 후, 을이 그 원본을 보관하고 갑에게 사본을 1부 교부한다.</p>
 
@@ -1447,6 +1447,7 @@ function resetContract(){
   });
   // 날짜 오늘로
   var d=new Date();sv('inp-month',d.getMonth()+1);sv('inp-day',d.getDate());
+  updateCivilFamilyDate();
   // 서명 지우기
   clearSignature();
   clearCivilSignature();
@@ -1592,6 +1593,7 @@ function restoreFormData(fd){
   }
   if(fd.month)sv('inp-month',fd.month);
   if(fd.day)sv('inp-day',fd.day);
+  updateCivilFamilyDate();
 }
 function sc(id,val){var e=document.getElementById(id);if(e)e.checked=!!val;}
 function sv(id,val){var e=document.getElementById(id);if(e&&val!==undefined&&val!==null)e.value=val;}
@@ -2272,13 +2274,15 @@ function snapshotSignDocHtml(){
   }
   return clone.innerHTML;
 }
-/* 서명한 '완성된 계약서'(정식 양식)를 이미지(PNG)로 저장 */
-/* F: 서명본 계약서를 PDF로 만들어 저장/공유(iOS 공유시트) */
+/* 서명한 '완성된 계약서'(정식 양식)를 사진(PNG 이미지)으로 저장/공유
+   - PDF가 아닌 이미지 파일로 저장(요청사항): 페이지별 PNG 1장씩
+   - 모바일: 공유시트(navigator.share)로 사진 저장 지원, 미지원 시 개별 다운로드 */
 async function saveSignedCopy(){
   var info=window._signedInfo;
   if(!info){showToast('저장할 계약서 정보가 없습니다');return;}
   var btn=document.querySelector('#signDoneActions .sign-submit-btn');
-  if(btn){btn.disabled=true;btn.textContent='계약서 만드는 중…';}
+  var restoreBtn=function(){if(btn){btn.disabled=false;btn.textContent='계약서 이미지 저장';}};
+  if(btn){btn.disabled=true;btn.textContent='이미지 만드는 중…';}
   try{
     var dt=info.docType||'형사';
     currentDocType=dt;
@@ -2289,29 +2293,34 @@ async function saveSignedCopy(){
     var canvases=await capturePages();
     if(!canvases||!canvases.length)throw new Error('계약서 페이지를 찾지 못했습니다');
     var d=new Date(info.signedAt||Date.now());var p=function(n){return (n<10?'0':'')+n;};
-    var fname='송무위임계약서(서명본)_'+(info.clientName||'의뢰인')+'_'+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate());
-    var jsPDFCtor=(window.jspdf&&window.jspdf.jsPDF)?window.jspdf.jsPDF:(window.jsPDF||null);
-    if(jsPDFCtor){
-      var pdf=new jsPDFCtor({orientation:'portrait',unit:'mm',format:'a4'});
-      addCanvasesToPdf(pdf,canvases,210,297);
-      var blob=pdf.output('blob');
-      var file=new File([blob],fname+'.pdf',{type:'application/pdf'});
-      if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
-        try{ await navigator.share({files:[file],title:'서명한 계약서',text:(info.clientName||'의뢰인')+' 님의 송무위임계약서(서명본)'}); }
-        catch(e){ if(e&&e.name!=='AbortError') fallbackDownload(blob,fname+'.pdf'); }
-      }else{ fallbackDownload(blob,fname+'.pdf'); }
+    var base='송무위임계약서(서명본)_'+(info.clientName||'의뢰인')+'_'+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate());
+    // 각 페이지를 PNG로 변환
+    var blobs=await Promise.all(canvases.map(function(c){
+      return new Promise(function(res){
+        if(c.toBlob){c.toBlob(function(b){res(b);},'image/png');}
+        else{ // toBlob 미지원 폴백
+          var bin=atob(c.toDataURL('image/png').split(',')[1]);var arr=new Uint8Array(bin.length);
+          for(var i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);res(new Blob([arr],{type:'image/png'}));
+        }
+      });
+    }));
+    var multi=blobs.length>1;
+    var files=blobs.map(function(b,i){return new File([b], base+(multi?('_'+(i+1)):'')+'.png', {type:'image/png'});});
+    // 모바일: 사진 파일 공유(사진앱 저장/카톡 전송)
+    if(navigator.share&&navigator.canShare&&navigator.canShare({files:files})){
+      try{
+        await navigator.share({files:files,title:'서명한 계약서',text:(info.clientName||'의뢰인')+' 님의 송무위임계약서(서명본)'});
+      }catch(e){
+        if(e&&e.name!=='AbortError'){ for(var i=0;i<blobs.length;i++){ fallbackDownload(blobs[i], files[i].name); await new Promise(function(r){setTimeout(r,350);}); } }
+      }
     }else{
-      // PDF 라이브러리 없으면 이미지로 폴백
-      var maxW=0,totH=0; canvases.forEach(function(c){if(c.width>maxW)maxW=c.width;totH+=c.height;});
-      var merged=document.createElement('canvas');merged.width=maxW;merged.height=totH;
-      var mctx=merged.getContext('2d');mctx.fillStyle='#fff';mctx.fillRect(0,0,maxW,totH);
-      var y=0;canvases.forEach(function(c){mctx.drawImage(c,0,y);y+=c.height;});
-      var a=document.createElement('a');a.download=fname+'.png';a.href=merged.toDataURL('image/png');a.click();
+      // PC 등: 페이지별 이미지 파일 다운로드
+      for(var j=0;j<blobs.length;j++){ fallbackDownload(blobs[j], files[j].name); await new Promise(function(r){setTimeout(r,350);}); }
     }
   }catch(e){
     showToast('저장 실패: '+((e&&e.message)?e.message:'다시 시도'));
   }finally{
-    if(btn){btn.disabled=false;btn.textContent='계약서 저장 · 공유';}
+    restoreBtn();
   }
 }
 async function downloadSignedContract(){
@@ -2837,6 +2846,7 @@ function applyFormSheet(){
   });
   sv('inp-month',document.getElementById('f-month').value);
   sv('inp-day',document.getElementById('f-day').value);
+  updateCivilFamilyDate();
   closeFormSheet();
   showToast('계약서에 입력되었습니다');
   scrollContractTop();
@@ -3413,6 +3423,17 @@ function syncFamilyField(){
   var s=document.getElementById('fm-inp-success');
   if(s)data.success=s.value;
 }
+/* 민사·가사 서명일자: 폼의 월/일(inp-month·inp-day)을 계약서 날짜란에 반영
+   (형사는 계약서 안에 월/일 입력칸이 있어 자동 반영되지만, 민사·가사는 정적 텍스트라 별도 갱신 필요) */
+function updateCivilFamilyDate(){
+  var mEl=document.getElementById('inp-month');var dEl=document.getElementById('inp-day');
+  var m=mEl&&mEl.value?String(mEl.value).trim():'';
+  var d=dEl&&dEl.value?String(dEl.value).trim():'';
+  var y=new Date().getFullYear();
+  var txt=(m&&d)?(y+'. '+m+'. '+d+'.'):(y+'.   .   .');
+  var cv=document.getElementById('cv-sign-date');if(cv)cv.textContent=txt;
+  var fm=document.getElementById('fm-sign-date');if(fm)fm.textContent=txt;
+}
 
 document.addEventListener('DOMContentLoaded',function(){
   // 서명 요청 링크로 들어왔는지 먼저 확인
@@ -3425,6 +3446,7 @@ document.addEventListener('DOMContentLoaded',function(){
   var m=document.getElementById('inp-month');var dd=document.getElementById('inp-day');
   if(m)m.value=d.getMonth()+1;
   if(dd)dd.value=d.getDate();
+  updateCivilFamilyDate();
 
   var canvas=document.getElementById('sigCanvas');
   if(!canvas)return;
