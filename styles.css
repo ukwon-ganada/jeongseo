@@ -696,10 +696,10 @@ body.print-emulate td.js-case-edit{background:transparent!important;box-shadow:n
   body.mode-seonim .sj-wrap{padding:0!important;display:block!important;overflow:visible!important;background:#fff!important;}
   body.mode-seonim .sj-page{box-shadow:none!important;min-height:0!important;width:210mm!important;margin:0 auto!important;padding:20mm 19.5mm 15mm 19.4mm!important;}
   body.mode-seonim .sj-editable{outline:none!important;}
-  /* 선임계/소송위임장은 무조건 A4 1장: 넘치는 부분은 잘라 2페이지 생성을 원천 차단
-     (#sj-host의 scale 축소로 내용은 이미 한 장에 맞게 들어가 있음) */
+  /* 선임계/소송위임장은 무조건 A4 1장: 페이지 높이를 A4로 고정하고 넘침을 잘라 2페이지 생성을 원천 차단.
+     내용은 #sj-host의 scale 축소로 이미 한 장(≈258mm) 안에 들어가 있어 실제로 잘릴 내용은 없음.
+     ※ #sj-host 자체에는 overflow/height를 걸지 말 것 — 표 하단('귀중' 줄)이 잘림. */
   body.mode-seonim .sj-page{height:297mm!important;overflow:hidden!important;page-break-after:avoid!important;break-after:avoid!important;}
-  body.mode-seonim #sj-host{overflow:hidden!important;}
 }
 
 @media print{

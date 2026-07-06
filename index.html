@@ -4184,15 +4184,14 @@ function fitSeonimPage(){
   host.style.height='';
   var tbl=host.querySelector('.sj'); if(!tbl)return;
   var pxPerMm=tbl.offsetWidth/169;
-  var availPx=262*pxPerMm;
+  /* 인쇄영역(297-상20-하15=262mm)보다 살짝 작은 258mm를 목표로 축소해
+     제3채권자 여러 명이어도 마지막 '귀중' 줄까지 A4 한 장 안에 안전하게 들어가게 한다. */
+  var availPx=258*pxPerMm;
   var h=tbl.offsetHeight;
   if(h>availPx){
-    /* 살짝 여유(0.4%)를 둬 소수점 반올림으로 2장이 되는 것을 방지 */
-    var scale=(availPx/h)*0.996;
-    host.style.transform='scale('+scale+')';
-    /* transform은 레이아웃 박스 높이를 줄이지 않으므로(축소해도 원래 높이만큼 자리를 차지)
-       실제 높이를 축소분에 맞춰 지정해 A4 한 장으로 고정한다. (제3채권자 2명↑ 2페이지 방지) */
-    host.style.height=(h*scale)+'px';
+    /* transform scale로 시각적 축소. 실제 1장 보장은 인쇄 CSS(.sj-page 297mm+overflow)가 담당.
+       host에 overflow/height를 걸면 표 하단이 잘리므로 절대 걸지 않는다. */
+    host.style.transform='scale('+(availPx/h)+')';
   }
 }
 
