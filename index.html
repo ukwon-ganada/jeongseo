@@ -102,8 +102,8 @@
     </div>
     <div class="sign-submit-bar">
       <div id="cpSubmitError" class="sign-submit-error" style="display:none;"></div>
-      <button id="cpSubmitBtn" class="sign-submit-btn" onclick="submitCounterpartySign()" disabled>서명 제출</button>
-      <div class="sign-submit-note">위 내용에 동의하고 서명하시면 활성화됩니다.<br>제출 시점의 계약서 내용이 그대로 고정·보관됩니다.</div>
+      <button id="cpSubmitBtn" class="sign-submit-btn is-inactive" onclick="submitCounterpartySign()">서명 제출</button>
+      <div class="sign-submit-note">연락처·본인확인·약관 동의·서명을 완료한 뒤 제출하세요.<br>제출 시점의 계약서 내용이 그대로 고정·보관됩니다.</div>
       <div class="app-ver" style="text-align:center;font-size:10px;color:#cfd3d9;margin-top:12px;"></div>
     </div>
   </div>
@@ -2206,9 +2206,13 @@ async function submitCounterpartySign(){
 /* 동의 체크 여부에 따라 제출 버튼 활성/비활성 */
 function updateSubmitState(){
   var btn=document.getElementById('cpSubmitBtn');
-  // 필수 약관 전체 동의 + (OTP 켜져 있으면) 휴대폰 인증 완료 여야 제출 활성화
+  if(!btn)return;
+  // 필수 약관 전체 동의 + (OTP 켜져 있으면) 휴대폰 인증 완료 여부
   var ok=consentAllAgreed()&&(!OTP_ENABLED||_otpVerified);
-  if(btn)btn.disabled=!ok;
+  // 버튼은 항상 눌러서 안내를 받을 수 있게 두고(고장 오인 방지), 미완료 시엔 시각적으로만 흐리게 표시.
+  // 무엇이 부족한지는 submitCounterpartySign() 의 검증에서 안내 문구로 알려준다.
+  btn.disabled=false;
+  btn.classList.toggle('is-inactive', !ok);
 }
 
 /* ═══ 휴대폰 본인확인(OTP) ═══ */
