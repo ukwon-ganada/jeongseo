@@ -776,7 +776,7 @@ body.print-emulate td.js-case-edit{background:transparent!important;box-shadow:n
   #screen-contract .date-input{font-size:9pt!important;width:24px!important;}
   .sign-stamp-circle{border:none!important;}
   .sign-clear-btn{display:none!important;}
-  #special-extra{border:none!important;resize:none;-webkit-appearance:none;max-height:none;}
+  #special-extra,#cv-special-extra,#fm-special-extra{border:none!important;resize:none;-webkit-appearance:none;max-height:none;}
   @page{size:A4 portrait;margin:0;}
 }
 
@@ -838,7 +838,7 @@ body.print-emulate #screen-contract .sign-date{font-size:9pt!important;}
 body.print-emulate #screen-contract .date-input{font-size:9pt!important;width:24px!important;}
 body.print-emulate .sign-stamp-circle{border:none!important;}
 body.print-emulate .sign-clear-btn{display:none!important;}
-body.print-emulate #special-extra{border:none!important;resize:none;-webkit-appearance:none;max-height:none;}
+body.print-emulate #special-extra,body.print-emulate #cv-special-extra,body.print-emulate #fm-special-extra{border:none!important;resize:none;-webkit-appearance:none;max-height:none;}
 
 /* ── 모달 ── */
 .modal-overlay{
