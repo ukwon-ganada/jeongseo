@@ -2484,8 +2484,10 @@ function renderContractList(){
       var histLine=histParts.length?'<div class="lc-hist">'+histParts.join(' → ')+'</div>':'';
       var hasHist=it.sent_at||it.accessed_at||it.signed_at||it.sign_status;
       var histBtn=hasHist?'<button class="lc-hist-btn" onclick="event.stopPropagation();openHistorySheet(\''+it.id+'\')" aria-label="서명 이력"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg></button>':'';
+      var dtp=it.doc_type||'형사';
+      var dtBadgeCls=(dtp==='민사')?'lc-b-civil':(dtp==='가사')?'lc-b-family':'lc-b-crim';
       html+='<div class="list-card" onclick="openContractDetail(\''+it.id+'\')">'+
-        '<div class="lc-badge">'+(it.doc_type||'형사')+'</div>'+
+        '<div class="lc-badge '+dtBadgeCls+'">'+dtp+'</div>'+
         '<div class="lc-body"><div class="lc-name">'+esc(name)+(it.sign_status==='signed'?'<span class="lc-signed">✓ 서명완료</span>':(it.sign_status==='requested'?'<span class="lc-pending">서명대기</span>':''))+'</div><div class="lc-meta">'+esc(meta)+'</div>'+histLine+'</div>'+
         '<div class="lc-time">'+hh+':'+mm+'</div>'+
         histBtn+

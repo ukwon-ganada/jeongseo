@@ -24,6 +24,9 @@ var HOME_ICON = {
 function homeIcon(key, sw) {
   return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="' + (sw || '1.8') + '">' + HOME_ICON[key] + '</svg>';
 }
+function homeIconCls(key, cls, sw) {
+  return '<svg class="' + cls + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="' + (sw || '1.8') + '">' + HOME_ICON[key] + '</svg>';
+}
 
 /* ── ① 창고: 메뉴 항목 기본 정의 (이름·설명·아이콘·동작) ── */
 var MENU = {
@@ -175,17 +178,18 @@ window.homeDevToast = function () {
 function renderMoreScreen() {
   var box = document.getElementById('more-list');
   if (!box) return;
-  var html = '';
+  // 공유·서명 메뉴와 동일한 언어: 그룹 카드 · 텍스트 좌 · 기호 우
+  var html = '<div class="asheet-group">';
   for (var i = 0; i < MORE_ORDER.length; i++) {
     var item = MORE_ORDER[i], m = MENU[item.id];
-    var name = homeName(item, m), desc = homeDesc(item, m);
+    var name = homeName(item, m);
     html +=
-      '<div class="more-item" onclick="' + m.action + '">' +
-        '<div class="more-ico">' + homeIcon(m.icon) + '</div>' +
-        '<div class="more-body-txt"><div class="more-name">' + name + '</div><div class="more-desc">' + desc + '</div></div>' +
-        '<div class="more-arrow">›</div>' +
+      '<div class="asheet-item" onclick="' + m.action + '">' +
+        '<span class="asheet-label">' + name + '</span>' +
+        homeIconCls(m.icon, 'asheet-ico') +
       '</div>';
   }
+  html += '</div>';
   box.innerHTML = html;
 }
 

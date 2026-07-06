@@ -238,7 +238,7 @@ html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black)
 }
 
 /* ════ 전체 기능 화면 (폰에서 '전체 기능 보기'로 진입) ════ */
-#screen-more{background:var(--gray-100);min-height:100vh;}
+#screen-more{background:#fff;min-height:100vh;}
 #screen-more.active{display:flex;flex-direction:column;}
 .more-appbar{display:flex;align-items:center;gap:6px;padding:44px 12px 12px;background:#fff;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:5;}
 .more-back{display:flex;align-items:center;gap:2px;background:none;border:none;font-family:var(--font);font-size:16px;color:var(--gray-700);cursor:pointer;padding:6px 8px;border-radius:var(--r-lg);}
@@ -395,7 +395,11 @@ html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black)
 @media (min-width:768px){.list-card{margin:0 0 8px;}}
 .list-card:active{background:var(--gray-50);box-shadow:0 2px 8px rgba(0,0,0,0.08);}
 .list-card:hover{box-shadow:0 6px 20px rgba(0,0,0,0.10);}
-.lc-badge{font-size:10px;font-weight:600;padding:4px 10px;border-radius:var(--r-pill);background:var(--black);color:#fff;flex-shrink:0;}
+/* 계약서 종류 배지 — 흑백 컨셉 유지하며 형사·민사·가사를 명도로 구분 */
+.lc-badge{font-size:10px;font-weight:700;padding:4px 10px;border-radius:var(--r-pill);border:1px solid transparent;background:var(--black);color:#fff;flex-shrink:0;letter-spacing:0.02em;}
+.lc-badge.lc-b-crim{background:#111;border-color:#111;color:#fff;}
+.lc-badge.lc-b-civil{background:#fff;border-color:#111;color:#111;}
+.lc-badge.lc-b-family{background:#e4e4e4;border-color:#e4e4e4;color:#333;}
 .lc-body{flex:1;min-width:0;}
 .lc-name{font-size:17px;font-weight:600;color:var(--black);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .lc-meta{font-size:15px;color:var(--gray-500);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
