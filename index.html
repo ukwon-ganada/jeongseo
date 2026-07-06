@@ -49,8 +49,9 @@
     <div class="sign-msg-spinner"></div>
     <div class="sign-msg-text">불러오는 중...</div>
     <div id="signDoneActions" style="display:none;margin-top:26px;width:100%;max-width:320px;">
-      <button class="sign-submit-btn" onclick="saveSignedCopy()">계약서 이미지 저장</button>
-      <div class="sign-submit-note" style="margin-top:10px;">서명본 계약서를 사진(이미지)으로 저장하거나<br>카카오톡·파일 등으로 보관하세요.</div>
+      <button class="sign-submit-btn" id="btnSaveImg" onclick="saveSignedImage()">이미지로 저장 (사진 1장)</button>
+      <button class="sign-submit-btn" id="btnSavePdf" onclick="saveSignedPdf()" style="margin-top:10px;background:#fff;color:#2d6cdf;border:1.5px solid #2d6cdf;">PDF 사본 저장</button>
+      <div class="sign-submit-note" style="margin-top:10px;">누르면 기기에 바로 저장됩니다.<br>이미지(사진 1장) 또는 PDF 사본으로 보관하세요.</div>
       <div class="app-ver" style="text-align:center;font-size:10px;color:#cfd3d9;margin-top:14px;"></div>
     </div>
   </div>
@@ -2274,95 +2275,83 @@ function snapshotSignDocHtml(){
   }
   return clone.innerHTML;
 }
-/* 서명한 '완성된 계약서'(정식 양식)를 사진(PNG 이미지)으로 저장/공유
-   - PDF가 아닌 이미지 파일로 저장(요청사항): 페이지별 PNG 1장씩
-   - 모바일: 공유시트(navigator.share)로 사진 저장 지원, 미지원 시 개별 다운로드 */
-async function saveSignedCopy(){
+/* ── 서명본 계약서 저장 공통 로직 ──
+   완료 화면 뒤에서 정식 양식을 서명 데이터로 렌더링 → 페이지 캡처 */
+async function _renderSignedCanvases(){
   var info=window._signedInfo;
-  if(!info){showToast('저장할 계약서 정보가 없습니다');return;}
-  var btn=document.querySelector('#signDoneActions .sign-submit-btn');
-  var restoreBtn=function(){if(btn){btn.disabled=false;btn.textContent='계약서 이미지 저장';}};
+  if(!info)throw new Error('저장할 계약서 정보가 없습니다');
+  var dt=info.docType||'형사';
+  currentDocType=dt;
+  showScreen('screen-contract'); switchContractType(dt);
+  restoreFormData(info.formData||{});
+  if(info.sigData)restoreSignatureByType(info.sigData, dt);
+  await new Promise(function(r){setTimeout(r,400);});
+  var canvases=await capturePages();
+  if(!canvases||!canvases.length)throw new Error('계약서 페이지를 찾지 못했습니다');
+  var d=new Date(info.signedAt||Date.now());var p=function(n){return (n<10?'0':'')+n;};
+  var base='송무위임계약서(서명본)_'+(info.clientName||'의뢰인')+'_'+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate());
+  return {canvases:canvases, base:base};
+}
+/* 여러 페이지 캔버스를 세로로 이어붙여 1장으로 */
+function _mergeCanvasesVertical(canvases){
+  var maxW=0,totH=0;
+  canvases.forEach(function(c){if(c.width>maxW)maxW=c.width;totH+=c.height;});
+  var merged=document.createElement('canvas');
+  merged.width=maxW;merged.height=totH;
+  var mctx=merged.getContext('2d');
+  mctx.fillStyle='#ffffff';mctx.fillRect(0,0,maxW,totH);
+  var y=0;canvases.forEach(function(c){mctx.drawImage(c,0,y);y+=c.height;});
+  return merged;
+}
+function _canvasToBlob(cv){
+  return new Promise(function(res){
+    if(cv.toBlob){cv.toBlob(function(b){res(b);},'image/png');}
+    else{var bin=atob(cv.toDataURL('image/png').split(',')[1]);var arr=new Uint8Array(bin.length);for(var i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);res(new Blob([arr],{type:'image/png'}));}
+  });
+}
+/* 공유시트 없이 기기에 바로 저장(다운로드) */
+function directDownload(blob,fileName){
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url;a.download=fileName;
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(function(){URL.revokeObjectURL(url);},4000);
+}
+/* 서명본 계약서를 '사진 1장(PNG)'으로 바로 저장 */
+async function saveSignedImage(){
+  var btn=document.getElementById('btnSaveImg');
+  var label=btn?btn.textContent:'';
   if(btn){btn.disabled=true;btn.textContent='이미지 만드는 중…';}
   try{
-    var dt=info.docType||'형사';
-    currentDocType=dt;
-    showScreen('screen-contract'); switchContractType(dt);
-    restoreFormData(info.formData||{});
-    if(info.sigData)restoreSignatureByType(info.sigData, dt);
-    await new Promise(function(r){setTimeout(r,400);});
-    var canvases=await capturePages();
-    if(!canvases||!canvases.length)throw new Error('계약서 페이지를 찾지 못했습니다');
-    var d=new Date(info.signedAt||Date.now());var p=function(n){return (n<10?'0':'')+n;};
-    var base='송무위임계약서(서명본)_'+(info.clientName||'의뢰인')+'_'+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate());
-    // 각 페이지를 PNG로 변환
-    var blobs=await Promise.all(canvases.map(function(c){
-      return new Promise(function(res){
-        if(c.toBlob){c.toBlob(function(b){res(b);},'image/png');}
-        else{ // toBlob 미지원 폴백
-          var bin=atob(c.toDataURL('image/png').split(',')[1]);var arr=new Uint8Array(bin.length);
-          for(var i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);res(new Blob([arr],{type:'image/png'}));
-        }
-      });
-    }));
-    var multi=blobs.length>1;
-    var files=blobs.map(function(b,i){return new File([b], base+(multi?('_'+(i+1)):'')+'.png', {type:'image/png'});});
-    // 모바일: 사진 파일 공유(사진앱 저장/카톡 전송)
-    if(navigator.share&&navigator.canShare&&navigator.canShare({files:files})){
-      try{
-        await navigator.share({files:files,title:'서명한 계약서',text:(info.clientName||'의뢰인')+' 님의 송무위임계약서(서명본)'});
-      }catch(e){
-        if(e&&e.name!=='AbortError'){ for(var i=0;i<blobs.length;i++){ fallbackDownload(blobs[i], files[i].name); await new Promise(function(r){setTimeout(r,350);}); } }
-      }
-    }else{
-      // PC 등: 페이지별 이미지 파일 다운로드
-      for(var j=0;j<blobs.length;j++){ fallbackDownload(blobs[j], files[j].name); await new Promise(function(r){setTimeout(r,350);}); }
-    }
+    var r=await _renderSignedCanvases();
+    var merged=_mergeCanvasesVertical(r.canvases);
+    var blob=await _canvasToBlob(merged);
+    directDownload(blob, r.base+'.png');
+    showToast('이미지가 저장되었습니다');
   }catch(e){
     showToast('저장 실패: '+((e&&e.message)?e.message:'다시 시도'));
   }finally{
-    restoreBtn();
+    if(btn){btn.disabled=false;btn.textContent=label||'이미지로 저장 (사진 1장)';}
   }
 }
-async function downloadSignedContract(){
-  var info=window._signedInfo;
-  if(!info){showToast('저장할 계약서 정보가 없습니다');return;}
-  var btn=document.querySelector('#signDoneActions .sign-submit-btn');
-  if(btn){btn.disabled=true;btn.textContent='계약서 이미지 만드는 중...';}
+/* 서명본 계약서를 'PDF 사본'으로 바로 저장 */
+async function saveSignedPdf(){
+  var btn=document.getElementById('btnSavePdf');
+  var label=btn?btn.textContent:'';
+  if(btn){btn.disabled=true;btn.textContent='PDF 만드는 중…';}
   try{
-    var dt=info.docType||'형사';
-    // 완료 화면(오버레이) 뒤에서 정식 계약서 양식을 서명 데이터로 렌더링
-    currentDocType=dt;
-    showScreen('screen-contract');
-    switchContractType(dt);
-    restoreFormData(info.formData||{});
-    // 의뢰인 서명을 위임인 서명란에 넣어 '완성된' 계약서로
-    if(info.sigData)restoreSignatureByType(info.sigData, dt);
-    // 렌더 안정화 대기 (이미지·폰트 반영)
-    await new Promise(function(r){setTimeout(r,400);});
-    // 정식 양식 페이지들을 캡처
-    var canvases=await capturePages();
-    if(!canvases||!canvases.length){throw new Error('계약서 페이지를 찾지 못했습니다');}
-    // 여러 페이지를 세로로 이어붙여 한 장으로
-    var maxW=0,totH=0;
-    canvases.forEach(function(c){if(c.width>maxW)maxW=c.width;totH+=c.height;});
-    var merged=document.createElement('canvas');
-    merged.width=maxW;merged.height=totH;
-    var mctx=merged.getContext('2d');
-    mctx.fillStyle='#ffffff';mctx.fillRect(0,0,maxW,totH);
-    var y=0;
-    canvases.forEach(function(c){mctx.drawImage(c,0,y);y+=c.height;});
-    // 파일명
-    var d=new Date(info.signedAt);var p=function(n){return (n<10?'0':'')+n;};
-    var fname='송무위임계약서_'+(info.clientName||'서명본')+'_'+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate());
-    // PNG 다운로드
-    var a=document.createElement('a');
-    a.download=fname+'.png';
-    a.href=merged.toDataURL('image/png');
-    a.click();
-    if(btn){btn.disabled=false;btn.textContent='서명한 계약서 저장 (이미지)';}
+    var jsPDFCtor=(window.jspdf&&window.jspdf.jsPDF)?window.jspdf.jsPDF:(window.jsPDF||null);
+    if(!jsPDFCtor)throw new Error('PDF 모듈을 불러오지 못했습니다');
+    var r=await _renderSignedCanvases();
+    var pdf=new jsPDFCtor({orientation:'portrait',unit:'mm',format:'a4'});
+    addCanvasesToPdf(pdf,r.canvases,210,297);
+    var blob=pdf.output('blob');
+    directDownload(blob, r.base+'.pdf');
+    showToast('PDF가 저장되었습니다');
   }catch(e){
-    if(btn){btn.disabled=false;btn.textContent='서명한 계약서 저장 (이미지)';}
     showToast('저장 실패: '+((e&&e.message)?e.message:'다시 시도'));
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent=label||'PDF로 저장';}
   }
 }
 /* 상대방(의뢰인) 서명 캔버스 설정값 */
