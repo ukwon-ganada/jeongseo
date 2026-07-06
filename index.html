@@ -952,22 +952,30 @@
 
 <!-- 통합 입력 폼 -->
 <!-- 서명 링크 시트 -->
-<div class="sl-overlay" id="signLinkSheet" onclick="if(event.target===this)closeSignLinkSheet()">
-  <div class="sl-box">
-    <div class="sl-title">서명 요청 링크</div>
-    <div class="sl-desc">아래 링크를 상대방에게 보내세요. <b>96시간 동안</b> 유효하며, 상대방이 링크를 열어 서명하면 목록에서 확인할 수 있습니다.</div>
-    <input type="text" class="sl-input" id="signLinkInput" readonly onclick="this.select()">
-    <div class="sl-btns">
-      <button class="sl-btn primary" onclick="shareSignLink()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-        공유 (카톡·문자)
-      </button>
-      <button class="sl-btn" onclick="copySignLink()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-        링크 복사
-      </button>
+<div class="overlay" id="signLinkSheet" onclick="if(event.target===this)closeSignLinkSheet()">
+  <div class="sheet asheet">
+    <div class="sh-handle"></div>
+    <div class="asheet-head">
+      <div class="asheet-head-title">서명 요청 링크</div>
+      <div class="asheet-head-desc">아래 링크를 상대방에게 보내세요. <b>96시간</b> 유효하며, 상대방이 서명하면 목록에서 확인할 수 있습니다.</div>
+      <input type="text" class="asheet-link" id="signLinkInput" readonly onclick="this.select()">
     </div>
-    <button class="sl-close" onclick="closeSignLinkSheet()">닫기</button>
+    <div class="asheet-group">
+      <div class="asheet-item" onclick="shareSignLink()">
+        <span class="asheet-label">공유 (카톡·문자)</span>
+        <svg class="asheet-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+      </div>
+      <div class="asheet-item" onclick="copySignLink()">
+        <span class="asheet-label">링크 복사</span>
+        <svg class="asheet-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      </div>
+    </div>
+    <div class="asheet-group">
+      <div class="asheet-item" onclick="closeSignLinkSheet()">
+        <span class="asheet-label">닫기</span>
+        <svg class="asheet-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -975,14 +983,23 @@
 
   </div>
   <div class="ct-bottombar">
-    <div class="ct-bb-group">
-      <button class="ct-bb-btn" onclick="saveToListBtn()">임시저장</button>
-      <button class="ct-bb-btn js-info-btn" onclick="openFormSheet()">수정</button>
-    </div>
-    <div class="ct-bb-group">
-      <button class="ct-bb-share" onclick="openActionSheet()">공유</button>
-      <button class="ct-bb-sign" onclick="createSignRequest()"><span class="txt-normal">서명</span><span class="txt-locked">완료</span></button>
-    </div>
+    <button class="ct-bb-item" onclick="saveToListBtn()" aria-label="임시저장">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+      <span>임시저장</span>
+    </button>
+    <button class="ct-bb-item js-info-btn" onclick="openFormSheet()" aria-label="수정">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      <span>수정</span>
+    </button>
+    <button class="ct-bb-item" onclick="openActionSheet()" aria-label="공유">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+      <span>공유</span>
+    </button>
+    <button class="ct-bb-item ct-bb-sign" onclick="createSignRequest()" aria-label="서명">
+      <svg class="ic-normal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 19c3.333-2 5-4 5-6c0-3-1-3-2-3s-2.032 1.085-2 3c.034 2.048 1.658 4.877 2.5 6c1.5 2 2.5 2 3.5 1s5.5-7 6.5-8c.667 1.333 1.333 2.667 2 4c1-.667 2-1.333 3-2"/></svg>
+      <svg class="ic-locked" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      <span class="txt-normal">서명</span><span class="txt-locked">완료</span>
+    </button>
   </div>
 </div>
 
@@ -1163,27 +1180,32 @@
 </div>
 
 <div class="overlay" id="actionSheet" onclick="if(event.target===this)closeActionSheet()">
-  <div class="sheet">
+  <div class="sheet asheet">
     <div class="sh-handle"></div>
-    <div class="sh-head"><div class="sh-title">공유 및 출력</div></div>
-    <div class="sh-div"></div>
-    <div class="action-item" onclick="doActionAndClose('print')">
-      <div class="action-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="6,9 6,2 18,2 18,9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></div>
-      <div class="action-body"><div class="action-name">프린트</div><div class="action-desc">A4 용지로 직접 인쇄</div></div>
+    <div class="asheet-group">
+      <div class="asheet-item" onclick="doActionAndClose('print')">
+        <span class="asheet-label">프린트</span>
+        <svg class="asheet-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      </div>
+      <div class="asheet-item" onclick="doActionAndClose('pdf')">
+        <span class="asheet-label">PDF 저장</span>
+        <svg class="asheet-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+      </div>
+      <div class="asheet-item" onclick="doActionAndClose('image')">
+        <span class="asheet-label">이미지 저장</span>
+        <svg class="asheet-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+      </div>
+      <div class="asheet-item" onclick="doActionAndClose('share')">
+        <span class="asheet-label">공유하기</span>
+        <svg class="asheet-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+      </div>
     </div>
-    <div class="action-item" onclick="doActionAndClose('pdf')">
-      <div class="action-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg></div>
-      <div class="action-body"><div class="action-name">PDF 저장</div><div class="action-desc">인쇄창에서 'PDF로 저장' 선택</div></div>
+    <div class="asheet-group">
+      <div class="asheet-item" onclick="closeActionSheet()">
+        <span class="asheet-label">취소</span>
+        <svg class="asheet-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </div>
     </div>
-    <div class="action-item" onclick="doActionAndClose('image')">
-      <div class="action-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg></div>
-      <div class="action-body"><div class="action-name">이미지 저장</div><div class="action-desc">PNG 파일로 다운로드</div></div>
-    </div>
-    <div class="action-item" onclick="doActionAndClose('share')">
-      <div class="action-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></div>
-      <div class="action-body"><div class="action-name">공유하기</div><div class="action-desc">카카오톡·이메일·메시지로 전송</div></div>
-    </div>
-    <button class="sh-cancel" onclick="closeActionSheet()">취소</button>
   </div>
 </div>
 
