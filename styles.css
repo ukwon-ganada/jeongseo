@@ -1266,15 +1266,13 @@ body.contract-locked .ct-bb-sign{pointer-events:none;color:var(--success)!import
   #screen-contract .ct-content{flex:1;min-height:0;padding-top:0!important;}
   .ct-back-float{display:flex;align-items:center;justify-content:center;position:absolute;top:calc(10px + env(safe-area-inset-top,0px));left:12px;z-index:60;width:34px;height:34px;border-radius:var(--r-pill);border:none;cursor:pointer;background:rgba(0,0,0,0.42);}
   .ct-back-float svg{width:20px;height:20px;stroke:#fff;}
-  /* 아이콘+라벨 탭 스타일 (홈 하단바와 동일 언어) */
-  .ct-bottombar{display:flex;justify-content:space-around;align-items:stretch;gap:2px;flex-shrink:0;padding:9px 6px calc(10px + env(safe-area-inset-bottom,0px));border-top:.5px solid var(--border);background:#fff;}
-  .ct-bb-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;background:none;border:none;padding:4px 0;color:var(--gray-500);font-family:var(--font);cursor:pointer;-webkit-tap-highlight-color:transparent;}
-  .ct-bb-item svg{width:23px;height:23px;}
-  .ct-bb-item span{font-size:11px;font-weight:500;line-height:1;}
+  /* 아이콘 전용 탭 스타일 (홈 하단바와 동일 언어, 라벨 없이 미니멀) */
+  .ct-bottombar{display:flex;justify-content:space-around;align-items:center;gap:2px;flex-shrink:0;padding:14px 6px calc(16px + env(safe-area-inset-bottom,0px));border-top:.5px solid var(--border);background:#fff;}
+  .ct-bb-item{flex:1;display:flex;align-items:center;justify-content:center;background:none;border:none;padding:2px 0;color:var(--gray-500);cursor:pointer;-webkit-tap-highlight-color:transparent;}
+  .ct-bb-item svg{width:25px;height:25px;}
   .ct-bb-item:active{opacity:.55;}
-  /* 서명: 주요 동작 강조 (흑백 컨셉 — 빨강 대신 진한 검정) */
-  .ct-bb-sign{color:var(--black);}
-  .ct-bb-sign span{font-weight:700;}
+  /* 서명: 주요 동작 강조 (붉은색) */
+  .ct-bb-sign{color:var(--danger);}
 }
 
 /* ═══ 계약서 화면맞춤: 창틀(wrapper) — 원본 서면은 그대로, 겉보기만 축소 (v104) ═══ */
