@@ -655,6 +655,11 @@ body.print-emulate td.js-case-edit{background:transparent!important;box-shadow:n
 .sj-appbar .sj-title{font-size:17px;font-weight:600;flex:1;text-align:center;}
 .sj-appbar .sj-edit-btn{border:none;background:var(--black);color:#fff;height:38px;padding:0 16px;border-radius:var(--r-pill);font-size:15px;font-weight:600;cursor:pointer;}
 .sj-appbar .sj-print-btn{border:none;background:var(--danger);color:#fff;height:38px;padding:0 16px;border-radius:var(--r-pill);font-size:15px;font-weight:600;cursor:pointer;margin-left:8px;}
+/* 폰: 서면 제목이 좁은 공간에서 세로로 접히므로 상단바 제목 숨김 (문서 본문 제목은 유지) */
+@media (max-width:767px){
+  .sj-appbar .sj-title{display:none;}
+  .sj-appbar .sj-back{margin-right:auto;}
+}
 .sj-gy-btn{border:none;background:var(--danger);color:#fff;height:38px;padding:0 16px;border-radius:var(--r-pill);font-size:14px;font-weight:600;cursor:pointer;margin-left:8px;;background:#fff;color:var(--black);border:1px solid var(--black);}
 .sj-wrap{padding:24px;display:flex;justify-content:center;align-items:flex-start;overflow:auto;}
 .sj-page{background:#fff;box-shadow:0 4px 24px rgba(0,0,0,.12);width:210mm;min-height:297mm;padding:20mm 19.5mm 15mm 19.4mm;box-sizing:border-box;}
