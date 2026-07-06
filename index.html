@@ -4176,11 +4176,19 @@ sjBindHostClicks();
 function fitSeonimPage(){
   var host=document.getElementById('sj-host'); if(!host)return;
   host.style.transform='';
+  host.style.height='';
   var tbl=host.querySelector('.sj'); if(!tbl)return;
   var pxPerMm=tbl.offsetWidth/169;
   var availPx=262*pxPerMm;
   var h=tbl.offsetHeight;
-  if(h>availPx){ host.style.transform='scale('+(availPx/h)+')'; }
+  if(h>availPx){
+    /* 살짝 여유(0.4%)를 둬 소수점 반올림으로 2장이 되는 것을 방지 */
+    var scale=(availPx/h)*0.996;
+    host.style.transform='scale('+scale+')';
+    /* transform은 레이아웃 박스 높이를 줄이지 않으므로(축소해도 원래 높이만큼 자리를 차지)
+       실제 높이를 축소분에 맞춰 지정해 A4 한 장으로 고정한다. (제3채권자 2명↑ 2페이지 방지) */
+    host.style.height=(h*scale)+'px';
+  }
 }
 
 
