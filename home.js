@@ -184,7 +184,7 @@ function renderMoreScreen() {
     var item = MORE_ORDER[i], m = MENU[item.id];
     var name = homeName(item, m);
     html +=
-      '<div class="asheet-item" onclick="' + m.action + '">' +
+      '<div class="asheet-item" onclick="closeMoreSheet();' + m.action + '">' +
         '<span class="asheet-label">' + name + '</span>' +
         homeIconCls(m.icon, 'asheet-ico') +
       '</div>';

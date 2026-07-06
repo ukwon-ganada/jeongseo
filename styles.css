@@ -367,6 +367,9 @@ html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black)
 .asheet-label{font-size:15.5px;font-weight:500;color:var(--black);}
 .asheet-ico{width:21px;height:21px;flex-shrink:0;color:var(--gray-700);}
 .asheet-item.danger .asheet-label,.asheet-item.danger .asheet-ico{color:var(--danger);}
+/* 기타 서류 시트: 항목이 많아도 넘치지 않게 */
+.more-sheet{max-height:82vh;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.more-sheet .asheet-head{padding-bottom:6px;}
 
 .loading{display:none;position:fixed;inset:0;background:rgba(255,255,255,0.88);z-index:600;flex-direction:column;align-items:center;justify-content:center;gap:14px;}
 .loading.active{display:flex;}

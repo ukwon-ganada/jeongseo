@@ -180,25 +180,19 @@
         <div class="sw-tab sw-tab-on" aria-label="계약서 작성"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg></div>
         <div class="sw-tab" onclick="openContractList()" aria-label="계약서 목록"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div>
         <div class="sw-tab" onclick="homeDevToast()" aria-label="합의서 작성 준비중"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><span class="sw-devdot"></span></div>
-        <div class="sw-tab" onclick="showScreen('screen-more')" aria-label="기타 기능"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></div>
+        <div class="sw-tab" onclick="openMoreSheet()" aria-label="기타 서류"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></div>
       </div>
       <div class="sw-toast" id="sw-toast">합의서 작성은 준비 중입니다</div>
     </div>
   </div>
 </div>
 
-<!-- ═══ 전체 기능 화면 (폰 '전체 기능 보기'로 진입 · 앞으로 서비스 추가 시 여기 목록에 한 줄씩) ═══ -->
-<div id="screen-more" class="screen">
-  <div class="more-appbar">
-    <button class="more-back" onclick="showScreen('screen-home')" aria-label="홈으로">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="22" height="22"><polyline points="15,18 9,12 15,6"/></svg>홈
-    </button>
-    <div class="more-title">전체 기능</div>
-  </div>
-  <div class="more-body">
-    <div class="more-seclabel">문서 작성</div>
+<!-- ═══ 기타 서류 시트 (폰 홈 위로 아래에서 슬라이드업 · 서비스 추가 시 여기 목록에 한 줄씩) ═══ -->
+<div class="overlay" id="moreSheet" onclick="if(event.target===this)closeMoreSheet()">
+  <div class="sheet asheet more-sheet">
+    <div class="sh-handle"></div>
+    <div class="asheet-head"><div class="asheet-head-title">기타 서류</div></div>
     <div id="more-list"></div>
-    <div class="more-soon">앞으로 새로운 서비스가 추가될 예정입니다</div>
   </div>
 </div>
 
@@ -2986,6 +2980,8 @@ function openTypeSheet(){document.getElementById('typeSheet').classList.add('act
 function closeTypeSheet(){document.getElementById('typeSheet').classList.remove('active');}
 function openActionSheet(){document.getElementById('actionSheet').classList.add('active');}
 function closeActionSheet(){document.getElementById('actionSheet').classList.remove('active');}
+function openMoreSheet(){document.getElementById('moreSheet').classList.add('active');}
+function closeMoreSheet(){document.getElementById('moreSheet').classList.remove('active');}
 function doActionAndClose(t){closeActionSheet();doAction(t);}
 function showLoading(m){document.getElementById('loadingMsg').textContent=m||'처리 중...';document.getElementById('loading').classList.add('active');}
 function hideLoading(){document.getElementById('loading').classList.remove('active');}
@@ -3806,7 +3802,7 @@ document.addEventListener('pointerdown',function(e){
 /* ESC 키로 열려 있는 팝업/시트 닫기 */
 document.addEventListener('keydown',function(e){
   if(e.key!=='Escape'&&e.keyCode!==27) return;
-  var overlays=['typeSheet','seonimTypeSheet','actionSheet'];
+  var overlays=['typeSheet','seonimTypeSheet','actionSheet','moreSheet'];
   for(var i=0;i<overlays.length;i++){
     var el=document.getElementById(overlays[i]);
     if(el&&el.classList.contains('active')){ el.classList.remove('active'); return; }
