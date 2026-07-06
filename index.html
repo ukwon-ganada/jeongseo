@@ -568,7 +568,7 @@
         <div style="display:flex;flex-wrap:wrap;gap:7px 18px;align-items:center;">
           <div>
             <span class="fee-label">착수금</span>
-            <input type="text" id="cv-inp-fee1" class="fee-input" placeholder="0" oninput="formatFee(this)"> 만원 (부가가치세 별도)
+            <input type="text" id="cv-inp-fee1" class="fee-input" placeholder="0" oninput="formatFee(this)"> 만원 (부가가치세 <span id="cv-vat1-text">별도</span>)
           </div>
         </div>
       </td>
@@ -779,7 +779,7 @@
         <div style="display:flex;flex-wrap:wrap;gap:7px 18px;align-items:center;">
           <div>
             <span class="fee-label">착수금</span>
-            <input type="text" id="fm-inp-fee1" class="fee-input" placeholder="0" oninput="formatFee(this)"> 만원 (부가가치세 별도)
+            <input type="text" id="fm-inp-fee1" class="fee-input" placeholder="0" oninput="formatFee(this)"> 만원 (부가가치세 <span id="fm-vat1-text">별도</span>)
           </div>
         </div>
       </td>
@@ -1459,6 +1459,8 @@ function resetContract(){
   ['fm-chk-trial','fm-chk-mediation','fm-chk-presolve','fm-chk-preserve','fm-chk-other'].forEach(function(id){var e=document.getElementById(id);if(e)e.checked=false;});
   ['fm-inp-trial','fm-inp-other','fm-inp-fee1','fm-inp-success'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
   document.querySelectorAll('input[name="fm-receipt"]').forEach(function(r,i){r.checked=(i===0);});
+  // 민사·가사 부가세 표기 기본값(별도)
+  ['cv-vat1-text','fm-vat1-text'].forEach(function(id){var e=document.getElementById(id);if(e)e.textContent='별도';});
   // 줌 초기화
   if(window._resetZoom)window._resetZoom();
 }
@@ -1509,7 +1511,7 @@ function collectFormData(){
       mediation:gv('cv-chk-mediation'),preserve:gv('cv-chk-preserve'),
       other:gv('cv-chk-other'),otherTxt:vv('cv-inp-other')
     };
-    fd.fee={fee1:vv('cv-inp-fee1')};
+    fd.fee={fee1:vv('cv-inp-fee1'),vat1:(document.getElementById('cv-vat1-text')||{}).textContent};
     fd.success=vv('cv-inp-success');
     fd.account=vv('cv-sel-account');
     fd.receipt=rv('cv-receipt');
@@ -1522,7 +1524,7 @@ function collectFormData(){
       mediation:gv('fm-chk-mediation'),presolve:gv('fm-chk-presolve'),
       preserve:gv('fm-chk-preserve'),other:gv('fm-chk-other'),otherTxt:vv('fm-inp-other')
     };
-    fd.fee={fee1:vv('fm-inp-fee1')};
+    fd.fee={fee1:vv('fm-inp-fee1'),vat1:(document.getElementById('fm-vat1-text')||{}).textContent};
     fd.success=vv('fm-inp-success');
     fd.account=vv('fm-sel-account');
     fd.receipt=rv('fm-receipt');
@@ -1568,6 +1570,7 @@ function restoreFormData(fd){
       sv('cv-inp-trial',fd.scope.trialNum);sv('cv-inp-other',fd.scope.otherTxt);
     }
     if(fd.fee)sv('cv-inp-fee1',fd.fee.fee1);
+    if(fd.fee&&fd.fee.vat1){var cvvt=document.getElementById('cv-vat1-text');if(cvvt)cvvt.textContent=fd.fee.vat1;}
     if(fd.success!==undefined)sv('cv-inp-success',fd.success);
     if(fd.account)sv('cv-sel-account',fd.account);
     if(fd.receipt)sr('cv-receipt',fd.receipt);
@@ -1580,6 +1583,7 @@ function restoreFormData(fd){
       sv('fm-inp-trial',fd.scope.trialNum);sv('fm-inp-other',fd.scope.otherTxt);
     }
     if(fd.fee)sv('fm-inp-fee1',fd.fee.fee1);
+    if(fd.fee&&fd.fee.vat1){var fmvt=document.getElementById('fm-vat1-text');if(fmvt)fmvt.textContent=fd.fee.vat1;}
     if(fd.success!==undefined)sv('fm-inp-success',fd.success);
     if(fd.account)sv('fm-sel-account',fd.account);
     if(fd.receipt)sr('fm-receipt',fd.receipt);
@@ -1976,7 +1980,7 @@ function renderSignContract(rec){
     html+=roRow('착수금',fee1?fee1+' 만원'+(fd.fee.vat1?' (VAT '+fd.fee.vat1+')':''):'');
     html+=roRow('2차 보수',fee2?fee2+' 만원'+(fd.fee.vat2?' (VAT '+fd.fee.vat2+')':''):'');
   }else{
-    html+=roRow('착수금',fee1?fee1+' 만원 (부가세 별도)':'');
+    html+=roRow('착수금',fee1?fee1+' 만원 (부가세 '+((fd.fee&&fd.fee.vat1)?fd.fee.vat1:'별도')+')':'');
     if(fd.success)html+=roRow('성공보수',fd.success+' %');
   }
   html+=roRow('입금계좌',accountTxt);
@@ -2696,7 +2700,11 @@ function openFormSheet(){
   // 수임조건
   document.getElementById('f-fee1').value=vv('inp-fee1');
   document.getElementById('f-fee2').value=vv('inp-fee2');
-  setRadioUI('vat1',rv('vat1'));setRadioUI('vat2',rv('vat2'));setRadioUI('receipt',rv('receipt'));
+  var vat1Init;
+  if(isCivil){var cvt=document.getElementById('cv-vat1-text');vat1Init=cvt?cvt.textContent.trim():'별도';}
+  else if(isFamily){var fmt=document.getElementById('fm-vat1-text');vat1Init=fmt?fmt.textContent.trim():'별도';}
+  else{vat1Init=rv('vat1');}
+  setRadioUI('vat1',vat1Init);setRadioUI('vat2',rv('vat2'));setRadioUI('receipt',rv('receipt'));
   document.getElementById('f-account').value=vv('sel-account')||document.getElementById('f-account').options[0].value;
   document.getElementById('f-special').value=isCivil?vv('cv-special-extra'):isFamily?vv('fm-special-extra'):vv('special-extra');
   document.getElementById('f-month').value=vv('inp-month');
@@ -2818,6 +2826,10 @@ function applyFormSheet(){
   var e1=document.getElementById('inp-fee1');if(e1)formatFee(e1);
   var e2=document.getElementById('inp-fee2');if(e2)formatFee(e2);
   sr('vat1',getRadioUI('vat1'));sr('vat2',getRadioUI('vat2'));sr('receipt',getRadioUI('receipt'));
+  // 민사·가사 착수금 부가세 별도/포함 반영 (계약서 텍스트)
+  var vat1Val=getRadioUI('vat1')||'별도';
+  var cvVat=document.getElementById('cv-vat1-text');if(cvVat)cvVat.textContent=vat1Val;
+  var fmVat=document.getElementById('fm-vat1-text');if(fmVat)fmVat.textContent=vat1Val;
   sv('sel-account',document.getElementById('f-account').value);
   var specialVal=document.getElementById('f-special').value;
   ['special-extra','cv-special-extra','fm-special-extra'].forEach(function(id){
