@@ -75,6 +75,8 @@ html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black)
 
 /* ════ PC 홈: 스카이/글래스 세로 스크롤 히어로 ════ */
 @media (min-width:768px){
+  /* html,body{height:100%} 때문에 문서 자체는 안 늘어남 → 홈 화면을 세로 스크롤 컨테이너로 */
+  #screen-home.active{height:100dvh;overflow-x:hidden;overflow-y:auto;}
   .home-main{width:100%;background:#0C1119;}
   .hm-mobile{display:none;}
 

@@ -151,7 +151,7 @@
         <!-- 이미지 맨 아래(골목) 위에 얹히는 마무리 바 -->
         <div class="hp-foot">
           <span class="hp-foot-say">필요한 것만, 차례로.</span>
-          <a href="#" class="hp-foot-top" onclick="event.preventDefault();window.scrollTo({top:0,behavior:'smooth'})">맨 위로 ↑</a>
+          <a href="#" class="hp-foot-top" onclick="event.preventDefault();(document.getElementById('screen-home')||document.scrollingElement).scrollTo({top:0,behavior:'smooth'})">맨 위로 ↑</a>
         </div>
       </div>
     </div>
