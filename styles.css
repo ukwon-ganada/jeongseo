@@ -1437,39 +1437,98 @@ body.contract-locked .ct-bb-sign{pointer-events:none;color:var(--success)!import
   #screen-appeal.active::before{display:none!important;}
 }
 
-/* ─── 선임계 종류 선택 모달(#seonimTypeSheet): 가시성↑ + 형사/민·가사 구분 타일 ───
-   PC(≥768px) 전용. 모바일은 기존 점(dot) 그대로 유지. */
+/* ═══════════════════════════════════════════════════════════════
+   PC(≥768px) 전용 통합 테마 — 모바일은 일절 변경 없음
+   (1) 종류 선택 모달 3종 가시성  (2) 열람 법원/검찰 가시성
+   (3) 데이터 입력폼을 '계약서 목록' 룩(파스텔 하늘+글래스)으로
+   (4) 출력창 검정/빨강 버튼 → 네이비/브라스 통일
+   ═══════════════════════════════════════════════════════════════ */
 @media (min-width:768px){
-  #seonimTypeSheet .sheet{
+  /* ── (1)(2) 종류 선택 모달 공통 가시성: 계약서·선임계·열람 ── */
+  #typeSheet .sheet,#seonimTypeSheet .sheet,#yeollamTypeSheet .sheet{
     background:rgba(255,255,255,.93);
     backdrop-filter:blur(30px) saturate(1.3);-webkit-backdrop-filter:blur(30px) saturate(1.3);
     border:1px solid rgba(255,255,255,.85);
     box-shadow:0 44px 96px -32px rgba(12,25,45,.55);
   }
-  #seonimTypeSheet .sh-title{font-family:'Noto Serif KR',serif;font-weight:600;font-size:19px;color:#16263f;}
-  #seonimTypeSheet .sh-desc{color:#5b6b86;}
-  #seonimTypeSheet .sh-div{background:rgba(22,38,63,.10);}
-  #seonimTypeSheet .type-item{
+  #typeSheet .sh-title,#seonimTypeSheet .sh-title,#yeollamTypeSheet .sh-title{font-family:'Noto Serif KR',serif;font-weight:600;font-size:19px;color:#16263f;}
+  #typeSheet .sh-desc,#seonimTypeSheet .sh-desc,#yeollamTypeSheet .sh-desc{color:#5b6b86;}
+  #typeSheet .sh-div,#seonimTypeSheet .sh-div,#yeollamTypeSheet .sh-div{background:rgba(22,38,63,.10);}
+  #typeSheet .type-item,#seonimTypeSheet .type-item,#yeollamTypeSheet .type-item{
     background:#fff;border:1.5px solid rgba(22,38,63,.14);border-radius:16px;
     box-shadow:0 12px 26px -18px rgba(12,25,45,.45);transition:transform .15s,border-color .15s,box-shadow .15s;
   }
-  #seonimTypeSheet .type-item:not(.disabled):hover{border-color:#16263f;box-shadow:0 18px 34px -16px rgba(12,25,45,.5);transform:translateY(-1px);}
-  #seonimTypeSheet .type-item:active{background:#f4f7fb;}
-  #seonimTypeSheet .type-name{color:#1a1a1a;font-size:16px;font-weight:600;}
-  #seonimTypeSheet .type-desc{color:#5b6b86;font-size:12.5px;margin-top:2px;}
-  #seonimTypeSheet .type-arrow{color:#9aa6b8;font-size:20px;}
-  #seonimTypeSheet .sh-cancel{color:#3f5170;border-color:rgba(22,38,63,.16);}
-  #seonimTypeSheet .sh-cancel:hover{background:#f4f7fb;}
+  #typeSheet .type-item:not(.disabled):hover,#seonimTypeSheet .type-item:not(.disabled):hover,#yeollamTypeSheet .type-item:not(.disabled):hover{border-color:#16263f;box-shadow:0 18px 34px -16px rgba(12,25,45,.5);transform:translateY(-1px);}
+  #typeSheet .type-item:active,#seonimTypeSheet .type-item:active,#yeollamTypeSheet .type-item:active{background:#f4f7fb;}
+  #typeSheet .type-name,#seonimTypeSheet .type-name,#yeollamTypeSheet .type-name{color:#1a1a1a;font-size:16px;font-weight:600;}
+  #typeSheet .type-desc,#seonimTypeSheet .type-desc,#yeollamTypeSheet .type-desc{color:#5b6b86;font-size:12.5px;margin-top:2px;}
+  #typeSheet .type-arrow,#seonimTypeSheet .type-arrow,#yeollamTypeSheet .type-arrow{color:#9aa6b8;font-size:20px;}
+  #typeSheet .sh-cancel,#seonimTypeSheet .sh-cancel,#yeollamTypeSheet .sh-cancel{color:#3f5170;border-color:rgba(22,38,63,.16);}
+  #typeSheet .sh-cancel:hover,#seonimTypeSheet .sh-cancel:hover,#yeollamTypeSheet .sh-cancel:hover{background:#f4f7fb;}
 
-  /* 점 → 모노그램 타일 (색 의미 유지: 네이비=형사, 아이보리=민·가사) */
-  #seonimTypeSheet .type-dot{
+  /* (1) 형사/민사/가사 구분 모노그램 타일 — 계약서·선임계 (색 의미 유지 + 글자 이중단서) */
+  #typeSheet .type-dot,#seonimTypeSheet .type-dot{
     width:42px;height:42px;border-radius:13px;flex-shrink:0;
     display:flex;align-items:center;justify-content:center;
     font-family:'Noto Serif KR',serif;font-weight:600;font-size:18px;line-height:1;
     box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 6px 14px -8px rgba(12,25,45,.5);
   }
-  #seonimTypeSheet .type-dot-criminal{background:linear-gradient(155deg,#22344f,#16263f);color:#EAF1F9;border:none;}
-  #seonimTypeSheet .type-dot-criminal::before{content:"형";}
-  #seonimTypeSheet .type-dot-civil{background:linear-gradient(155deg,#f4ecd7,#e4d4ac);color:#5a4a24;border:1px solid #d9c79b;}
-  #seonimTypeSheet .type-dot-civil::before{content:"민";}
+  #typeSheet .type-dot-criminal,#seonimTypeSheet .type-dot-criminal{background:linear-gradient(155deg,#22344f,#16263f);color:#EAF1F9;border:none;}
+  #typeSheet .type-dot-criminal::before,#seonimTypeSheet .type-dot-criminal::before{content:"형";}
+  #typeSheet .type-dot-civil,#seonimTypeSheet .type-dot-civil{background:linear-gradient(155deg,#f4ecd7,#e4d4ac);color:#5a4a24;border:1px solid #d9c79b;}
+  #typeSheet .type-dot-civil::before,#seonimTypeSheet .type-dot-civil::before{content:"민";}
+  #typeSheet .type-dot-family{background:linear-gradient(155deg,#f3d7de,#e6b6c4);color:#7a3b52;border:1px solid #dca7b8;}
+  #typeSheet .type-dot-family::before{content:"가";}
+
+  /* (2) 열람 법원/검찰: 구분 강조 없이 가시성만 — 아이콘을 네이비 글래스 타일로 통일 */
+  #yeollamTypeSheet .yl-type-ico{
+    width:42px;height:42px;border-radius:13px;flex-shrink:0;
+    background:rgba(22,38,63,.06);border:1px solid rgba(22,38,63,.14);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.5);
+  }
+  #yeollamTypeSheet .yl-type-ico svg{stroke:#16263f;}
+
+  /* ── (3) 데이터 입력폼을 '계약서 목록' 룩으로: 흐릿한 파스텔 하늘 + 글래스 헤더/푸터 ── */
+  #seonimForm,#formSheet,#appealForm,#yeollamForm,#gukseonForm,#pankyulForm{background:transparent!important;}
+  #seonimForm::before,#formSheet::before,#appealForm::before,#yeollamForm::before,#gukseonForm::before,#pankyulForm::before{
+    content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+    background:linear-gradient(rgba(234,241,249,.60),rgba(234,241,249,.72)),url("hero-city.jpg") center 30%/cover no-repeat;
+    filter:blur(26px) saturate(1.05);transform:scale(1.12);
+  }
+  #seonimForm .fs-head,#formSheet .fs-head,#appealForm .fs-head,#yeollamForm .fs-head,#gukseonForm .fs-head,#pankyulForm .fs-head,
+  #seonimForm .fs-foot,#formSheet .fs-foot,#appealForm .fs-foot,#yeollamForm .fs-foot,#gukseonForm .fs-foot,#pankyulForm .fs-foot{
+    background:rgba(255,255,255,.60);backdrop-filter:blur(18px) saturate(1.2);-webkit-backdrop-filter:blur(18px) saturate(1.2);
+    border-color:rgba(255,255,255,.55);
+  }
+  /* 데이터 입력 구역 = 하나의 뚜렷한 흰색 패널 (배경 하늘과 분명히 분리).
+     하늘은 패널 '바깥 여백'으로만 보이고, 입력 필드 사이로는 비치지 않음. */
+  #seonimForm .fs-body,#formSheet .fs-body,#appealForm .fs-body,#yeollamForm .fs-body,#gukseonForm .fs-body,#pankyulForm .fs-body{
+    background:rgba(255,255,255,.86);
+    backdrop-filter:blur(26px) saturate(1.25);-webkit-backdrop-filter:blur(26px) saturate(1.25);
+    border:1px solid rgba(255,255,255,.75);border-radius:20px;
+    margin:14px auto 16px;
+    box-shadow:0 34px 72px -34px rgba(12,25,45,.5);
+  }
+  /* 패널 안 하위 카드·그룹은 은은한 인셋 (패널과 구분되되 과하지 않게) */
+  .cl-card,.fs-group{background:#eef3fa;border:1px solid #dfe7f2;box-shadow:none;}
+  .fs-group{border-radius:14px;}
+  /* 섹션 라벨: 흰 패널에서 읽히는 네이비-그레이 */
+  .fs-section{color:#41537a;}
+
+  /* ── (4) 출력창 버튼 테마 통일: 검정→네이비, 빨강→브라스 (모바일 .ab-* 는 제외) ── */
+  .cts-btn.primary,.sj-appbar .sj-edit-btn,.fs-btn.primary,.modal-btn.primary{
+    background:linear-gradient(155deg,#22344f,#16263f);color:#fff;border:none;
+  }
+  .cts-btn.primary:hover,.sj-appbar .sj-edit-btn:hover,.fs-btn.primary:hover,.modal-btn.primary:hover{
+    background:linear-gradient(155deg,#2a3e5c,#1b2e4b);
+  }
+  .cts-btn.cts-sign,.sj-appbar .sj-print-btn{
+    background:linear-gradient(155deg,#a9791f,#8a5f14);color:#fff;border:none;
+  }
+  .cts-btn.cts-sign:hover,.sj-appbar .sj-print-btn:hover{
+    background:linear-gradient(155deg,#96691a,#79510f);
+  }
+  .cts-btn.cts-outline{border:1.5px solid #16263f;color:#16263f;background:#fff;}
+  .cts-btn.cts-outline:hover{background:#f4f7fb;}
+  .fs-chip.on{background:#16263f;border-color:#16263f;color:#fff;}
 }
