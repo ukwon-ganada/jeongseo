@@ -117,19 +117,31 @@ html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black)
     width:max-content;max-width:calc(100% - 40px);
   }
 
-  /* 글래스 카드 */
+  /* 글래스 카드 (하늘 위에 둥둥 떠 있는 효과) */
+  @keyframes hp-floaty{0%,100%{transform:translateY(0) rotate(0deg)}50%{transform:translateY(-8px) rotate(.5deg)}}
   .doc-card{
     width:250px;box-sizing:border-box;
     background:linear-gradient(155deg,rgba(24,36,56,.32),rgba(10,18,32,.46));
     backdrop-filter:blur(18px) saturate(1.1);-webkit-backdrop-filter:blur(18px) saturate(1.1);
     border:1px solid rgba(255,255,255,.32);border-radius:18px;
-    padding:20px 22px;cursor:pointer;transition:transform .2s,box-shadow .2s;position:relative;
+    padding:20px 22px;cursor:pointer;transition:box-shadow .2s,border-color .2s;position:relative;
     box-shadow:0 30px 54px -26px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.26);
     display:flex;flex-direction:column;
+    animation:hp-floaty 7.5s ease-in-out infinite;will-change:transform;
   }
-  .doc-card:hover{transform:translateY(-6px);box-shadow:0 38px 64px -24px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.3);}
+  /* 카드마다 서로 다른 주기·시작점으로 제각각 둥둥 */
+  .doc-card:nth-child(1){animation-duration:6.5s;animation-delay:-0.4s}
+  .doc-card:nth-child(2){animation-duration:7.8s;animation-delay:-2.3s}
+  .doc-card:nth-child(3){animation-duration:6.9s;animation-delay:-4.1s}
+  .doc-card:nth-child(4){animation-duration:8.4s;animation-delay:-1.2s}
+  .doc-card:nth-child(5){animation-duration:7.2s;animation-delay:-5.0s}
+  .doc-card:nth-child(6){animation-duration:9.0s;animation-delay:-3.0s}
+  .doc-card:nth-child(7){animation-duration:7.6s;animation-delay:-0.9s}
+  .doc-card:hover{box-shadow:0 42px 72px -24px rgba(0,0,0,.62),inset 0 1px 0 rgba(255,255,255,.42);border-color:rgba(255,255,255,.5);}
   .doc-card.dc-soon{opacity:.62;cursor:default;}
-  .doc-card.dc-soon:hover{transform:none;box-shadow:0 30px 54px -26px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.26);}
+  .doc-card.dc-soon:hover{box-shadow:0 30px 54px -26px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.26);border-color:rgba(255,255,255,.32);}
+  /* 모션 최소화 설정 존중 */
+  @media (prefers-reduced-motion:reduce){.doc-card{animation:none}}
 
   .dc-kicker{font:500 10.5px 'IBM Plex Mono',monospace;letter-spacing:.16em;color:rgba(220,238,252,.8);}
   .dc-name{
