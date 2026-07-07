@@ -147,6 +147,20 @@
   .toast{ position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(18px); background:var(--black); color:#fff;
     padding:11px 18px; border-radius:var(--r); font-size:13px; opacity:0; pointer-events:none; transition:.25s; z-index:95; box-shadow:0 8px 30px rgba(0,0,0,.25); }
   .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  /* ═══ PC(≥768px) 전용: 앱 전체 테마 통일 — 편집구역(흰 카드) vs 배경(파스텔 하늘) 분리
+         + 검정 버튼/세그먼트 → 네이비. 모바일(<768px)은 기존 그대로. ═══ */
+  @media (min-width:768px){
+    body{ background:#e7eef7; }
+    body::before{ content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
+      background:linear-gradient(rgba(234,241,249,.60),rgba(234,241,249,.72)),url("hero-city.jpg") center 30%/cover no-repeat;
+      filter:blur(26px) saturate(1.05); transform:scale(1.12); }
+    .wrap{ position:relative; z-index:1; }
+    .app-card{ background:#fff; box-shadow:0 34px 72px -34px rgba(12,25,45,.5); border-color:rgba(255,255,255,.7); }
+    .btn.primary{ background:linear-gradient(155deg,#22344f,#16263f); }
+    .btn.primary:hover{ background:linear-gradient(155deg,#2a3e5c,#1b2e4b); }
+    .kind-seg button.on{ background:#16263f; }
+  }
   </style>
 </head>
 <body>

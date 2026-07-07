@@ -1489,20 +1489,20 @@ body.contract-locked .ct-bb-sign{pointer-events:none;color:var(--success)!import
   #yeollamTypeSheet .yl-type-ico svg{stroke:#16263f;}
 
   /* ── (3) 데이터 입력폼을 '계약서 목록' 룩으로: 흐릿한 파스텔 하늘 + 글래스 헤더/푸터 ── */
-  #seonimForm,#formSheet,#appealForm,#yeollamForm,#gukseonForm,#pankyulForm{background:transparent!important;}
-  #seonimForm::before,#formSheet::before,#appealForm::before,#yeollamForm::before,#gukseonForm::before,#pankyulForm::before{
+  #seonimForm,#formSheet,#appealForm,#yeollamForm,#gukseonForm,#pankyulForm,#geomchalForm{background:transparent!important;}
+  #seonimForm::before,#formSheet::before,#appealForm::before,#yeollamForm::before,#gukseonForm::before,#pankyulForm::before,#geomchalForm::before{
     content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
     background:linear-gradient(rgba(234,241,249,.60),rgba(234,241,249,.72)),url("hero-city.jpg") center 30%/cover no-repeat;
     filter:blur(26px) saturate(1.05);transform:scale(1.12);
   }
-  #seonimForm .fs-head,#formSheet .fs-head,#appealForm .fs-head,#yeollamForm .fs-head,#gukseonForm .fs-head,#pankyulForm .fs-head,
-  #seonimForm .fs-foot,#formSheet .fs-foot,#appealForm .fs-foot,#yeollamForm .fs-foot,#gukseonForm .fs-foot,#pankyulForm .fs-foot{
+  #seonimForm .fs-head,#formSheet .fs-head,#appealForm .fs-head,#yeollamForm .fs-head,#gukseonForm .fs-head,#pankyulForm .fs-head,#geomchalForm .fs-head,
+  #seonimForm .fs-foot,#formSheet .fs-foot,#appealForm .fs-foot,#yeollamForm .fs-foot,#gukseonForm .fs-foot,#pankyulForm .fs-foot,#geomchalForm .fs-foot{
     background:rgba(255,255,255,.60);backdrop-filter:blur(18px) saturate(1.2);-webkit-backdrop-filter:blur(18px) saturate(1.2);
     border-color:rgba(255,255,255,.55);
   }
   /* 데이터 입력 구역 = 하나의 뚜렷한 흰색 패널 (배경 하늘과 분명히 분리).
      하늘은 패널 '바깥 여백'으로만 보이고, 입력 필드 사이로는 비치지 않음. */
-  #seonimForm .fs-body,#formSheet .fs-body,#appealForm .fs-body,#yeollamForm .fs-body,#gukseonForm .fs-body,#pankyulForm .fs-body{
+  #seonimForm .fs-body,#formSheet .fs-body,#appealForm .fs-body,#yeollamForm .fs-body,#gukseonForm .fs-body,#pankyulForm .fs-body,#geomchalForm .fs-body{
     background:rgba(255,255,255,.86);
     backdrop-filter:blur(26px) saturate(1.25);-webkit-backdrop-filter:blur(26px) saturate(1.25);
     border:1px solid rgba(255,255,255,.75);border-radius:20px;
@@ -1522,13 +1522,17 @@ body.contract-locked .ct-bb-sign{pointer-events:none;color:var(--success)!import
   .cts-btn.primary:hover,.sj-appbar .sj-edit-btn:hover,.fs-btn.primary:hover,.modal-btn.primary:hover{
     background:linear-gradient(155deg,#2a3e5c,#1b2e4b);
   }
+  /* 인쇄/서명 = 네이비 아웃라인 (편집=네이비 채움과 구분) */
   .cts-btn.cts-sign,.sj-appbar .sj-print-btn{
-    background:linear-gradient(155deg,#a9791f,#8a5f14);color:#fff;border:none;
+    background:#fff;border:1.5px solid #16263f;color:#16263f;
   }
   .cts-btn.cts-sign:hover,.sj-appbar .sj-print-btn:hover{
-    background:linear-gradient(155deg,#96691a,#79510f);
+    background:#eef2f9;border-color:#16263f;
   }
   .cts-btn.cts-outline{border:1.5px solid #16263f;color:#16263f;background:#fff;}
+
+  /* 의뢰인/사건번호 검색창(autofill): 검정 반전 → 네이비 (테마 통일, 여전히 눈에 띔) */
+  .af-searchbox{background:linear-gradient(155deg,#22344f,#16263f)!important;border-color:#16263f!important;}
   .cts-btn.cts-outline:hover{background:#f4f7fb;}
   .fs-chip.on{background:#16263f;border-color:#16263f;color:#fff;}
 }
