@@ -4380,15 +4380,23 @@ function fitSeonimPage(){
   var tbl=host.querySelector('.sj'); if(!tbl)return;
   var pxPerMm=tbl.offsetWidth/169;
   /* 인쇄영역(297-상20-하15=262mm)보다 살짝 작은 258mm를 목표로 축소해
-     제3채권자 여러 명이어도 마지막 '귀중' 줄까지 A4 한 장 안에 안전하게 들어가게 한다. */
+     원고·피고·제3자가 여러 명이어도 마지막 '귀중' 줄까지 A4 한 장 안에 안전하게 들어가게 한다.
+     인원이 아무리 많아도 항상 1장(필요 시 글씨가 작아짐). */
   var availPx=258*pxPerMm;
   var h=tbl.offsetHeight;
   if(h>availPx){
-    /* transform scale로 시각적 축소. 실제 1장 보장은 인쇄 CSS(.sj-page 297mm+overflow)가 담당.
-       host에 overflow/height를 걸면 표 하단이 잘리므로 절대 걸지 않는다. */
-    host.style.transform='scale('+(availPx/h)+')';
+    var s=availPx/h;
+    /* transform scale로 시각적 축소 + 축소분만큼 host 레이아웃 높이도 줄여
+       화면 미리보기 페이지가 A4보다 길어지지 않게 한다(빈 여백/2장처럼 보이던 문제 방지).
+       transform-origin:top center 라 위→아래로 축소되므로 height=h*s면 잘림 없이 딱 맞는다. */
+    host.style.transform='scale('+s+')';
+    host.style.height=Math.ceil(h*s)+'px';
   }
 }
+/* 인쇄 직전에도 축소 재적용(렌더 직후 바로 출력해 축소 타이밍을 놓치는 경우 방지) */
+window.addEventListener('beforeprint',function(){
+  if(document.body.classList.contains('mode-seonim'))fitSeonimPage();
+});
 
 
 
