@@ -58,7 +58,26 @@
       + '.au-remember{display:flex;align-items:center;justify-content:center;gap:7px;'
       + 'font-size:13px;color:#666;margin:6px 0 2px;cursor:pointer;user-select:none;}'
       + '.au-remember input{width:16px;height:16px;accent-color:#1a1a1a;margin:0;cursor:pointer;}'
-      + '.au-foot{font-size:11px;color:#cfd3d9;margin-top:22px;line-height:1.5;}';
+      + '.au-foot{font-size:11px;color:#cfd3d9;margin-top:22px;line-height:1.5;}'
+      // ── PC(≥768px) 전용: 하늘 배경 + 흰색 글래스 (홈과 통일). 모바일 로그인은 위 기본 그대로 ──
+      + '@media (min-width:768px){'
+      +   '#' + OVERLAY_ID + '{background:#0C1119 url("hero-city.jpg") center 28%/cover no-repeat;}'
+      +   '#' + OVERLAY_ID + '::before{content:"";position:absolute;inset:0;'
+      +     'background:linear-gradient(180deg,rgba(12,19,34,.26),rgba(12,19,34,.52));'
+      +     'backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);}'
+      +   '.au-box{position:relative;z-index:1;max-width:360px;padding:36px 32px 30px;'
+      +     'background:rgba(255,255,255,.62);backdrop-filter:blur(22px) saturate(1.2);'
+      +     '-webkit-backdrop-filter:blur(22px) saturate(1.2);border:1px solid rgba(255,255,255,.7);'
+      +     'border-radius:24px;box-shadow:0 40px 80px -30px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.7);}'
+      +   ".au-brand{font-family:'Noto Serif KR',serif;font-weight:600;color:#16263f;}"
+      +   '.au-sub{color:#3f5170;}'
+      +   '.au-input{background:#fff;border:1.5px solid rgba(22,38,63,.22);color:#1a1a1a;}'
+      +   '.au-input::placeholder{color:#9aa6b8;}'
+      +   '.au-input:focus{border-color:#16263f;background:#fff;box-shadow:0 0 0 3px rgba(22,38,63,.14);}'
+      +   '.au-btn{background:#16263f;}'
+      +   '.au-remember{color:#3f5170;}.au-remember input{accent-color:#16263f;}'
+      +   '.au-foot{color:#5b6b86;}'
+      + '}';
     var s = document.createElement('style');
     s.id = STYLE_ID; s.textContent = css;
     document.head.appendChild(s);

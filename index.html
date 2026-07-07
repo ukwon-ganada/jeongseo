@@ -24,6 +24,10 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script id="daumPostcodeScript" src="https://t1.kakaocdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+<!-- 서면작성 홈(스카이/글래스) 전용 웹폰트 -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@300;400;500;600&family=Noto+Serif+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
@@ -119,60 +123,37 @@
 </div>
 
 <div id="screen-home" class="screen active">
-  <aside class="home-sidebar">
-    <div class="sb-brand"><img class="sb-logo" src="logo-sidebar.png" alt="법무법인 정서 로고"><div class="sb-brand-name">법무법인 정서</div></div>
-    <nav class="sb-nav">
-      <div class="sb-label">문서</div>
-      <div class="sb-item on" onclick="openTypeSheet()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg>
-        계약서 작성
-      </div>
-      <div class="sb-item" onclick="openContractList()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-        계약서 목록
-      </div>
-      <div class="sb-item" onclick="openSeonimType()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
-        선임계 작성
-      </div>
-      <div class="sb-item" onclick="goAppeal()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-        항소장 작성
-      </div>
-      <div class="sb-item" onclick="goYeollam()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-        열람·복사 신청서
-      </div>
-      <div class="sb-item" onclick="goGukseon()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
-        국선보수증액 신청서
-      </div>
-      <div class="sb-item" onclick="goCaseManager()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 12h18"/></svg>
-        사건 관리
-      </div>
-      <div class="sb-item" onclick="goPankyul()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><path d="M9 15l2 2 4-4"/></svg>
-        판결등본교부청구
-      </div>
-      <div class="sb-item disabled">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-        합의서 작성<span class="sb-badge">준비중</span>
-      </div>
-      <div class="sb-item" onclick="openDojang()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-        형사서면 출력
-      </div>
-    </nav>
-    <div class="sb-foot">인천광역시 미추홀구<br>한나루로 436, 501호<br>032-868-7171</div>
-  </aside>
-
   <div class="home-main">
+    <!-- PC 홈: 맑은 하늘 위 글래스 카드 (세로 스크롤 히어로) -->
     <div class="home-pc">
-      <div class="hm-hi">법률문서 작성</div>
-      <div class="hm-title">문서 작성</div>
-      <div class="hm-desc">작성할 문서를 선택하세요</div>
-      <div class="doc-grid" id="doc-grid"></div>
+      <div class="hp-hero">
+        <img class="hp-bg" src="./hero-city.jpg" alt="맑은 하늘 아래 도시와 골목" onerror="this.style.display='none'">
+
+        <!-- 하늘 위에 겹치는 오버레이 -->
+        <div class="hp-overlay">
+          <div class="hp-head">
+            <div class="hp-pills">
+              <span class="hp-pill">서면 작성</span>
+              <span class="hp-pill hp-pill-link" onclick="openContractList()">계약서</span>
+              <span class="hp-pill hp-pill-link" onclick="goCaseManager()">국선</span>
+            </div>
+            <h1 class="hp-title">법무법인 정서</h1>
+          </div>
+
+          <div class="doc-grid" id="doc-grid"></div>
+
+          <div class="hp-scroll">
+            <span>아래로 스크롤</span>
+            <span class="hp-arrow">↓</span>
+          </div>
+        </div>
+
+        <!-- 이미지 맨 아래(골목) 위에 얹히는 마무리 바 -->
+        <div class="hp-foot">
+          <span class="hp-foot-say">필요한 것만, 차례로.</span>
+          <a href="#" class="hp-foot-top" onclick="event.preventDefault();(document.getElementById('screen-home')||document.scrollingElement).scrollTo({top:0,behavior:'smooth'})">맨 위로 ↑</a>
+        </div>
+      </div>
     </div>
 
     <div class="hm-mobile" data-theme="light">

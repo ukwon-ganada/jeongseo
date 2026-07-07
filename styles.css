@@ -65,77 +65,127 @@ html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black)
 .ab-edit svg{width:19px;height:19px;stroke:var(--black);}
 
 /* ════ 공통 홈 골격 ════ */
-#screen-home.active{display:flex;min-height:100vh;}
+#screen-home.active{display:block;min-height:100vh;background:#0C1119;}
 
-/* PC 사이드바 */
-.home-sidebar{display:none;}
-@media (min-width:768px){
-  .home-sidebar{
-    display:flex;flex-direction:column;
-    width:240px;min-width:240px;
-    border-right:1px solid var(--border);
-    padding:0;position:sticky;top:0;height:100vh;
-  }
-  .sb-brand{padding:30px 22px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:flex-start;gap:12px;}
-  .sb-logo{width:38px;height:38px;border-radius:9px;flex-shrink:0;}
-  .sb-brand-name{font-size:19px;font-weight:700;color:var(--black);letter-spacing:-0.01em;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .sb-nav{padding:16px 12px;}
-  .sb-label{font-size:10px;font-weight:600;color:var(--gray-400);letter-spacing:0.1em;text-transform:uppercase;padding:0 10px;margin-bottom:6px;}
-  .sb-item{
-    display:flex;align-items:center;gap:11px;
-    padding:11px 14px;border-radius:var(--r-pill);
-    cursor:pointer;font-size:14px;color:var(--gray-700);
-    transition:all 0.15s;
-  }
-  .sb-item:hover{background:var(--gray-100);}
-  .sb-item.on{background:var(--black);color:#fff;}
-  .sb-item svg{width:16px;height:16px;flex-shrink:0;}
-  .sb-item.disabled{color:var(--gray-400);cursor:default;}
-  .sb-item.disabled:hover{background:transparent;}
-  .sb-item .sb-badge{margin-left:auto;font-size:9px;padding:1px 6px;border-radius:99px;background:var(--gray-100);color:var(--gray-400);}
-  .sb-foot{margin-top:auto;padding:18px 22px;border-top:1px solid var(--border);font-size:11px;color:var(--gray-400);line-height:1.6;position:relative;z-index:11;}
-}
+/* 사이드바 제거됨 (스카이/글래스 홈으로 대체) */
+.home-sidebar{display:none!important;}
 
 /* 메인 영역 */
 .home-main{flex:1;}
+
+/* ════ PC 홈: 스카이/글래스 세로 스크롤 히어로 ════ */
 @media (min-width:768px){
-  .home-main{padding:40px 44px;background:var(--gray-100);}
-  .hm-hi{font-size:12px;font-weight:600;color:var(--gray-400);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px;}
-  .hm-title{font-size:32px;font-weight:700;margin-bottom:24px;letter-spacing:-0.03em;}
-  .hm-desc{display:none;}
+  /* html,body{height:100%} 때문에 문서 자체는 안 늘어남 → 홈 화면을 세로 스크롤 컨테이너로 */
+  #screen-home.active{height:100dvh;overflow-x:hidden;overflow-y:auto;}
+  .home-main{width:100%;background:#0C1119;}
   .hm-mobile{display:none;}
-  .doc-grid{display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:100px;gap:14px;}
-  .doc-card{
-    border:1px solid transparent;border-radius:16px;
-    padding:20px;cursor:pointer;transition:all 0.18s;position:relative;overflow:hidden;background:#fff;
-    box-shadow:0 4px 16px rgba(0,0,0,0.06);display:flex;flex-direction:column;
+
+  /* 히어로: 배경 이미지가 자연 높이로 페이지를 채우고, 오버레이가 그 위에 겹침 */
+  .hp-hero{
+    position:relative;width:100%;min-height:100vh;
+    background:#0C1119;
+    /* 이미지가 없을 때의 하늘 폴백 */
+    background-image:linear-gradient(180deg,#2E6FB0 0%,#5B93C9 42%,#9FBFD8 72%,#0C1119 100%);
   }
-  .doc-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,0.10);}
-  .doc-card.disabled{opacity:0.5;cursor:default;}
-  .doc-card.disabled:hover{transform:none;box-shadow:0 4px 16px rgba(0,0,0,0.06);}
-  /* 벤토 타일 크기 */
-  .doc-card.dc-hero{grid-column:span 2;grid-row:span 2;background:var(--hero);color:#fff;justify-content:space-between;}
-  .doc-card.dc-wide{grid-column:span 2;flex-direction:row;align-items:center;gap:14px;}
-  .doc-card.dc-small{grid-column:span 1;justify-content:center;}
-  /* 히어로 내부 */
-  .dc-watermark{position:absolute;right:-16px;bottom:-26px;width:150px;height:150px;opacity:0.06;pointer-events:none;}
-  .dc-watermark svg{width:100%;height:100%;stroke:#fff;}
-  .dc-main-tag{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:rgba(255,255,255,0.6);letter-spacing:0.05em;position:relative;}
-  .dc-main-tag::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--hero-dot);}
-  .dc-cta{position:relative;align-self:flex-start;display:inline-flex;align-items:center;gap:5px;background:#fff;color:var(--hero);font-size:13px;font-weight:600;padding:8px 14px;border-radius:var(--r-pill);}
-  /* 아이콘 박스: 외곽선(기본)/채움(강조) */
-  .dc-ico{width:46px;height:46px;background:#fff;border:1.5px solid var(--gray-300);border-radius:13px;display:flex;align-items:center;justify-content:center;margin-bottom:12px;flex-shrink:0;}
-  .dc-wide .dc-ico{margin-bottom:0;}
-  .doc-card.dc-accent .dc-ico{background:var(--hero);border-color:var(--hero);}
-  .doc-card.dc-accent .dc-ico svg{stroke:#fff;}
-  .dc-hero .dc-ico{display:none;}
-  .dc-ico svg{width:20px;height:20px;stroke:var(--gray-700);}
-  .dc-name{font-size:16px;font-weight:600;margin-bottom:0;}
-  .dc-hero .dc-name{font-size:26px;font-weight:700;color:#fff;margin-top:12px;position:relative;}
-  .dc-desc{font-size:12px;color:var(--gray-500);line-height:1.5;margin-top:3px;}
-  .dc-hero .dc-desc{font-size:14px;color:rgba(255,255,255,0.6);margin-top:5px;position:relative;}
-  .dc-wide .dc-body{flex:1;}
-  .dc-badge{position:absolute;top:14px;right:14px;font-size:10px;padding:1px 8px;border-radius:99px;background:transparent;border:1px solid var(--gray-300);color:var(--gray-500);}
+  .hp-bg{display:block;width:100%;height:auto;}
+
+  /* 하늘(첫 화면) 위에 겹치는 오버레이 */
+  .hp-overlay{position:absolute;top:0;left:0;width:100%;height:100vh;color:#fff;pointer-events:none;}
+  .hp-overlay > *{pointer-events:auto;}
+
+  /* 헤드라인 블록 */
+  .hp-head{position:absolute;top:7vh;left:5vw;max-width:420px;}
+  .hp-pills{display:flex;flex-wrap:wrap;align-items:center;gap:8px;}
+  .hp-pill{
+    display:inline-block;padding:6px 14px;border-radius:999px;
+    background:rgba(255,255,255,.22);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    border:1px solid rgba(255,255,255,.4);
+    font:600 11px 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#fff;
+  }
+  .hp-pill-link{cursor:pointer;transition:background .15s,transform .15s;}
+  .hp-pill-link:hover{background:rgba(255,255,255,.34);transform:translateY(-1px);}
+  .hp-title{
+    font-family:'Noto Serif KR',serif;font-weight:500;font-size:36px;line-height:1.14;
+    letter-spacing:-.02em;margin:16px 0 10px;color:#fff;
+    text-shadow:0 2px 22px rgba(20,40,70,.6);
+  }
+
+  /* 카드 그리드: 3열 고정폭, 가운데 정렬 (좁아지면 자동 줄바꿈) */
+  .doc-grid{
+    position:absolute;top:28vh;left:50%;transform:translateX(-50%);
+    display:grid;grid-template-columns:repeat(3,250px);gap:18px;
+    width:max-content;max-width:calc(100% - 40px);
+  }
+
+  /* 글래스 카드 (하늘 위에 둥둥 떠 있는 효과) */
+  @keyframes hp-floaty{0%,100%{transform:translateY(0) rotate(0deg)}50%{transform:translateY(-8px) rotate(.5deg)}}
+  .doc-card{
+    width:250px;box-sizing:border-box;
+    background:linear-gradient(155deg,rgba(24,36,56,.32),rgba(10,18,32,.46));
+    backdrop-filter:blur(18px) saturate(1.1);-webkit-backdrop-filter:blur(18px) saturate(1.1);
+    border:1px solid rgba(255,255,255,.32);border-radius:18px;
+    padding:20px 22px;cursor:pointer;transition:box-shadow .2s,border-color .2s;position:relative;
+    box-shadow:0 30px 54px -26px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.26);
+    display:flex;flex-direction:column;
+    animation:hp-floaty 7.5s ease-in-out infinite;will-change:transform;
+  }
+  /* 카드마다 서로 다른 주기·시작점으로 제각각 둥둥 */
+  .doc-card:nth-child(1){animation-duration:6.5s;animation-delay:-0.4s}
+  .doc-card:nth-child(2){animation-duration:7.8s;animation-delay:-2.3s}
+  .doc-card:nth-child(3){animation-duration:6.9s;animation-delay:-4.1s}
+  .doc-card:nth-child(4){animation-duration:8.4s;animation-delay:-1.2s}
+  .doc-card:nth-child(5){animation-duration:7.2s;animation-delay:-5.0s}
+  .doc-card:nth-child(6){animation-duration:9.0s;animation-delay:-3.0s}
+  .doc-card:nth-child(7){animation-duration:7.6s;animation-delay:-0.9s}
+  .doc-card:hover{box-shadow:0 42px 72px -24px rgba(0,0,0,.62),inset 0 1px 0 rgba(255,255,255,.42);border-color:rgba(255,255,255,.5);}
+  .doc-card.dc-soon{opacity:.62;cursor:default;}
+  .doc-card.dc-soon:hover{box-shadow:0 30px 54px -26px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.26);border-color:rgba(255,255,255,.32);}
+  /* 모션 최소화 설정 존중 */
+  @media (prefers-reduced-motion:reduce){.doc-card{animation:none}}
+
+  .dc-kicker{font:500 10.5px 'IBM Plex Mono',monospace;letter-spacing:.16em;color:rgba(220,238,252,.8);}
+  .dc-name{
+    font-family:'Noto Serif KR',serif;font-weight:600;font-size:24px;margin-top:6px;color:#fff;
+    text-shadow:0 1px 10px rgba(0,0,0,.4);
+  }
+  .dc-rule{height:1px;background:rgba(255,255,255,.18);margin:13px 0 11px;}
+  .dc-desc{font:400 12.5px/1.55 'IBM Plex Sans KR',sans-serif;color:rgba(255,255,255,.92);margin:0 0 14px;}
+  .dc-cta{font:600 12px 'IBM Plex Sans KR',sans-serif;color:#EAF4FC;}
+  .dc-badge{
+    display:inline-block;font:600 11px 'IBM Plex Mono',monospace;letter-spacing:.04em;
+    padding:3px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.32);color:rgba(255,255,255,.85);
+  }
+
+  /* 스크롤 힌트 */
+  .hp-scroll{
+    position:absolute;bottom:16px;left:0;width:100%;
+    display:flex;flex-direction:column;align-items:center;gap:3px;
+    font:400 11px 'IBM Plex Mono',monospace;letter-spacing:.14em;color:rgba(255,255,255,.85);
+    text-shadow:0 1px 8px rgba(20,40,70,.5);
+  }
+  .hp-arrow{font-size:15px;animation:hp-bob 1.8s ease-in-out infinite;}
+  @keyframes hp-bob{0%,100%{transform:translateY(0);opacity:.9}50%{transform:translateY(7px);opacity:.5}}
+
+  /* 하단 마무리 바 (이미지 맨 아래 위에 얹힘) */
+  .hp-foot{
+    position:absolute;bottom:0;left:0;width:100%;box-sizing:border-box;
+    padding:28px 26px 26px;
+    background:linear-gradient(to bottom,rgba(12,19,34,0),rgba(12,19,34,.55));
+    color:rgba(255,255,255,.92);display:flex;justify-content:space-between;align-items:center;
+  }
+  .hp-foot-say{font-family:'Noto Serif KR',serif;font-weight:500;font-size:16px;text-shadow:0 1px 10px rgba(0,0,0,.5);}
+  .hp-foot-top{
+    font:500 11px 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#DCEEFB;
+    padding:8px 14px;border-radius:999px;
+    background:rgba(255,255,255,.16);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    border:1px solid rgba(255,255,255,.32);
+  }
+  .hp-foot-top:hover{color:#fff;}
+
+  /* 좁은 데스크톱: 카드가 3열을 못 채우면 자동으로 열 수 조절 */
+  @media (max-width:900px){
+    .doc-grid{grid-template-columns:repeat(auto-fit,minmax(230px,250px));justify-content:center;}
+  }
 }
 
 /* 모바일 홈 */
@@ -1306,3 +1356,82 @@ body.contract-locked .ct-bb-sign{pointer-events:none;color:var(--success)!import
 .addr-close svg{width:24px;height:24px;stroke:var(--black);}
 .addr-title{font-size:17px;font-weight:600;}
 .addr-embed{flex:1;min-height:0;overflow:hidden;}
+
+/* ═══════════════════════════════════════════════════════════════
+   PC 스카이/글래스 테마 확장 (로그인·홈과 통일)  — PC(≥768px) 전용
+   원칙: "글래스 프레임 + 솔리드 화이트 데이터"
+     · 창·패널·앱바·사이드바·시트·모달 = 하늘 위 흰색 서리유리
+     · 실제 문서(.page/.sj)와 입력칸 = 불투명 흰색·강한 테두리 (가독성 최우선)
+   모바일(<768px)은 일절 건드리지 않음.
+   ═══════════════════════════════════════════════════════════════ */
+@media (min-width:768px){
+  /* ── 작업 화면 뒤에 '최대한 흐릿한' 하늘 (업무 집중) ──
+     각 화면을 stacking context로 만들고 하늘을 z-index:-1로 깔아
+     기존 sticky 앱바/사이드바 배치를 건드리지 않는다. */
+  #screen-contract.active,
+  #screen-list.active,
+  #screen-seonim.active,
+  #screen-appeal.active{position:relative;z-index:0;}
+  #screen-contract.active::before,
+  #screen-list.active::before,
+  #screen-seonim.active::before,
+  #screen-appeal.active::before{
+    content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+    background:linear-gradient(rgba(234,241,249,.60),rgba(234,241,249,.72)),
+               url("hero-city.jpg") center 30%/cover no-repeat;
+    filter:blur(26px) saturate(1.05);
+    transform:scale(1.12);   /* blur 가장자리 비침 방지 */
+  }
+  /* 큰 중립 배경을 투명화 → 하늘이 은은히 비침 (문서·카드는 그대로 흰색) */
+  #screen-list.active{background:transparent;}
+  #screen-seonim{background:transparent;}
+  .ct-content{background:transparent;}
+
+  /* ── 앱바 / 사이드바: 흰색 글래스 ── */
+  .list-appbar,.sj-appbar{
+    background:rgba(255,255,255,.60);
+    backdrop-filter:blur(18px) saturate(1.2);-webkit-backdrop-filter:blur(18px) saturate(1.2);
+    border-bottom:1px solid rgba(255,255,255,.55);
+  }
+  .ct-sidebar{
+    background:rgba(255,255,255,.50);
+    backdrop-filter:blur(20px) saturate(1.2);-webkit-backdrop-filter:blur(20px) saturate(1.2);
+    border-right:1px solid rgba(255,255,255,.5);
+  }
+
+  /* ── 목록 카드: 흰 글래스 프레임 (검색 입력칸은 솔리드 흰색 유지) ── */
+  .list-card{
+    background:rgba(255,255,255,.74);
+    backdrop-filter:blur(14px) saturate(1.1);-webkit-backdrop-filter:blur(14px) saturate(1.1);
+    border:1px solid rgba(255,255,255,.6);
+    box-shadow:0 20px 44px -24px rgba(20,40,70,.5);
+  }
+  .list-card:hover{box-shadow:0 26px 54px -22px rgba(20,40,70,.58);border-color:rgba(255,255,255,.8);}
+
+  /* ── 하단 시트 / 모달: 흰 글래스 ── */
+  .sheet{
+    background:rgba(255,255,255,.74);
+    backdrop-filter:blur(26px) saturate(1.25);-webkit-backdrop-filter:blur(26px) saturate(1.25);
+    border-top:1px solid rgba(255,255,255,.6);
+  }
+  .modal-box{
+    background:rgba(255,255,255,.82);
+    backdrop-filter:blur(24px) saturate(1.2);-webkit-backdrop-filter:blur(24px) saturate(1.2);
+    border:1px solid rgba(255,255,255,.6);
+  }
+
+  /* ── 입력칸 공통: 선명한 흰색 + 강한 테두리 + 진한 글씨 (반투명 금지) ── */
+  .fs-input,.modal-input,.sl-input,.otp-input,.list-search input{
+    background:#fff;border-color:rgba(22,38,63,.20);color:#1a1a1a;
+  }
+  .fs-input:focus,.modal-input:focus,.sl-input:focus,.otp-input:focus,.list-search input:focus{
+    border-color:#16263f;box-shadow:0 0 0 3px rgba(22,38,63,.12);
+  }
+}
+/* 인쇄 시 하늘 배경 레이어 제거 (문서는 흰 종이 그대로) */
+@media print{
+  #screen-contract.active::before,
+  #screen-list.active::before,
+  #screen-seonim.active::before,
+  #screen-appeal.active::before{display:none!important;}
+}

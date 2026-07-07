@@ -28,32 +28,35 @@ function homeIconCls(key, cls, sw) {
   return '<svg class="' + cls + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="' + (sw || '1.8') + '">' + HOME_ICON[key] + '</svg>';
 }
 
-/* ── ① 창고: 메뉴 항목 기본 정의 (이름·설명·아이콘·동작) ── */
+/* ── ① 창고: 메뉴 항목 기본 정의 (키커·이름·설명·아이콘·동작) ──
+   kicker = PC 스카이/글래스 카드 상단의 카테고리 라벨 */
 var MENU = {
-  seonim:        { name: '선임계 작성',   desc: '변호인 선임신고서',       icon: 'file',    action: 'openSeonimType()' },
-  dojang:        { name: '형사서면 출력', desc: '증거·참고자료 서면 출력', icon: 'printer', action: 'openDojang()' },
-  yeollam:       { name: '열람·복사',     desc: '재판기록 열람·복사 신청서', icon: 'copy',  action: 'goYeollam()' },
-  gukseon:       { name: '국선보수증액',   desc: '국선변호보수증액등신청서', icon: 'file',   action: 'goGukseon()' },
-  pankyul:       { name: '판결등본교부',   desc: '판결등본교부청구',       icon: 'check',   action: 'goPankyul()' },
-  contractWrite: { name: '계약서 작성',   desc: '송무위임계약서',         icon: 'doc',     action: 'openTypeSheet()' },
-  contractList:  { name: '계약서 목록',   desc: '저장된 계약서 관리',     icon: 'list',    action: 'openContractList()' },
-  appeal:        { name: '항소장',        desc: '항소이유서',             icon: 'check',   action: 'goAppeal()' },
-  agreement:     { name: '합의서 작성',   desc: '',                       icon: 'users',   soon: true }
+  seonim:        { kicker: '소송 · 대리', name: '선임계 작성',   desc: '변호인 선임을 통지해요.',           icon: 'file',    action: 'openSeonimType()' },
+  dojang:        { kicker: '형사 · 출력', name: '형사서면 출력', desc: '증거·참고자료 서면을 출력해요.',     icon: 'printer', action: 'openDojang()' },
+  yeollam:       { kicker: '기록 · 열람', name: '열람·복사',     desc: '사건 기록을 보고 복사해요.',         icon: 'copy',    action: 'goYeollam()' },
+  gukseon:       { kicker: '보수 · 증액', name: '국선보수증액',   desc: '국선변호 보수 증액을 청구해요.',     icon: 'file',    action: 'goGukseon()' },
+  pankyul:       { kicker: '판결 · 수령', name: '판결등본교부',   desc: '확정된 판결등본을 받아요.',           icon: 'check',   action: 'goPankyul()' },
+  contractWrite: { kicker: '거래 · 계약', name: '계약서 작성',   desc: '거래 조건과 책임을 문서로 남겨요.', icon: 'doc',     action: 'openTypeSheet()' },
+  contractList:  { kicker: '관리 · 보관', name: '계약서 목록',   desc: '저장된 계약서를 관리해요.',           icon: 'list',    action: 'openContractList()' },
+  appeal:        { kicker: '소송 · 불복', name: '항소장',        desc: '판결에 불복해 다시 다퉈요.',         icon: 'check',   action: 'goAppeal()' },
+  caseManager:   { kicker: '사건 · 관리', name: '사건 관리',     desc: '진행 중인 사건을 한눈에 관리해요.', icon: 'grid',    action: 'goCaseManager()' },
+  agreement:     { kicker: '합의 · 조정', name: '합의서 작성',   desc: '준비 중인 서비스예요.',             icon: 'users',   soon: true }
 };
 
-/* ── ② 화면별 진열 순서 (+ 화면마다 다른 크기/글자는 여기서 지정) ──
+/* ── ② 화면별 진열 순서 (+ 화면마다 다른 글자는 여기서 지정) ──
    name·desc 를 적어주면 그 화면에서만 기본값을 덮어씀 (미세한 표기 차이 재현용) */
 
-/* PC 홈: 4열 벤토 그리드 (지금 우선순위 그대로) */
+/* PC 홈: 하늘 위 글래스 카드 그리드 (3열 → 좁아지면 자동 줄바꿈).
+   계약서 목록·국선(사건 관리)은 상단 필로 옮겨 그리드에서 제외.
+   새 서면 추가 = MENU 에 한 줄 + 아래 배열에 id 하나 → 카드가 그대로 늘어남 */
 var PC_ORDER = [
-  { id: 'seonim',        size: 'hero' },
-  { id: 'dojang',        size: 'wide' },
-  { id: 'yeollam',       size: 'wide' },
-  { id: 'gukseon',       size: 'small' },
-  { id: 'pankyul',       size: 'small' },
-  { id: 'contractWrite', size: 'small' },
-  { id: 'appeal',        size: 'small' },
-  { id: 'agreement',     size: 'small' }
+  { id: 'seonim' },
+  { id: 'contractWrite' },
+  { id: 'yeollam' },
+  { id: 'appeal' },
+  { id: 'pankyul' },
+  { id: 'dojang', kicker: '자료 · 출력', name: '자료출력' },
+  { id: 'gukseon' }
 ];
 
 /* 폰 홈: 계약서 종류 풀스크린 스와이프 카드 (민사–형사–가사, 형사가 가운데서 시작) */
@@ -77,7 +80,7 @@ var MORE_ORDER = [
 function homeName(item, m) { return item.name !== undefined ? item.name : m.name; }
 function homeDesc(item, m) { return item.desc !== undefined ? item.desc : m.desc; }
 
-/* ── ③-A PC 그리드 렌더 ── */
+/* ── ③-A PC 그리드 렌더 (스카이/글래스 카드) ── */
 function renderPcGrid() {
   var box = document.getElementById('doc-grid');
   if (!box) return;
@@ -85,32 +88,20 @@ function renderPcGrid() {
   for (var i = 0; i < PC_ORDER.length; i++) {
     var item = PC_ORDER[i], m = MENU[item.id];
     var name = homeName(item, m), desc = homeDesc(item, m);
+    var kicker = item.kicker !== undefined ? item.kicker : (m.kicker || '');
+    var dis = m.soon ? ' dc-soon' : '';
     var click = m.soon ? '' : ' onclick="' + m.action + '"';
-    if (item.size === 'hero') {
-      html +=
-        '<div class="doc-card dc-hero"' + click + '>' +
-          '<div class="dc-watermark">' + homeIcon(m.icon, '1.5') + '</div>' +
-          '<div class="dc-main-tag">MAIN</div>' +
-          '<div class="dc-name">' + name + '</div>' +
-          '<div class="dc-desc">' + desc + '</div>' +
-          '<div class="dc-cta">시작하기 →</div>' +
-        '</div>';
-    } else if (item.size === 'wide') {
-      html +=
-        '<div class="doc-card dc-wide dc-accent"' + click + '>' +
-          '<div class="dc-ico">' + homeIcon(m.icon) + '</div>' +
-          '<div class="dc-body"><div class="dc-name">' + name + '</div><div class="dc-desc">' + desc + '</div></div>' +
-        '</div>';
-    } else {
-      var dis = m.soon ? ' disabled' : '';
-      var badge = m.soon ? '<div class="dc-badge">준비중</div>' : '';
-      html +=
-        '<div class="doc-card dc-small' + dis + '"' + click + '>' +
-          badge +
-          '<div class="dc-ico">' + homeIcon(m.icon) + '</div>' +
-          '<div class="dc-name">' + name + '</div>' +
-        '</div>';
-    }
+    var cta = m.soon
+      ? '<span class="dc-badge">준비중</span>'
+      : '<span class="dc-cta">작성 시작 →</span>';
+    html +=
+      '<div class="doc-card' + dis + '"' + click + '>' +
+        '<span class="dc-kicker">' + kicker + '</span>' +
+        '<div class="dc-name">' + name + '</div>' +
+        '<div class="dc-rule"></div>' +
+        '<p class="dc-desc">' + desc + '</p>' +
+        cta +
+      '</div>';
   }
   box.innerHTML = html;
 }
