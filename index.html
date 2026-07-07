@@ -4076,7 +4076,7 @@ function normalizeMgClient(c){
 function mgPersonFields(c){
   var noAddr=!!c.noAddr;
   return '<div class="mg-person-fields"'+((c.kind==='corp')?' style="display:none"':'')+'>'
-    +'<div class="fs-field"><input type="text" class="fs-input mp-name" maxlength="20" placeholder="의뢰인명" value="'+sjEsc(c.name||'')+'"></div>'
+    +'<div class="fs-field"><input type="text" class="fs-input mp-name" maxlength="40" placeholder="의뢰인명" value="'+sjEsc(c.name||'')+'"></div>'
     +'<div class="fs-field mp-addr-field"'+(noAddr?' style="display:none"':'')+'><input type="text" class="fs-input mp-addr" placeholder="주소 (인천 미추홀구 …)" value="'+sjEsc(c.addr||'')+'"></div>'
     +'<div class="fs-field mp-ssn-field"'+(noAddr?'':' style="display:none"')+'><input type="text" class="fs-input mp-ssn" inputmode="numeric" placeholder="주민등록번호 000000-0000000" value="'+sjEsc(c.ssn||'')+'" oninput="this.value=sjFmtSSN(this.value)"></div>'
     +'<label class="mg-noaddr"><input type="checkbox" class="mp-noaddr"'+(noAddr?' checked':'')+' onchange="mgToggleNoAddr(this)"> 주소를 몰라요 (주민번호로 입력)</label>'
@@ -4085,7 +4085,7 @@ function mgPersonFields(c){
 function mgCorpFields(c){
   var reps=(c.reps&&c.reps.length)?c.reps:[{name:''}];
   var repInputs=reps.map(function(r,ri){
-    return '<div class="mc-rep-row"><input type="text" class="fs-input mc-rep" maxlength="20" placeholder="대표자 성명" value="'+sjEsc(r.name||'')+'">'
+    return '<div class="mc-rep-row"><input type="text" class="fs-input mc-rep" maxlength="40" placeholder="대표자 성명" value="'+sjEsc(r.name||'')+'">'
       +(ri>0?'<button type="button" class="mc-rep-del" onclick="mgDelRep(this)">×</button>':'')+'</div>';
   }).join('');
   return '<div class="mg-corp-fields"'+((c.kind==='corp')?'':' style="display:none"')+'>'
@@ -4124,7 +4124,7 @@ function mgToggleNoAddr(cb){
 }
 function mgAddRep(btn){
   var wrap=btn.closest('.fs-field').querySelector('.mc-rep-list');
-  wrap.insertAdjacentHTML('beforeend','<div class="mc-rep-row"><input type="text" class="fs-input mc-rep" maxlength="20" placeholder="대표자 성명"><button type="button" class="mc-rep-del" onclick="mgDelRep(this)">×</button></div>');
+  wrap.insertAdjacentHTML('beforeend','<div class="mc-rep-row"><input type="text" class="fs-input mc-rep" maxlength="40" placeholder="대표자 성명"><button type="button" class="mc-rep-del" onclick="mgDelRep(this)">×</button></div>');
 }
 function mgDelRep(btn){var row=btn.closest('.mc-rep-row');row.parentNode.removeChild(row);}
 function addMgClient(listId){var l=document.getElementById(listId||'mg-cl-list');l.insertAdjacentHTML('beforeend',mgClientCardHTML(l.children.length,{kind:'person'}));}
@@ -4370,7 +4370,18 @@ function renderMingasa(){
    +'</table>';
   document.getElementById('sj-host').innerHTML=html;
   var _t=document.querySelector('#screen-seonim .sj-title'); if(_t)_t.textContent='소송위임장';
-  setTimeout(fitSeonimPage,40);
+  alignPartyLabels();
+  setTimeout(function(){alignPartyLabels();fitSeonimPage();},40);
+}
+/* 당사자 라벨(원고/피고/신청인/제3채무자 등)을 이 문서에서 실제로 쓰인 라벨 중
+   가장 넓은 것에 맞춰 정렬한다. 짧은 라벨(원고·피고)만 있으면 폭이 좁아져
+   라벨-이름 간격이 불필요하게 벌어지지 않는다(글자수 제한과는 무관, 표시 폭 조정). */
+function alignPartyLabels(){
+  var lbls=document.querySelectorAll('#sj-host .party-lbl');
+  if(!lbls.length)return;
+  var max=0;
+  lbls.forEach(function(l){l.style.minWidth='0';var w=l.offsetWidth;if(w>max)max=w;});
+  lbls.forEach(function(l){l.style.minWidth=max+'px';});
 }
 
 /* 인원 많으면 A4 한 장에 맞춰 축소 */
