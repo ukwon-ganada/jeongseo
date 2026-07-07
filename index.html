@@ -1299,8 +1299,8 @@
     <div class="cl-head"><div class="fs-section">의뢰인(위임인)</div><button type="button" class="cl-add-mini" onclick="addMgClient()" aria-label="의뢰인 추가"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></button></div>
     <div id="mg-cl-list"></div>
 
-    <div class="fs-section">상대방</div>
-    <div class="fs-field"><label class="fs-label" id="mg-opp-label">상대방(피고) 이름</label><input type="text" class="fs-input" id="mg-opp" placeholder="상대방 성명"></div>
+    <div class="cl-head"><div class="fs-section" id="mg-opp-section">상대방</div><button type="button" class="cl-add-mini" onclick="addMgOpp()" aria-label="상대방 추가"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></button></div>
+    <div id="mg-opp-list"></div>
 
     <div class="fs-section" id="mg-third-section" style="display:none">제3채무자 · 제3채권자</div>
     <div id="mg-third-list" style="display:none"></div>
@@ -3707,7 +3707,7 @@ function removeAttChip(e,el){
 }
 var seonimState = {role:'피의자',casenum:'',casename:'',date:'',agency:'',attorneys:ALL_ATTORNEYS.slice(),clients:[]};
 var seonimMode='형사';
-var mingasaState={partyType:'wongo',role:'원고',casenum:'',casename:'',opp:'',date:'',agency:'',attorneys:ALL_ATTORNEYS.slice(),clients:[],thirds:[]};
+var mingasaState={partyType:'wongo',role:'원고',casenum:'',casename:'',opp:'',opps:[],date:'',agency:'',attorneys:ALL_ATTORNEYS.slice(),clients:[],thirds:[]};
 
 function sjEsc(v){return v==null?'':escapeHtml(v);} /* null 가드 유지 + escapeHtml 위임 (따옴표까지 안전 처리) */
 function sjFmtSSN(v){return formatSSN(v);} /* formatSSN과 동일 — 중복 제거 후 위임 */
@@ -3913,7 +3913,7 @@ function openSjEdit(type){
   } else if(type==='opp'){
     var _od=MG_PARTY_TYPES[s.partyType||'wongo']||MG_PARTY_TYPES.wongo;
     var _ol=(s.role===_od.front)?_od.back:_od.front;
-    title='상대방('+_ol+')'; html='<input type="text" class="modal-input" id="sjm-opp" value="'+escapeHtml(s.opp||'')+'">';
+    title='상대방('+_ol+')'; html='<div id="sjm-opp-list"></div><button type="button" class="att-add-btn" style="width:100%;margin-top:8px" onclick="addMgOpp(\'sjm-opp-list\')">＋ 상대방 추가</button>';
   } else if(type==='date'){
     title='작성일'; html='<input type="date" class="modal-input" id="sjm-date" value="'+escapeHtml(s.date||'')+'">';
   } else if(type==='role'){
@@ -3944,6 +3944,7 @@ function openSjEdit(type){
     var ab=document.getElementById('sjm-att');
     if(ab)ab.addEventListener('click',function(e){attChipClick(e,'sjm');});
   }
+  if(type==='opp'){ fillMgOppList('#sjm-opp-list', s); }
   if(type==='clients'){
     var list=document.getElementById('sjm-cl-list');
     if(mg){
@@ -3961,7 +3962,7 @@ function saveSjModal(){
   var s=sjState(), t=sjEditCtx, mg=(seonimMode==='민가사');
   if(t==='case'){s.casenum=document.getElementById('sjm-casenum').value.trim();s.casename=document.getElementById('sjm-casename').value.trim();}
   else if(t==='agency'){s.agency=document.getElementById('sjm-agency').value.trim();}
-  else if(t==='opp'){s.opp=document.getElementById('sjm-opp').value.trim();}
+  else if(t==='opp'){s.opps=collectMgOpps('#sjm-opp-list');s.opp='';}
   else if(t==='date'){s.date=document.getElementById('sjm-date').value;}
   else if(t==='role'){var on=document.querySelector('#sjm-role .fs-chip.on');if(on)s.role=on.dataset.role;}
   else if(t==='att'){var a=[];document.querySelectorAll('#sjm-att .fs-chip.on').forEach(function(c){a.push(c.dataset.att);});if(!a.length)a=['서고은'];s.attorneys=a;}
@@ -4029,7 +4030,7 @@ function updateMgOppLabel(){
   var on=document.querySelector('#mg-role .fs-chip.on');
   var role=on?on.dataset.role:def.front;
   var oppLabel=(role===def.front)?def.back:def.front;
-  document.getElementById('mg-opp-label').textContent='상대방('+oppLabel+') 이름';
+  var sec=document.getElementById('mg-opp-section'); if(sec)sec.textContent='상대방('+oppLabel+')';
 }
 
 /* 당사자 유형 변경 시: 우리측 지위 칩 라벨·제3자 섹션 갱신 */
@@ -4139,6 +4140,37 @@ function collectMgClients(sel){
   return out;
 }
 
+/* 상대방(피고/피신청인/채무자) — 여러 명 입력 (원고 여러 명처럼) */
+function mgOppRowHTML(idx,name){
+  return '<div class="cl-card opp-card">'
+    +'<button type="button" class="cl-del" onclick="removeMgOpp(this)"'+(idx===0?' style="display:none"':'')+'>×</button>'
+    +'<div class="fs-field" style="margin-bottom:0"><label class="fs-label">'+(idx===0?'상대방 이름':'상대방 이름 '+(idx+1))+'</label>'
+    +'<input type="text" class="fs-input mg-opp-name" placeholder="상대방 성명" value="'+sjEsc(name||'')+'"></div>'
+    +'</div>';
+}
+function addMgOpp(listId){var l=document.getElementById(listId||'mg-opp-list');l.insertAdjacentHTML('beforeend',mgOppRowHTML(l.children.length,''));renumberMgOpps(l);}
+function removeMgOpp(btn){var card=btn.closest('.cl-card');var list=card.parentNode;card.parentNode.removeChild(card);renumberMgOpps(list);}
+function renumberMgOpps(list){
+  var cards=list.children;
+  for(var i=0;i<cards.length;i++){
+    var lbl=cards[i].querySelector('.fs-label'); if(lbl)lbl.textContent=(i===0)?'상대방 이름':'상대방 이름 '+(i+1);
+    var del=cards[i].querySelector('.cl-del'); if(del)del.style.display=(i===0)?'none':'';
+  }
+}
+function collectMgOpps(sel){
+  var out=[];
+  document.querySelectorAll(sel+' .mg-opp-name').forEach(function(inp){var v=inp.value.trim();if(v)out.push(v);});
+  return out;
+}
+/* 상태의 상대방 목록 (구버전 단일 opp 문자열 호환) */
+function mgOppList(s){ if(s&&s.opps&&s.opps.length)return s.opps; if(s&&s.opp)return [s.opp]; return []; }
+function fillMgOppList(listSel,s){
+  var l=document.querySelector(listSel); if(!l)return; l.innerHTML='';
+  var arr=mgOppList(s); if(!arr.length)arr=[''];
+  arr.forEach(function(n,i){l.insertAdjacentHTML('beforeend',mgOppRowHTML(i,n));});
+  renumberMgOpps(l);
+}
+
 /* 제3자(제3채무자/제3채권자) — 이름만 */
 function thirdCardHTML(idx,t){
   t=t||{}; var label=t.label||'제3채무자';
@@ -4172,7 +4204,7 @@ function openMgForm(){
   mgUpdatePartyUI();
   document.getElementById('mg-casenum').value='';
   document.getElementById('mg-casename').value='';
-  document.getElementById('mg-opp').value='';
+  document.getElementById('mg-opp-list').innerHTML=''; addMgOpp();
   document.getElementById('mg-agency').value='';
   renderAttChips('mg', ALL_ATTORNEYS.slice());
   var t=new Date();
@@ -4205,7 +4237,7 @@ function editMingasa(){
   updateMgOppLabel();
   document.getElementById('mg-casenum').value=s.casenum||'';
   document.getElementById('mg-casename').value=s.casename||'';
-  document.getElementById('mg-opp').value=s.opp||'';
+  fillMgOppList('#mg-opp-list',s);
   document.getElementById('mg-agency').value=s.agency||'';
   document.getElementById('mg-date').value=s.date||'';
   renderAttChips('mg', s.attorneys);
@@ -4231,7 +4263,7 @@ function applyMgForm(){
     role: roleOn?roleOn.dataset.role:def.front,
     casenum: document.getElementById('mg-casenum').value.trim(),
     casename: document.getElementById('mg-casename').value.trim(),
-    opp: document.getElementById('mg-opp').value.trim(),
+    opps: collectMgOpps('#mg-opp-list'),
     date: document.getElementById('mg-date').value,
     agency: document.getElementById('mg-agency').value.trim(),
     attorneys: atts,
@@ -4284,8 +4316,9 @@ function renderMingasa(){
   var ourNames=clients.map(function(c){return (c.kind==='corp')?sjEsc(c.corpName):sjEsc(c.name);}).join(', ');
   var role=s.role||def.front;
   var oursFront=(role===def.front);
-  var frontName=oursFront?ourNames:sjEsc(s.opp);
-  var backName=oursFront?sjEsc(s.opp):ourNames;
+  var oppNames=mgOppList(s).map(function(n){return sjEsc(n);}).join(', ');
+  var frontName=oursFront?ourNames:oppNames;
+  var backName=oursFront?oppNames:ourNames;
   var frontClick=oursFront?'clients':'opp';
   var backClick=oursFront?'opp':'clients';
   var thirds=(def.hasThird&&s.thirds)?s.thirds:[];
