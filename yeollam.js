@@ -149,7 +149,7 @@
         '<td colspan="7" class="oath">' +
           '<div class="body">이와 같이 신청하고, 신청인은 열람·복사/출력·복제에 관련된 준수사항을 엄수하며, 열람·복사/출력·복제의 결과물을 통하여 알게 된 개인정보, 영업비밀 등을 개인정보 보호법 등 관계법령 상 정당한 용도 이외로 사용하는 경우 민사상, 형사상 모든 책임을 지겠습니다.</div>' +
           '<div class="date">' + esc(v.writeDate || '') + '</div>' +
-          '<div class="sign">신청인&nbsp;&nbsp;&nbsp; ' + esc(v.attorney || '서고은') + stampHTML + '&nbsp;(서명 또는 날인)</div>' +
+          '<div class="sign">신청인&nbsp;&nbsp;&nbsp; <span class="yl-sign-anchor">' + esc(v.attorney || '서고은') + stampHTML + '</span>&nbsp;(서명 또는 날인)</div>' +
         '</td>' +
       '</tr>' +
 
@@ -225,8 +225,11 @@
         "font-family:'맑은 고딕','Malgun Gothic',sans-serif;letter-spacing:-0.062em;}" +
       '.yl-form .oath .date{font-size:12pt;margin-top:3mm;}' +
       '.yl-form .oath .sign{font-size:12pt;margin-top:2mm;}' +
-      '.yl-seal{width:13mm;height:13mm;vertical-align:middle;margin-left:3mm;}' +
-      '.yl-stamp-blank{display:inline-block;width:13mm;height:13mm;vertical-align:middle;margin-left:3mm;}' +
+      '.yl-sign-anchor{position:relative;display:inline-block;}' +
+      /* 서고은 직인: 이름 위에 겹쳐 찍음(칸 안 늘림, 빈공간 없음) */
+      '.yl-seal{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:1.8cm;height:1.8cm;z-index:5;pointer-events:none;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+      /* 그 외 변호사: 실물 날인 여백만 확보 */
+      '.yl-stamp-blank{display:inline-block;width:1.8cm;height:1.2cm;vertical-align:middle;margin-left:2mm;}' +
       '.yl-rules{width:158.7mm;margin-top:2mm;font-size:9pt;line-height:1.34;text-align:justify;' +
         "font-family:'함초롬바탕','HCR Batang','바탕',Batang,serif;}" +
       '.yl-rules .head{font-weight:700;margin-bottom:1mm;}' +

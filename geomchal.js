@@ -272,7 +272,7 @@
       /* 서명란 클릭-날인 */
       '.gm-sign-slot{cursor:pointer;position:relative;}' +
       /* 도장: 서명 슬롯 기준 절대배치로 이름 위에 겹쳐 찍음(칸/줄 안 늘림) */
-      '.gm-seal{width:12mm;height:12mm;position:absolute;left:-2em;top:50%;' +
+      '.gm-seal{width:1.8cm;height:1.8cm;position:absolute;left:-1.2em;top:50%;' +
         'transform:translateY(-50%);z-index:5;pointer-events:none;}' +
       '@media print{.gm-sign-slot{cursor:auto;}}' +
       /* 입력폼 (오버레이) */

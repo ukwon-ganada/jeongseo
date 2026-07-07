@@ -179,7 +179,7 @@
     '.pk-yeongsu{font-size:12pt;}' +
     /* 도장 */
     '.pk-seal-wrap{position:relative;display:inline-block;cursor:pointer;}' +
-    '.pk-seal{position:absolute;left:50%;top:50%;width:2cm;height:2cm;transform:translate(-50%,-58%);' +
+    '.pk-seal{position:absolute;left:50%;top:50%;width:1.8cm;height:1.8cm;transform:translate(-50%,-58%);' +
       'z-index:50;pointer-events:none;user-select:none;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
     /* 입력폼 오버레이 */
     '#pankyulForm{display:none;position:fixed;inset:0;z-index:1100;background:#fff;flex-direction:column;}' +

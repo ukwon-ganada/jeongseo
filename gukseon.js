@@ -249,7 +249,7 @@
     '#screen-gukseon .gk-doc-court{text-align:center;font-size:20px;font-weight:700;letter-spacing:6px;margin:16px 0 0;color:#000;}' +
     /* 직인 — (인) 클릭 토글 */
     '#screen-gukseon .gk-seal-wrap{position:relative;display:inline-block;cursor:pointer;}' +
-    '#screen-gukseon .gk-seal{position:absolute;left:50%;top:50%;width:2cm;height:2cm;transform:translate(-50%,-62%);' +
+    '#screen-gukseon .gk-seal{position:absolute;left:50%;top:50%;width:1.8cm;height:1.8cm;transform:translate(-50%,-62%);' +
       'z-index:50;pointer-events:none;user-select:none;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
     /* 입력폼: 화면 전체를 덮는 팝업 (열람·복사 폼과 동일) */
     '#gukseonForm{display:none;position:fixed;inset:0;z-index:1100;background:#fff;flex-direction:column;}' +
