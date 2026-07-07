@@ -65,7 +65,8 @@ html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black)
 .ab-edit svg{width:19px;height:19px;stroke:var(--black);}
 
 /* ════ 공통 홈 골격 ════ */
-#screen-home.active{display:block;min-height:100vh;background:#0C1119;}
+/* 모바일 포함 공통은 원래대로(flex) — block/어두운 배경/스크롤은 PC 전용에서만 지정 */
+#screen-home.active{display:flex;min-height:100vh;}
 
 /* 사이드바 제거됨 (스카이/글래스 홈으로 대체) */
 .home-sidebar{display:none!important;}
@@ -75,8 +76,8 @@ html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black)
 
 /* ════ PC 홈: 스카이/글래스 세로 스크롤 히어로 ════ */
 @media (min-width:768px){
-  /* html,body{height:100%} 때문에 문서 자체는 안 늘어남 → 홈 화면을 세로 스크롤 컨테이너로 */
-  #screen-home.active{height:100dvh;overflow-x:hidden;overflow-y:auto;}
+  /* html,body{height:100%} 때문에 문서 자체는 안 늘어남 → 홈 화면을 세로 스크롤 컨테이너로 (PC만) */
+  #screen-home.active{display:block;height:100dvh;overflow-x:hidden;overflow-y:auto;background:#0C1119;}
   .home-main{width:100%;background:#0C1119;}
   .hm-mobile{display:none;}
 
