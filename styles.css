@@ -1372,11 +1372,17 @@ body.contract-locked .ct-bb-sign{pointer-events:none;color:var(--success)!import
   #screen-contract.active,
   #screen-list.active,
   #screen-seonim.active,
-  #screen-appeal.active{position:relative;z-index:0;}
+  #screen-appeal.active,
+  #screen-yeollam.active,
+  #screen-gukseon.active,
+  #screen-pankyul.active{position:relative;z-index:0;}
   #screen-contract.active::before,
   #screen-list.active::before,
   #screen-seonim.active::before,
-  #screen-appeal.active::before{
+  #screen-appeal.active::before,
+  #screen-yeollam.active::before,
+  #screen-gukseon.active::before,
+  #screen-pankyul.active::before{
     content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
     background:linear-gradient(rgba(234,241,249,.60),rgba(234,241,249,.72)),
                url("hero-city.jpg") center 30%/cover no-repeat;
@@ -1387,6 +1393,12 @@ body.contract-locked .ct-bb-sign{pointer-events:none;color:var(--success)!import
   #screen-list.active{background:transparent;}
   #screen-seonim{background:transparent;}
   .ct-content{background:transparent;}
+  /* 출력(미리보기) 화면의 wrap 회색 배경을 투명화 → 양식 뒤로 하늘이 보이게
+     (문서 페이지 .xx-page 는 흰색 그대로, JS 주입 회색은 !important 로 덮음) */
+  .ap-wrap,
+  #screen-yeollam .yl-wrap,
+  #screen-gukseon .gk-wrap,
+  #screen-pankyul .pk-wrap{background:transparent!important;}
 
   /* ── 앱바 / 사이드바: 흰색 글래스 ── */
   .list-appbar,.sj-appbar{
@@ -1434,7 +1446,10 @@ body.contract-locked .ct-bb-sign{pointer-events:none;color:var(--success)!import
   #screen-contract.active::before,
   #screen-list.active::before,
   #screen-seonim.active::before,
-  #screen-appeal.active::before{display:none!important;}
+  #screen-appeal.active::before,
+  #screen-yeollam.active::before,
+  #screen-gukseon.active::before,
+  #screen-pankyul.active::before{display:none!important;}
 }
 
 /* ═══════════════════════════════════════════════════════════════
