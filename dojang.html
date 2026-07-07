@@ -159,7 +159,13 @@
     .app-card{ background:#fff; box-shadow:0 34px 72px -34px rgba(12,25,45,.5); border-color:rgba(255,255,255,.7); }
     .btn.primary{ background:linear-gradient(155deg,#22344f,#16263f); }
     .btn.primary:hover{ background:linear-gradient(155deg,#2a3e5c,#1b2e4b); }
-    .kind-seg button.on{ background:#16263f; }
+    /* 종류(참고/첨부/증) 세그먼트: 동일 너비로 균형 + 테마 통일 */
+    .kind-seg{ border-color:rgba(22,38,63,.18); background:#fff; }
+    .kind-seg button{ min-width:60px; text-align:center; justify-content:center; color:#41537a; font-weight:600; padding:7px 14px; }
+    .kind-seg button + button{ border-left-color:rgba(22,38,63,.14); }
+    .kind-seg button:hover{ background:#eef2f9; }
+    .kind-seg button.on{ background:#16263f; color:#fff; }
+    .kind-seg button.on:hover{ background:#1b2e4b; }
   }
   </style>
 </head>
@@ -170,7 +176,7 @@
 
     <div class="app-head">
       <div class="ttl">
-        <h1>형사서면 출력</h1>
+        <h1>자료출력</h1>
         <span class="sub">서류에 도장을 찍고 순서대로 병합·저장</span>
       </div>
       <div class="head-tools">
