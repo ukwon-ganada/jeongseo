@@ -3713,6 +3713,24 @@ function sjEsc(v){return v==null?'':escapeHtml(v);} /* null 가드 유지 + esca
 function sjFmtSSN(v){return formatSSN(v);} /* formatSSN과 동일 — 중복 제거 후 위임 */
 function sjFmtDate(iso){if(!iso)return '';var p=iso.split('-');return p[0]+'. '+parseInt(p[1],10)+'. '+parseInt(p[2],10)+'.';}
 
+/* 이름 끝의 '(…)'를 도장 이름 지정용으로 처리.
+   예) "중화인민공화국 (홍길동)" → 도장은 '홍길동'만, 출력 표시는 "중화인민공화국 홍길동".
+   괄호가 앞글자에 바로 붙은 경우(예: "정서(주)")는 법인 접미사이므로 건드리지 않는다
+   (마커로 인식하려면 괄호 앞에 공백이 있거나 이름 맨 앞이어야 함). */
+var SEAL_MARK_RE=/(^|\s)\(([^()]+)\)\s*$/;
+function sealNameOf(name){
+  name=(name||'').trim();
+  var m=name.match(SEAL_MARK_RE);
+  return m?m[2].trim():name;
+}
+function displayNameOf(name){
+  name=(name||'').trim();
+  var m=name.match(SEAL_MARK_RE);
+  if(!m)return name;
+  var prefix=name.slice(0,m.index).trim();
+  var inner=m[2].trim();
+  return prefix?(prefix+' '+inner):inner;
+}
 /* 타원 막도장 10×15mm — 실제 인주 도장 질감 */
 function makeOvalSeal(name){
   name=(name||'').trim(); if(!name) return '';
@@ -3976,12 +3994,12 @@ function saveSjModal(){
 function renderSeonim(){
   var s=seonimState;
   var clients=s.clients.filter(function(c){return c.name.trim();});
-  var names=clients.map(function(c){return sjEsc(c.name);}).join(', ');
+  var names=clients.map(function(c){return sjEsc(displayNameOf(c.name));}).join(', ');
   var multi=clients.length>=2;
   var rows=clients.map(function(c){
     var ssn=c.ssn?'('+sjEsc(c.ssn)+')':'';
-    var seal=makeOvalSeal(c.name);
-    return '<div class="sunim-row"><span class="sn-id">'+sjEsc(c.name)+'&nbsp;&nbsp;'+ssn+'</span>'
+    var seal=makeOvalSeal(sealNameOf(c.name));
+    return '<div class="sunim-row"><span class="sn-id">'+sjEsc(displayNameOf(c.name))+'&nbsp;&nbsp;'+ssn+'</span>'
       +'<span class="seal-wrap"><span class="ins">(인)</span>'+(seal?'<img class="name-seal" src="'+seal+'">':'')+'</span></div>';
   }).join('');
   var html='<table class="sj"><colgroup><col style="width:20.9mm"><col style="width:148.1mm"></colgroup>'
@@ -4292,18 +4310,18 @@ function mgWiimanBlock(c){
     var reps=(c.reps&&c.reps.length)?c.reps:[{name:''}];
     var title=sjEsc(c.title||'대표이사');
     var lines=reps.map(function(r,ri){
-      var seal=makeOvalSeal(r.name);
+      var seal=makeOvalSeal(sealNameOf(r.name));
       var titleHtml=(ri===0)?(title+' '):('<span class="wi-tpad">'+title+' </span>');
-      return '<div class="wi-line"><span class="wi-name">'+titleHtml+sjEsc(r.name)+'</span>'
+      return '<div class="wi-line"><span class="wi-name">'+titleHtml+sjEsc(displayNameOf(r.name))+'</span>'
         +'<span class="wi-seal"><span class="ins">(인)</span>'+(seal?'<img class="wi-sealimg" src="'+seal+'">':'')+'</span></div>';
     }).join('');
     return '<div class="wi-block">'
       +'<div class="wi-corpname">'+sjEsc(c.corpName)+'</div>'+lines
       +(c.addr?'<div class="wi-addr">('+sjEsc(c.addr)+')</div>':'')+'</div>';
   }
-  var seal=makeOvalSeal(c.name);
+  var seal=makeOvalSeal(sealNameOf(c.name));
   var hasAddr=c.addr&&!c.noAddr;
-  var nameHtml=sjEsc(c.name)+((!hasAddr&&c.ssn)?'('+sjEsc(c.ssn)+')':'');
+  var nameHtml=sjEsc(displayNameOf(c.name))+((!hasAddr&&c.ssn)?'('+sjEsc(c.ssn)+')':'');
   return '<div class="wi-block">'
     +'<div class="wi-line"><span class="wi-name">'+nameHtml+'</span>'
     +'<span class="wi-seal"><span class="ins">(인)</span>'+(seal?'<img class="wi-sealimg" src="'+seal+'">':'')+'</span></div>'
@@ -4313,10 +4331,10 @@ function renderMingasa(){
   var s=mingasaState;
   var def=MG_PARTY_TYPES[s.partyType||'wongo']||MG_PARTY_TYPES.wongo;
   var clients=(s.clients||[]).map(normalizeMgClient).filter(function(c){return (c.kind==='corp')?(c.corpName||(c.reps&&c.reps.some(function(r){return r.name&&r.name.trim();}))):(c.name&&c.name.trim());});
-  var ourNames=clients.map(function(c){return (c.kind==='corp')?sjEsc(c.corpName):sjEsc(c.name);}).join(', ');
+  var ourNames=clients.map(function(c){return (c.kind==='corp')?sjEsc(displayNameOf(c.corpName)):sjEsc(displayNameOf(c.name));}).join(', ');
   var role=s.role||def.front;
   var oursFront=(role===def.front);
-  var oppNames=mgOppList(s).map(function(n){return sjEsc(n);}).join(', ');
+  var oppNames=mgOppList(s).map(function(n){return sjEsc(displayNameOf(n));}).join(', ');
   var frontName=oursFront?ourNames:oppNames;
   var backName=oursFront?oppNames:ourNames;
   var frontClick=oursFront?'clients':'opp';
