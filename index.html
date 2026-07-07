@@ -3713,11 +3713,11 @@ function sjEsc(v){return v==null?'':escapeHtml(v);} /* null 가드 유지 + esca
 function sjFmtSSN(v){return formatSSN(v);} /* formatSSN과 동일 — 중복 제거 후 위임 */
 function sjFmtDate(iso){if(!iso)return '';var p=iso.split('-');return p[0]+'. '+parseInt(p[1],10)+'. '+parseInt(p[2],10)+'.';}
 
-/* 이름 끝의 '(…)'를 도장 이름 지정용으로 처리.
-   예) "중화인민공화국 (홍길동)" → 도장은 '홍길동'만, 출력 표시는 "중화인민공화국 홍길동".
-   괄호가 앞글자에 바로 붙은 경우(예: "정서(주)")는 법인 접미사이므로 건드리지 않는다
-   (마커로 인식하려면 괄호 앞에 공백이 있거나 이름 맨 앞이어야 함). */
-var SEAL_MARK_RE=/(^|\s)\(([^()]+)\)\s*$/;
+/* 이름 끝의 '<…>'를 도장 이름 지정용으로 처리.
+   예) "중화인민공화국 <홍길동>" → 도장은 '홍길동'만, 출력 표시는 "중화인민공화국 홍길동".
+   마커를 <>로 쓰는 이유: 이름에 괄호()가 실제로 들어갈 수 있어 괄호는 그대로 두기 위함.
+   (마커로 인식하려면 < 앞에 공백이 있거나 이름 맨 앞이어야 함). */
+var SEAL_MARK_RE=/(^|\s)<([^<>]+)>\s*$/;
 function sealNameOf(name){
   name=(name||'').trim();
   var m=name.match(SEAL_MARK_RE);
