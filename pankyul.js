@@ -155,9 +155,10 @@
     '.pk-tbl{width:167mm;border-collapse:collapse;table-layout:fixed;margin:0 auto;}' +
     '.pk-tbl td{border:0.15mm solid #000;padding:0 2mm;vertical-align:middle;' +
       'font-size:12pt;line-height:1.3;word-break:keep-all;text-align:center;}' +
-    /* 제목 */
-    ".pk-title{font-size:20pt;font-weight:700;letter-spacing:0.5em;text-indent:0.5em;" +
-      "font-family:'맑은 고딕','Malgun Gothic',sans-serif;}" +
+    /* 제목: 원본처럼 셀 너비를 넓게 채우도록 자간 확대(폰트 무관), 가운데 정렬 유지
+       (text-indent 로 끝 자간분 보정해 좌우 대칭) */
+    ".pk-title{font-size:20pt;font-weight:700;letter-spacing:1.1em;text-indent:1.1em;" +
+      "font-family:'맑은 고딕','Malgun Gothic','Apple SD Gothic Neo',sans-serif;}" +
     /* 라벨/값 */
     '.pk-lbl{letter-spacing:0.05em;}' +
     '.pk-val{text-align:left;}' +
