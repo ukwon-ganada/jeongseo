@@ -2764,14 +2764,17 @@ function openFormSheet(){
     setChipState('fmpresolve',gvc('fm-chk-presolve'));setChipState('fmpreserve',gvc('fm-chk-preserve'));
     setChipState('fmother',gvc('fm-chk-other'));
   }
-  document.getElementById('f-trial').value=vv('inp-trial');
+  // 심급·기타·착수금은 모델(data)이 아닌 타입별 DOM 필드에 저장됨(민사 cv-, 가사 fm-, 형사 무접두).
+  // applyFormSheet의 기록 위치와 동일한 접두사로 읽어야 저장본을 다시 열 때 값이 비지 않음.
+  var _fsPre=isCivil?'cv-':(isFamily?'fm-':'');
+  document.getElementById('f-trial').value=vv(_fsPre+'inp-trial');
   (function(){var tv=document.getElementById('f-trial').value;
     document.querySelectorAll('.fs-subchip[data-trial]').forEach(function(s){s.classList.toggle('on',s.getAttribute('data-trial')===tv);});
     if(typeof updateTrialVis==='function')updateTrialVis();
   })();
-  document.getElementById('f-other').value=vv('inp-other');
+  document.getElementById('f-other').value=vv(_fsPre+'inp-other');
   // 수임조건
-  document.getElementById('f-fee1').value=vv('inp-fee1');
+  document.getElementById('f-fee1').value=vv(_fsPre+'inp-fee1');
   document.getElementById('f-fee2').value=vv('inp-fee2');
   var vat1Init;
   if(isCivil){var cvt=document.getElementById('cv-vat1-text');vat1Init=cvt?cvt.textContent.trim():'별도';}
