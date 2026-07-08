@@ -90,9 +90,14 @@
     }
     return out + esc(raw.slice(last));
   }
+  function deletedCount() {
+    return state.cases.filter(function (c) { return c.deleted; }).length;
+  }
   function panelCases(tab) {
     var arr = state.cases.filter(function (c) {
       if (!matchesQuery(c)) return false;
+      if (tab === 'trash') return c.deleted;          // 휴지통: 삭제된 것만
+      if (c.deleted) return false;                    // 그 외 패널: 삭제된 것 제외
       if (tab === 'closed') return isClosed(c);
       if (tab === 'fee') return isClosed(c) && !!c.claimed;
       return !isClosed(c); // active
@@ -161,6 +166,25 @@
       '#' + SHELL_ID + ' .gm-search-x:hover{background:rgba(22,38,63,.16);color:#16263f;}',
       /* 검색어 하이라이트 */
       '#' + SHELL_ID + ' mark.gm-hl{background:#fff2ac;color:inherit;border-radius:3px;padding:0 1px;}',
+      /* 휴지통 버튼 */
+      '#' + SHELL_ID + ' .gm-trash-btn{display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(22,38,63,.18);',
+        'background:#fff;color:#5b6b86;font-weight:700;font-size:12.5px;height:34px;padding:0 12px;border-radius:999px;',
+        'cursor:pointer;font-family:inherit;margin-right:8px;}',
+      '#' + SHELL_ID + ' .gm-trash-btn svg{width:15px;height:15px;}',
+      '#' + SHELL_ID + ' .gm-trash-btn:hover{background:#eef2f9;color:#16263f;border-color:#16263f;}',
+      '#' + SHELL_ID + ' .gm-trash-btn.on{background:#16263f;color:#fff;border-color:#16263f;}',
+      /* 휴지통 뷰 */
+      '#' + SHELL_ID + ' .gm-trash-head{display:flex;align-items:center;justify-content:space-between;gap:10px;',
+        'padding:12px 4px 10px;color:#5b6b86;font-size:13px;}',
+      '#' + SHELL_ID + ' .gm-trash-back{border:1px solid rgba(22,38,63,.18);background:#fff;color:#16263f;font-weight:600;',
+        'font-size:12.5px;height:32px;padding:0 12px;border-radius:999px;cursor:pointer;font-family:inherit;}',
+      '#' + SHELL_ID + ' .gm-trash-back:hover{background:#eef2f9;}',
+      '#' + SHELL_ID + ' .gm-restore{border:1.5px solid #1a7f3c;background:#fff;color:#1a7f3c;font-weight:700;font-size:11.5px;',
+        'padding:5px 12px;border-radius:8px;cursor:pointer;font-family:inherit;margin-right:6px;}',
+      '#' + SHELL_ID + ' .gm-restore:hover{background:#e8f5ec;}',
+      '#' + SHELL_ID + ' .gm-purge{border:1.5px solid #d9b3ad;background:#fff;color:#b23a2e;font-weight:700;font-size:11.5px;',
+        'padding:5px 12px;border-radius:8px;cursor:pointer;font-family:inherit;}',
+      '#' + SHELL_ID + ' .gm-purge:hover{background:#fdf0ee;}',
       '#' + SHELL_ID + ' .gm-edit{border:1.5px solid #16263f;background:#fff;color:#16263f;font-weight:600;',
         'font-size:13px;height:34px;padding:0 14px;border-radius:999px;cursor:pointer;font-family:inherit;}',
       '#' + SHELL_ID + ' .gm-edit:hover{background:#eef2f9;}',
@@ -362,6 +386,10 @@
           '<input id="gsmgr-search" class="gm-search" type="text" autocomplete="off" placeholder="피고인 · 사건번호 · 사건명 검색" oninput="gsmgrSearch(this.value)">' +
           '<button class="gm-search-x" id="gsmgr-search-x" onclick="gsmgrClearSearch()" aria-label="지우기" style="display:none">✕</button>' +
         '</div>' +
+        '<button class="gm-trash-btn" id="gsmgr-trash-btn" onclick="gsmgrTrash()" style="display:none" title="휴지통(복원 가능)">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m5 0V4a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v2"/></svg>' +
+          '<span id="gsmgr-trash-n">0</span>' +
+        '</button>' +
         '<button class="gm-add" onclick="gsmgrOpenAdd()">＋ 사건 추가</button>' +
       '</div>' +
       '<div class="gm-tabs" id="gsmgr-tabs"></div>' +
@@ -383,7 +411,8 @@
       verdictDate: d.verdictDate || '', todo: d.todo || '',
       claimed: !!d.claimed, appeal: d.appeal || '', appealStamped: !!d.appealStamped,
       depositDate: d.depositDate || '', depositAmount: d.depositAmount || '',
-      _raw: d
+      deleted: !!d.deleted, deletedAt: d.deletedAt || '',
+      _raw: d, _updatedAt: (row && row.updated_at) || null   // 동시수정 잠금용 버전
     };
     return c;
   }
@@ -392,7 +421,7 @@
   function load(cb) {
     var sb = (typeof getSB === 'function') ? getSB() : null;
     if (!sb) { state.error = 'nosb'; render(); return; }
-    sb.from('gukseon_cases').select('id,data').then(function (res) {
+    sb.from('gukseon_cases').select('id,data,updated_at').then(function (res) {
       if (res && res.error) { state.error = 'err'; state.loaded = true; render(); return; }
       state.error = '';
       state.cases = (res.data || []).map(normalize);
@@ -498,9 +527,21 @@
         t.label + '<span class="gm-cnt">' + n + '</span></button>';
     }).join('');
 
+    // 휴지통 버튼(삭제된 사건 있을 때만 표시) + 카운트/활성 상태
+    var tb = document.getElementById('gsmgr-trash-btn'), tn = document.getElementById('gsmgr-trash-n');
+    var dc = deletedCount();
+    if (tb) {
+      tb.style.display = dc ? 'inline-flex' : 'none';
+      tb.classList.toggle('on', state.tab === 'trash');
+      if (tn) tn.textContent = dc;
+    }
+    if (state.loaded && state.tab === 'trash' && !dc) state.tab = 'active'; // 로드 후 휴지통 비면 목록으로
+
     if (!state.loaded) { body.innerHTML = '<div class="gm-loading">불러오는 중…</div>'; return; }
     if (state.error === 'nosb') { body.innerHTML = '<div class="gm-empty">데이터 연결 준비 중입니다. 잠시 후 다시 열어 주세요.</div>'; return; }
     if (state.error === 'err') { body.innerHTML = '<div class="gm-empty">불러오지 못했습니다. 로그인 상태를 확인해 주세요.</div>'; return; }
+
+    if (state.tab === 'trash') { renderTrash(body); return; }
 
     var rows = panelCases(state.tab);
     if (!rows.length) {
@@ -521,6 +562,33 @@
     body.innerHTML = '<div class="gm-card"><table id="' + TABLE_ID + '">' +
       colgroup(state.tab) + thead(state.tab) +
       '<tbody>' + rows.map(function (c) { return trow(state.tab, c); }).join('') + '</tbody></table></div>';
+  }
+
+  // 휴지통 뷰: 삭제된 사건 목록 + 복원/완전삭제
+  function renderTrash(body) {
+    var rows = panelCases('trash');
+    var head = '<div class="gm-trash-head">' +
+      '<button class="gm-trash-back" onclick="gsmgrTab(\'active\')">‹ 목록으로</button>' +
+      '<span>삭제된 사건 ' + rows.length + '건 — 목록에서 숨겨져 있고 복원할 수 있습니다.</span>' +
+    '</div>';
+    if (!rows.length) { body.innerHTML = head + '<div class="gm-empty">휴지통이 비어 있습니다.</div>'; return; }
+    var cols = ['피고인', '사건번호', '사건명', '삭제일', '관리'];
+    var w = ['12%', '18%', '26%', '18%', '26%'];
+    body.innerHTML = head + '<div class="gm-card"><table>' +
+      '<colgroup>' + w.map(function (x) { return '<col style="width:' + x + '">'; }).join('') + '</colgroup>' +
+      '<thead><tr>' + cols.map(function (c) { return '<th>' + c + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      rows.map(function (c) {
+        return '<tr>' +
+          '<td>' + nameCell(c) + '</td>' +
+          '<td class="gm-code">' + hlEsc(c.caseNumber) + '</td>' +
+          '<td class="gm-clip" title="' + esc(c.caseName) + '">' + hlEsc(c.caseName) + '</td>' +
+          '<td>' + (fmtDate(c.deletedAt) || '—') + '</td>' +
+          '<td>' +
+            '<button class="gm-restore" data-id="' + esc(c.id) + '" onclick="gsmgrRestore(this)">복원</button>' +
+            '<button class="gm-purge" data-id="' + esc(c.id) + '" onclick="gsmgrPurge(this)">완전 삭제</button>' +
+          '</td>' +
+        '</tr>';
+      }).join('') + '</tbody></table></div>';
   }
 
   // 열 너비 — 진행:메모 최대 · 종결:선고일/항소/항소장제출/보수청구 강조(피고인·번호·사건명은 축소)
@@ -700,16 +768,45 @@
     if (hide) t._tm = setTimeout(function () { t.classList.remove('on'); }, hide);
   }
 
-  // 실제 저장(업서트) — 성공/실패 피드백 + 실패 시 재시도(낙관적 값 유지, 조용히 되돌리지 않음)
-  function persist(id, raw) {
+  /* ── 동시수정 안전 저장(read-modify-write + updated_at 낙관적 잠금) ──
+     저장 직전 그 행의 최신 data 를 다시 읽어 '내가 바꾼 필드(patch)만' 병합해 쓴다.
+     → 다른 사람이 그 사이 다른 필드를 고쳐도 그 값을 덮어쓰지 않는다.
+     updated_at 이 그 사이 바뀌면(충돌) 재조회 후 재시도, 마지막엔 안전하게 강제 반영. */
+  function commitPatch(id, patch, tries, done) {
     var sb = (typeof getSB === 'function') ? getSB() : null;
-    if (!sb) { gsmgrToast('저장 실패 — 연결을 확인해 주세요', 'err', 0, function () { persist(id, raw); }); return; }
-    gsmgrToast('저장 중…', 'info', 0);
-    sb.from('gukseon_cases').upsert({ id: id, data: raw, updated_at: new Date().toISOString() })
-      .then(function (res) {
-        if (res && res.error) { gsmgrToast('저장 실패 — 다시 시도해 주세요', 'err', 0, function () { persist(id, raw); }); }
-        else { gsmgrToast('저장됨', 'ok'); }
-      }, function () { gsmgrToast('저장 실패 — 네트워크를 확인해 주세요', 'err', 0, function () { persist(id, raw); }); });
+    var retry = function () { gsmgrToast('저장 실패 — 다시 시도해 주세요', 'err', 0, function () { commitPatch(id, patch, 0, done); }); };
+    if (!sb) { gsmgrToast('저장 실패 — 연결을 확인해 주세요', 'err', 0, function () { commitPatch(id, patch, 0, done); }); return; }
+    tries = tries || 0;
+    if (tries === 0) gsmgrToast('저장 중…', 'info', 0);
+    sb.from('gukseon_cases').select('data,updated_at').eq('id', id).limit(1).then(function (rd) {
+      if (rd && rd.error) { retry(); return; }
+      var rows = (rd && rd.data) || [];
+      if (!rows.length) { gsmgrToast('이미 삭제된 사건입니다', 'err', 2600); load(); return; } // 행이 사라짐
+      var fresh = rows[0];
+      var merged = Object.assign({}, fresh.data || {}); merged.id = id;
+      Object.keys(patch).forEach(function (k) { merged[k] = patch[k]; });   // 내 필드만 병합
+      var newTs = new Date().toISOString();
+      var last = (tries >= 2);  // 마지막 시도: 잠금 없이 강제 반영(무한 충돌 방지)
+      var q = sb.from('gukseon_cases').update({ data: merged, updated_at: newTs }).eq('id', id);
+      if (!last && fresh.updated_at != null) q = q.eq('updated_at', fresh.updated_at); // 낙관적 잠금
+      q.select().then(function (up) {
+        if (up && up.error) { retry(); return; }
+        if (!up || !up.data || !up.data.length) {          // 충돌(그 사이 다른 쓰기) → 재조회 재시도
+          if (tries < 3) { commitPatch(id, patch, tries + 1, done); return; }
+          gsmgrToast('저장 실패 — 다시 시도해 주세요', 'err', 0, function () { commitPatch(id, patch, 0, done); });
+          return;
+        }
+        applyLocal(id, merged, newTs);                     // 로컬 상태를 최신(병합본)으로 정렬
+        gsmgrToast('저장됨', 'ok');
+        if (typeof done === 'function') done();
+      }, retry);
+    }, retry);
+  }
+  // 서버 병합 결과를 로컬 상태에 반영(강제 리렌더는 안 함 — 실시간/명시 호출이 처리)
+  function applyLocal(id, data, ts) {
+    for (var i = 0; i < state.cases.length; i++) {
+      if (state.cases[i].id === id) { state.cases[i] = normalize({ id: id, data: data, updated_at: ts }); break; }
+    }
   }
 
   // 인라인 공통 저장: 지정 필드 하나만 덮어쓰고 나머지(feeForm·항소·보수 등) 전부 보존
@@ -719,9 +816,9 @@
     if (!c) return;
     var nv = (field === 'claimed' || field === 'appealStamped') ? !!value : value;
     if (String(c[field] == null ? '' : c[field]) === String(nv == null ? '' : nv)) return;
-    var raw = Object.assign({}, c._raw || {}); raw.id = c.id; raw[field] = nv;
-    c[field] = nv; c._raw = raw; // 낙관적 반영(실패해도 입력값 유지 → 재시도 가능)
-    persist(c.id, raw);
+    c[field] = nv; if (c._raw) c._raw[field] = nv; // 낙관적 반영(즉시 표시 · 실패해도 입력값 유지)
+    var patch = {}; patch[field] = nv;
+    commitPatch(id, patch);
   }
   // 보수청구 토글(종결/보수 패널) — 체크하면 보수 패널로 이동, 해제하면 빠짐
   window.gsmgrToggleClaim = function (el) {
@@ -995,44 +1092,53 @@
   window.gsmgrEditSave = function () {
     var c = editState; if (!c) return;
     var g = function (id) { var e = document.getElementById(id); return e ? e.value : ''; };
-    var sb = (typeof getSB === 'function') ? getSB() : null;
-    if (!sb) { alert('데이터 연결 준비 중입니다.'); return; }
-    // 기존 데이터(메모·항소·보수·feeForm 등) 전부 보존하고 편집 대상 6개만 덮어씀
-    var raw = Object.assign({}, c._raw || {});
-    raw.id = c.id;
-    raw.defendant = g('gf-defendant').trim();
-    raw.caseNumber = g('gf-caseNumber').trim();
-    raw.caseName = g('gf-caseName').trim();
-    raw.hearingType = (addForm && addForm.hearingType) || c.hearingType || '공판';
-    raw.hearingDate = g('gf-hearingDate');
-    raw.verdictDate = g('gf-verdictDate');
-    raw.contact = g('gf-contact').trim();
-    var btn = document.getElementById('gf-save'); if (btn) { btn.disabled = true; btn.textContent = '저장 중…'; }
-    sb.from('gukseon_cases').upsert({ id: c.id, data: raw, updated_at: new Date().toISOString() })
-      .then(function (res) {
-        if (res && res.error) { if (btn) { btn.disabled = false; btn.textContent = '저장'; } alert('저장 실패: ' + (res.error.message || '권한/연결 확인')); return; }
-        // 낙관적 반영
-        for (var i = 0; i < state.cases.length; i++) { if (state.cases[i].id === c.id) { state.cases[i] = normalize({ id: c.id, data: raw }); break; } }
-        render();
-        closeAdd();
-      }, function () { if (btn) { btn.disabled = false; btn.textContent = '저장'; } alert('저장 중 오류가 발생했습니다.'); });
+    // 편집 대상 6개만 patch — 나머지(메모·항소·보수·feeForm 등)는 서버 최신본에서 병합 보존
+    var patch = {
+      defendant: g('gf-defendant').trim(), caseNumber: g('gf-caseNumber').trim(), caseName: g('gf-caseName').trim(),
+      hearingType: (addForm && addForm.hearingType) || c.hearingType || '공판',
+      hearingDate: g('gf-hearingDate'), verdictDate: g('gf-verdictDate'), contact: g('gf-contact').trim()
+    };
+    Object.keys(patch).forEach(function (k) { c[k] = patch[k]; if (c._raw) c._raw[k] = patch[k]; }); // 낙관적
+    closeAdd();
+    render();
+    commitPatch(c.id, patch); // 동시수정 안전 저장(토스트·재시도 포함)
   };
 
   window.gsmgrDelete = function () {
     var c = editState; if (!c) return;
-    if (!window.confirm('이 사건을 삭제할까요?\n' + (c.defendant || '') + ' ' + (c.caseNumber || ''))) return;
-    var sb = (typeof getSB === 'function') ? getSB() : null;
-    if (!sb) { alert('데이터 연결 준비 중입니다.'); return; }
-    sb.from('gukseon_cases').delete().in('id', [c.id]).then(function (res) {
-      if (res && res.error) { alert('삭제 실패: ' + (res.error.message || '권한/연결 확인')); return; }
-      state.cases = state.cases.filter(function (x) { return x.id !== c.id; });
-      render();
-      closeAdd();
-    }, function () { alert('삭제 중 오류가 발생했습니다.'); });
+    if (!window.confirm('이 사건을 휴지통으로 옮길까요? (복원할 수 있습니다)\n' + (c.defendant || '') + ' ' + (c.caseNumber || ''))) return;
+    var now = new Date().toISOString();
+    c.deleted = true; c.deletedAt = now; if (c._raw) { c._raw.deleted = true; c._raw.deletedAt = now; } // 낙관적
+    closeAdd();
+    render();
+    commitPatch(c.id, { deleted: true, deletedAt: now }, 0, function () { gsmgrToast('휴지통으로 이동했습니다 · 복원 가능', 'ok', 2600); });
   };
 
   /* ── 외부 API ── */
-  window.gsmgrTab = function (k) { state.tab = k; render(); };
+  window.gsmgrTab = function (k) { state.tab = k; hideTip(); render(); };
+
+  // 휴지통 열기/복원/완전삭제
+  window.gsmgrTrash = function () { state.tab = 'trash'; hideTip(); render(); };
+  window.gsmgrRestore = function (el) {
+    var id = el.getAttribute('data-id');
+    var c = state.cases.filter(function (x) { return x.id === id; })[0]; if (!c) return;
+    c.deleted = false; c.deletedAt = ''; if (c._raw) { c._raw.deleted = false; c._raw.deletedAt = ''; } // 낙관적
+    render();
+    commitPatch(id, { deleted: false, deletedAt: '' }, 0, function () { gsmgrToast('복원되었습니다', 'ok'); });
+  };
+  window.gsmgrPurge = function (el) {
+    var id = el.getAttribute('data-id');
+    var c = state.cases.filter(function (x) { return x.id === id; })[0]; if (!c) return;
+    if (!window.confirm('완전히 삭제하면 복구할 수 없습니다.\n정말 삭제할까요?\n' + (c.defendant || '') + ' ' + (c.caseNumber || ''))) return;
+    var sb = (typeof getSB === 'function') ? getSB() : null;
+    if (!sb) { gsmgrToast('저장 실패 — 연결을 확인해 주세요', 'err', 2600); return; }
+    sb.from('gukseon_cases').delete().in('id', [id]).then(function (res) {
+      if (res && res.error) { gsmgrToast('삭제 실패 — 다시 시도해 주세요', 'err', 2600); return; }
+      state.cases = state.cases.filter(function (x) { return x.id !== id; });
+      gsmgrToast('완전 삭제되었습니다', 'ok');
+      render();
+    }, function () { gsmgrToast('삭제 중 오류가 발생했습니다', 'err', 2600); });
+  };
 
   // 목록 검색(피고인·사건번호·사건명·연락처) — 입력창은 앱바에 있어 리렌더돼도 유지됨
   window.gsmgrSearch = function (v) {
