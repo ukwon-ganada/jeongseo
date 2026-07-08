@@ -1403,9 +1403,21 @@ body.contract-locked .ct-bb-sign{pointer-events:none;color:var(--success)!import
 
   /* ── 앱바 / 사이드바: 흰색 글래스 ── */
   .list-appbar,.sj-appbar{
-    background:rgba(255,255,255,.60);
-    backdrop-filter:blur(18px) saturate(1.2);-webkit-backdrop-filter:blur(18px) saturate(1.2);
-    border-bottom:1px solid rgba(255,255,255,.55);
+    background:rgba(255,255,255,.62);
+    backdrop-filter:blur(20px) saturate(1.3);-webkit-backdrop-filter:blur(20px) saturate(1.3);
+    border-bottom:1px solid rgba(22,38,63,.09);
+    box-shadow:0 1px 0 rgba(255,255,255,.5),0 6px 20px -16px rgba(20,40,70,.35);
+  }
+  /* 출력 문서 툴바 = 국선/서면 언어로: 세리프 제목+모노그램 점, 네이비 뒤로 */
+  .sj-appbar .sj-title{font-family:'Noto Serif KR',serif;font-weight:600;font-size:18px;color:#16263f;letter-spacing:.01em;}
+  .sj-appbar .sj-title::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;
+    background:linear-gradient(150deg,#33507f,#16263f);margin:0 8px 2px 2px;vertical-align:middle;}
+  .sj-appbar .sj-back{color:#2b3f63;font-weight:600;font-size:14.5px;}
+  .sj-appbar .sj-back:hover{background:rgba(22,38,63,.07);}
+  /* 출력 미리보기: A4 페이지가 떠 있는 느낌으로 통일(프리미엄 그림자·헤어라인) — 인쇄 시엔 제거됨 */
+  .sj-page,.ap-page,.pk-page,.gk-page,.yl-page{
+    box-shadow:0 24px 56px -30px rgba(20,40,70,.5),0 3px 10px -6px rgba(20,40,70,.18)!important;
+    border:1px solid rgba(22,38,63,.06);
   }
   .ct-sidebar{
     background:rgba(255,255,255,.50);
