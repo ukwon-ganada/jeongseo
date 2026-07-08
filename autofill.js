@@ -94,7 +94,7 @@
     if (!sb){ cb('nosb', []); return; }
     var like = '%' + query + '%';
     var builder = sb.from('cases')
-      .select('l_num,l_code,l_name,l_client,court,client_position');
+      .select('l_num,l_code,l_name,l_client,court,client_position,next_date,next_contents');
     if (mode === 'both'){
       // 의뢰인명(l_client) 또는 사건번호(l_code) 어느 쪽이든 매칭
       builder = builder.or('l_client.ilike.' + like + ',l_code.ilike.' + like);
@@ -321,15 +321,30 @@
        → 사건 선택 시 fillByDataAttr 후, 같은 사건번호로 court-lookup을 불러 재판부만 채움.
      opts.sentDate: 선고일(judgment_date)을 채울 칸 id (선택). 같은 court-lookup 결과 재사용.
        기존 호출 initAutofillFor('id') 는 opts 없이 그대로 동작(영향 없음). */
+  // 창고 행에서 선고일 직접 추출: 다음 기일 종류가 '선고'면 그 기일(next_date)이 선고일.
+  // court-lookup(느린 조회)에 의존하지 않고 즉시·정확히 채운다(선고일 == next_date 확인됨).
+  function judgmentFromRow(row){
+    if (!row) return '';
+    if (/선고/.test(row.next_contents || '') && row.next_date) return normalizeDate(row.next_date);
+    return '';
+  }
+
   window.initAutofillFor = function(anchorId, opts){
     injectStyle();
     var anchor = document.getElementById(anchorId);
     if (!anchor) return;
     var body = anchor.closest('.fs-body');
     if (!body) return;
-    buildSearchCard(anchor, function(row){
+
+    // 한 건의 사건 행으로 폼 전체를 채우는 공통 루틴(검색카드 선택 · 사건번호 직접입력 공용)
+    function doFill(row){
       fillByDataAttr(body, row);
-      // 재판부·선고일 실시간 조회(선택) — court-lookup 결과(캐시) 재사용
+      // 선고일: 창고 값(next_date, 선고기일일 때)으로 즉시 채움 — 가장 빠르고 정확
+      if (opts && opts.sentDate){
+        var jd = judgmentFromRow(row);
+        if (jd){ var s0 = document.getElementById(opts.sentDate); if (s0) s0.value = jd; }
+      }
+      // 재판부·선고일 실시간 조회(선택) — court-lookup 결과(캐시) 재사용 (창고에 선고일 없을 때 보강)
       if (opts && (opts.courtDept || opts.sentDate) && row.l_num && row.l_code){
         var applyLookup = function(res){
           if (opts.courtDept && res.court_dept){
@@ -338,13 +353,34 @@
           }
           if (opts.sentDate && res.judgment_date){
             var sEl = document.getElementById(opts.sentDate);
-            if (sEl) sEl.value = normalizeDate(res.judgment_date);
+            if (sEl && !sEl.value) sEl.value = normalizeDate(res.judgment_date); // 이미 창고값 있으면 유지
           }
         };
         if (deptCache[row.l_num] !== undefined){ applyLookup(deptCache[row.l_num]); }
         else { fetchCourtDept(row.l_code, row.l_num, function(res){ deptCache[row.l_num] = res; applyLookup(res); }); }
       }
-    });
+    }
+
+    buildSearchCard(anchor, doFill);
+
+    // 사건번호를 직접 입력/붙여넣기하고 칸을 벗어나면(change) 창고에서 정확히 조회해 자동채움.
+    // 검색카드로 채운 경우엔 값이 프로그램으로 설정돼 change 가 발생하지 않아 중복 조회 없음.
+    if (anchor.dataset.afManual !== '1'){
+      anchor.dataset.afManual = '1';
+      anchor.addEventListener('change', function(){
+        var code = (anchor.value || '').trim();
+        if (!code) return;
+        var sb = (typeof getSB === 'function') ? getSB() : null;
+        if (!sb) return;
+        sb.from('cases')
+          .select('l_num,l_code,l_name,l_client,court,client_position,next_date,next_contents')
+          .eq('l_code', code).limit(1)
+          .then(function(res){
+            var row = res && res.data && res.data[0];
+            if (row) doFill(row);
+          }, function(){});
+      });
+    }
   };
 
   /* ── 진입점: 항소장 폼 열릴 때 index.html의 goAppeal()에서 호출 ── */
