@@ -19,7 +19,7 @@
   var STYLE_ID = 'gsmgr-style';
   var TABLE_ID = 'gsmgr-tbl';
 
-  var state = { cases: [], tab: 'active', loaded: false, error: '', pendingReload: false, query: '' };
+  var state = { cases: [], tab: 'active', loaded: false, error: '', pendingReload: false, query: '', feeFilter: 'all' };
   var channel = null;
   var reloadTimer = null;
 
@@ -99,7 +99,7 @@
       if (tab === 'trash') return c.deleted;          // 휴지통: 삭제된 것만
       if (c.deleted) return false;                    // 그 외 패널: 삭제된 것 제외
       if (tab === 'closed') return isClosed(c);
-      if (tab === 'fee') return isClosed(c) && !!c.claimed;
+      if (tab === 'fee') return isClosed(c);          // 보수: 종결된 사건 전부(상태로 미청구/청구/지급 구분)
       return !isClosed(c); // active
     });
     arr.sort(function (a, b) {
@@ -113,6 +113,10 @@
   }
   // 진행 패널의 '기일' = 선고기일 예정 있으면 그것, 없으면 최근 공판기일
   function activeDate(c) { return verdictOf(c) || c.hearingDate || ''; }
+  // 보수 단계: 미청구(none) → 청구(claimed) → 지급(paid, 입금일 있음)
+  function feeStage(c) { return ymd(c.depositDate) ? 'paid' : (c.claimed ? 'claimed' : 'none'); }
+  // 어떤 날짜로부터 오늘까지 지난 일수(양수=지남) — 미청구 경고 D+n
+  function daysSince(dstr) { var n = dayDiff(ymd(dstr)); return n == null ? null : -n; }
   // 날짜(YYYYMMDD) → 오늘 기준 남은 일수(음수=지남)
   function dayDiff(y) {
     if (!y || y.length < 8) return null;
@@ -166,6 +170,25 @@
       '#' + SHELL_ID + ' .gm-search-x:hover{background:rgba(22,38,63,.16);color:#16263f;}',
       /* 검색어 하이라이트 */
       '#' + SHELL_ID + ' mark.gm-hl{background:#fff2ac;color:inherit;border-radius:3px;padding:0 1px;}',
+      /* 보수 상태 배지/버튼(미청구=빨강·청구=주황·지급=초록) */
+      '#' + SHELL_ID + ' .gm-fst{display:inline-flex;align-items:center;font-weight:800;font-size:11.5px;',
+        'padding:4px 10px;border-radius:999px;border:1.5px solid transparent;font-family:inherit;white-space:nowrap;}',
+      '#' + SHELL_ID + ' button.gm-fst{cursor:pointer;}',
+      '#' + SHELL_ID + ' .gm-fst.none{background:#fdecea;border-color:#e2b7b0;color:#b23a2e;}',
+      '#' + SHELL_ID + ' .gm-fst.none:hover{background:#fbdcd7;}',
+      '#' + SHELL_ID + ' .gm-fst.claimed{background:#fff1e6;border-color:#f0c69e;color:#c2620f;}',
+      '#' + SHELL_ID + ' .gm-fst.claimed:hover{background:#ffe6d1;}',
+      '#' + SHELL_ID + ' .gm-fst.paid{background:#e8f5ec;border-color:#a9d9ba;color:#1a7f3c;}',
+      '#' + SHELL_ID + ' .gm-fst-sub{color:#8a97ab;font-size:10.5px;margin-left:5px;}',
+      /* 보수 탭 헤더(필터 칩 + 미청구 경고) */
+      '#' + SHELL_ID + ' .gm-fee-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:12px 4px 10px;}',
+      '#' + SHELL_ID + ' .gm-fee-chips{display:inline-flex;gap:6px;}',
+      '#' + SHELL_ID + ' .gm-fee-chip{border:1.5px solid rgba(22,38,63,.16);background:#fff;color:#41537a;font-weight:700;',
+        'font-size:12.5px;padding:6px 14px;border-radius:999px;cursor:pointer;font-family:inherit;}',
+      '#' + SHELL_ID + ' .gm-fee-chip:hover{border-color:#16263f;}',
+      '#' + SHELL_ID + ' .gm-fee-chip.on{background:#16263f;border-color:#16263f;color:#fff;}',
+      '#' + SHELL_ID + ' .gm-fee-chip.warn.on{background:#b23a2e;border-color:#b23a2e;}',
+      '#' + SHELL_ID + ' .gm-fee-warn{color:#b23a2e;font-size:12.5px;font-weight:600;}',
       /* 휴지통 버튼 */
       '#' + SHELL_ID + ' .gm-trash-btn{display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(22,38,63,.18);',
         'background:#fff;color:#5b6b86;font-weight:700;font-size:12.5px;height:34px;padding:0 12px;border-radius:999px;',
@@ -410,6 +433,7 @@
       hearingType: d.hearingType || '공판', hearingDate: d.hearingDate || '',
       verdictDate: d.verdictDate || '', todo: d.todo || '',
       claimed: !!d.claimed, appeal: d.appeal || '', appealStamped: !!d.appealStamped,
+      claimDate: d.claimDate || '', claimAmount: d.claimAmount || '',
       depositDate: d.depositDate || '', depositAmount: d.depositAmount || '',
       deleted: !!d.deleted, deletedAt: d.deletedAt || '',
       _raw: d, _updatedAt: (row && row.updated_at) || null   // 동시수정 잠금용 버전
@@ -542,6 +566,7 @@
     if (state.error === 'err') { body.innerHTML = '<div class="gm-empty">불러오지 못했습니다. 로그인 상태를 확인해 주세요.</div>'; return; }
 
     if (state.tab === 'trash') { renderTrash(body); return; }
+    if (state.tab === 'fee') { renderFee(body); return; }
 
     var rows = panelCases(state.tab);
     if (!rows.length) {
@@ -596,7 +621,7 @@
     var w;
     if (tab === 'active') w = ['10%', '14%', '16%', '17%', '43%'];       // 피고인·사건번호·사건명·기일·메모
     else if (tab === 'closed') w = ['9%', '13%', '15%', '13%', '17%', '21%', '12%']; // …선고일·항소·항소장제출·보수청구
-    else w = ['11%', '15%', '16%', '13%', '27%', '18%'];                  // 피고인·번호·선고기일·보수청구·보수입금일·입금액
+    else w = ['10%', '14%', '13%', '16%', '13%', '13%', '11%', '10%'];   // 피고인·번호·선고일·상태·청구액·입금일·입금액·증액신청서
     return '<colgroup>' + w.map(function (x) { return '<col style="width:' + x + '">'; }).join('') + '</colgroup>';
   }
 
@@ -604,8 +629,30 @@
     var cols;
     if (tab === 'active') cols = ['피고인', '사건번호', '사건명', '기일', '메모'];
     else if (tab === 'closed') cols = ['피고인', '사건번호', '사건명', '선고일', '항소', '항소장 제출', '보수청구'];
-    else cols = ['피고인', '사건번호', '선고기일', '보수청구', '보수입금일', '입금액'];
+    else cols = ['피고인', '사건번호', '선고일', '상태', '청구액', '입금일', '입금액', '증액신청서'];
     return '<thead><tr>' + cols.map(function (c) { return '<th>' + c + '</th>'; }).join('') + '</tr></thead>';
+  }
+
+  // 보수 뷰: 종결 사건 전부 + 미청구/청구/지급 상태 · 미청구 경고 · 필터
+  function renderFee(body) {
+    var all = panelCases('fee');
+    var unclaimed = all.filter(function (c) { return feeStage(c) === 'none'; }).length;
+    var rows = (state.feeFilter === 'unclaimed') ? all.filter(function (c) { return feeStage(c) === 'none'; }) : all;
+    var head = '<div class="gm-fee-head">' +
+      '<div class="gm-fee-chips">' +
+        '<button class="gm-fee-chip' + (state.feeFilter === 'all' ? ' on' : '') + '" onclick="gsmgrFeeFilter(\'all\')">전체 ' + all.length + '</button>' +
+        '<button class="gm-fee-chip warn' + (state.feeFilter === 'unclaimed' ? ' on' : '') + '" onclick="gsmgrFeeFilter(\'unclaimed\')">미청구 ' + unclaimed + '</button>' +
+      '</div>' +
+      (unclaimed ? '<span class="gm-fee-warn">⚠ 선고 후 미청구 ' + unclaimed + '건 — 청구 기한을 확인하세요.</span>' : '') +
+    '</div>';
+    if (!rows.length) {
+      body.innerHTML = head + '<div class="gm-empty">' +
+        (state.query ? '검색 결과가 없습니다.' : (state.feeFilter === 'unclaimed' ? '미청구 사건이 없습니다.' : '종결된 사건이 없습니다.')) +
+        '</div>';
+      return;
+    }
+    body.innerHTML = head + '<div class="gm-card"><table>' + colgroup('fee') + thead('fee') +
+      '<tbody>' + rows.map(function (c) { return trow('fee', c); }).join('') + '</tbody></table></div>';
   }
 
   function nameCell(c) {
@@ -645,19 +692,33 @@
         '<td>' + claimToggle(c) + '</td>' +
       '</tr>';
     }
-    // fee
+    // fee — 종결 사건의 보수 단계 관리(미청구/청구/지급) + 청구액·입금 + 증액신청서
     return '<tr data-id="' + esc(c.id) + '" class="gm-row">' +
       '<td>' + nameCell(c) + '</td>' +
       '<td class="gm-code">' + hlEsc(c.caseNumber) + '</td>' +
       '<td>' + fmtDate(caseDate(c)) + '</td>' +
-      '<td>' + claimToggle(c) + '</td>' +
+      '<td>' + feeStatusCell(c) + '</td>' +
+      '<td><span class="gm-inline" contenteditable="true" data-id="' + esc(c.id) + '" data-field="claimAmount" data-ph="청구액…">' + esc(c.claimAmount) + '</span></td>' +
       '<td><input type="date" class="gm-inline-date" data-id="' + esc(c.id) + '" data-field="depositDate" value="' + esc(ymdDash(c.depositDate)) + '"></td>' +
       '<td><span class="gm-inline" contenteditable="true" data-id="' + esc(c.id) + '" data-field="depositAmount" data-ph="입금액…">' + esc(c.depositAmount) + '</span></td>' +
+      '<td><button type="button" class="gm-writebtn" data-id="' + esc(c.id) + '" onclick="gsmgrGoFee(this)">작성</button></td>' +
     '</tr>';
   }
   function claimToggle(c) {
     return '<button type="button" class="gm-toggle' + (c.claimed ? ' on' : '') + '" data-id="' + esc(c.id) +
       '" onclick="gsmgrToggleClaim(this)">' + (c.claimed ? 'O' : '—') + '</button>';
+  }
+  // 보수 상태 배지 — 클릭하면 미청구↔청구 토글(청구 시 청구일 자동), 입금일 입력 시 '지급'
+  function feeStatusCell(c) {
+    var st = feeStage(c);
+    if (st === 'paid') return '<span class="gm-fst paid">지급</span>';
+    if (st === 'claimed') {
+      var cd = c.claimDate ? ' <span class="gm-fst-sub">' + fmtDate(c.claimDate) + '</span>' : '';
+      return '<button type="button" class="gm-fst claimed" data-id="' + esc(c.id) + '" onclick="gsmgrFeeStage(this)">청구</button>' + cd;
+    }
+    var n = daysSince(caseDate(c));
+    var dtxt = (n != null && n >= 0) ? ' D+' + n : '';
+    return '<button type="button" class="gm-fst none" data-id="' + esc(c.id) + '" onclick="gsmgrFeeStage(this)">미청구' + dtxt + '</button>';
   }
   // 항소: 항소함(붉은계열) / 항소안함(푸른계열) 두 버튼 택1(다시 누르면 해제)
   function appealCell(c) {
@@ -706,7 +767,7 @@
     });
     // 클릭: 인라인 편집/버튼 요소는 통과, 메모칸은 필기공간(패널 안 열림), 피고인은 툴팁, 그 외 행은 편집 패널
     shell.addEventListener('click', function (e) {
-      if (e.target.closest && e.target.closest('.gm-inline,.gm-inline-date,.gm-toggle,.gm-ap,.gm-writebtn,.gm-stamp,.gm-memo-edit')) return; // 인라인 편집/버튼/메모
+      if (e.target.closest && e.target.closest('.gm-inline,.gm-inline-date,.gm-toggle,.gm-ap,.gm-writebtn,.gm-stamp,.gm-fst,.gm-memo-edit')) return; // 인라인 편집/버튼/메모
       // 메모 셀의 여백을 눌러도 편집 패널 대신 그 자리에서 바로 입력(메모장처럼)
       var mc = e.target.closest && e.target.closest('.gm-memocell');
       if (mc) { var ed = mc.querySelector('.gm-memo-edit'); if (ed) focusEnd(ed); return; }
@@ -730,10 +791,10 @@
       var m = e.target.closest && e.target.closest('.gm-inline');
       if (m && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); m.blur(); }
     });
-    // 날짜(보수입금일): 값 바뀌면 즉시 저장
+    // 날짜(보수입금일): 값 바뀌면 즉시 저장 + 리렌더(입금일 → '지급' 상태 즉시 반영)
     shell.addEventListener('change', function (e) {
       var d = e.target.closest && e.target.closest('.gm-inline-date');
-      if (d) saveField(d.getAttribute('data-id'), d.getAttribute('data-field'), d.value || '');
+      if (d) { saveField(d.getAttribute('data-id'), d.getAttribute('data-field'), d.value || ''); render(); }
     });
   }
   // 편집칸에 포커스 + 커서를 맨 끝으로(메모 셀 여백 클릭 시 메모장처럼)
@@ -827,6 +888,47 @@
     if (!c) return;
     saveField(id, 'claimed', !c.claimed);
     render();
+  };
+  // 보수 상태 토글(미청구↔청구) — 청구로 바꾸면 청구일 자동 기록(비어 있을 때)
+  window.gsmgrFeeStage = function (el) {
+    var id = el.getAttribute('data-id');
+    var c = state.cases.filter(function (x) { return x.id === id; })[0];
+    if (!c) return;
+    var now = !c.claimed;
+    var patch = { claimed: now };
+    if (now && !c.claimDate) { patch.claimDate = todayISO(); }
+    c.claimed = now; if (c._raw) c._raw.claimed = now;
+    if (patch.claimDate) { c.claimDate = patch.claimDate; if (c._raw) c._raw.claimDate = patch.claimDate; }
+    commitPatch(id, patch);
+    render();
+  };
+  // 보수 탭 필터(전체/미청구)
+  window.gsmgrFeeFilter = function (f) { state.feeFilter = f; render(); };
+  // 국선보수증액신청서로 이동 + 피고인·사건 데이터 자동채움
+  window.gsmgrGoFee = function (el) {
+    var id = el.getAttribute('data-id');
+    var c = state.cases.filter(function (x) { return x.id === id; })[0];
+    if (!c) return;
+    if (typeof goGukseon !== 'function') { gsmgrToast('증액신청서 화면을 열 수 없습니다', 'err', 2600); return; }
+    window.closeGsmgr();
+    goGukseon(); // 폼 초기화 + 열기 + 검색카드 장착
+    var set = function (fid, val) { var e = document.getElementById(fid); if (e && val) e.value = val; };
+    set('gk-defendant', c.defendant);
+    set('gk-casenum', c.caseNumber);
+    set('gk-casename', c.caseName);
+    set('gk-court', courtOf(c));
+    var ff = (c._raw && c._raw.feeForm) || {};
+    if (ff.courtDiv) set('gk-courtdiv', ff.courtDiv);
+    if (ff.attorney) {
+      var sel = document.getElementById('gk-attorney');
+      if (sel) {
+        var has = false, i;
+        for (i = 0; i < sel.options.length; i++) { if (sel.options[i].value === ff.attorney) has = true; }
+        if (!has) { var o = document.createElement('option'); o.value = ff.attorney; o.textContent = ff.attorney; sel.appendChild(o); }
+        sel.value = ff.attorney;
+      }
+      if (ff.rrn) set('gk-rrn', ff.rrn);
+    }
   };
   // 항소 선택(항소함/항소안함) — 같은 값 다시 누르면 해제(미정)
   window.gsmgrSetAppeal = function (el) {
