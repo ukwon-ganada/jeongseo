@@ -187,8 +187,14 @@
       '#' + SHELL_ID + ' .gm-yes{color:#1a7f3c;font-weight:700;}',
       '#' + SHELL_ID + ' .gm-no{color:#9aa6b8;}',
       '#' + SHELL_ID + ' .gm-memo{color:#444;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
-      '#' + SHELL_ID + ' .gm-memocell{max-width:300px;}',
-      /* 인라인 편집(메모·항소·입금액) */
+      /* 메모 셀 = 순수 필기 공간: 편집칸이 셀 전체를 채워 어디를 눌러도 바로 입력(패널 안 뜸) */
+      '#' + SHELL_ID + ' td.gm-memocell{padding:0;vertical-align:top;}',
+      '#' + SHELL_ID + ' .gm-memo-edit{display:block;width:100%;box-sizing:border-box;min-height:40px;',
+        'padding:9px 11px;cursor:text;outline:none;color:#333;white-space:pre-wrap;word-break:break-word;transition:background .1s;}',
+      '#' + SHELL_ID + ' .gm-memo-edit:empty::before{content:attr(data-ph);color:#b3bccb;}',
+      '#' + SHELL_ID + ' .gm-memo-edit:hover{background:#f2f6fc;}',
+      '#' + SHELL_ID + ' .gm-memo-edit:focus{background:#fff;box-shadow:inset 0 0 0 1.5px #16263f;}',
+      /* 인라인 편집(입금액 등 단일값) */
       '#' + SHELL_ID + ' .gm-inline{display:inline-block;min-height:19px;min-width:48px;padding:5px 8px;margin:-5px -6px;',
         'border-radius:8px;cursor:text;outline:none;color:#333;white-space:pre-wrap;word-break:break-word;transition:background .1s;}',
       '#' + SHELL_ID + ' .gm-inline:empty::before{content:attr(data-ph);color:#b3bccb;}',
@@ -463,7 +469,7 @@
         '<td class="gm-code">' + esc(c.caseNumber) + '</td>' +
         '<td class="gm-clip" title="' + esc(c.caseName) + '">' + esc(c.caseName) + '</td>' +
         '<td>' + hearingTag(c) + dueBadge(c) + '</td>' +
-        '<td class="gm-memocell"><div class="gm-inline" contenteditable="true" data-id="' + esc(c.id) + '" data-field="todo" data-ph="메모 입력…">' + esc(c.todo) + '</div></td>' +
+        '<td class="gm-memocell"><div class="gm-memo-edit" contenteditable="true" data-id="' + esc(c.id) + '" data-field="todo" data-ph="메모 입력…">' + esc(c.todo) + '</div></td>' +
       '</tr>';
     }
     if (tab === 'closed') {
@@ -536,9 +542,12 @@
     shell.addEventListener('mouseout', function (e) {
       if (e.target.closest && e.target.closest('.gm-name')) hideTip();
     });
-    // 클릭: 인라인 편집/버튼 요소는 통과, 피고인은 툴팁, 그 외 행은 편집 패널
+    // 클릭: 인라인 편집/버튼 요소는 통과, 메모칸은 필기공간(패널 안 열림), 피고인은 툴팁, 그 외 행은 편집 패널
     shell.addEventListener('click', function (e) {
-      if (e.target.closest && e.target.closest('.gm-inline,.gm-inline-date,.gm-toggle,.gm-ap,.gm-writebtn,.gm-stamp')) return; // 인라인 편집/버튼
+      if (e.target.closest && e.target.closest('.gm-inline,.gm-inline-date,.gm-toggle,.gm-ap,.gm-writebtn,.gm-stamp,.gm-memo-edit')) return; // 인라인 편집/버튼/메모
+      // 메모 셀의 여백을 눌러도 편집 패널 대신 그 자리에서 바로 입력(메모장처럼)
+      var mc = e.target.closest && e.target.closest('.gm-memocell');
+      if (mc) { var ed = mc.querySelector('.gm-memo-edit'); if (ed) focusEnd(ed); return; }
       var t = e.target.closest && e.target.closest('.gm-name');
       if (t) { // 피고인 클릭 = 연락처/수감번호 툴팁만 (편집 안 열림)
         var r = t.getBoundingClientRect(); tipFor(t, r.left + r.width / 2, r.top); setTimeout(hideTip, 2200);
@@ -548,11 +557,12 @@
       var row = e.target.closest && e.target.closest('.gm-row');
       if (row && row.getAttribute('data-id')) gsmgrEdit(row.getAttribute('data-id'));
     });
-    // 인라인(텍스트·메모): 포커스 잃을 때 저장, Enter 로 확정
+    // 인라인/메모: 포커스 잃을 때 저장
     shell.addEventListener('focusout', function (e) {
-      var m = e.target.closest && e.target.closest('.gm-inline');
+      var m = e.target.closest && e.target.closest('.gm-inline,.gm-memo-edit');
       if (m) saveField(m.getAttribute('data-id'), m.getAttribute('data-field'), inlineText(m));
     });
+    // 단일값 인라인(입금액 등)만 Enter 로 확정 — 메모(.gm-memo-edit)는 필기공간이라 Enter=줄바꿈
     shell.addEventListener('keydown', function (e) {
       var m = e.target.closest && e.target.closest('.gm-inline');
       if (m && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); m.blur(); }
@@ -562,6 +572,14 @@
       var d = e.target.closest && e.target.closest('.gm-inline-date');
       if (d) saveField(d.getAttribute('data-id'), d.getAttribute('data-field'), d.value || '');
     });
+  }
+  // 편집칸에 포커스 + 커서를 맨 끝으로(메모 셀 여백 클릭 시 메모장처럼)
+  function focusEnd(el) {
+    el.focus();
+    try {
+      var r = document.createRange(); r.selectNodeContents(el); r.collapse(false);
+      var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    } catch (e) {}
   }
   // 인라인 요소 텍스트 정규화(개행/특수공백 정리)
   function inlineText(el) { return String(el.innerText || el.textContent || '').replace(/[\u00a0\u2007\u202f]/g, ' ').trim(); }
