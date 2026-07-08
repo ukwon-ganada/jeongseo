@@ -371,6 +371,8 @@
   window.closeGukseonForm = function () {
     var f = document.getElementById('gukseonForm');
     if (f) f.classList.remove('active');
+    // 국선 사건관리에서 진입해 '취소'로 닫는 경우 → 홈이 아니라 국선 화면으로 복귀
+    if (window._gsmgrReturn) { window._gsmgrReturn = false; if (window.goCaseManager) window.goCaseManager(); }
   };
 
   /* ── 신청인: 변호사 선택/추가 ── */
@@ -426,6 +428,7 @@
 
   /* ── 완료 → 서면 렌더 → 출력 화면 (사건정보·신청인만 갱신, 서면 체크는 유지) ── */
   window.applyGukseonForm = function () {
+    window._gsmgrReturn = false; // 완료는 서면으로 진행(국선 복귀 아님)
     if (!state) state = defaultState();
     var name = getVal('gk-attorney') || '서고은';
     state.attorney = name;

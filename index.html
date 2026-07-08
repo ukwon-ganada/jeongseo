@@ -4523,7 +4523,9 @@ function goAppeal(){
   document.getElementById('appealForm').classList.add('active');
   if(window.initAppealAutofill) initAppealAutofill();
 }
-function closeAppealForm(){document.getElementById('appealForm').classList.remove('active');}
+function closeAppealForm(){document.getElementById('appealForm').classList.remove('active');
+  // 국선 사건관리에서 진입해 '취소'로 닫는 경우 → 홈이 아니라 국선 화면으로 복귀
+  if(window._gsmgrReturn){window._gsmgrReturn=false; if(window.goCaseManager)goCaseManager();}}
 
 /* 수정: 현재 값으로 폼 다시 열기 */
 function editAppeal(){
@@ -4543,6 +4545,7 @@ document.getElementById('ap-att').addEventListener('click',function(e){ attChipC
 
 /* 완료 → state 저장 후 렌더 */
 function applyAppealForm(){
+  window._gsmgrReturn=false; // 완료는 서면으로 진행(국선 복귀 아님)
   var atts=[];
   document.querySelectorAll('#ap-att .fs-chip.on').forEach(function(c){atts.push(c.dataset.att);});
   if(!atts.length)atts=['서고은'];

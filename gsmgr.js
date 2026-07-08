@@ -1029,6 +1029,7 @@
     var c = state.cases.filter(function (x) { return x.id === id; })[0];
     if (!c) return;
     if (typeof goGukseon !== 'function') { gsmgrToast('증액신청서 화면을 열 수 없습니다', 'err', 2600); return; }
+    window._gsmgrReturn = true; // 폼에서 '취소' 시 홈이 아니라 국선으로 복귀
     window.closeGsmgr();
     goGukseon(); // 폼 초기화 + 열기 + 검색카드 장착
     var set = function (fid, val) { var e = document.getElementById(fid); if (e && val) e.value = val; };
@@ -1072,6 +1073,7 @@
     var c = state.cases.filter(function (x) { return x.id === id; })[0];
     if (!c) return;
     if (typeof goAppeal !== 'function') { alert('항소장 화면을 열 수 없습니다.'); return; }
+    window._gsmgrReturn = true; // 폼에서 '취소' 시 홈이 아니라 국선으로 복귀
     window.closeGsmgr();
     goAppeal(); // 폼 초기화 + 열기 + 검색카드 장착
     var set = function (fid, val) { var e = document.getElementById(fid); if (e && val) e.value = val; };
