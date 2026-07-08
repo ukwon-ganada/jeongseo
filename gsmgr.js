@@ -233,6 +233,27 @@
       '#' + SHELL_ID + ' .gm-cnt{display:inline-block;min-width:18px;text-align:center;font-size:11px;',
         'padding:1px 6px;border-radius:999px;background:rgba(22,38,63,.10);color:#41537a;font-weight:700;}',
       '#' + SHELL_ID + ' .gm-tab.on .gm-cnt{background:#16263f;color:#fff;}',
+      /* 코크핏 — 유리 스탯 타일(이번주 기일·임박·미청구) */
+      '#' + SHELL_ID + ' .gm-cockpit{flex:none;display:flex;gap:12px;padding:16px 16px 4px;overflow-x:auto;}',
+      '#' + SHELL_ID + ' .gm-tile{flex:1 1 0;min-width:150px;text-align:left;cursor:pointer;font-family:inherit;',
+        'display:flex;flex-direction:column;gap:2px;padding:14px 16px;border-radius:16px;',
+        'background:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.7);',
+        'box-shadow:0 1px 0 rgba(255,255,255,.6) inset,0 16px 34px -26px rgba(20,40,70,.5);',
+        'backdrop-filter:blur(16px) saturate(1.25);-webkit-backdrop-filter:blur(16px) saturate(1.25);',
+        'transition:transform .14s,box-shadow .14s;position:relative;overflow:hidden;}',
+      '#' + SHELL_ID + ' .gm-tile:hover{transform:translateY(-2px);box-shadow:0 1px 0 rgba(255,255,255,.6) inset,0 22px 40px -24px rgba(20,40,70,.55);}',
+      '#' + SHELL_ID + ' .gm-tile-label{font-size:12px;font-weight:600;color:#5b6b86;letter-spacing:.01em;display:flex;align-items:center;gap:6px;}',
+      '#' + SHELL_ID + ' .gm-tile-label svg{width:14px;height:14px;opacity:.75;}',
+      '#' + SHELL_ID + ' .gm-tile-num{font-family:\'Noto Serif KR\',serif;font-size:30px;font-weight:600;line-height:1.05;color:#16263f;font-variant-numeric:tabular-nums;}',
+      '#' + SHELL_ID + ' .gm-tile-cap{font-size:11px;color:#8a97ab;}',
+      '#' + SHELL_ID + ' .gm-tile-unit{font-size:14px;font-weight:600;color:#8a97ab;margin-left:3px;font-family:var(--font,sans-serif);}',
+      /* 값이 있을 때만 좌측 강조바 + 숫자 색 (없으면 차분) */
+      '#' + SHELL_ID + ' .gm-tile.hot::before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:3px;border-radius:0 3px 3px 0;}',
+      '#' + SHELL_ID + ' .gm-tile.hot.warn::before{background:#b45340;}',
+      '#' + SHELL_ID + ' .gm-tile.hot.warn .gm-tile-num{color:#9c4a38;}',
+      '#' + SHELL_ID + ' .gm-tile.hot.soon::before{background:#c19a54;}',
+      '#' + SHELL_ID + ' .gm-tile.hot.soon .gm-tile-num{color:#8a6524;}',
+      '#' + SHELL_ID + ' .gm-tile.hot.info::before{background:#33507f;}',
       /* 본문/표 — 데이터는 종이처럼 흰 카드 위, 로드 시 살짝 떠오름 */
       '#' + SHELL_ID + ' .gm-body{flex:1;overflow:auto;padding:0 16px 18px;-webkit-overflow-scrolling:touch;}',
       '@keyframes gm-rise{from{opacity:0;transform:translateY(7px);}to{opacity:1;transform:none;}}',
@@ -431,6 +452,7 @@
         '</button>' +
         '<button class="gm-add" onclick="gsmgrOpenAdd()">＋ 사건 추가</button>' +
       '</div>' +
+      '<div class="gm-cockpit" id="gsmgr-cockpit"></div>' +
       '<div class="gm-tabs" id="gsmgr-tabs"></div>' +
       '<div class="gm-body" id="gsmgr-body"></div>' +
       '<div class="gm-tip" id="gsmgr-tip"></div>';
@@ -556,10 +578,44 @@
     { key: 'fee', label: '보수' }
   ];
 
+  /* ── 코크핏(상단 요약): 이번 주 기일 · 임박 · 미청구 ── */
+  function cockpitStats() {
+    var wk = 0, urg = 0, unc = 0;
+    state.cases.forEach(function (c) {
+      if (c.deleted) return;
+      if (isClosed(c)) { if (feeStage(c) === 'none') unc++; return; }
+      var n = dayDiff(ymd(activeDate(c)));
+      if (n != null && n >= 0 && n <= 6) wk++;   // 향후 7일 이내 기일
+      if (dueLevel(c) === 'urgent') urg++;        // D-2 이내
+    });
+    return { week: wk, urgent: urg, unclaimed: unc };
+  }
+  function renderCockpit() {
+    var box = document.getElementById('gsmgr-cockpit');
+    if (!box) return;
+    var s = cockpitStats();
+    var icCal = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
+    var icBolt = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>';
+    var icWon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="12" x2="20" y2="12"/><path d="M5 6l3 12 4-9 4 9 3-12"/></svg>';
+    function tile(cls, icon, label, num, cap, onclick) {
+      var hot = num > 0 ? ' hot ' + cls : '';
+      return '<button class="gm-tile' + hot + '" onclick="' + onclick + '">' +
+        '<span class="gm-tile-label">' + icon + label + '</span>' +
+        '<span class="gm-tile-num">' + num + '<span class="gm-tile-unit">건</span></span>' +
+        '<span class="gm-tile-cap">' + cap + '</span></button>';
+    }
+    box.innerHTML =
+      tile('info', icCal, '이번 주 기일', s.week, '7일 이내 · 진행', "gsmgrTab('active')") +
+      tile('warn', icBolt, '임박 기일', s.urgent, 'D-2 이내', "gsmgrTab('active')") +
+      tile('soon', icWon, '미청구', s.unclaimed, '선고 후 보수 미청구', 'gsmgrFeeUnclaimed()');
+  }
+
   function render() {
     var tabsBox = document.getElementById('gsmgr-tabs');
     var body = document.getElementById('gsmgr-body');
     if (!tabsBox || !body) return;
+
+    renderCockpit();
 
     tabsBox.innerHTML = TABS.map(function (t) {
       var n = panelCases(t.key).length;
@@ -920,6 +976,8 @@
   };
   // 보수 탭 필터(전체/미청구)
   window.gsmgrFeeFilter = function (f) { state.feeFilter = f; render(); };
+  // 코크핏 '미청구' 타일 → 보수 탭 + 미청구 필터로 바로 이동
+  window.gsmgrFeeUnclaimed = function () { state.tab = 'fee'; state.feeFilter = 'unclaimed'; hideTip(); render(); };
   // 국선보수증액신청서로 이동 + 피고인·사건 데이터 자동채움
   window.gsmgrGoFee = function (el) {
     var id = el.getAttribute('data-id');
