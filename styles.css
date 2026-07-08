@@ -1535,8 +1535,57 @@ body.contract-locked .ct-bb-sign{pointer-events:none;color:var(--success)!import
   }
   .cts-btn.cts-outline{border:1.5px solid #16263f;color:#16263f;background:#fff;}
 
-  /* 의뢰인/사건번호 검색창(autofill): 검정 반전 → 네이비 (테마 통일, 여전히 눈에 띔) */
-  .af-searchbox{background:linear-gradient(155deg,#22344f,#16263f)!important;border-color:#16263f!important;}
+  /* 의뢰인/사건번호 검색창(autofill): 무거운 네이비 → 깨끗한 화이트 글래스(국선 검색창과 통일) */
+  .af-searchbox{
+    background:rgba(255,255,255,.92)!important;border:1.5px solid rgba(22,38,63,.16)!important;
+    border-radius:999px!important;box-shadow:0 1px 0 rgba(255,255,255,.6) inset,0 8px 20px -16px rgba(20,40,70,.4)!important;
+  }
+  .af-searchbox:focus-within{border-color:#16263f!important;box-shadow:0 0 0 3px rgba(22,38,63,.10)!important;}
+  .af-searchbox svg{color:#8a97ab!important;}
+  .af-search-input{color:#1a1a1a!important;}
+  .af-search-input::placeholder{color:#9aa6b8!important;}
   .cts-btn.cts-outline:hover{background:#f4f7fb;}
   .fs-chip.on{background:#16263f;border-color:#16263f;color:#fff;}
+
+  /* ── 서면 폼 크롬을 '국선 언어'로 통일 (헤더 세리프+모노그램 / 섹션·필드 / 푸터) ── */
+  #seonimForm .fs-title,#formSheet .fs-title,#appealForm .fs-title,#yeollamForm .fs-title,#gukseonForm .fs-title,#pankyulForm .fs-title,#geomchalForm .fs-title{
+    font-family:'Noto Serif KR',serif;font-weight:600;font-size:18px;color:#16263f;letter-spacing:.01em;
+  }
+  #seonimForm .fs-title::before,#formSheet .fs-title::before,#appealForm .fs-title::before,#yeollamForm .fs-title::before,#gukseonForm .fs-title::before,#pankyulForm .fs-title::before,#geomchalForm .fs-title::before{
+    content:"";display:inline-block;width:6px;height:6px;border-radius:50%;
+    background:linear-gradient(150deg,#33507f,#16263f);margin:0 9px 2px 2px;vertical-align:middle;
+  }
+  #seonimForm .fs-head .fs-close,#formSheet .fs-head .fs-close,#appealForm .fs-head .fs-close,#yeollamForm .fs-head .fs-close,#gukseonForm .fs-head .fs-close,#pankyulForm .fs-head .fs-close,#geomchalForm .fs-head .fs-close{
+    background:rgba(22,38,63,.06);border-radius:50%;width:34px;height:34px;
+  }
+  #seonimForm .fs-head .fs-close:hover,#formSheet .fs-head .fs-close:hover,#appealForm .fs-head .fs-close:hover,#yeollamForm .fs-head .fs-close:hover,#gukseonForm .fs-head .fs-close:hover,#pankyulForm .fs-head .fs-close:hover,#geomchalForm .fs-head .fs-close:hover{
+    background:rgba(22,38,63,.13);
+  }
+  #seonimForm .fs-head .fs-close svg,#formSheet .fs-head .fs-close svg,#appealForm .fs-head .fs-close svg,#yeollamForm .fs-head .fs-close svg,#gukseonForm .fs-head .fs-close svg,#pankyulForm .fs-head .fs-close svg,#geomchalForm .fs-head .fs-close svg{
+    width:18px;height:18px;stroke:#5b6b86;
+  }
+  /* 섹션 라벨 = 국선 gd-sec 톤(트래킹·뮤트·선명) */
+  #seonimForm .fs-section,#formSheet .fs-section,#appealForm .fs-section,#yeollamForm .fs-section,#gukseonForm .fs-section,#pankyulForm .fs-section,#geomchalForm .fs-section{
+    font-size:11.5px;font-weight:700;color:#8391a8;letter-spacing:.06em;margin:22px 2px 9px;
+  }
+  /* 입력칸: 국선 규격(둥근 12px·1.5px 테두리) */
+  #seonimForm .fs-input,#formSheet .fs-input,#appealForm .fs-input,#yeollamForm .fs-input,#gukseonForm .fs-input,#pankyulForm .fs-input,#geomchalForm .fs-input{
+    border-width:1.5px;border-radius:12px;
+  }
+  #seonimForm .fs-label,#formSheet .fs-label,#appealForm .fs-label,#yeollamForm .fs-label,#gukseonForm .fs-label,#pankyulForm .fs-label,#geomchalForm .fs-label{
+    font-size:13px;font-weight:600;color:#41537a;
+  }
+  /* 푸터 버튼 = 국선 드로어 규격(네이비 그라디언트 채움 / 화이트+네이비 아웃라인 취소) */
+  #seonimForm .fs-btn,#formSheet .fs-btn,#appealForm .fs-btn,#yeollamForm .fs-btn,#gukseonForm .fs-btn,#pankyulForm .fs-btn,#geomchalForm .fs-btn{
+    border-radius:12px;height:48px;font-size:15px;
+  }
+  #seonimForm .fs-btn.primary,#formSheet .fs-btn.primary,#appealForm .fs-btn.primary,#yeollamForm .fs-btn.primary,#gukseonForm .fs-btn.primary,#pankyulForm .fs-btn.primary,#geomchalForm .fs-btn.primary{
+    box-shadow:0 10px 22px -14px rgba(20,40,70,.8);
+  }
+  #seonimForm .fs-btn.ghost,#formSheet .fs-btn.ghost,#appealForm .fs-btn.ghost,#yeollamForm .fs-btn.ghost,#gukseonForm .fs-btn.ghost,#pankyulForm .fs-btn.ghost,#geomchalForm .fs-btn.ghost{
+    background:#fff;color:#41537a;border:1.5px solid rgba(22,38,63,.18);
+  }
+  #seonimForm .fs-btn.ghost:hover,#formSheet .fs-btn.ghost:hover,#appealForm .fs-btn.ghost:hover,#yeollamForm .fs-btn.ghost:hover,#gukseonForm .fs-btn.ghost:hover,#pankyulForm .fs-btn.ghost:hover,#geomchalForm .fs-btn.ghost:hover{
+    background:#eef2f9;border-color:#16263f;color:#16263f;
+  }
 }
