@@ -989,6 +989,7 @@
 <div id="fsBackdrop" onclick="closeFormSheet()"></div>
 <div id="formSheet">
   <div class="fs-grabber" aria-hidden="true"></div>
+  <div class="fs-card">
   <div class="fs-head">
     <button class="fs-close" onclick="closeFormSheet()" aria-label="닫기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     <div class="fs-title">계약서 정보 입력</div>
@@ -1153,6 +1154,7 @@
     <button class="fs-btn ghost" onclick="closeFormSheet()">취소</button>
     <button class="fs-btn primary" onclick="applyFormSheet()">완료</button>
   </div>
+  </div>
 </div>
 
 <div class="overlay" id="actionSheet" onclick="if(event.target===this)closeActionSheet()">
@@ -1224,6 +1226,7 @@
 
 <!-- ═══════════ 선임계 입력 ═══════════ -->
 <div id="seonimForm">
+  <div class="fs-card">
   <div class="fs-head">
     <button class="fs-close" onclick="closeSeonimForm()" aria-label="닫기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     <div class="fs-title">변호인선임신고서 작성 (형사)</div>
@@ -1255,10 +1258,12 @@
     <button class="fs-btn ghost" onclick="closeSeonimForm()">취소</button>
     <button class="fs-btn primary" onclick="applySeonimForm()">완료</button>
   </div>
+  </div>
 </div>
 
 <!-- ═══════════ 민·가사 입력 ═══════════ -->
 <div id="mgForm">
+  <div class="fs-card">
   <div class="fs-head">
     <button class="fs-close" onclick="closeMgForm()" aria-label="닫기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     <div class="fs-title">소송위임장 작성 (민·가사)</div>
@@ -1302,6 +1307,7 @@
     <button class="fs-btn ghost" onclick="closeMgForm()">취소</button>
     <button class="fs-btn primary" onclick="applyMgForm()">완료</button>
   </div>
+  </div>
 </div>
 
 <!-- ═══════════ 선임계 결과 화면 ═══════════ -->
@@ -1318,6 +1324,7 @@
 
 <!-- ═══════════ 항소장 입력 (형사) ═══════════ -->
 <div id="appealForm">
+  <div class="fs-card">
   <div class="fs-head">
     <button class="fs-close" onclick="closeAppealForm()" aria-label="닫기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     <div class="fs-title">항소장 작성 (형사)</div>
@@ -1341,6 +1348,7 @@
   <div class="fs-foot">
     <button class="fs-btn ghost" onclick="closeAppealForm()">취소</button>
     <button class="fs-btn primary" onclick="applyAppealForm()">완료</button>
+  </div>
   </div>
 </div>
 

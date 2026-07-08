@@ -962,6 +962,8 @@ body.print-emulate #special-extra,body.print-emulate #cv-special-extra,body.prin
 /* ═══ 통합 입력 폼 ═══ */
 #formSheet{display:none;position:fixed;inset:0;z-index:1100;background:#fff;flex-direction:column;}
 #formSheet.active{display:flex;}
+/* 폼 카드 래퍼: 모바일에서는 레이아웃에서 사라져(=display:contents) 헤더/본문/푸터가 컨테이너 플렉스에 그대로 흐름(모바일 무변경). PC에서만 하나의 라운드 카드가 됨(아래 @media). */
+.fs-card{display:contents;}
 .fs-head{display:flex;align-items:center;gap:10px;padding:0 16px;height:56px;border-bottom:1px solid var(--border);flex-shrink:0;}
 .fs-head .fs-close{width:36px;height:36px;border:none;background:none;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:var(--r-pill);flex-shrink:0;}
 .fs-head .fs-close:active{background:var(--gray-100);}
@@ -1513,25 +1515,31 @@ body.contract-locked .ct-bb-sign{pointer-events:none;color:var(--success)!import
 
   /* ── (3) 데이터 입력폼을 '계약서 목록' 룩으로: 흐릿한 파스텔 하늘 + 글래스 헤더/푸터 ──
      ([id$="Form"] = 항소장·형사/민가사 선임계·열람·검찰·국선증액·판결등본 7종을 공통으로. #formSheet=계약서) */
-  [id$="Form"],#formSheet{background:transparent!important;}
+  [id$="Form"],#formSheet{background:transparent!important;justify-content:center;align-items:center;}
   [id$="Form"]::before,#formSheet::before{
     content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
     background:linear-gradient(rgba(234,241,249,.60),rgba(234,241,249,.72)),url("hero-city.jpg") center 30%/cover no-repeat;
     filter:blur(26px) saturate(1.05);transform:scale(1.12);
   }
-  [id$="Form"] .fs-head,#formSheet .fs-head,
-  [id$="Form"] .fs-foot,#formSheet .fs-foot{
-    background:rgba(255,255,255,.60);backdrop-filter:blur(18px) saturate(1.2);-webkit-backdrop-filter:blur(18px) saturate(1.2);
-    border-color:rgba(255,255,255,.55);
+  /* 헤더+본문+푸터를 하나의 이음새 없는 라운드 카드로. 흐릿한 하늘 위에 중앙 플로팅. */
+  [id$="Form"] .fs-card,#formSheet .fs-card{
+    display:flex;flex-direction:column;width:100%;max-width:560px;margin:auto;
+    max-height:calc(100vh - 56px);
+    background:#fff;border-radius:22px;overflow:hidden;
+    border:1px solid rgba(255,255,255,.7);
+    box-shadow:0 40px 90px -42px rgba(12,25,45,.55),0 2px 8px rgba(12,25,45,.06);
   }
-  /* 데이터 입력 구역 = 하나의 뚜렷한 흰색 패널 (배경 하늘과 분명히 분리). */
+  /* 세 구역은 카드 폭을 꽉 채우는 평면 흰색 (라운드·그림자는 카드가 소유) */
+  [id$="Form"] .fs-card>.fs-head,#formSheet .fs-card>.fs-head,
+  [id$="Form"] .fs-card>.fs-body,#formSheet .fs-card>.fs-body,
+  [id$="Form"] .fs-card>.fs-foot,#formSheet .fs-card>.fs-foot{max-width:none;width:100%;margin:0;}
+  [id$="Form"] .fs-head,#formSheet .fs-head{background:#fff;border-bottom:1px solid rgba(22,38,63,.09);}
+  [id$="Form"] .fs-foot,#formSheet .fs-foot{background:#fff;border-top:1px solid rgba(22,38,63,.09);}
   [id$="Form"] .fs-body,#formSheet .fs-body{
-    background:rgba(255,255,255,.86);
-    backdrop-filter:blur(26px) saturate(1.25);-webkit-backdrop-filter:blur(26px) saturate(1.25);
-    border:1px solid rgba(255,255,255,.75);border-radius:20px;
-    margin:14px auto 16px;
-    box-shadow:0 34px 72px -34px rgba(12,25,45,.5);
+    background:#fff;border:none;border-radius:0;margin:0;box-shadow:none;flex:1;min-height:0;
   }
+  /* 모바일 드래그 핸들은 PC 카드에서 숨김 */
+  #formSheet .fs-grabber{display:none;}
   /* 라운드 패널 안 스크롤바: 네모 → 얇고 둥근 '떠 있는' 스크롤(패널 모서리와 어우러지게) */
   [id$="Form"] .fs-body,#formSheet .fs-body{scrollbar-width:thin;scrollbar-color:rgba(22,38,63,.26) transparent;}
   [id$="Form"] .fs-body::-webkit-scrollbar,#formSheet .fs-body::-webkit-scrollbar{width:12px;}

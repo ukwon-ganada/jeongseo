@@ -309,6 +309,7 @@
     wrap.id = SHELL_ID;
     wrap.innerHTML =
       '<div id="geomchalForm">' +
+        '<div class="fs-card">' +
         '<div class="fs-head">' +
           '<button class="fs-close" onclick="closeGeomchalForm()" aria-label="닫기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>' +
           '<div class="fs-title">열람·등사 신청서 (검찰)</div>' +
@@ -328,6 +329,7 @@
         '<div class="fs-foot">' +
           '<button class="fs-btn ghost" onclick="closeGeomchalForm()">취소</button>' +
           '<button class="fs-btn primary" onclick="applyGeomchalForm()">완료</button>' +
+        '</div>' +
         '</div>' +
       '</div>' +
       '<div id="screen-geomchal" class="screen">' +

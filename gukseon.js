@@ -282,6 +282,7 @@
     wrap.innerHTML =
       /* ── 입력폼 (오버레이) ── */
       '<div id="gukseonForm">' +
+        '<div class="fs-card">' +
         '<div class="fs-head">' +
           '<button class="fs-close" onclick="closeGukseonForm()" aria-label="닫기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>' +
           '<div class="fs-title">국선보수증액 신청서</div>' +
@@ -305,6 +306,7 @@
         '<div class="fs-foot">' +
           '<button class="fs-btn ghost" onclick="closeGukseonForm()">취소</button>' +
           '<button class="fs-btn primary" onclick="applyGukseonForm()">완료</button>' +
+        '</div>' +
         '</div>' +
       '</div>' +
 
