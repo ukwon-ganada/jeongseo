@@ -119,40 +119,62 @@
         'cursor:pointer;font:inherit;font-size:15px;font-weight:600;color:#16263f;padding:8px 8px;border-radius:9px;}',
       '#' + SHELL_ID + ' .gm-back:hover{background:#e6ecf5;}',
       '#' + SHELL_ID + ' .gm-back svg{width:18px;height:18px;}',
-      '#' + SHELL_ID + ' .gm-title{font-family:\'Noto Serif KR\',serif;font-size:18px;font-weight:600;color:#16263f;}',
+      '#' + SHELL_ID + ' .gm-title{font-family:\'Noto Serif KR\',serif;font-size:16px;font-weight:600;color:#16263f;}',
       '#' + SHELL_ID + ' .gm-spacer{flex:1;}',
       '#' + SHELL_ID + ' .gm-edit{border:1.5px solid #16263f;background:#fff;color:#16263f;font-weight:600;',
-        'font-size:13.5px;height:38px;padding:0 15px;border-radius:999px;cursor:pointer;font-family:inherit;}',
+        'font-size:13px;height:34px;padding:0 14px;border-radius:999px;cursor:pointer;font-family:inherit;}',
       '#' + SHELL_ID + ' .gm-edit:hover{background:#eef2f9;}',
-      /* 탭 */
-      '#' + SHELL_ID + ' .gm-tabs{flex:none;display:flex;gap:8px;padding:14px 16px 6px;}',
-      '#' + SHELL_ID + ' .gm-tab{border:1px solid rgba(22,38,63,.16);background:#fff;color:#41537a;',
-        'font-weight:600;font-size:14px;padding:9px 18px;border-radius:999px;cursor:pointer;font-family:inherit;',
-        'display:inline-flex;align-items:center;gap:7px;transition:.12s;}',
-      '#' + SHELL_ID + ' .gm-tab:hover{border-color:#16263f;}',
-      '#' + SHELL_ID + ' .gm-tab.on{background:#16263f;border-color:#16263f;color:#fff;}',
-      '#' + SHELL_ID + ' .gm-cnt{display:inline-block;min-width:20px;text-align:center;font-size:12px;',
-        'padding:1px 7px;border-radius:999px;background:rgba(22,38,63,.10);color:#41537a;font-weight:700;}',
-      '#' + SHELL_ID + ' .gm-tab.on .gm-cnt{background:rgba(255,255,255,.22);color:#fff;}',
+      /* 탭 — 책갈피(폴더 탭) 스타일 */
+      '#' + SHELL_ID + ' .gm-tabs{flex:none;display:flex;gap:4px;padding:12px 14px 0;align-items:flex-end;}',
+      '#' + SHELL_ID + ' .gm-tab{border:1px solid rgba(22,38,63,.14);border-bottom:none;background:#e4eaf3;',
+        'color:#5b6b86;font-weight:600;font-size:12.5px;padding:7px 18px 8px;border-radius:11px 11px 0 0;',
+        'cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;position:relative;',
+        'top:1px;transition:background .12s,color .12s;}',
+      '#' + SHELL_ID + ' .gm-tab:hover{background:#eef3f9;color:#16263f;}',
+      '#' + SHELL_ID + ' .gm-tab.on{background:#fff;color:#16263f;font-weight:700;',
+        'box-shadow:0 -3px 8px -4px rgba(20,40,70,.22);}',
+      /* 활성 탭 아래 1px 을 카드 흰색으로 덮어 카드와 이어지게 */
+      '#' + SHELL_ID + ' .gm-tab.on::after{content:"";position:absolute;left:1px;right:1px;bottom:-1px;height:2px;background:#fff;}',
+      '#' + SHELL_ID + ' .gm-tab.on::before{content:"";position:absolute;left:0;right:0;top:0;height:3px;',
+        'border-radius:11px 11px 0 0;background:linear-gradient(90deg,#22344f,#16263f);}',
+      '#' + SHELL_ID + ' .gm-cnt{display:inline-block;min-width:18px;text-align:center;font-size:11px;',
+        'padding:1px 6px;border-radius:999px;background:rgba(22,38,63,.10);color:#41537a;font-weight:700;}',
+      '#' + SHELL_ID + ' .gm-tab.on .gm-cnt{background:#16263f;color:#fff;}',
       /* 본문/표 */
-      '#' + SHELL_ID + ' .gm-body{flex:1;overflow:auto;padding:6px 10px 16px;-webkit-overflow-scrolling:touch;}',
-      '#' + SHELL_ID + ' .gm-card{background:#fff;border:1px solid rgba(22,38,63,.10);border-radius:14px;',
+      '#' + SHELL_ID + ' .gm-body{flex:1;overflow:auto;padding:0 14px 16px;-webkit-overflow-scrolling:touch;}',
+      '#' + SHELL_ID + ' .gm-card{background:#fff;border:1px solid rgba(22,38,63,.14);border-radius:0 12px 12px 12px;',
         'box-shadow:0 10px 30px -22px rgba(20,40,70,.3);overflow:hidden;max-width:none;margin:0;}',
-      '#' + SHELL_ID + ' table{width:100%;border-collapse:collapse;font-size:14px;table-layout:fixed;}',
+      '#' + SHELL_ID + ' table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed;}',
       '#' + SHELL_ID + ' thead th{position:sticky;top:0;background:#f4f7fb;color:#41537a;font-weight:700;',
-        'font-size:12.5px;text-align:left;padding:12px 14px;border-bottom:1.5px solid rgba(22,38,63,.14);white-space:nowrap;z-index:1;}',
-      '#' + SHELL_ID + ' tbody td{padding:13px 14px;border-bottom:1px solid rgba(22,38,63,.07);vertical-align:middle;}',
+        'font-size:11.5px;text-align:left;padding:9px 11px;border-bottom:1.5px solid rgba(22,38,63,.14);white-space:nowrap;z-index:1;}',
+      '#' + SHELL_ID + ' tbody td{padding:9px 11px;border-bottom:1px solid rgba(22,38,63,.07);vertical-align:middle;}',
       '#' + SHELL_ID + ' tbody tr:hover{background:#f7faff;}',
       '#' + SHELL_ID + ' tbody tr:last-child td{border-bottom:none;}',
       /* 사건명·사건번호: 넘치면 … 로 줄임(메모칸을 최대한 확보) */
       '#' + SHELL_ID + ' .gm-clip{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
       '#' + SHELL_ID + ' .gm-name{font-weight:700;color:#16263f;cursor:default;position:relative;',
         'border-bottom:1px dotted rgba(22,38,63,.4);}',
-      '#' + SHELL_ID + ' .gm-code{font-family:\'IBM Plex Mono\',monospace;color:#243d5e;font-size:13px;',
+      '#' + SHELL_ID + ' .gm-code{font-family:\'IBM Plex Mono\',monospace;color:#243d5e;font-size:12px;',
         'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
+      /* 항소 두 버튼(항소함=붉은계열 / 항소안함=푸른계열) */
+      '#' + SHELL_ID + ' .gm-appeal{display:inline-flex;gap:4px;}',
+      '#' + SHELL_ID + ' .gm-ap{border:1.5px solid rgba(22,38,63,.16);background:#fff;color:#8a97ab;',
+        'font-weight:700;font-size:11.5px;padding:4px 9px;border-radius:8px;cursor:pointer;font-family:inherit;white-space:nowrap;}',
+      '#' + SHELL_ID + ' .gm-ap:hover{border-color:#16263f;color:#16263f;}',
+      '#' + SHELL_ID + ' .gm-ap-yes.on{background:#fdecea;border-color:#d64027;color:#b23a2e;}',
+      '#' + SHELL_ID + ' .gm-ap-no.on{background:#e7eefb;border-color:#1a4ea2;color:#1a4ea2;}',
+      /* 항소장 제출 셀: 작성 버튼 + 제출됨 토글 */
+      '#' + SHELL_ID + ' .gm-apsub{display:inline-flex;gap:5px;align-items:center;}',
+      '#' + SHELL_ID + ' .gm-writebtn{border:none;background:linear-gradient(155deg,#22344f,#16263f);color:#fff;',
+        'font-weight:700;font-size:11.5px;padding:5px 11px;border-radius:8px;cursor:pointer;font-family:inherit;white-space:nowrap;}',
+      '#' + SHELL_ID + ' .gm-writebtn:hover{background:linear-gradient(155deg,#2a3e5c,#1b2e4b);}',
+      '#' + SHELL_ID + ' .gm-stamp{border:1.5px solid rgba(22,38,63,.16);background:#fff;color:#8a97ab;',
+        'font-weight:700;font-size:11px;padding:4px 9px;border-radius:999px;cursor:pointer;font-family:inherit;white-space:nowrap;}',
+      '#' + SHELL_ID + ' .gm-stamp:hover{border-color:#16263f;}',
+      '#' + SHELL_ID + ' .gm-stamp.on{background:#e8f5ec;border-color:#1a7f3c;color:#1a7f3c;}',
       /* 임박 기일 D-day 뱃지 + 행 강조(진행 패널) */
-      '#' + SHELL_ID + ' .gm-due{display:inline-block;margin-left:8px;font-size:11px;font-weight:800;',
-        'padding:2px 8px;border-radius:999px;vertical-align:middle;letter-spacing:.02em;}',
+      '#' + SHELL_ID + ' .gm-due{display:inline-block;margin-left:6px;font-size:10.5px;font-weight:800;',
+        'padding:2px 7px;border-radius:999px;vertical-align:middle;letter-spacing:.02em;}',
       '#' + SHELL_ID + ' .due-urgent{background:#fdecea;color:#b23a2e;}',
       '#' + SHELL_ID + ' .due-soon{background:#fff1e6;color:#c2620f;}',
       '#' + SHELL_ID + ' .due-near{background:#fdf6e3;color:#8a6d10;}',
@@ -160,7 +182,7 @@
       '#' + SHELL_ID + ' tr.u-urgent td:first-child{box-shadow:inset 3px 0 0 #d64027;}',
       '#' + SHELL_ID + ' tr.u-soon td:first-child{box-shadow:inset 3px 0 0 #e0872e;}',
       '#' + SHELL_ID + ' tr.u-urgent:hover{background:#fef6f4;}',
-      '#' + SHELL_ID + ' .gm-tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;margin-right:6px;}',
+      '#' + SHELL_ID + ' .gm-tag{display:inline-block;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:999px;margin-right:5px;}',
       '#' + SHELL_ID + ' .tag-gongpan{background:#e7eefb;color:#1a4ea2;}',
       '#' + SHELL_ID + ' .tag-sgo{background:#fdecea;color:#b23a2e;}',
       '#' + SHELL_ID + ' .tag-cancel{background:#eef0f2;color:#6b7280;}',
@@ -175,13 +197,13 @@
       '#' + SHELL_ID + ' .gm-inline:hover{background:#eef3fb;}',
       '#' + SHELL_ID + ' .gm-inline:focus{background:#fff;box-shadow:0 0 0 1.5px #16263f;}',
       /* 인라인 날짜(보수입금일) */
-      '#' + SHELL_ID + ' .gm-inline-date{height:34px;border:1.5px solid rgba(22,38,63,.18);border-radius:8px;padding:0 8px;',
-        'font:inherit;font-size:13px;color:#243d5e;background:#fff;outline:none;cursor:pointer;}',
+      '#' + SHELL_ID + ' .gm-inline-date{height:30px;border:1.5px solid rgba(22,38,63,.18);border-radius:8px;padding:0 7px;',
+        'font:inherit;font-size:12px;color:#243d5e;background:#fff;outline:none;cursor:pointer;}',
       '#' + SHELL_ID + ' .gm-inline-date:focus{border-color:#16263f;box-shadow:0 0 0 2px rgba(22,38,63,.12);}',
       /* 인라인 토글(보수청구) */
-      '#' + SHELL_ID + ' .gm-toggle{display:inline-flex;align-items:center;justify-content:center;min-width:34px;height:28px;',
-        'padding:0 12px;border-radius:999px;border:1.5px solid rgba(22,38,63,.18);background:#fff;cursor:pointer;',
-        'font-weight:700;font-size:13px;color:#9aa6b8;font-family:inherit;transition:.12s;}',
+      '#' + SHELL_ID + ' .gm-toggle{display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:26px;',
+        'padding:0 11px;border-radius:999px;border:1.5px solid rgba(22,38,63,.18);background:#fff;cursor:pointer;',
+        'font-weight:700;font-size:12px;color:#9aa6b8;font-family:inherit;transition:.12s;}',
       '#' + SHELL_ID + ' .gm-toggle:hover{border-color:#16263f;}',
       '#' + SHELL_ID + ' .gm-toggle.on{background:#e8f5ec;border-color:#1a7f3c;color:#1a7f3c;}',
       '#' + SHELL_ID + ' .gm-empty{padding:60px 20px;text-align:center;color:#8a97ab;font-size:14px;}',
@@ -247,11 +269,12 @@
       '#' + SHELL_ID + ' .gm-row{cursor:pointer;}',
       /* 좁은 화면(모바일) */
       '@media (max-width:640px){',
-        '#' + SHELL_ID + ' .gm-body{padding:6px 8px 24px;}',
-        '#' + SHELL_ID + ' table{font-size:13px;}',
-        '#' + SHELL_ID + ' thead th,#' + SHELL_ID + ' tbody td{padding:10px 9px;}',
-        '#' + SHELL_ID + ' .gm-title{font-size:16px;}',
+        '#' + SHELL_ID + ' .gm-body{padding:0 8px 24px;}',
+        '#' + SHELL_ID + ' table{font-size:12.5px;}',
+        '#' + SHELL_ID + ' thead th,#' + SHELL_ID + ' tbody td{padding:8px 8px;}',
+        '#' + SHELL_ID + ' .gm-title{font-size:15px;}',
         '#' + SHELL_ID + ' .gm-memo{max-width:120px;}',
+        '#' + SHELL_ID + ' .gm-tab{padding:6px 13px 7px;font-size:12px;}',
       '}'
     ].join('');
     var s = document.createElement('style');
@@ -402,19 +425,19 @@
       '<tbody>' + rows.map(function (c) { return trow(state.tab, c); }).join('') + '</tbody></table></div>';
   }
 
-  // 열 너비 — 메모칸을 가장 넓게, 사건명은 좁게(엑셀에서 메모가 가장 중요)
+  // 열 너비 — 진행:메모 최대 · 종결:선고일/항소/항소장제출/보수청구 강조(피고인·번호·사건명은 축소)
   function colgroup(tab) {
     var w;
-    if (tab === 'active') w = ['11%', '15%', '17%', '18%', '39%'];       // 피고인·사건번호·사건명·기일·메모
-    else if (tab === 'closed') w = ['13%', '18%', '25%', '17%', '15%', '12%'];
-    else w = ['15%', '20%', '19%', '13%', '19%', '14%'];
+    if (tab === 'active') w = ['10%', '14%', '16%', '17%', '43%'];       // 피고인·사건번호·사건명·기일·메모
+    else if (tab === 'closed') w = ['9%', '13%', '15%', '13%', '17%', '21%', '12%']; // …선고일·항소·항소장제출·보수청구
+    else w = ['11%', '15%', '16%', '13%', '27%', '18%'];                  // 피고인·번호·선고기일·보수청구·보수입금일·입금액
     return '<colgroup>' + w.map(function (x) { return '<col style="width:' + x + '">'; }).join('') + '</colgroup>';
   }
 
   function thead(tab) {
     var cols;
     if (tab === 'active') cols = ['피고인', '사건번호', '사건명', '기일', '메모'];
-    else if (tab === 'closed') cols = ['피고인', '사건번호', '사건명', '선고일', '항소', '보수청구'];
+    else if (tab === 'closed') cols = ['피고인', '사건번호', '사건명', '선고일', '항소', '항소장 제출', '보수청구'];
     else cols = ['피고인', '사건번호', '선고기일', '보수청구', '보수입금일', '입금액'];
     return '<thead><tr>' + cols.map(function (c) { return '<th>' + c + '</th>'; }).join('') + '</tr></thead>';
   }
@@ -451,7 +474,8 @@
         '<td class="gm-code">' + esc(c.caseNumber) + '</td>' +
         '<td class="gm-clip" title="' + esc(c.caseName) + '">' + esc(c.caseName) + '</td>' +
         '<td>' + fmtDate(caseDate(c)) + '</td>' +
-        '<td><span class="gm-inline" contenteditable="true" data-id="' + esc(c.id) + '" data-field="appeal" data-ph="항소 입력…">' + esc(c.appeal) + '</span></td>' +
+        '<td>' + appealCell(c) + '</td>' +
+        '<td>' + appealSubmitCell(c) + '</td>' +
         '<td>' + claimToggle(c) + '</td>' +
       '</tr>';
     }
@@ -468,6 +492,25 @@
   function claimToggle(c) {
     return '<button type="button" class="gm-toggle' + (c.claimed ? ' on' : '') + '" data-id="' + esc(c.id) +
       '" onclick="gsmgrToggleClaim(this)">' + (c.claimed ? 'O' : '—') + '</button>';
+  }
+  // 항소: 항소함(붉은계열) / 항소안함(푸른계열) 두 버튼 택1(다시 누르면 해제)
+  function appealCell(c) {
+    var v = c.appeal;
+    return '<div class="gm-appeal">' +
+      '<button type="button" class="gm-ap gm-ap-yes' + (v === '항소함' ? ' on' : '') + '" data-id="' + esc(c.id) +
+        '" data-val="항소함" onclick="gsmgrSetAppeal(this)">항소함</button>' +
+      '<button type="button" class="gm-ap gm-ap-no' + (v === '항소안함' ? ' on' : '') + '" data-id="' + esc(c.id) +
+        '" data-val="항소안함" onclick="gsmgrSetAppeal(this)">안함</button>' +
+    '</div>';
+  }
+  // 항소장 제출: 항소함일 때만 [작성](항소장 폼 이동) + [제출됨] 토글
+  function appealSubmitCell(c) {
+    if (c.appeal !== '항소함') return '<span class="gm-no">—</span>';
+    return '<div class="gm-apsub">' +
+      '<button type="button" class="gm-writebtn" data-id="' + esc(c.id) + '" onclick="gsmgrGoAppeal(this)">작성</button>' +
+      '<button type="button" class="gm-stamp' + (c.appealStamped ? ' on' : '') + '" data-id="' + esc(c.id) +
+        '" onclick="gsmgrToggleStamp(this)">' + (c.appealStamped ? '제출됨' : '미제출') + '</button>' +
+    '</div>';
   }
 
   /* ── 피고인 hover(PC)/탭(모바일) → 연락처·수감번호 툴팁 ── */
@@ -495,9 +538,9 @@
     shell.addEventListener('mouseout', function (e) {
       if (e.target.closest && e.target.closest('.gm-name')) hideTip();
     });
-    // 클릭: 인라인 편집 요소는 통과, 피고인은 툴팁, 그 외 행은 편집 패널
+    // 클릭: 인라인 편집/버튼 요소는 통과, 피고인은 툴팁, 그 외 행은 편집 패널
     shell.addEventListener('click', function (e) {
-      if (e.target.closest && e.target.closest('.gm-inline,.gm-inline-date,.gm-toggle')) return; // 인라인 편집 요소
+      if (e.target.closest && e.target.closest('.gm-inline,.gm-inline-date,.gm-toggle,.gm-ap,.gm-writebtn,.gm-stamp')) return; // 인라인 편집/버튼
       var t = e.target.closest && e.target.closest('.gm-name');
       if (t) { // 피고인 클릭 = 연락처/수감번호 툴팁만 (편집 안 열림)
         var r = t.getBoundingClientRect(); tipFor(t, r.left + r.width / 2, r.top); setTimeout(hideTip, 2200);
@@ -545,6 +588,38 @@
     if (!c) return;
     saveField(id, 'claimed', !c.claimed);
     render();
+  };
+  // 항소 선택(항소함/항소안함) — 같은 값 다시 누르면 해제(미정)
+  window.gsmgrSetAppeal = function (el) {
+    var id = el.getAttribute('data-id'), val = el.getAttribute('data-val');
+    var c = state.cases.filter(function (x) { return x.id === id; })[0];
+    if (!c) return;
+    var nv = (c.appeal === val) ? '' : val;
+    saveField(id, 'appeal', nv);
+    render(); // 항소장 제출 칸(작성 버튼) 표시 갱신
+  };
+  // 항소장 제출 여부 토글(제출됨/미제출)
+  window.gsmgrToggleStamp = function (el) {
+    var id = el.getAttribute('data-id');
+    var c = state.cases.filter(function (x) { return x.id === id; })[0];
+    if (!c) return;
+    saveField(id, 'appealStamped', !c.appealStamped);
+    render();
+  };
+  // 항소장 작성: 국선 화면을 닫고 항소장 폼을 피고인 데이터로 자동채워 연다
+  window.gsmgrGoAppeal = function (el) {
+    var id = el.getAttribute('data-id');
+    var c = state.cases.filter(function (x) { return x.id === id; })[0];
+    if (!c) return;
+    if (typeof goAppeal !== 'function') { alert('항소장 화면을 열 수 없습니다.'); return; }
+    window.closeGsmgr();
+    goAppeal(); // 폼 초기화 + 열기 + 검색카드 장착
+    var set = function (fid, val) { var e = document.getElementById(fid); if (e && val) e.value = val; };
+    set('ap-defendant', c.defendant);
+    set('ap-casenum', c.caseNumber);
+    set('ap-casename', c.caseName);
+    set('ap-court', courtOf(c));           // feeForm.court
+    set('ap-sentdate', ymdDash(verdictOf(c))); // 선고일
   };
 
   /* ══════════════════════════════════════════════════════════════
