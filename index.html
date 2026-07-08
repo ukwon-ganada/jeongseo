@@ -135,7 +135,7 @@
             <div class="hp-pills">
               <span class="hp-pill">서면 작성</span>
               <span class="hp-pill hp-pill-link" onclick="openContractList()">계약서</span>
-              <span class="hp-pill hp-pill-link" onclick="goCaseManager()">국선</span>
+              <span class="hp-pill hp-pill-link" id="hp-pill-gukseon" onclick="goCaseManager()">국선<span class="hp-badge" id="hp-badge-gukseon" hidden></span></span>
             </div>
             <h1 class="hp-title">법무법인 정서</h1>
           </div>
@@ -1382,6 +1382,8 @@ function showScreen(id){
   if(id==='screen-contract'&&window._resetZoom){setTimeout(window._resetZoom,60);}
   // 홈으로 돌아온 순간, 대기 중이던 새 버전 교체(있으면) 처리 — 작업 중엔 안 튕김
   if(id==='screen-home'&&window._swMaybeReload){setTimeout(window._swMaybeReload,0);}
+  // 홈 복귀 시 국선 pill 주의 배지 갱신
+  if(id==='screen-home'&&window.gsmgrUpdateBadge){setTimeout(window.gsmgrUpdateBadge,0);}
 }
 
 /* ═══ 직원 인증 (Supabase Auth · auth.js) ═══

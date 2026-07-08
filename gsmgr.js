@@ -533,9 +533,37 @@
       state.cases = (res.data || []).map(normalize);
       state.loaded = true;
       render();
+      setPillBadge(computeAttention(state.cases)); // 홈 국선 pill 배지 갱신
       if (typeof cb === 'function') cb();
     }, function () { state.error = 'err'; state.loaded = true; render(); });
   }
+
+  /* ── 홈 '국선' pill 주의 배지: 임박 기일(D-2) + 미청구 ── */
+  function computeAttention(cases) {
+    var n = 0;
+    cases.forEach(function (c) {
+      if (c.deleted) return;
+      if (isClosed(c)) { if (feeStage(c) === 'none') n++; }   // 미청구
+      else if (dueLevel(c) === 'urgent') n++;                 // 임박 기일(D-2 이내)
+    });
+    return n;
+  }
+  function setPillBadge(n) {
+    var el = document.getElementById('hp-badge-gukseon');
+    if (!el) return;
+    if (n > 0) { el.textContent = n; el.hidden = false; el.title = '임박 기일·미청구 ' + n + '건'; }
+    else { el.hidden = true; el.textContent = ''; }
+  }
+  // 홈에서 호출(로그인 후·홈 복귀 시): 최신 데이터로 배지만 갱신
+  window.gsmgrUpdateBadge = function () {
+    if (state.loaded && state.cases.length) setPillBadge(computeAttention(state.cases));
+    var sb = (typeof getSB === 'function') ? getSB() : null;
+    if (!sb) return;
+    sb.from('gukseon_cases').select('id,data,updated_at').then(function (res) {
+      if (!res || res.error || !res.data) return;
+      setPillBadge(computeAttention(res.data.map(normalize)));
+    }, function () {});
+  };
 
   /* ── 로웨어(cases) 기일 자동 반영 ──
      화면 열 때, 저장된 사건번호로 cases 를 다시 조회해 next_date(공판기일)/next_contents(종류)를
@@ -1418,8 +1446,18 @@
     if (el) el.classList.remove('active');
     document.body.style.overflow = '';
     hideTip();
+    setPillBadge(computeAttention(state.cases)); // 홈 복귀 → 배지 갱신
     if (window._swMaybeReload) setTimeout(window._swMaybeReload, 0); // 홈 복귀 → 대기 중 새 버전 교체
   };
+
+  /* 첫 홈 진입(로그인 직후) 배지 표시 — 세션 준비될 때까지 몇 번 시도 */
+  if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+    (function initBadge(i) {
+      try { if (window.gsmgrUpdateBadge) window.gsmgrUpdateBadge(); } catch (e) {}
+      var delays = [1800, 4000, 8000];
+      if (i < delays.length) setTimeout(function () { initBadge(i + 1); }, delays[i]);
+    })(0);
+  }
 
   /* node 검증/하네스용 (브라우저에선 무시) */
   if (typeof module !== 'undefined' && module.exports) {
