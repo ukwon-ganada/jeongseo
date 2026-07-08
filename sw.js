@@ -1,7 +1,7 @@
 /* 법무법인 정서 - 서비스 워커
    목적: ① PWA 설치 요건(fetch 핸들러) 충족  ② 오프라인에서도 앱 열기
    전략: 같은 출처 파일만 캐시(네트워크 우선). 외부 API/CDN은 건드리지 않음. */
-const CACHE = 'jeongseo-v141';
+const CACHE = 'jeongseo-v142';
 // 실제 존재하는 파일만. (없는 파일이 하나라도 섞이면 예전 방식(addAll)은 통째로 실패했음)
 const ASSETS = ['./', './index.html', './styles.css', './dojang.html', './manifest.json', './favicon.png', './logo-sidebar.png', './icon-192.png', './icon-512.png', './watermark.png', './firm-stamp.png', './util.js', './gyeongyu.js', './autofill.js', './yeollam.js', './geomchal.js', './home.js', './auth.js', './criminal.jpg', './civil.jpg', './family.jpg', './fonts/NotoSansKR-400.woff2', './fonts/NotoSansKR-500.woff2'];
 

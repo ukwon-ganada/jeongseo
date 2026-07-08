@@ -9,9 +9,9 @@
      hearingType, hearingDate, verdictDate, todo, claimed, feeForm{...},
      depositDate, depositAmount, appeal, appealStamped } }
    패널(파생, 저장 안 함):
-     · 종결 = verdictDate 있고 오늘 ≥ verdictDate(선고기일 지남)
+     · 기준일 = 선고일(verdictDate, 없으면 hearingType='선고'의 hearingDate) 우선, 없으면 (최근)기일
+     · 종결 = 기준일이 오늘 지남(선고든 공판이든)  · 진행 = 미래 기일이거나 기일 없음
      · 보수 = 종결 && claimed(보수청구 체크) — 필터뷰(종결에도 남음)
-     · 진행 = 그 외
    진입점: window.goCaseManager() / window.closeGsmgr()
    ─────────────────────────────────────────────────────────────── */
 (function () {
@@ -54,7 +54,10 @@
   /* ── 파생 패널 ── */
   // 선고일 = verdictDate 우선, 없으면 hearingType==='선고'일 때 hearingDate
   function verdictOf(c) { return c.verdictDate || (c.hearingType === '선고' ? c.hearingDate : ''); }
-  function isClosed(c) { return reached(verdictOf(c)); }
+  // 사건의 기준 날짜 = 선고일 우선, 없으면 (최근)기일
+  function caseDate(c) { return verdictOf(c) || c.hearingDate || ''; }
+  // 종결 = 기준 날짜가 오늘 지남(선고든 공판이든). 미래 기일이면 진행.
+  function isClosed(c) { return reached(caseDate(c)); }
   function panelCases(tab) {
     var arr = state.cases.filter(function (c) {
       if (tab === 'closed') return isClosed(c);
@@ -66,7 +69,7 @@
         return (activeDate(a) || '9999').localeCompare(activeDate(b) || '9999');
       }
       // 종결/보수: 최근 선고 먼저
-      return ymd(verdictOf(b)).localeCompare(ymd(verdictOf(a)));
+      return ymd(caseDate(b)).localeCompare(ymd(caseDate(a)));
     });
     return arr;
   }
@@ -283,7 +286,7 @@
         '<td>' + nameCell(c) + '</td>' +
         '<td class="gm-code">' + esc(c.caseNumber) + '</td>' +
         '<td>' + esc(c.caseName) + '</td>' +
-        '<td>' + fmtDate(verdictOf(c)) + '</td>' +
+        '<td>' + fmtDate(caseDate(c)) + '</td>' +
         '<td>' + (c.appeal ? '<span class="gm-yes">' + esc(c.appeal) + '</span>' : yesNo(c.appealStamped)) + '</td>' +
         '<td>' + yesNo(c.claimed) + '</td>' +
       '</tr>';
@@ -292,7 +295,7 @@
     return '<tr>' +
       '<td>' + nameCell(c) + '</td>' +
       '<td class="gm-code">' + esc(c.caseNumber) + '</td>' +
-      '<td>' + fmtDate(verdictOf(c)) + '</td>' +
+      '<td>' + fmtDate(caseDate(c)) + '</td>' +
       '<td>' + yesNo(c.claimed) + '</td>' +
       '<td>' + fmtDate(c.depositDate) + '</td>' +
       '<td>' + (c.depositAmount ? esc(c.depositAmount) : '<span class="gm-no">—</span>') + '</td>' +
