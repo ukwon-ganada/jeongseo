@@ -620,16 +620,16 @@
   function colgroup(tab) {
     var w;
     if (tab === 'active') w = ['10%', '14%', '16%', '17%', '43%'];       // 피고인·사건번호·사건명·기일·메모
-    else if (tab === 'closed') w = ['9%', '13%', '15%', '13%', '17%', '21%', '12%']; // …선고일·항소·항소장제출·보수청구
-    else w = ['10%', '14%', '13%', '16%', '13%', '13%', '11%', '10%'];   // 피고인·번호·선고일·상태·청구액·입금일·입금액·증액신청서
+    else if (tab === 'closed') w = ['8%', '12%', '14%', '12%', '15%', '18%', '10%', '11%']; // …선고일·항소·항소장제출·보수청구·증액신청서
+    else w = ['11%', '15%', '14%', '17%', '15%', '15%', '13%'];          // 피고인·번호·선고일·상태·청구액·입금일·입금액
     return '<colgroup>' + w.map(function (x) { return '<col style="width:' + x + '">'; }).join('') + '</colgroup>';
   }
 
   function thead(tab) {
     var cols;
     if (tab === 'active') cols = ['피고인', '사건번호', '사건명', '기일', '메모'];
-    else if (tab === 'closed') cols = ['피고인', '사건번호', '사건명', '선고일', '항소', '항소장 제출', '보수청구'];
-    else cols = ['피고인', '사건번호', '선고일', '상태', '청구액', '입금일', '입금액', '증액신청서'];
+    else if (tab === 'closed') cols = ['피고인', '사건번호', '사건명', '선고일', '항소', '항소장 제출', '보수청구', '증액신청서'];
+    else cols = ['피고인', '사건번호', '선고일', '상태', '청구액', '입금일', '입금액'];
     return '<thead><tr>' + cols.map(function (c) { return '<th>' + c + '</th>'; }).join('') + '</tr></thead>';
   }
 
@@ -690,6 +690,7 @@
         '<td>' + appealCell(c) + '</td>' +
         '<td>' + appealSubmitCell(c) + '</td>' +
         '<td>' + claimToggle(c) + '</td>' +
+        '<td><button type="button" class="gm-writebtn" data-id="' + esc(c.id) + '" onclick="gsmgrGoFee(this)">작성</button></td>' +
       '</tr>';
     }
     // fee — 종결 사건의 보수 단계 관리(미청구/청구/지급) + 청구액·입금 + 증액신청서
@@ -701,7 +702,6 @@
       '<td><span class="gm-inline" contenteditable="true" data-id="' + esc(c.id) + '" data-field="claimAmount" data-ph="청구액…">' + esc(c.claimAmount) + '</span></td>' +
       '<td><input type="date" class="gm-inline-date" data-id="' + esc(c.id) + '" data-field="depositDate" value="' + esc(ymdDash(c.depositDate)) + '"></td>' +
       '<td><span class="gm-inline" contenteditable="true" data-id="' + esc(c.id) + '" data-field="depositAmount" data-ph="입금액…">' + esc(c.depositAmount) + '</span></td>' +
-      '<td><button type="button" class="gm-writebtn" data-id="' + esc(c.id) + '" onclick="gsmgrGoFee(this)">작성</button></td>' +
     '</tr>';
   }
   function claimToggle(c) {
