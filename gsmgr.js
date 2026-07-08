@@ -134,6 +134,52 @@
         'max-width:260px;line-height:1.5;display:none;}',
       '#' + SHELL_ID + ' .gm-tip b{color:#EAF1F9;}',
       '#' + SHELL_ID + ' .gm-tip .gm-tip-lbl{color:#9fb4d6;font-size:10.5px;letter-spacing:.04em;display:block;margin-bottom:2px;}',
+      /* 앱바 버튼 */
+      '#' + SHELL_ID + ' .gm-add{border:none;background:linear-gradient(155deg,#22344f,#16263f);color:#fff;font-weight:600;',
+        'font-size:13.5px;height:38px;padding:0 16px;border-radius:999px;cursor:pointer;font-family:inherit;}',
+      '#' + SHELL_ID + ' .gm-add:hover{background:linear-gradient(155deg,#2a3e5c,#1b2e4b);}',
+      '#' + SHELL_ID + ' .gm-legacy{border:1px solid rgba(22,38,63,.2);background:#fff;color:#5b6b86;font-weight:600;',
+        'font-size:12.5px;height:38px;padding:0 12px;border-radius:999px;cursor:pointer;font-family:inherit;}',
+      '#' + SHELL_ID + ' .gm-legacy:hover{background:#eef2f9;}',
+      /* 추가 모달 */
+      '#gsmgr-add{display:none;position:fixed;inset:0;z-index:1300;background:rgba(12,19,34,.5);',
+        'align-items:center;justify-content:center;padding:20px;font-family:var(--font,sans-serif);}',
+      '#gsmgr-add.on{display:flex;}',
+      '#gsmgr-add .ga-box{width:100%;max-width:440px;max-height:88vh;overflow:auto;background:#fff;',
+        'border-radius:20px;box-shadow:0 40px 90px -30px rgba(12,25,45,.55);padding:22px 22px 20px;}',
+      '#gsmgr-add .ga-h{font-family:\'Noto Serif KR\',serif;font-size:19px;font-weight:600;color:#16263f;margin-bottom:4px;}',
+      '#gsmgr-add .ga-sub{font-size:12.5px;color:#5b6b86;margin-bottom:14px;}',
+      '#gsmgr-add .ga-search{position:relative;}',
+      '#gsmgr-add input,#gsmgr-add .ga-seg{width:100%;box-sizing:border-box;}',
+      '#gsmgr-add .ga-input{height:46px;border:1.5px solid rgba(22,38,63,.2);border-radius:12px;padding:0 14px;',
+        'font-size:15px;font-family:inherit;outline:none;background:#fff;color:#1a1a1a;}',
+      '#gsmgr-add .ga-input:focus{border-color:#16263f;box-shadow:0 0 0 3px rgba(22,38,63,.12);}',
+      '#gsmgr-add .ga-results{margin-top:8px;border:1px solid rgba(22,38,63,.12);border-radius:12px;overflow:hidden;}',
+      '#gsmgr-add .ga-item{padding:11px 14px;cursor:pointer;border-bottom:1px solid rgba(22,38,63,.07);}',
+      '#gsmgr-add .ga-item:last-child{border-bottom:none;}',
+      '#gsmgr-add .ga-item:hover{background:#f4f7fb;}',
+      '#gsmgr-add .ga-item .ga-nm{font-weight:700;color:#16263f;}',
+      '#gsmgr-add .ga-item .ga-meta{font-size:12px;color:#5b6b86;margin-top:2px;}',
+      '#gsmgr-add .ga-empty{padding:12px 14px;font-size:13px;color:#8a97ab;}',
+      '#gsmgr-add .ga-manual{margin-top:10px;text-align:center;}',
+      '#gsmgr-add .ga-manual button{border:1px dashed rgba(22,38,63,.3);background:#fff;color:#41537a;',
+        'font-weight:600;font-size:13px;padding:10px 14px;border-radius:12px;cursor:pointer;width:100%;font-family:inherit;}',
+      '#gsmgr-add .ga-field{margin-top:12px;}',
+      '#gsmgr-add .ga-lbl{font-size:12.5px;font-weight:600;color:#41537a;margin-bottom:5px;display:block;}',
+      '#gsmgr-add .ga-row{display:flex;gap:8px;}',
+      '#gsmgr-add .ga-seg{display:flex;gap:6px;}',
+      '#gsmgr-add .ga-seg button{flex:1;height:40px;border:1.5px solid rgba(22,38,63,.18);background:#fff;',
+        'color:#41537a;font-weight:600;font-size:13px;border-radius:10px;cursor:pointer;font-family:inherit;}',
+      '#gsmgr-add .ga-seg button.on{background:#16263f;border-color:#16263f;color:#fff;}',
+      '#gsmgr-add .ga-warn{margin-top:12px;background:#fdf0ee;border:1px solid #f2c9c2;color:#a5352a;',
+        'font-size:12.5px;padding:9px 12px;border-radius:10px;}',
+      '#gsmgr-add .ga-btns{display:flex;gap:8px;margin-top:18px;}',
+      '#gsmgr-add .ga-cancel{flex:0 0 auto;padding:0 18px;height:46px;border:1px solid rgba(22,38,63,.18);',
+        'background:#fff;color:#41537a;font-weight:600;border-radius:12px;cursor:pointer;font-family:inherit;}',
+      '#gsmgr-add .ga-save{flex:1;height:46px;border:none;background:linear-gradient(155deg,#22344f,#16263f);',
+        'color:#fff;font-weight:700;font-size:15px;border-radius:12px;cursor:pointer;font-family:inherit;}',
+      '#gsmgr-add .ga-save:disabled{opacity:.5;cursor:default;}',
+      '#gsmgr-add .ga-loading{font-size:12px;color:#8a97ab;padding:8px 2px;}',
       /* 좁은 화면(모바일) */
       '@media (max-width:640px){',
         '#' + SHELL_ID + ' .gm-body{padding:6px 8px 24px;}',
@@ -160,7 +206,8 @@
         '</button>' +
         '<span class="gm-title">국선 사건 관리</span>' +
         '<span class="gm-spacer"></span>' +
-        '<button class="gm-edit" onclick="if(window.openCaseMgrLegacy)openCaseMgrLegacy()">＋ 사건 추가 · 편집</button>' +
+        '<button class="gm-add" onclick="gsmgrOpenAdd()">＋ 사건 추가</button>' +
+        '<button class="gm-legacy" onclick="if(window.openCaseMgrLegacy)openCaseMgrLegacy()" title="기존 편집 화면">편집(기존)</button>' +
       '</div>' +
       '<div class="gm-tabs" id="gsmgr-tabs"></div>' +
       '<div class="gm-body" id="gsmgr-body"></div>' +
@@ -334,6 +381,191 @@
       else hideTip();
     });
   }
+
+  /* ══════════════════════════════════════════════════════════════
+     [Phase 2] 사건 추가: 검색(cases) → 자동채움(+court-lookup 선고일) → 저장(upsert)
+     ══════════════════════════════════════════════════════════════ */
+  var addForm = null;          // 폼 단계 데이터
+  var addSearchTimer = null;
+
+  function cleanCaseName(n) { return String(n == null ? '' : n).replace(/^\s*\[[^\]]*\]\s*/, ''); }
+  function normCode(s) { return String(s == null ? '' : s).replace(/\s+/g, ''); }
+
+  function feeFormDefault(court) {
+    return { r1: false, r2: false, r3: false, r4: false, r5: false, r6: false, r12: false, r13: false,
+      visit_t: '', visit_o: '', person_t: '', person_o: '', attend_t: '', attend_o: '', witness_t: '', witness_o: '',
+      outcourt: '', exp_visit: '', copy: '', interp_chk: false, interp_amt: '', travel_chk: false, travel_amt: '',
+      etc: '', writeDate: '', attorney: '', rrn: '', court: court || '', courtDiv: '', stamped: false };
+  }
+  function newId() {
+    try { if (window.crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (e) {}
+    return 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+  }
+  function makeCaseData(f) {
+    var id = newId();
+    return {
+      id: id, defendant: f.defendant || '', contact: f.contact || '',
+      caseNumber: f.caseNumber || '', caseName: f.caseName || '',
+      hearingType: f.hearingType || '공판', hearingDate: f.hearingDate || '',
+      todo: f.todo || '', claimed: false, feeForm: feeFormDefault(f.court),
+      verdictDate: f.verdictDate || '', depositDate: '', depositAmount: '',
+      appeal: '', appealStamped: false
+    };
+  }
+
+  /* court-lookup 엣지 함수: 사건번호 → { court_dept(재판부), judgment_date(선고일) } */
+  function courtLookup(caseNo, lNum, cb) {
+    var base = (window.SUPABASE_URL || 'https://nyjyemjsperpakrrgzcc.supabase.co');
+    var key = (window.SUPABASE_KEY || 'sb_publishable_QKl9MIt2_MflYnpN41VRvg_cNIAbYhU');
+    fetch(base + '/functions/v1/court-lookup', {
+      method: 'POST', headers: { 'content-type': 'application/json', 'apikey': key },
+      body: JSON.stringify({ schKey: String(caseNo || ''), schVal: String(lNum || '') })
+    }).then(function (r) { return r.json(); }).then(function (d) { cb(d || {}); }, function () { cb({}); });
+  }
+
+  function injectAddModal() {
+    if (document.getElementById('gsmgr-add')) return;
+    var el = document.createElement('div');
+    el.id = 'gsmgr-add';
+    el.addEventListener('click', function (e) { if (e.target === el) closeAdd(); });
+    el.innerHTML = '<div class="ga-box" id="ga-box"></div>';
+    document.body.appendChild(el);
+  }
+
+  window.gsmgrOpenAdd = function () {
+    injectAddModal();
+    addForm = null;
+    document.getElementById('gsmgr-add').classList.add('on');
+    renderAddSearch('', null);
+    setTimeout(function () { var i = document.getElementById('ga-q'); if (i) i.focus(); }, 60);
+  };
+  window.closeAdd = function () { var m = document.getElementById('gsmgr-add'); if (m) m.classList.remove('on'); };
+
+  /* ── 1단계: 검색 ── */
+  function renderAddSearch(q, rows) {
+    var box = document.getElementById('ga-box');
+    if (!box) return;
+    var list = '';
+    if (rows === 'loading') list = '<div class="ga-results"><div class="ga-loading" style="padding:12px 14px">사건 찾는 중…</div></div>';
+    else if (rows && rows.length) {
+      list = '<div class="ga-results">' + rows.map(function (r, i) {
+        var nm = esc(r.l_client || '(이름 없음)');
+        var meta = [esc(r.l_code || ''), esc(cleanCaseName(r.l_name) || '')].filter(Boolean).join(' · ');
+        return '<div class="ga-item" onclick="gsmgrPick(' + i + ')"><div class="ga-nm">' + nm + '</div><div class="ga-meta">' + meta + '</div></div>';
+      }).join('') + '</div>';
+      window._gsmgrRows = rows;
+    } else if (rows && rows.length === 0) list = '<div class="ga-results"><div class="ga-empty">검색 결과가 없습니다. 창고에 없으면 직접 입력하세요.</div></div>';
+    box.innerHTML =
+      '<div class="ga-h">사건 추가</div>' +
+      '<div class="ga-sub">의뢰인 이름 또는 사건번호로 검색하세요.</div>' +
+      '<div class="ga-search"><input id="ga-q" class="ga-input" placeholder="의뢰인 또는 사건번호" value="' + esc(q) + '" autocomplete="off"></div>' +
+      list +
+      '<div class="ga-manual"><button onclick="gsmgrManual()">＋ 창고에 없음 · 직접 입력</button></div>' +
+      '<div class="ga-btns"><button class="ga-cancel" style="flex:1" onclick="closeAdd()">닫기</button></div>';
+    var input = document.getElementById('ga-q');
+    if (input) input.addEventListener('input', function () {
+      var v = input.value.trim();
+      clearTimeout(addSearchTimer);
+      if (v.length < 2) { renderAddSearch(v, null); return; }
+      renderAddSearch(v, 'loading');
+      addSearchTimer = setTimeout(function () { doSearch(v); }, 250);
+    });
+  }
+  function doSearch(q) {
+    var sb = (typeof getSB === 'function') ? getSB() : null;
+    if (!sb) { renderAddSearch(q, []); return; }
+    var cq = q.replace(/[,%()]/g, '').trim();
+    sb.from('cases').select('l_num,l_code,l_name,l_client,court')
+      .or('l_client.ilike.%' + cq + '%,l_code.ilike.%' + cq + '%').limit(8)
+      .then(function (res) {
+        var cur = document.getElementById('ga-q');
+        if (!cur || cur.value.trim() !== q) return; // 입력이 바뀌면 무시
+        renderAddSearch(q, (res && res.data) ? res.data : []);
+      }, function () { renderAddSearch(q, []); });
+  }
+
+  window.gsmgrPick = function (i) {
+    var r = (window._gsmgrRows || [])[i]; if (!r) return;
+    var f = { defendant: r.l_client || '', caseNumber: r.l_code || '', caseName: cleanCaseName(r.l_name),
+      court: r.court || '', hearingType: '공판', hearingDate: '', verdictDate: '', contact: '', todo: '', lNum: r.l_num || '' };
+    renderAddForm(f, true);
+    // 로웨어 선고일/재판부 자동 조회
+    courtLookup(f.caseNumber, f.lNum, function (d) {
+      if (!addForm) return;
+      if (d.judgment_date && !addForm.verdictDate) { addForm.verdictDate = String(d.judgment_date).slice(0, 10); }
+      if (d.court_dept && !addForm.court) { addForm.court = d.court_dept; }
+      renderAddForm(addForm, false);
+    });
+  };
+  window.gsmgrManual = function () {
+    renderAddForm({ defendant: '', caseNumber: '', caseName: '', court: '', hearingType: '공판', hearingDate: '', verdictDate: '', contact: '', todo: '', lNum: '' }, true);
+  };
+
+  /* ── 2단계: 폼(자동채움 결과 + 나머지 입력) ── */
+  function dupCase(codeNorm) {
+    if (!codeNorm) return false;
+    return state.cases.some(function (c) { return normCode(c.caseNumber) === codeNorm; });
+  }
+  function renderAddForm(f, focusFirst) {
+    addForm = f;
+    var box = document.getElementById('ga-box');
+    if (!box) return;
+    var dup = dupCase(normCode(f.caseNumber));
+    box.innerHTML =
+      '<div class="ga-h">사건 정보 확인</div>' +
+      '<div class="ga-sub">자동으로 채워진 값을 확인하고 기일·수감번호·메모를 입력하세요.</div>' +
+      field('피고인', '<input id="gf-defendant" class="ga-input" value="' + esc(f.defendant) + '">') +
+      field('사건번호', '<input id="gf-caseNumber" class="ga-input" value="' + esc(f.caseNumber) + '" oninput="gsmgrDup()">') +
+      field('사건명', '<input id="gf-caseName" class="ga-input" value="' + esc(f.caseName) + '">') +
+      field('재판부', '<input id="gf-court" class="ga-input" value="' + esc(f.court) + '">') +
+      '<div class="ga-field"><span class="ga-lbl">기일</span>' +
+        '<div class="ga-seg" id="gf-htype">' +
+          seg('공판', f.hearingType) + seg('선고', f.hearingType) + seg('선정취소', f.hearingType) +
+        '</div>' +
+        '<div style="height:8px"></div>' +
+        '<input id="gf-hearingDate" class="ga-input" type="date" value="' + esc(f.hearingDate) + '">' +
+      '</div>' +
+      field('선고기일 (자동/선택)', '<input id="gf-verdictDate" class="ga-input" type="date" value="' + esc(f.verdictDate) + '">') +
+      field('연락처 · 수감번호', '<input id="gf-contact" class="ga-input" placeholder="예: 0421(인천구치소) 또는 010-…" value="' + esc(f.contact) + '">') +
+      field('메모 (해야 할 것)', '<input id="gf-todo" class="ga-input" value="' + esc(f.todo) + '">') +
+      '<div class="ga-warn" id="gf-warn" style="' + (dup ? '' : 'display:none') + '">이미 같은 사건번호의 사건이 목록에 있습니다. 그래도 추가하려면 저장을 누르세요.</div>' +
+      '<div class="ga-btns"><button class="ga-cancel" onclick="gsmgrOpenAdd()">‹ 검색</button>' +
+        '<button class="ga-save" id="gf-save" onclick="gsmgrAddSave()">저장</button></div>';
+    if (focusFirst) setTimeout(function () { var i = document.getElementById('gf-defendant'); if (i) i.focus(); }, 40);
+  }
+  function field(label, inner) { return '<div class="ga-field"><span class="ga-lbl">' + label + '</span>' + inner + '</div>'; }
+  function seg(t, cur) { return '<button type="button" class="' + (cur === t ? 'on' : '') + '" onclick="gsmgrSeg(this,\'' + t + '\')">' + t + '</button>'; }
+  window.gsmgrSeg = function (btn, t) {
+    if (addForm) addForm.hearingType = t;
+    var wrap = btn.parentNode; if (wrap) wrap.querySelectorAll('button').forEach(function (b) { b.classList.toggle('on', b === btn); });
+  };
+  window.gsmgrDup = function () {
+    var code = (document.getElementById('gf-caseNumber') || {}).value || '';
+    var w = document.getElementById('gf-warn'); if (w) w.style.display = dupCase(normCode(code)) ? '' : 'none';
+  };
+
+  window.gsmgrAddSave = function () {
+    var g = function (id) { var e = document.getElementById(id); return e ? e.value : ''; };
+    var f = {
+      defendant: g('gf-defendant').trim(), caseNumber: g('gf-caseNumber').trim(), caseName: g('gf-caseName').trim(),
+      court: g('gf-court').trim(), hearingType: (addForm && addForm.hearingType) || '공판',
+      hearingDate: g('gf-hearingDate'), verdictDate: g('gf-verdictDate'),
+      contact: g('gf-contact').trim(), todo: g('gf-todo').trim()
+    };
+    if (!f.defendant && !f.caseNumber) { alert('피고인 또는 사건번호를 입력하세요.'); return; }
+    var sb = (typeof getSB === 'function') ? getSB() : null;
+    if (!sb) { alert('데이터 연결 준비 중입니다. 잠시 후 다시 시도하세요.'); return; }
+    var data = makeCaseData(f);
+    var btn = document.getElementById('gf-save'); if (btn) { btn.disabled = true; btn.textContent = '저장 중…'; }
+    sb.from('gukseon_cases').upsert({ id: data.id, data: data, updated_at: new Date().toISOString() })
+      .then(function (res) {
+        if (res && res.error) { if (btn) { btn.disabled = false; btn.textContent = '저장'; } alert('저장 실패: ' + (res.error.message || '권한/연결 확인')); return; }
+        // 낙관적 반영(실시간이 곧 덮어씀)
+        state.cases.push(normalize({ id: data.id, data: data }));
+        render();
+        closeAdd();
+      }, function () { if (btn) { btn.disabled = false; btn.textContent = '저장'; } alert('저장 중 오류가 발생했습니다.'); });
+  };
 
   /* ── 외부 API ── */
   window.gsmgrTab = function (k) { state.tab = k; render(); };
