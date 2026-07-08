@@ -152,7 +152,10 @@
     setVal('ap-casename', cleanCaseName(r.l_name));
     setVal('ap-defendant', r.l_client);
     setVal('ap-court', r.court);
-    fillCourtDept(r);
+    // 판결 선고일: 창고 next_date(선고기일)로 즉시 채움 — court-lookup 지연/누락에 비의존
+    var jd = judgmentFromRow(r);
+    if (jd){ var s = document.getElementById('ap-sentdate'); if (s) s.value = jd; }
+    fillCourtDept(r); // 재판부(+선고일 보강: 창고에 선고일 없을 때만)
   }
 
   // 재판부를 중계소에서 받아 제출법원 칸에 "법원 재판부"로 덧붙임
@@ -179,7 +182,7 @@
     var el = document.getElementById('ap-sentdate');
     if (!el) return;
     var norm = normalizeDate(jdate);
-    if (norm) el.value = norm;
+    if (norm && !el.value) el.value = norm; // 이미 창고(next_date)로 채워졌으면 유지
   }
 
   // 사용자가 법원 칸을 직접 수정하지 않았을 때만 재판부를 덧붙임
@@ -329,6 +332,26 @@
     return '';
   }
 
+  // 사건번호를 직접 입력/붙여넣기하고 칸을 벗어나면(change) 창고에서 정확히 조회해 자동채움.
+  // 검색카드로 채운 경우엔 값이 프로그램으로 설정돼 change 가 발생하지 않아 중복 조회 없음.
+  function attachManualLookup(anchor, filler){
+    if (!anchor || anchor.dataset.afManual === '1') return;
+    anchor.dataset.afManual = '1';
+    anchor.addEventListener('change', function(){
+      var code = (anchor.value || '').trim();
+      if (!code) return;
+      var sb = (typeof getSB === 'function') ? getSB() : null;
+      if (!sb) return;
+      sb.from('cases')
+        .select('l_num,l_code,l_name,l_client,court,client_position,next_date,next_contents')
+        .eq('l_code', code).limit(1)
+        .then(function(res){
+          var row = res && res.data && res.data[0];
+          if (row) filler(row);
+        }, function(){});
+    });
+  }
+
   window.initAutofillFor = function(anchorId, opts){
     injectStyle();
     var anchor = document.getElementById(anchorId);
@@ -362,31 +385,16 @@
     }
 
     buildSearchCard(anchor, doFill);
-
-    // 사건번호를 직접 입력/붙여넣기하고 칸을 벗어나면(change) 창고에서 정확히 조회해 자동채움.
-    // 검색카드로 채운 경우엔 값이 프로그램으로 설정돼 change 가 발생하지 않아 중복 조회 없음.
-    if (anchor.dataset.afManual !== '1'){
-      anchor.dataset.afManual = '1';
-      anchor.addEventListener('change', function(){
-        var code = (anchor.value || '').trim();
-        if (!code) return;
-        var sb = (typeof getSB === 'function') ? getSB() : null;
-        if (!sb) return;
-        sb.from('cases')
-          .select('l_num,l_code,l_name,l_client,court,client_position,next_date,next_contents')
-          .eq('l_code', code).limit(1)
-          .then(function(res){
-            var row = res && res.data && res.data[0];
-            if (row) doFill(row);
-          }, function(){});
-      });
-    }
+    attachManualLookup(anchor, doFill);
   };
 
-  /* ── 진입점: 항소장 폼 열릴 때 index.html의 goAppeal()에서 호출 ── */
+  /* ── 진입점: 항소장 폼 열릴 때 index.html의 goAppeal()에서 호출 ──
+     검색카드 선택 + 사건번호 직접입력 모두에서 선고일(ap-sentdate)이 자동 채워진다. */
   window.initAppealAutofill = function(){
     injectStyle();
-    buildSearchCard(document.getElementById('ap-casenum'), fillForm); // 폼 맨 위 검색카드 한 곳으로 일원화
+    var anchor = document.getElementById('ap-casenum');
+    buildSearchCard(anchor, fillForm); // 폼 맨 위 검색카드 한 곳으로 일원화
+    attachManualLookup(anchor, fillForm);
   };
 
   /* ── 선임계(형사) 폼 채우기 ──

@@ -61,8 +61,8 @@
   function verdictOf(c) { return c.verdictDate || (c.hearingType === '선고' ? c.hearingDate : ''); }
   // 사건의 기준 날짜 = 선고일 우선, 없으면 (최근)기일
   function caseDate(c) { return verdictOf(c) || c.hearingDate || ''; }
-  // 종결 = 기준 날짜가 오늘 지남(선고든 공판이든). 미래 기일이면 진행.
-  function isClosed(c) { return reached(caseDate(c)); }
+  // 종결 = 선정취소면 즉시 종결 · 그 외엔 기준 날짜가 오늘 지남(선고든 공판이든). 미래 기일이면 진행.
+  function isClosed(c) { return c.hearingType === '선정취소' || reached(caseDate(c)); }
   function panelCases(tab) {
     var arr = state.cases.filter(function (c) {
       if (tab === 'closed') return isClosed(c);
@@ -326,11 +326,13 @@
       res.data.forEach(function (r) { map[normCode(r.l_code)] = r; });
       var changed = [];
       state.cases.forEach(function (c) {
+        if (c.hearingType === '선정취소') return;         // 선정취소로 종결된 건 → 기일 자동 갱신 안 함
         var r = map[normCode(c.caseNumber)];
         if (!r || !r.next_date) return;                 // 로웨어에 다음 기일 없음 → 유지
         var nd = String(r.next_date).slice(0, 10);
+        var isCancel = /선정\s*취소/.test(r.next_contents || '');
         var isSgo = /선고/.test(r.next_contents || '');
-        var ht = isSgo ? '선고' : '공판';
+        var ht = isCancel ? '선정취소' : (isSgo ? '선고' : '공판');
         var sameDate = ymd(c.hearingDate) === ymd(nd);
         var sameType = c.hearingType === ht;
         var sameVerdict = !isSgo || ymd(c.verdictDate) === ymd(nd);
