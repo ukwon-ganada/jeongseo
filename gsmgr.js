@@ -338,6 +338,50 @@
       '#' + SHELL_ID + ' .gm-toggle.on{background:#e7efe8;border-color:#8bb495;color:#40694e;}',
       '#' + SHELL_ID + ' .gm-empty{padding:60px 20px;text-align:center;color:#8a97ab;font-size:14px;}',
       '#' + SHELL_ID + ' .gm-loading{padding:60px 20px;text-align:center;color:#8a97ab;font-size:14px;}',
+      /* ── 우측 디테일 드로어(편집) ── */
+      '#gsmgr-drawer{position:fixed;inset:0;z-index:1300;display:none;font-family:var(--font,sans-serif);}',
+      '#gsmgr-drawer.on{display:block;}',
+      '#gsmgr-drawer .gd-bd{position:absolute;inset:0;background:rgba(12,19,34,.34);opacity:0;transition:opacity .22s;}',
+      '#gsmgr-drawer.on .gd-bd{opacity:1;}',
+      '#gsmgr-drawer .gm-drawer{position:absolute;top:0;right:0;height:100%;width:min(452px,92vw);box-sizing:border-box;',
+        'background:linear-gradient(180deg,#fbfcfe,#f4f7fb);border-left:1px solid rgba(22,38,63,.12);',
+        'box-shadow:-30px 0 70px -40px rgba(12,25,45,.55);transform:translateX(100%);transition:transform .26s cubic-bezier(.2,.7,.25,1);',
+        'display:flex;flex-direction:column;}',
+      '#gsmgr-drawer.on .gm-drawer{transform:none;}',
+      '#gsmgr-drawer #gd-inner{display:flex;flex-direction:column;height:100%;min-height:0;}',
+      /* 드로어 헤더 = 사건 요약 */
+      '#gsmgr-drawer .gd-head{flex:none;position:relative;padding:22px 22px 18px;',
+        'background:rgba(255,255,255,.7);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid rgba(22,38,63,.08);}',
+      '#gsmgr-drawer .gd-close{position:absolute;top:16px;right:16px;width:34px;height:34px;border:none;background:rgba(22,38,63,.06);',
+        'color:#5b6b86;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;}',
+      '#gsmgr-drawer .gd-close svg{width:17px;height:17px;}',
+      '#gsmgr-drawer .gd-close:hover{background:rgba(22,38,63,.13);color:#16263f;}',
+      '#gsmgr-drawer .gd-stage{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.02em;padding:3px 10px;border-radius:999px;margin-bottom:10px;}',
+      '#gsmgr-drawer .gd-stage-active{background:#e9eef6;color:#34507f;}',
+      '#gsmgr-drawer .gd-stage-closed{background:#eef1f6;color:#5b6b86;}',
+      '#gsmgr-drawer .gd-stage-cancel{background:#eef0f3;color:#6b7280;}',
+      '#gsmgr-drawer .gd-name{font-family:\'Noto Serif KR\',serif;font-size:24px;font-weight:600;color:#16263f;line-height:1.15;}',
+      '#gsmgr-drawer .gd-code{font-family:\'IBM Plex Mono\',monospace;font-size:13px;color:#41537a;margin-top:3px;}',
+      /* 드로어 본문 */
+      '#gsmgr-drawer .gd-body{flex:1;overflow:auto;padding:18px 22px 8px;-webkit-overflow-scrolling:touch;}',
+      '#gsmgr-drawer .gd-sec{font-size:11.5px;font-weight:700;letter-spacing:.06em;color:#8a97ab;margin:2px 0 4px;}',
+      '#gsmgr-drawer .ga-field{margin-top:14px;}',
+      '#gsmgr-drawer .ga-lbl{font-size:12.5px;font-weight:600;color:#41537a;margin-bottom:5px;display:block;}',
+      '#gsmgr-drawer .ga-input{width:100%;box-sizing:border-box;height:46px;border:1.5px solid rgba(22,38,63,.18);border-radius:12px;',
+        'padding:0 14px;font-size:15px;font-family:inherit;outline:none;background:#fff;color:#1a1a1a;}',
+      '#gsmgr-drawer .ga-input:focus{border-color:#16263f;box-shadow:0 0 0 3px rgba(22,38,63,.12);}',
+      '#gsmgr-drawer .ga-seg{display:flex;gap:6px;}',
+      '#gsmgr-drawer .ga-seg button{flex:1;height:40px;border:1.5px solid rgba(22,38,63,.18);background:#fff;color:#41537a;',
+        'font-weight:600;font-size:13px;border-radius:10px;cursor:pointer;font-family:inherit;}',
+      '#gsmgr-drawer .ga-seg button.on{background:#16263f;border-color:#16263f;color:#fff;}',
+      /* 드로어 푸터 */
+      '#gsmgr-drawer .gd-foot{flex:none;display:flex;gap:10px;padding:14px 22px;border-top:1px solid rgba(22,38,63,.08);background:rgba(255,255,255,.7);}',
+      '#gsmgr-drawer .ga-del{flex:0 0 auto;padding:0 18px;height:48px;border:1.5px solid #d9b3ad;background:#fff;color:#9c4a38;',
+        'font-weight:600;border-radius:12px;cursor:pointer;font-family:inherit;}',
+      '#gsmgr-drawer .ga-del:hover{background:#f7ece8;}',
+      '#gsmgr-drawer .ga-save{flex:1;height:48px;border:none;background:linear-gradient(155deg,#2a3d5c,#16263f);color:#fff;',
+        'font-weight:700;font-size:15px;border-radius:12px;cursor:pointer;font-family:inherit;box-shadow:0 10px 22px -14px rgba(20,40,70,.8);}',
+      '#gsmgr-drawer .ga-save:hover{background:linear-gradient(155deg,#33496d,#1b2e4b);}',
       /* 수감번호/연락처 툴팁 */
       '#' + SHELL_ID + ' .gm-tip{position:fixed;z-index:1200;background:#16263f;color:#fff;font-size:12.5px;',
         'padding:8px 12px;border-radius:10px;box-shadow:0 12px 30px rgba(12,25,45,.4);pointer-events:none;',
@@ -543,7 +587,9 @@
     if (ae && shell && shell.contains(ae) &&
         (ae.classList.contains('gm-memo-edit') || ae.classList.contains('gm-inline') || ae.classList.contains('gm-inline-date'))) return true;
     var add = document.getElementById('gsmgr-add');
-    if (add && add.classList.contains('on')) return true; // 추가/편집 모달 열림
+    if (add && add.classList.contains('on')) return true;   // 추가 모달 열림
+    var dr = document.getElementById('gsmgr-drawer');
+    if (dr && dr.classList.contains('on')) return true;     // 편집 드로어 열림
     return false;
   }
   function scheduleReload() {
@@ -692,7 +738,7 @@
   function colgroup(tab) {
     var w;
     if (tab === 'active') w = ['10%', '14%', '16%', '17%', '43%'];       // 피고인·사건번호·사건명·기일·메모
-    else if (tab === 'closed') w = ['8%', '12%', '14%', '12%', '15%', '18%', '10%', '11%']; // …선고일·항소·항소장제출·보수청구·증액신청서
+    else if (tab === 'closed') w = ['9%', '13%', '16%', '13%', '16%', '20%', '13%']; // …선고일·항소·항소장제출·증액신청서
     else w = ['11%', '15%', '14%', '17%', '15%', '15%', '13%'];          // 피고인·번호·선고일·상태·청구액·입금일·입금액
     return '<colgroup>' + w.map(function (x) { return '<col style="width:' + x + '">'; }).join('') + '</colgroup>';
   }
@@ -700,7 +746,7 @@
   function thead(tab) {
     var cols;
     if (tab === 'active') cols = ['피고인', '사건번호', '사건명', '기일', '메모'];
-    else if (tab === 'closed') cols = ['피고인', '사건번호', '사건명', '선고일', '항소', '항소장 제출', '보수청구', '증액신청서'];
+    else if (tab === 'closed') cols = ['피고인', '사건번호', '사건명', '선고일', '항소', '항소장 제출', '증액신청서'];
     else cols = ['피고인', '사건번호', '선고일', '상태', '청구액', '입금일', '입금액'];
     return '<thead><tr>' + cols.map(function (c) { return '<th>' + c + '</th>'; }).join('') + '</tr></thead>';
   }
@@ -761,7 +807,6 @@
         '<td>' + fmtDate(caseDate(c)) + '</td>' +
         '<td>' + appealCell(c) + '</td>' +
         '<td>' + appealSubmitCell(c) + '</td>' +
-        '<td>' + claimToggle(c) + '</td>' +
         '<td><button type="button" class="gm-writebtn" data-id="' + esc(c.id) + '" onclick="gsmgrGoFee(this)">작성</button></td>' +
       '</tr>';
     }
@@ -1086,6 +1131,20 @@
     el.innerHTML = '<div class="ga-box" id="ga-box"></div>';
     document.body.appendChild(el);
   }
+  // 우측 디테일 드로어(편집) — 목록을 보면서 편집. 추가는 모달, 편집은 드로어.
+  function injectDrawer() {
+    if (document.getElementById('gsmgr-drawer')) return;
+    var el = document.createElement('div');
+    el.id = 'gsmgr-drawer';
+    el.innerHTML = '<div class="gd-bd" id="gd-bd"></div><aside class="gm-drawer"><div id="gd-inner"></div></aside>';
+    el.querySelector('#gd-bd').addEventListener('click', function () { closeDrawer(); });
+    document.body.appendChild(el);
+  }
+  window.closeDrawer = function () {
+    var m = document.getElementById('gsmgr-drawer'); if (m) m.classList.remove('on');
+    editState = null;
+    setTimeout(flushPendingReload, 80);
+  };
 
   window.gsmgrOpenAdd = function () {
     injectAddModal();
@@ -1234,33 +1293,45 @@
   window.gsmgrEdit = function (id) {
     var c = state.cases.filter(function (x) { return x.id === id; })[0];
     if (!c) return;
-    injectAddModal();
+    injectDrawer();
     editState = c;
     addForm = { hearingType: c.hearingType || '공판' };
-    document.getElementById('gsmgr-add').classList.add('on');
+    var d = document.getElementById('gsmgr-drawer'); if (d) d.classList.add('on');
     renderEditForm(c);
+    setTimeout(function () { var i = document.getElementById('gf-defendant'); if (i) i.focus(); }, 120);
   };
 
   function courtOf(c) { return (c._raw && c._raw.feeForm && c._raw.feeForm.court) || ''; }
 
+  // 편집 = 우측 드로어(상단 요약 + 사건정보 편집 + 삭제/저장)
   function renderEditForm(c) {
-    var box = document.getElementById('ga-box');
+    var box = document.getElementById('gd-inner');
     if (!box) return;
+    var closed = isClosed(c);
+    var stage = c.hearingType === '선정취소' ? '선정취소' : (closed ? (c.claimed ? '보수' : '종결') : '진행');
+    var scls = c.hearingType === '선정취소' ? 'cancel' : (closed ? 'closed' : 'active');
     box.innerHTML =
-      '<div class="ga-h">사건 편집</div>' +
-      '<div class="ga-sub">' + (esc(c.defendant) || '—') + ' · ' + (esc(c.caseNumber) || '') + '</div>' +
-      field('피고인', '<input id="gf-defendant" class="ga-input" value="' + esc(c.defendant) + '">') +
-      field('사건번호', '<input id="gf-caseNumber" class="ga-input" value="' + esc(c.caseNumber) + '">') +
-      field('사건명', '<input id="gf-caseName" class="ga-input" value="' + esc(c.caseName) + '">') +
-      '<div class="ga-field"><span class="ga-lbl">기일</span>' +
-        '<div class="ga-seg" id="gf-htype">' + seg('공판', c.hearingType) + seg('선고', c.hearingType) + seg('선정취소', c.hearingType) + '</div>' +
-        '<div style="height:8px"></div>' +
-        '<input id="gf-hearingDate" class="ga-input" type="date" value="' + esc(c.hearingDate) + '">' +
+      '<div class="gd-head">' +
+        '<button class="gd-close" onclick="closeDrawer()" aria-label="닫기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>' +
+        '<span class="gd-stage gd-stage-' + scls + '">' + stage + '</span>' +
+        '<div class="gd-name">' + (esc(c.defendant) || '—') + '</div>' +
+        '<div class="gd-code">' + esc(c.caseNumber) + '</div>' +
       '</div>' +
-      field('선고기일', '<input id="gf-verdictDate" class="ga-input" type="date" value="' + esc(c.verdictDate) + '">') +
-      field('연락처 · 수감번호', '<input id="gf-contact" class="ga-input" value="' + esc(c.contact) + '">') +
-      '<div class="ga-btns">' +
-        '<button class="ga-del" onclick="gsmgrDelete()">삭제</button>' +
+      '<div class="gd-body">' +
+        '<div class="gd-sec">사건 정보</div>' +
+        field('피고인', '<input id="gf-defendant" class="ga-input" value="' + esc(c.defendant) + '">') +
+        field('사건번호', '<input id="gf-caseNumber" class="ga-input" value="' + esc(c.caseNumber) + '">') +
+        field('사건명', '<input id="gf-caseName" class="ga-input" value="' + esc(c.caseName) + '">') +
+        '<div class="ga-field"><span class="ga-lbl">기일</span>' +
+          '<div class="ga-seg" id="gf-htype">' + seg('공판', c.hearingType) + seg('선고', c.hearingType) + seg('선정취소', c.hearingType) + '</div>' +
+          '<div style="height:8px"></div>' +
+          '<input id="gf-hearingDate" class="ga-input" type="date" value="' + esc(c.hearingDate) + '">' +
+        '</div>' +
+        field('선고기일', '<input id="gf-verdictDate" class="ga-input" type="date" value="' + esc(c.verdictDate) + '">') +
+        field('연락처 · 수감번호', '<input id="gf-contact" class="ga-input" value="' + esc(c.contact) + '">') +
+      '</div>' +
+      '<div class="gd-foot">' +
+        '<button class="ga-del" onclick="gsmgrDelete()">휴지통</button>' +
         '<button class="ga-save" id="gf-save" onclick="gsmgrEditSave()">저장</button>' +
       '</div>';
   }
@@ -1275,7 +1346,7 @@
       hearingDate: g('gf-hearingDate'), verdictDate: g('gf-verdictDate'), contact: g('gf-contact').trim()
     };
     Object.keys(patch).forEach(function (k) { c[k] = patch[k]; if (c._raw) c._raw[k] = patch[k]; }); // 낙관적
-    closeAdd();
+    closeDrawer();
     render();
     commitPatch(c.id, patch); // 동시수정 안전 저장(토스트·재시도 포함)
   };
@@ -1285,7 +1356,7 @@
     if (!window.confirm('이 사건을 휴지통으로 옮길까요? (복원할 수 있습니다)\n' + (c.defendant || '') + ' ' + (c.caseNumber || ''))) return;
     var now = new Date().toISOString();
     c.deleted = true; c.deletedAt = now; if (c._raw) { c._raw.deleted = true; c._raw.deletedAt = now; } // 낙관적
-    closeAdd();
+    closeDrawer();
     render();
     commitPatch(c.id, { deleted: true, deletedAt: now }, 0, function () { gsmgrToast('휴지통으로 이동했습니다 · 복원 가능', 'ok', 2600); });
   };
