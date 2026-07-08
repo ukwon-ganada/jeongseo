@@ -1511,26 +1511,36 @@ body.contract-locked .ct-bb-sign{pointer-events:none;color:var(--success)!import
   }
   #yeollamTypeSheet .yl-type-ico svg{stroke:#16263f;}
 
-  /* ── (3) 데이터 입력폼을 '계약서 목록' 룩으로: 흐릿한 파스텔 하늘 + 글래스 헤더/푸터 ── */
-  #seonimForm,#formSheet,#appealForm,#yeollamForm,#gukseonForm,#pankyulForm,#geomchalForm{background:transparent!important;}
-  #seonimForm::before,#formSheet::before,#appealForm::before,#yeollamForm::before,#gukseonForm::before,#pankyulForm::before,#geomchalForm::before{
+  /* ── (3) 데이터 입력폼을 '계약서 목록' 룩으로: 흐릿한 파스텔 하늘 + 글래스 헤더/푸터 ──
+     ([id$="Form"] = 항소장·형사/민가사 선임계·열람·검찰·국선증액·판결등본 7종을 공통으로. #formSheet=계약서) */
+  [id$="Form"],#formSheet{background:transparent!important;}
+  [id$="Form"]::before,#formSheet::before{
     content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
     background:linear-gradient(rgba(234,241,249,.60),rgba(234,241,249,.72)),url("hero-city.jpg") center 30%/cover no-repeat;
     filter:blur(26px) saturate(1.05);transform:scale(1.12);
   }
-  #seonimForm .fs-head,#formSheet .fs-head,#appealForm .fs-head,#yeollamForm .fs-head,#gukseonForm .fs-head,#pankyulForm .fs-head,#geomchalForm .fs-head,
-  #seonimForm .fs-foot,#formSheet .fs-foot,#appealForm .fs-foot,#yeollamForm .fs-foot,#gukseonForm .fs-foot,#pankyulForm .fs-foot,#geomchalForm .fs-foot{
+  [id$="Form"] .fs-head,#formSheet .fs-head,
+  [id$="Form"] .fs-foot,#formSheet .fs-foot{
     background:rgba(255,255,255,.60);backdrop-filter:blur(18px) saturate(1.2);-webkit-backdrop-filter:blur(18px) saturate(1.2);
     border-color:rgba(255,255,255,.55);
   }
-  /* 데이터 입력 구역 = 하나의 뚜렷한 흰색 패널 (배경 하늘과 분명히 분리).
-     하늘은 패널 '바깥 여백'으로만 보이고, 입력 필드 사이로는 비치지 않음. */
-  #seonimForm .fs-body,#formSheet .fs-body,#appealForm .fs-body,#yeollamForm .fs-body,#gukseonForm .fs-body,#pankyulForm .fs-body,#geomchalForm .fs-body{
+  /* 데이터 입력 구역 = 하나의 뚜렷한 흰색 패널 (배경 하늘과 분명히 분리). */
+  [id$="Form"] .fs-body,#formSheet .fs-body{
     background:rgba(255,255,255,.86);
     backdrop-filter:blur(26px) saturate(1.25);-webkit-backdrop-filter:blur(26px) saturate(1.25);
     border:1px solid rgba(255,255,255,.75);border-radius:20px;
     margin:14px auto 16px;
     box-shadow:0 34px 72px -34px rgba(12,25,45,.5);
+  }
+  /* 라운드 패널 안 스크롤바: 네모 → 얇고 둥근 '떠 있는' 스크롤(패널 모서리와 어우러지게) */
+  [id$="Form"] .fs-body,#formSheet .fs-body{scrollbar-width:thin;scrollbar-color:rgba(22,38,63,.26) transparent;}
+  [id$="Form"] .fs-body::-webkit-scrollbar,#formSheet .fs-body::-webkit-scrollbar{width:12px;}
+  [id$="Form"] .fs-body::-webkit-scrollbar-track,#formSheet .fs-body::-webkit-scrollbar-track{background:transparent;margin:16px 0;}
+  [id$="Form"] .fs-body::-webkit-scrollbar-thumb,#formSheet .fs-body::-webkit-scrollbar-thumb{
+    background:rgba(22,38,63,.24);border-radius:999px;border:3px solid transparent;background-clip:padding-box;
+  }
+  [id$="Form"] .fs-body::-webkit-scrollbar-thumb:hover,#formSheet .fs-body::-webkit-scrollbar-thumb:hover{
+    background:rgba(22,38,63,.4);background-clip:padding-box;
   }
   /* 패널 안 하위 카드·그룹은 은은한 인셋 (패널과 구분되되 과하지 않게) */
   .cl-card,.fs-group{background:#eef3fa;border:1px solid #dfe7f2;box-shadow:none;}
@@ -1566,45 +1576,29 @@ body.contract-locked .ct-bb-sign{pointer-events:none;color:var(--success)!import
   .cts-btn.cts-outline:hover{background:#f4f7fb;}
   .fs-chip.on{background:#16263f;border-color:#16263f;color:#fff;}
 
-  /* ── 서면 폼 크롬을 '국선 언어'로 통일 (헤더 세리프+모노그램 / 섹션·필드 / 푸터) ── */
-  #seonimForm .fs-title,#formSheet .fs-title,#appealForm .fs-title,#yeollamForm .fs-title,#gukseonForm .fs-title,#pankyulForm .fs-title,#geomchalForm .fs-title{
+  /* ── 서면 폼 크롬을 '국선 언어'로 통일 (7종 서면 + 계약서 공통) ── */
+  [id$="Form"] .fs-title,#formSheet .fs-title{
     font-family:'Noto Serif KR',serif;font-weight:600;font-size:18px;color:#16263f;letter-spacing:.01em;
   }
-  #seonimForm .fs-title::before,#formSheet .fs-title::before,#appealForm .fs-title::before,#yeollamForm .fs-title::before,#gukseonForm .fs-title::before,#pankyulForm .fs-title::before,#geomchalForm .fs-title::before{
+  [id$="Form"] .fs-title::before,#formSheet .fs-title::before{
     content:"";display:inline-block;width:6px;height:6px;border-radius:50%;
     background:linear-gradient(150deg,#33507f,#16263f);margin:0 9px 2px 2px;vertical-align:middle;
   }
-  #seonimForm .fs-head .fs-close,#formSheet .fs-head .fs-close,#appealForm .fs-head .fs-close,#yeollamForm .fs-head .fs-close,#gukseonForm .fs-head .fs-close,#pankyulForm .fs-head .fs-close,#geomchalForm .fs-head .fs-close{
+  [id$="Form"] .fs-head .fs-close,#formSheet .fs-head .fs-close{
     background:rgba(22,38,63,.06);border-radius:50%;width:34px;height:34px;
   }
-  #seonimForm .fs-head .fs-close:hover,#formSheet .fs-head .fs-close:hover,#appealForm .fs-head .fs-close:hover,#yeollamForm .fs-head .fs-close:hover,#gukseonForm .fs-head .fs-close:hover,#pankyulForm .fs-head .fs-close:hover,#geomchalForm .fs-head .fs-close:hover{
-    background:rgba(22,38,63,.13);
-  }
-  #seonimForm .fs-head .fs-close svg,#formSheet .fs-head .fs-close svg,#appealForm .fs-head .fs-close svg,#yeollamForm .fs-head .fs-close svg,#gukseonForm .fs-head .fs-close svg,#pankyulForm .fs-head .fs-close svg,#geomchalForm .fs-head .fs-close svg{
-    width:18px;height:18px;stroke:#5b6b86;
-  }
+  [id$="Form"] .fs-head .fs-close:hover,#formSheet .fs-head .fs-close:hover{background:rgba(22,38,63,.13);}
+  [id$="Form"] .fs-head .fs-close svg,#formSheet .fs-head .fs-close svg{width:18px;height:18px;stroke:#5b6b86;}
   /* 섹션 라벨 = 국선 gd-sec 톤(트래킹·뮤트·선명) */
-  #seonimForm .fs-section,#formSheet .fs-section,#appealForm .fs-section,#yeollamForm .fs-section,#gukseonForm .fs-section,#pankyulForm .fs-section,#geomchalForm .fs-section{
+  [id$="Form"] .fs-section,#formSheet .fs-section{
     font-size:11.5px;font-weight:700;color:#8391a8;letter-spacing:.06em;margin:22px 2px 9px;
   }
   /* 입력칸: 국선 규격(둥근 12px·1.5px 테두리) */
-  #seonimForm .fs-input,#formSheet .fs-input,#appealForm .fs-input,#yeollamForm .fs-input,#gukseonForm .fs-input,#pankyulForm .fs-input,#geomchalForm .fs-input{
-    border-width:1.5px;border-radius:12px;
-  }
-  #seonimForm .fs-label,#formSheet .fs-label,#appealForm .fs-label,#yeollamForm .fs-label,#gukseonForm .fs-label,#pankyulForm .fs-label,#geomchalForm .fs-label{
-    font-size:13px;font-weight:600;color:#41537a;
-  }
-  /* 푸터 버튼 = 국선 드로어 규격(네이비 그라디언트 채움 / 화이트+네이비 아웃라인 취소) */
-  #seonimForm .fs-btn,#formSheet .fs-btn,#appealForm .fs-btn,#yeollamForm .fs-btn,#gukseonForm .fs-btn,#pankyulForm .fs-btn,#geomchalForm .fs-btn{
-    border-radius:12px;height:48px;font-size:15px;
-  }
-  #seonimForm .fs-btn.primary,#formSheet .fs-btn.primary,#appealForm .fs-btn.primary,#yeollamForm .fs-btn.primary,#gukseonForm .fs-btn.primary,#pankyulForm .fs-btn.primary,#geomchalForm .fs-btn.primary{
-    box-shadow:0 10px 22px -14px rgba(20,40,70,.8);
-  }
-  #seonimForm .fs-btn.ghost,#formSheet .fs-btn.ghost,#appealForm .fs-btn.ghost,#yeollamForm .fs-btn.ghost,#gukseonForm .fs-btn.ghost,#pankyulForm .fs-btn.ghost,#geomchalForm .fs-btn.ghost{
-    background:#fff;color:#41537a;border:1.5px solid rgba(22,38,63,.18);
-  }
-  #seonimForm .fs-btn.ghost:hover,#formSheet .fs-btn.ghost:hover,#appealForm .fs-btn.ghost:hover,#yeollamForm .fs-btn.ghost:hover,#gukseonForm .fs-btn.ghost:hover,#pankyulForm .fs-btn.ghost:hover,#geomchalForm .fs-btn.ghost:hover{
-    background:#eef2f9;border-color:#16263f;color:#16263f;
-  }
+  [id$="Form"] .fs-input,#formSheet .fs-input{border-width:1.5px;border-radius:12px;}
+  [id$="Form"] .fs-label,#formSheet .fs-label{font-size:13px;font-weight:600;color:#41537a;}
+  /* 푸터 버튼 = 국선 드로어 규격(네이비 채움 / 화이트+네이비 아웃라인 취소) */
+  [id$="Form"] .fs-btn,#formSheet .fs-btn{border-radius:12px;height:48px;font-size:15px;}
+  [id$="Form"] .fs-btn.primary,#formSheet .fs-btn.primary{box-shadow:0 10px 22px -14px rgba(20,40,70,.8);}
+  [id$="Form"] .fs-btn.ghost,#formSheet .fs-btn.ghost{background:#fff;color:#41537a;border:1.5px solid rgba(22,38,63,.18);}
+  [id$="Form"] .fs-btn.ghost:hover,#formSheet .fs-btn.ghost:hover{background:#eef2f9;border-color:#16263f;color:#16263f;}
 }
