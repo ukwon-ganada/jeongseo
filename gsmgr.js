@@ -36,17 +36,25 @@
     var day = String(d.getDate()).padStart(2, '0');
     return d.getFullYear() + '-' + m + '-' + day;
   }
-  // 'YYYY-MM-DD' 문자열은 사전식 비교가 곧 날짜 비교
-  function reached(dstr) { return !!dstr && String(dstr).slice(0, 10) <= todayISO(); }
+  // 날짜 문자열을 YYYYMMDD 로 정규화(대시/점/붙임 등 형식 무관)
+  function ymd(dstr) {
+    var m = String(dstr == null ? '' : dstr).match(/(\d{4})\D*(\d{1,2})\D*(\d{1,2})/);
+    return m ? m[1] + ('0' + m[2]).slice(-2) + ('0' + m[3]).slice(-2) : '';
+  }
+  function ymdToday() {
+    var d = new Date();
+    return '' + d.getFullYear() + ('0' + (d.getMonth() + 1)).slice(-2) + ('0' + d.getDate()).slice(-2);
+  }
+  function reached(dstr) { var a = ymd(dstr); return !!a && a <= ymdToday(); }
   function fmtDate(dstr) {
-    if (!dstr) return '';
-    var s = String(dstr).slice(0, 10).split('-');
-    if (s.length !== 3) return dstr;
-    return s[0] + '. ' + Number(s[1]) + '. ' + Number(s[2]) + '.';
+    var m = String(dstr == null ? '' : dstr).match(/(\d{4})\D*(\d{1,2})\D*(\d{1,2})/);
+    return m ? m[1] + '. ' + Number(m[2]) + '. ' + Number(m[3]) + '.' : '';
   }
 
   /* ── 파생 패널 ── */
-  function isClosed(c) { return reached(c.verdictDate); }
+  // 선고일 = verdictDate 우선, 없으면 hearingType==='선고'일 때 hearingDate
+  function verdictOf(c) { return c.verdictDate || (c.hearingType === '선고' ? c.hearingDate : ''); }
+  function isClosed(c) { return reached(verdictOf(c)); }
   function panelCases(tab) {
     var arr = state.cases.filter(function (c) {
       if (tab === 'closed') return isClosed(c);
@@ -58,12 +66,12 @@
         return (activeDate(a) || '9999').localeCompare(activeDate(b) || '9999');
       }
       // 종결/보수: 최근 선고 먼저
-      return String(b.verdictDate || '').localeCompare(String(a.verdictDate || ''));
+      return ymd(verdictOf(b)).localeCompare(ymd(verdictOf(a)));
     });
     return arr;
   }
   // 진행 패널의 '기일' = 선고기일 예정 있으면 그것, 없으면 최근 공판기일
-  function activeDate(c) { return c.verdictDate || c.hearingDate || ''; }
+  function activeDate(c) { return verdictOf(c) || c.hearingDate || ''; }
 
   /* ── 스타일(테마 통일 · 업무용 고가시성) ── */
   function injectStyle() {
@@ -249,9 +257,10 @@
   function nameCell(c) {
     return '<span class="gm-name" data-tip="' + esc(c.contact) + '">' + (esc(c.defendant) || '—') + '</span>';
   }
-  function hearingTag(c, useVerdict) {
-    if (useVerdict || (c.verdictDate && !reached(c.verdictDate))) {
-      return '<span class="gm-tag tag-sgo">선고</span>' + fmtDate(c.verdictDate);
+  function hearingTag(c) {
+    var v = verdictOf(c);
+    if (v && !reached(v)) { // 선고기일이 예정(미래)된 진행 사건
+      return '<span class="gm-tag tag-sgo">선고</span>' + fmtDate(v);
     }
     var t = c.hearingType || '공판';
     var cls = t === '선고' ? 'tag-sgo' : (t === '선정취소' ? 'tag-cancel' : 'tag-gongpan');
@@ -265,7 +274,7 @@
         '<td>' + nameCell(c) + '</td>' +
         '<td class="gm-code">' + esc(c.caseNumber) + '</td>' +
         '<td>' + esc(c.caseName) + '</td>' +
-        '<td>' + hearingTag(c, false) + '</td>' +
+        '<td>' + hearingTag(c) + '</td>' +
         '<td class="gm-memo" title="' + esc(c.todo) + '">' + esc(c.todo) + '</td>' +
       '</tr>';
     }
@@ -274,7 +283,7 @@
         '<td>' + nameCell(c) + '</td>' +
         '<td class="gm-code">' + esc(c.caseNumber) + '</td>' +
         '<td>' + esc(c.caseName) + '</td>' +
-        '<td>' + fmtDate(c.verdictDate) + '</td>' +
+        '<td>' + fmtDate(verdictOf(c)) + '</td>' +
         '<td>' + (c.appeal ? '<span class="gm-yes">' + esc(c.appeal) + '</span>' : yesNo(c.appealStamped)) + '</td>' +
         '<td>' + yesNo(c.claimed) + '</td>' +
       '</tr>';
@@ -283,7 +292,7 @@
     return '<tr>' +
       '<td>' + nameCell(c) + '</td>' +
       '<td class="gm-code">' + esc(c.caseNumber) + '</td>' +
-      '<td>' + fmtDate(c.verdictDate) + '</td>' +
+      '<td>' + fmtDate(verdictOf(c)) + '</td>' +
       '<td>' + yesNo(c.claimed) + '</td>' +
       '<td>' + fmtDate(c.depositDate) + '</td>' +
       '<td>' + (c.depositAmount ? esc(c.depositAmount) : '<span class="gm-no">—</span>') + '</td>' +
