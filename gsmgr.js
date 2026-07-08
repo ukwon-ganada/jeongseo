@@ -529,6 +529,14 @@
     if (!sb) { state.error = 'nosb'; render(); return; }
     sb.from('gukseon_cases').select('id,data,updated_at').then(function (res) {
       if (res && res.error) { state.error = 'err'; state.loaded = true; render(); return; }
+      // 응답이 도착한 시점에 편집이 시작됐을 수 있음(스케줄~완료 사이 TOCTOU).
+      // 편집 중이면 표를 교체·리렌더하지 않고 미룬다 → 진행 중 메모/입력·포커스 보호.
+      // 배지만 최신 데이터로 갱신(홈 화면 요소라 편집과 무관). 편집 끝나면 flushPendingReload가 다시 로드.
+      if (isEditing()) {
+        state.pendingReload = true;
+        setPillBadge(computeAttention((res.data || []).map(normalize)));
+        return;
+      }
       state.error = '';
       state.cases = (res.data || []).map(normalize);
       state.loaded = true;
@@ -591,16 +599,17 @@
         var sameType = c.hearingType === ht;
         var sameVerdict = !isSgo || ymd(c.verdictDate) === ymd(nd);
         if (sameDate && sameType && sameVerdict) return; // 변경 없음
-        var raw = Object.assign({}, c._raw || {}); raw.id = c.id;
-        raw.hearingType = ht; raw.hearingDate = nd;
-        c.hearingType = ht; c.hearingDate = nd;
-        if (isSgo && nd) { raw.verdictDate = nd; c.verdictDate = nd; } // 선고기일은 세팅(공판일 땐 기존 선고기일 유지)
-        c._raw = raw;
-        changed.push({ id: c.id, data: raw, updated_at: new Date().toISOString() });
+        // 바뀐 필드만 patch로 저장(commitPatch) — 예전엔 로컬 _raw 전체를 통째 upsert 해서
+        // 다른 기기가 그 사이 고친 메모·보수·항소 등을 낙관적 잠금 없이 덮어썼음(유실).
+        var patch = { hearingType: ht, hearingDate: nd };
+        c.hearingType = ht; c.hearingDate = nd;                       // 낙관적 즉시 표시
+        if (c._raw) { c._raw.hearingType = ht; c._raw.hearingDate = nd; }
+        if (isSgo && nd) { patch.verdictDate = nd; c.verdictDate = nd; if (c._raw) c._raw.verdictDate = nd; } // 공판일 땐 기존 선고기일 유지
+        changed.push({ id: c.id, patch: patch });
       });
       if (changed.length) {
         render();
-        changed.forEach(function (u) { sb.from('gukseon_cases').upsert(u).then(function () {}, function () {}); });
+        changed.forEach(function (u) { commitPatch(u.id, u.patch, 0, null, true); }); // 조용히 · 낙관적 잠금 · 변경 필드만
       }
     }, function () {});
   }
@@ -978,16 +987,17 @@
      저장 직전 그 행의 최신 data 를 다시 읽어 '내가 바꾼 필드(patch)만' 병합해 쓴다.
      → 다른 사람이 그 사이 다른 필드를 고쳐도 그 값을 덮어쓰지 않는다.
      updated_at 이 그 사이 바뀌면(충돌) 재조회 후 재시도, 마지막엔 안전하게 강제 반영. */
-  function commitPatch(id, patch, tries, done) {
+  function commitPatch(id, patch, tries, done, silent) {
     var sb = (typeof getSB === 'function') ? getSB() : null;
-    var retry = function () { gsmgrToast('저장 실패 — 다시 시도해 주세요', 'err', 0, function () { commitPatch(id, patch, 0, done); }); };
-    if (!sb) { gsmgrToast('저장 실패 — 연결을 확인해 주세요', 'err', 0, function () { commitPatch(id, patch, 0, done); }); return; }
+    // silent: 배경 동기화(로웨어 반영)용 — '저장 중/저장됨' 토스트·삭제 알림·실패 재시도 토스트를 띄우지 않고 조용히 처리
+    var retry = function () { if (silent) return; gsmgrToast('저장 실패 — 다시 시도해 주세요', 'err', 0, function () { commitPatch(id, patch, 0, done); }); };
+    if (!sb) { if (silent) return; gsmgrToast('저장 실패 — 연결을 확인해 주세요', 'err', 0, function () { commitPatch(id, patch, 0, done); }); return; }
     tries = tries || 0;
-    if (tries === 0) gsmgrToast('저장 중…', 'info', 0);
+    if (tries === 0 && !silent) gsmgrToast('저장 중…', 'info', 0);
     sb.from('gukseon_cases').select('data,updated_at').eq('id', id).limit(1).then(function (rd) {
       if (rd && rd.error) { retry(); return; }
       var rows = (rd && rd.data) || [];
-      if (!rows.length) { gsmgrToast('이미 삭제된 사건입니다', 'err', 2600); load(); return; } // 행이 사라짐
+      if (!rows.length) { if (silent) return; gsmgrToast('이미 삭제된 사건입니다', 'err', 2600); load(); return; } // 행이 사라짐
       var fresh = rows[0];
       var merged = Object.assign({}, fresh.data || {}); merged.id = id;
       Object.keys(patch).forEach(function (k) { merged[k] = patch[k]; });   // 내 필드만 병합
@@ -998,12 +1008,13 @@
       q.select().then(function (up) {
         if (up && up.error) { retry(); return; }
         if (!up || !up.data || !up.data.length) {          // 충돌(그 사이 다른 쓰기) → 재조회 재시도
-          if (tries < 3) { commitPatch(id, patch, tries + 1, done); return; }
+          if (tries < 3) { commitPatch(id, patch, tries + 1, done, silent); return; }
+          if (silent) return;
           gsmgrToast('저장 실패 — 다시 시도해 주세요', 'err', 0, function () { commitPatch(id, patch, 0, done); });
           return;
         }
         applyLocal(id, merged, newTs);                     // 로컬 상태를 최신(병합본)으로 정렬
-        gsmgrToast('저장됨', 'ok');
+        if (!silent) gsmgrToast('저장됨', 'ok');
         if (typeof done === 'function') done();
       }, retry);
     }, retry);
@@ -1328,7 +1339,7 @@
     addForm = { hearingType: c.hearingType || '공판' };
     var d = document.getElementById('gsmgr-drawer'); if (d) d.classList.add('on');
     renderEditForm(c);
-    setTimeout(function () { var i = document.getElementById('gf-defendant'); if (i) i.focus(); }, 120);
+    setTimeout(function () { var i = document.getElementById('gd-defendant'); if (i) i.focus(); }, 120);
   };
 
   function courtOf(c) { return (c._raw && c._raw.feeForm && c._raw.feeForm.court) || ''; }
@@ -1349,20 +1360,20 @@
       '</div>' +
       '<div class="gd-body">' +
         '<div class="gd-sec">사건 정보</div>' +
-        field('피고인', '<input id="gf-defendant" class="ga-input" value="' + esc(c.defendant) + '">') +
-        field('사건번호', '<input id="gf-caseNumber" class="ga-input" value="' + esc(c.caseNumber) + '">') +
-        field('사건명', '<input id="gf-caseName" class="ga-input" value="' + esc(c.caseName) + '">') +
+        field('피고인', '<input id="gd-defendant" class="ga-input" value="' + esc(c.defendant) + '">') +
+        field('사건번호', '<input id="gd-caseNumber" class="ga-input" value="' + esc(c.caseNumber) + '">') +
+        field('사건명', '<input id="gd-caseName" class="ga-input" value="' + esc(c.caseName) + '">') +
         '<div class="ga-field"><span class="ga-lbl">기일</span>' +
-          '<div class="ga-seg" id="gf-htype">' + seg('공판', c.hearingType) + seg('선고', c.hearingType) + seg('선정취소', c.hearingType) + '</div>' +
+          '<div class="ga-seg" id="gd-htype">' + seg('공판', c.hearingType) + seg('선고', c.hearingType) + seg('선정취소', c.hearingType) + '</div>' +
           '<div style="height:8px"></div>' +
-          '<input id="gf-hearingDate" class="ga-input" type="date" value="' + esc(c.hearingDate) + '">' +
+          '<input id="gd-hearingDate" class="ga-input" type="date" value="' + esc(c.hearingDate) + '">' +
         '</div>' +
-        field('선고기일', '<input id="gf-verdictDate" class="ga-input" type="date" value="' + esc(c.verdictDate) + '">') +
-        field('연락처 · 수감번호', '<input id="gf-contact" class="ga-input" value="' + esc(c.contact) + '">') +
+        field('선고기일', '<input id="gd-verdictDate" class="ga-input" type="date" value="' + esc(c.verdictDate) + '">') +
+        field('연락처 · 수감번호', '<input id="gd-contact" class="ga-input" value="' + esc(c.contact) + '">') +
       '</div>' +
       '<div class="gd-foot">' +
         '<button class="ga-del" onclick="gsmgrDelete()">휴지통</button>' +
-        '<button class="ga-save" id="gf-save" onclick="gsmgrEditSave()">저장</button>' +
+        '<button class="ga-save" id="gd-save" onclick="gsmgrEditSave()">저장</button>' +
       '</div>';
   }
 
@@ -1371,9 +1382,9 @@
     var g = function (id) { var e = document.getElementById(id); return e ? e.value : ''; };
     // 편집 대상 6개만 patch — 나머지(메모·항소·보수·feeForm 등)는 서버 최신본에서 병합 보존
     var patch = {
-      defendant: g('gf-defendant').trim(), caseNumber: g('gf-caseNumber').trim(), caseName: g('gf-caseName').trim(),
+      defendant: g('gd-defendant').trim(), caseNumber: g('gd-caseNumber').trim(), caseName: g('gd-caseName').trim(),
       hearingType: (addForm && addForm.hearingType) || c.hearingType || '공판',
-      hearingDate: g('gf-hearingDate'), verdictDate: g('gf-verdictDate'), contact: g('gf-contact').trim()
+      hearingDate: g('gd-hearingDate'), verdictDate: g('gd-verdictDate'), contact: g('gd-contact').trim()
     };
     Object.keys(patch).forEach(function (k) { c[k] = patch[k]; if (c._raw) c._raw[k] = patch[k]; }); // 낙관적
     closeDrawer();
