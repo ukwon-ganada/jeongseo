@@ -70,8 +70,8 @@
       return !isClosed(c); // active
     });
     arr.sort(function (a, b) {
-      if (tab === 'active') { // 임박한 기일 먼저
-        return (activeDate(a) || '9999').localeCompare(activeDate(b) || '9999');
+      if (tab === 'active') { // 기일이 빠른(임박한) 순 — 기일 없는 사건은 맨 뒤
+        return (ymd(activeDate(a)) || '99999999').localeCompare(ymd(activeDate(b)) || '99999999');
       }
       // 종결/보수: 최근 선고 먼저
       return ymd(caseDate(b)).localeCompare(ymd(caseDate(a)));
@@ -80,6 +80,29 @@
   }
   // 진행 패널의 '기일' = 선고기일 예정 있으면 그것, 없으면 최근 공판기일
   function activeDate(c) { return verdictOf(c) || c.hearingDate || ''; }
+  // 날짜(YYYYMMDD) → 오늘 기준 남은 일수(음수=지남)
+  function dayDiff(y) {
+    if (!y || y.length < 8) return null;
+    var d = new Date(+y.slice(0, 4), +y.slice(4, 6) - 1, +y.slice(6, 8));
+    var t = new Date(); t.setHours(0, 0, 0, 0);
+    return Math.round((d - t) / 86400000);
+  }
+  // 임박도 등급 — 색상/강조용 (진행 패널)
+  function dueLevel(c) {
+    var n = dayDiff(ymd(activeDate(c)));
+    if (n == null) return '';
+    if (n <= 2) return 'urgent';
+    if (n <= 6) return 'soon';
+    if (n <= 13) return 'near';
+    return 'far';
+  }
+  // D-day 뱃지 (진행 패널)
+  function dueBadge(c) {
+    var n = dayDiff(ymd(activeDate(c)));
+    if (n == null) return '';
+    var lbl = n < 0 ? '지남' : (n === 0 ? 'D-day' : 'D-' + n);
+    return '<span class="gm-due due-' + (dueLevel(c) || 'far') + '">' + lbl + '</span>';
+  }
 
   /* ── 스타일(테마 통일 · 업무용 고가시성) ── */
   function injectStyle() {
@@ -115,15 +138,28 @@
       '#' + SHELL_ID + ' .gm-body{flex:1;overflow:auto;padding:6px 10px 16px;-webkit-overflow-scrolling:touch;}',
       '#' + SHELL_ID + ' .gm-card{background:#fff;border:1px solid rgba(22,38,63,.10);border-radius:14px;',
         'box-shadow:0 10px 30px -22px rgba(20,40,70,.3);overflow:hidden;max-width:none;margin:0;}',
-      '#' + SHELL_ID + ' table{width:100%;border-collapse:collapse;font-size:14px;}',
+      '#' + SHELL_ID + ' table{width:100%;border-collapse:collapse;font-size:14px;table-layout:fixed;}',
       '#' + SHELL_ID + ' thead th{position:sticky;top:0;background:#f4f7fb;color:#41537a;font-weight:700;',
         'font-size:12.5px;text-align:left;padding:12px 14px;border-bottom:1.5px solid rgba(22,38,63,.14);white-space:nowrap;z-index:1;}',
       '#' + SHELL_ID + ' tbody td{padding:13px 14px;border-bottom:1px solid rgba(22,38,63,.07);vertical-align:middle;}',
       '#' + SHELL_ID + ' tbody tr:hover{background:#f7faff;}',
       '#' + SHELL_ID + ' tbody tr:last-child td{border-bottom:none;}',
+      /* 사건명·사건번호: 넘치면 … 로 줄임(메모칸을 최대한 확보) */
+      '#' + SHELL_ID + ' .gm-clip{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
       '#' + SHELL_ID + ' .gm-name{font-weight:700;color:#16263f;cursor:default;position:relative;',
         'border-bottom:1px dotted rgba(22,38,63,.4);}',
-      '#' + SHELL_ID + ' .gm-code{font-family:\'IBM Plex Mono\',monospace;color:#243d5e;font-size:13px;}',
+      '#' + SHELL_ID + ' .gm-code{font-family:\'IBM Plex Mono\',monospace;color:#243d5e;font-size:13px;',
+        'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
+      /* 임박 기일 D-day 뱃지 + 행 강조(진행 패널) */
+      '#' + SHELL_ID + ' .gm-due{display:inline-block;margin-left:8px;font-size:11px;font-weight:800;',
+        'padding:2px 8px;border-radius:999px;vertical-align:middle;letter-spacing:.02em;}',
+      '#' + SHELL_ID + ' .due-urgent{background:#fdecea;color:#b23a2e;}',
+      '#' + SHELL_ID + ' .due-soon{background:#fff1e6;color:#c2620f;}',
+      '#' + SHELL_ID + ' .due-near{background:#fdf6e3;color:#8a6d10;}',
+      '#' + SHELL_ID + ' .due-far{background:#eef2f9;color:#5b6b86;}',
+      '#' + SHELL_ID + ' tr.u-urgent td:first-child{box-shadow:inset 3px 0 0 #d64027;}',
+      '#' + SHELL_ID + ' tr.u-soon td:first-child{box-shadow:inset 3px 0 0 #e0872e;}',
+      '#' + SHELL_ID + ' tr.u-urgent:hover{background:#fef6f4;}',
       '#' + SHELL_ID + ' .gm-tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;margin-right:6px;}',
       '#' + SHELL_ID + ' .tag-gongpan{background:#e7eefb;color:#1a4ea2;}',
       '#' + SHELL_ID + ' .tag-sgo{background:#fdecea;color:#b23a2e;}',
@@ -262,7 +298,7 @@
   }
 
   /* ── 데이터 로드 ── */
-  function load() {
+  function load(cb) {
     var sb = (typeof getSB === 'function') ? getSB() : null;
     if (!sb) { state.error = 'nosb'; render(); return; }
     sb.from('gukseon_cases').select('id,data').then(function (res) {
@@ -271,7 +307,46 @@
       state.cases = (res.data || []).map(normalize);
       state.loaded = true;
       render();
+      if (typeof cb === 'function') cb();
     }, function () { state.error = 'err'; state.loaded = true; render(); });
+  }
+
+  /* ── 로웨어(cases) 기일 자동 반영 ──
+     화면 열 때, 저장된 사건번호로 cases 를 다시 조회해 next_date(공판기일)/next_contents(종류)를
+     기준으로 기일을 최신화한다. 로웨어 값이 가장 정확하므로 국선 화면의 기존 기일을 덮어쓴다.
+     (단, 로웨어에 다음 기일이 비어 있으면 지난 기일을 지우지 않도록 그냥 둔다) */
+  function syncFromLoware() {
+    var sb = (typeof getSB === 'function') ? getSB() : null;
+    if (!sb || !state.cases.length) return;
+    var codes = state.cases.map(function (c) { return c.caseNumber; }).filter(Boolean);
+    if (!codes.length) return;
+    sb.from('cases').select('l_code,next_date,next_contents').in('l_code', codes).then(function (res) {
+      if (!res || res.error || !res.data) return;
+      var map = {};
+      res.data.forEach(function (r) { map[normCode(r.l_code)] = r; });
+      var changed = [];
+      state.cases.forEach(function (c) {
+        var r = map[normCode(c.caseNumber)];
+        if (!r || !r.next_date) return;                 // 로웨어에 다음 기일 없음 → 유지
+        var nd = String(r.next_date).slice(0, 10);
+        var isSgo = /선고/.test(r.next_contents || '');
+        var ht = isSgo ? '선고' : '공판';
+        var sameDate = ymd(c.hearingDate) === ymd(nd);
+        var sameType = c.hearingType === ht;
+        var sameVerdict = !isSgo || ymd(c.verdictDate) === ymd(nd);
+        if (sameDate && sameType && sameVerdict) return; // 변경 없음
+        var raw = Object.assign({}, c._raw || {}); raw.id = c.id;
+        raw.hearingType = ht; raw.hearingDate = nd;
+        c.hearingType = ht; c.hearingDate = nd;
+        if (isSgo && nd) { raw.verdictDate = nd; c.verdictDate = nd; } // 선고기일은 세팅(공판일 땐 기존 선고기일 유지)
+        c._raw = raw;
+        changed.push({ id: c.id, data: raw, updated_at: new Date().toISOString() });
+      });
+      if (changed.length) {
+        render();
+        changed.forEach(function (u) { sb.from('gukseon_cases').upsert(u).then(function () {}, function () {}); });
+      }
+    }, function () {});
   }
 
   /* ── 실시간 구독 ── */
@@ -321,7 +396,17 @@
       return;
     }
     body.innerHTML = '<div class="gm-card"><table id="' + TABLE_ID + '">' +
-      thead(state.tab) + '<tbody>' + rows.map(function (c) { return trow(state.tab, c); }).join('') + '</tbody></table></div>';
+      colgroup(state.tab) + thead(state.tab) +
+      '<tbody>' + rows.map(function (c) { return trow(state.tab, c); }).join('') + '</tbody></table></div>';
+  }
+
+  // 열 너비 — 메모칸을 가장 넓게, 사건명은 좁게(엑셀에서 메모가 가장 중요)
+  function colgroup(tab) {
+    var w;
+    if (tab === 'active') w = ['11%', '15%', '17%', '18%', '39%'];       // 피고인·사건번호·사건명·기일·메모
+    else if (tab === 'closed') w = ['13%', '18%', '25%', '17%', '15%', '12%'];
+    else w = ['15%', '20%', '19%', '13%', '19%', '14%'];
+    return '<colgroup>' + w.map(function (x) { return '<col style="width:' + x + '">'; }).join('') + '</colgroup>';
   }
 
   function thead(tab) {
@@ -348,11 +433,13 @@
 
   function trow(tab, c) {
     if (tab === 'active') {
-      return '<tr data-id="' + esc(c.id) + '" class="gm-row">' +
+      var lv = dueLevel(c);
+      var ucls = (lv === 'urgent' || lv === 'soon') ? ' u-' + lv : '';
+      return '<tr data-id="' + esc(c.id) + '" class="gm-row' + ucls + '">' +
         '<td>' + nameCell(c) + '</td>' +
         '<td class="gm-code">' + esc(c.caseNumber) + '</td>' +
-        '<td>' + esc(c.caseName) + '</td>' +
-        '<td>' + hearingTag(c) + '</td>' +
+        '<td class="gm-clip" title="' + esc(c.caseName) + '">' + esc(c.caseName) + '</td>' +
+        '<td>' + hearingTag(c) + dueBadge(c) + '</td>' +
         '<td class="gm-memocell"><div class="gm-inline" contenteditable="true" data-id="' + esc(c.id) + '" data-field="todo" data-ph="메모 입력…">' + esc(c.todo) + '</div></td>' +
       '</tr>';
     }
@@ -360,7 +447,7 @@
       return '<tr data-id="' + esc(c.id) + '" class="gm-row">' +
         '<td>' + nameCell(c) + '</td>' +
         '<td class="gm-code">' + esc(c.caseNumber) + '</td>' +
-        '<td>' + esc(c.caseName) + '</td>' +
+        '<td class="gm-clip" title="' + esc(c.caseName) + '">' + esc(c.caseName) + '</td>' +
         '<td>' + fmtDate(caseDate(c)) + '</td>' +
         '<td><span class="gm-inline" contenteditable="true" data-id="' + esc(c.id) + '" data-field="appeal" data-ph="항소 입력…">' + esc(c.appeal) + '</span></td>' +
         '<td>' + claimToggle(c) + '</td>' +
@@ -734,7 +821,7 @@
     document.body.style.overflow = 'hidden';
     bindTip();
     if (!state.loaded) render(); // 로딩 표시
-    load();
+    load(syncFromLoware);        // 로드 후 로웨어 기일 자동 반영
     subscribe();
   };
 
