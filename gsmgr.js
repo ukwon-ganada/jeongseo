@@ -19,8 +19,9 @@
   var STYLE_ID = 'gsmgr-style';
   var TABLE_ID = 'gsmgr-tbl';
 
-  var state = { cases: [], tab: 'active', loaded: false, error: '' };
+  var state = { cases: [], tab: 'active', loaded: false, error: '', pendingReload: false };
   var channel = null;
+  var reloadTimer = null;
 
   /* ── 유틸 ── */
   function esc(v) {
@@ -218,6 +219,22 @@
         'max-width:260px;line-height:1.5;display:none;}',
       '#' + SHELL_ID + ' .gm-tip b{color:#EAF1F9;}',
       '#' + SHELL_ID + ' .gm-tip .gm-tip-lbl{color:#9fb4d6;font-size:10.5px;letter-spacing:.04em;display:block;margin-bottom:2px;}',
+      /* 저장 상태 토스트 */
+      '#' + SHELL_ID + ' .gm-toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,14px);z-index:1250;',
+        'display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;font-family:inherit;',
+        'padding:10px 16px;border-radius:12px;box-shadow:0 14px 34px rgba(12,25,45,.32);',
+        'opacity:0;pointer-events:none;transition:opacity .16s,transform .16s;max-width:82vw;}',
+      '#' + SHELL_ID + ' .gm-toast.on{opacity:1;transform:translate(-50%,0);}',
+      '#' + SHELL_ID + ' .gm-toast::before{content:"";width:8px;height:8px;border-radius:50%;flex:none;}',
+      '#' + SHELL_ID + ' .gm-toast-ok{background:#12351f;color:#d8f3e0;}',
+      '#' + SHELL_ID + ' .gm-toast-ok::before{background:#3ecf6b;}',
+      '#' + SHELL_ID + ' .gm-toast-err{background:#3a1512;color:#ffd9d2;}',
+      '#' + SHELL_ID + ' .gm-toast-err::before{background:#ff5b45;}',
+      '#' + SHELL_ID + ' .gm-toast-info{background:#16263f;color:#e6eefb;}',
+      '#' + SHELL_ID + ' .gm-toast-info::before{background:#7ea0d6;}',
+      '#' + SHELL_ID + ' .gm-toast .gm-toast-retry{background:rgba(255,255,255,.16);color:#fff;border:none;',
+        'font:inherit;font-size:12px;font-weight:700;padding:4px 10px;border-radius:8px;cursor:pointer;pointer-events:auto;}',
+      '#' + SHELL_ID + ' .gm-toast .gm-toast-retry:hover{background:rgba(255,255,255,.28);}',
       /* 앱바 버튼 */
       '#' + SHELL_ID + ' .gm-add{border:none;background:linear-gradient(155deg,#22344f,#16263f);color:#fff;font-weight:600;',
         'font-size:13.5px;height:38px;padding:0 16px;border-radius:999px;cursor:pointer;font-family:inherit;}',
@@ -378,13 +395,35 @@
     }, function () {});
   }
 
+  /* ── 편집 보호 · 실시간 리로드 스케줄 ──
+     사용자가 칸을 편집(메모/인라인/날짜) 중이거나 추가·편집 모달이 열려 있으면,
+     실시간 이벤트가 와도 즉시 다시 그리지 않고 편집이 끝난 뒤로 미룬다.
+     (예전엔 타이핑 도중 표가 통째로 리렌더돼 포커스·미저장 글자가 날아갔음) */
+  function isEditing() {
+    var shell = document.getElementById(SHELL_ID);
+    var ae = document.activeElement;
+    if (ae && shell && shell.contains(ae) &&
+        (ae.classList.contains('gm-memo-edit') || ae.classList.contains('gm-inline') || ae.classList.contains('gm-inline-date'))) return true;
+    var add = document.getElementById('gsmgr-add');
+    if (add && add.classList.contains('on')) return true; // 추가/편집 모달 열림
+    return false;
+  }
+  function scheduleReload() {
+    if (isEditing()) { state.pendingReload = true; return; } // 편집 중 → 나중에
+    clearTimeout(reloadTimer);
+    reloadTimer = setTimeout(function () { load(); }, 180); // 이벤트 몰림 코얼레싱
+  }
+  function flushPendingReload() {
+    if (state.pendingReload && !isEditing()) { state.pendingReload = false; load(); }
+  }
+
   /* ── 실시간 구독 ── */
   function subscribe() {
     var sb = (typeof getSB === 'function') ? getSB() : null;
     if (!sb || channel) return;
     try {
       channel = sb.channel('gsmgr-cases')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'gukseon_cases' }, function () { load(); })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'gukseon_cases' }, function () { scheduleReload(); })
         .subscribe();
     } catch (e) { /* realtime 미지원이어도 수동 로드로 동작 */ }
   }
@@ -557,10 +596,11 @@
       var row = e.target.closest && e.target.closest('.gm-row');
       if (row && row.getAttribute('data-id')) gsmgrEdit(row.getAttribute('data-id'));
     });
-    // 인라인/메모: 포커스 잃을 때 저장
+    // 인라인/메모: 포커스 잃을 때 저장 + (편집 중 미뤄둔) 실시간 리로드 처리
     shell.addEventListener('focusout', function (e) {
       var m = e.target.closest && e.target.closest('.gm-inline,.gm-memo-edit');
       if (m) saveField(m.getAttribute('data-id'), m.getAttribute('data-field'), inlineText(m));
+      setTimeout(flushPendingReload, 80);
     });
     // 단일값 인라인(입금액 등)만 Enter 로 확정 — 메모(.gm-memo-edit)는 필기공간이라 Enter=줄바꿈
     shell.addEventListener('keydown', function (e) {
@@ -583,19 +623,50 @@
   }
   // 인라인 요소 텍스트 정규화(개행/특수공백 정리)
   function inlineText(el) { return String(el.innerText || el.textContent || '').replace(/[\u00a0\u2007\u202f]/g, ' ').trim(); }
+  /* ── 저장 상태 토스트(성공/실패·재시도) ──
+     ms=0 이면 자동으로 안 사라짐(에러+재시도용). retryFn 있으면 [재시도] 버튼 표시. */
+  function gsmgrToast(msg, type, ms, retryFn) {
+    var shell = document.getElementById(SHELL_ID);
+    if (!shell) return;
+    var t = document.getElementById('gsmgr-toast');
+    if (!t) { t = document.createElement('div'); t.id = 'gsmgr-toast'; shell.appendChild(t); }
+    clearTimeout(t._tm);
+    t.className = 'gm-toast gm-toast-' + (type || 'info');
+    t.textContent = msg;
+    if (retryFn) {
+      var btn = document.createElement('button');
+      btn.className = 'gm-toast-retry'; btn.type = 'button'; btn.textContent = '재시도';
+      btn.onclick = function () { t.classList.remove('on'); retryFn(); };
+      t.appendChild(btn);
+    }
+    void t.offsetWidth;
+    t.classList.add('on');
+    var hide = (ms === 0) ? 0 : (ms || 1600);
+    if (hide) t._tm = setTimeout(function () { t.classList.remove('on'); }, hide);
+  }
+
+  // 실제 저장(업서트) — 성공/실패 피드백 + 실패 시 재시도(낙관적 값 유지, 조용히 되돌리지 않음)
+  function persist(id, raw) {
+    var sb = (typeof getSB === 'function') ? getSB() : null;
+    if (!sb) { gsmgrToast('저장 실패 — 연결을 확인해 주세요', 'err', 0, function () { persist(id, raw); }); return; }
+    gsmgrToast('저장 중…', 'info', 0);
+    sb.from('gukseon_cases').upsert({ id: id, data: raw, updated_at: new Date().toISOString() })
+      .then(function (res) {
+        if (res && res.error) { gsmgrToast('저장 실패 — 다시 시도해 주세요', 'err', 0, function () { persist(id, raw); }); }
+        else { gsmgrToast('저장됨', 'ok'); }
+      }, function () { gsmgrToast('저장 실패 — 네트워크를 확인해 주세요', 'err', 0, function () { persist(id, raw); }); });
+  }
+
   // 인라인 공통 저장: 지정 필드 하나만 덮어쓰고 나머지(feeForm·항소·보수 등) 전부 보존
   function saveField(id, field, value) {
     if (!id || !field) return;
     var c = state.cases.filter(function (x) { return x.id === id; })[0];
     if (!c) return;
     var nv = (field === 'claimed' || field === 'appealStamped') ? !!value : value;
-    if (String(c[field] == null ? '' : c[field]) === String(nv == null ? '' : nv)) return; // 변경 없음
-    var sb = (typeof getSB === 'function') ? getSB() : null;
-    if (!sb) { render(); return; }
+    if (String(c[field] == null ? '' : c[field]) === String(nv == null ? '' : nv)) return;
     var raw = Object.assign({}, c._raw || {}); raw.id = c.id; raw[field] = nv;
-    c[field] = nv; c._raw = raw; // 낙관적 반영
-    sb.from('gukseon_cases').upsert({ id: c.id, data: raw, updated_at: new Date().toISOString() })
-      .then(function (res) { if (res && res.error) { load(); } }, function () { load(); });
+    c[field] = nv; c._raw = raw; // 낙관적 반영(실패해도 입력값 유지 → 재시도 가능)
+    persist(c.id, raw);
   }
   // 보수청구 토글(종결/보수 패널) — 체크하면 보수 패널로 이동, 해제하면 빠짐
   window.gsmgrToggleClaim = function (el) {
@@ -695,7 +766,7 @@
     renderAddSearch();
     setTimeout(function () { var i = document.getElementById('ga-q'); if (i) i.focus(); }, 60);
   };
-  window.closeAdd = function () { var m = document.getElementById('gsmgr-add'); if (m) m.classList.remove('on'); };
+  window.closeAdd = function () { var m = document.getElementById('gsmgr-add'); if (m) m.classList.remove('on'); setTimeout(flushPendingReload, 80); };
 
   /* ── 1단계: 검색 (입력창은 한 번만 생성 → 타이핑 중 포커스/커서 안 튐. 결과만 갱신) ── */
   function renderAddSearch() {
