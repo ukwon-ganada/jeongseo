@@ -126,6 +126,12 @@
       '#' + SHELL_ID + ' .gm-yes{color:#1a7f3c;font-weight:700;}',
       '#' + SHELL_ID + ' .gm-no{color:#9aa6b8;}',
       '#' + SHELL_ID + ' .gm-memo{color:#444;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
+      '#' + SHELL_ID + ' .gm-memocell{max-width:300px;}',
+      '#' + SHELL_ID + ' .gm-memo-edit{min-height:19px;min-width:60px;padding:5px 8px;margin:-5px -6px;border-radius:8px;',
+        'cursor:text;outline:none;color:#333;white-space:pre-wrap;word-break:break-word;transition:background .1s;}',
+      '#' + SHELL_ID + ' .gm-memo-edit:empty::before{content:"메모 입력…";color:#b3bccb;}',
+      '#' + SHELL_ID + ' .gm-memo-edit:hover{background:#eef3fb;}',
+      '#' + SHELL_ID + ' .gm-memo-edit:focus{background:#fff;box-shadow:0 0 0 1.5px #16263f;}',
       '#' + SHELL_ID + ' .gm-empty{padding:60px 20px;text-align:center;color:#8a97ab;font-size:14px;}',
       '#' + SHELL_ID + ' .gm-loading{padding:60px 20px;text-align:center;color:#8a97ab;font-size:14px;}',
       /* 수감번호/연락처 툴팁 */
@@ -332,7 +338,7 @@
         '<td class="gm-code">' + esc(c.caseNumber) + '</td>' +
         '<td>' + esc(c.caseName) + '</td>' +
         '<td>' + hearingTag(c) + '</td>' +
-        '<td class="gm-memo" title="' + esc(c.todo) + '">' + esc(c.todo) + '</td>' +
+        '<td class="gm-memocell"><div class="gm-memo-edit" contenteditable="true" data-id="' + esc(c.id) + '">' + esc(c.todo) + '</div></td>' +
       '</tr>';
     }
     if (tab === 'closed') {
@@ -383,6 +389,7 @@
     });
     // 모바일: 탭하면 잠깐 표시
     shell.addEventListener('click', function (e) {
+      if (e.target.closest && e.target.closest('.gm-memo-edit')) return; // 메모 칸: 인라인 편집(패널 안 열림)
       var t = e.target.closest && e.target.closest('.gm-name');
       if (t) { // 피고인 클릭 = 연락처/수감번호 툴팁만 (편집 안 열림)
         var r = t.getBoundingClientRect(); tipFor(t, r.left + r.width / 2, r.top); setTimeout(hideTip, 2200);
@@ -392,6 +399,28 @@
       var row = e.target.closest && e.target.closest('.gm-row');
       if (row && row.getAttribute('data-id')) gsmgrEdit(row.getAttribute('data-id'));
     });
+    // 메모 인라인: 포커스 잃을 때 저장, Enter 로 확정
+    shell.addEventListener('focusout', function (e) {
+      var m = e.target.closest && e.target.closest('.gm-memo-edit');
+      if (m) saveMemo(m);
+    });
+    shell.addEventListener('keydown', function (e) {
+      var m = e.target.closest && e.target.closest('.gm-memo-edit');
+      if (m && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); m.blur(); }
+    });
+  }
+  function saveMemo(el) {
+    var id = el.getAttribute('data-id');
+    var c = state.cases.filter(function (x) { return x.id === id; })[0];
+    if (!c) return;
+    var val = (el.innerText || el.textContent || '').replace(/ /g, ' ').trim();
+    if (val === (c.todo || '')) return; // 변경 없음
+    var sb = (typeof getSB === 'function') ? getSB() : null;
+    if (!sb) { el.textContent = c.todo || ''; return; }
+    var raw = Object.assign({}, c._raw || {}); raw.id = c.id; raw.todo = val;
+    c.todo = val; c._raw = raw; // 낙관적 반영
+    sb.from('gukseon_cases').upsert({ id: c.id, data: raw, updated_at: new Date().toISOString() })
+      .then(function (res) { if (res && res.error) { el.textContent = c.todo; } }, function () {});
   }
 
   /* ══════════════════════════════════════════════════════════════
@@ -605,7 +634,6 @@
       field('피고인', '<input id="gf-defendant" class="ga-input" value="' + esc(c.defendant) + '">') +
       field('사건번호', '<input id="gf-caseNumber" class="ga-input" value="' + esc(c.caseNumber) + '">') +
       field('사건명', '<input id="gf-caseName" class="ga-input" value="' + esc(c.caseName) + '">') +
-      field('재판부', '<input id="gf-court" class="ga-input" value="' + esc(courtOf(c)) + '">') +
       '<div class="ga-field"><span class="ga-lbl">기일</span>' +
         '<div class="ga-seg" id="gf-htype">' + seg('공판', c.hearingType) + seg('선고', c.hearingType) + seg('선정취소', c.hearingType) + '</div>' +
         '<div style="height:8px"></div>' +
@@ -613,13 +641,6 @@
       '</div>' +
       field('선고기일', '<input id="gf-verdictDate" class="ga-input" type="date" value="' + esc(c.verdictDate) + '">') +
       field('연락처 · 수감번호', '<input id="gf-contact" class="ga-input" value="' + esc(c.contact) + '">') +
-      field('메모 (해야 할 것)', '<input id="gf-todo" class="ga-input" value="' + esc(c.todo) + '">') +
-      field('항소', '<input id="gf-appeal" class="ga-input" placeholder="예: 항소 / 기각 / 취하" value="' + esc(c.appeal) + '">') +
-      '<div class="ga-field"><label class="ga-check"><input type="checkbox" id="gf-claimed"' + (c.claimed ? ' checked' : '') + '> 보수 청구함</label></div>' +
-      '<div class="ga-row">' +
-        '<div class="ga-field" style="flex:1;margin-top:0"><span class="ga-lbl">보수입금일</span><input id="gf-depositDate" class="ga-input" type="date" value="' + esc(c.depositDate) + '"></div>' +
-        '<div class="ga-field" style="flex:1;margin-top:0"><span class="ga-lbl">입금액</span><input id="gf-depositAmount" class="ga-input" value="' + esc(c.depositAmount) + '"></div>' +
-      '</div>' +
       '<div class="ga-btns">' +
         '<button class="ga-del" onclick="gsmgrDelete()">삭제</button>' +
         '<button class="ga-save" id="gf-save" onclick="gsmgrEditSave()">저장</button>' +
@@ -631,7 +652,7 @@
     var g = function (id) { var e = document.getElementById(id); return e ? e.value : ''; };
     var sb = (typeof getSB === 'function') ? getSB() : null;
     if (!sb) { alert('데이터 연결 준비 중입니다.'); return; }
-    // 기존 데이터(feeForm 등) 전부 보존하고 편집분만 덮어씀
+    // 기존 데이터(메모·항소·보수·feeForm 등) 전부 보존하고 편집 대상 6개만 덮어씀
     var raw = Object.assign({}, c._raw || {});
     raw.id = c.id;
     raw.defendant = g('gf-defendant').trim();
@@ -641,12 +662,6 @@
     raw.hearingDate = g('gf-hearingDate');
     raw.verdictDate = g('gf-verdictDate');
     raw.contact = g('gf-contact').trim();
-    raw.todo = g('gf-todo').trim();
-    raw.appeal = g('gf-appeal').trim();
-    raw.claimed = !!(document.getElementById('gf-claimed') || {}).checked;
-    raw.depositDate = g('gf-depositDate');
-    raw.depositAmount = g('gf-depositAmount').trim();
-    raw.feeForm = Object.assign({}, raw.feeForm || feeFormDefault(''), { court: g('gf-court').trim() });
     var btn = document.getElementById('gf-save'); if (btn) { btn.disabled = true; btn.textContent = '저장 중…'; }
     sb.from('gukseon_cases').upsert({ id: c.id, data: raw, updated_at: new Date().toISOString() })
       .then(function (res) {
