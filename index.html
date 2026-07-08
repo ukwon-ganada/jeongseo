@@ -4443,7 +4443,7 @@ if ('serviceWorker' in navigator) {
       var a = document.querySelector('.screen.active');
       if (!a || a.id !== 'screen-home') return false;              // 홈이 아니면 대기
       if (document.querySelector('.overlay.active,.sl-overlay.active,.terms-overlay.active')) return false;
-      var busy = ['pankyulForm','seonimForm','mgForm','gsmgrScreen','caseMgrScreen',
+      var busy = ['pankyulForm','seonimForm','mgForm','gsmgrScreen',
                   'historySheet','seonimTypeSheet','typeSheet','actionSheet','moreSheet','signLinkSheet'];
       for (var i = 0; i < busy.length; i++) {
         var el = document.getElementById(busy[i]);
@@ -4645,7 +4645,6 @@ document.getElementById('ap-host').addEventListener('click',function(e){
 <script src="./yeollam.js"></script>
 <script src="./geomchal.js"></script>
 <script src="./gukseon.js"></script>
-<script src="./casemgr.js"></script>
 <script src="./gsmgr.js"></script>
 <script src="./pankyul.js"></script>
 <script src="./home.js"></script>

@@ -1,10 +1,8 @@
 /* 법무법인 정서 — 국선 사건 관리 (네이티브 · gsmgr.js)
    ───────────────────────────────────────────────────────────────
-   기존 iframe React 앱(gukseon-manager.html)을 정서 본체 스타일로 새로 만든다.
-   [Phase 1] 읽기 전용:
-     · 같은 Supabase 테이블 gukseon_cases 를 그대로 읽어 3패널(진행/종결/보수)로 표시
-     · 실시간(realtime) 구독으로 다른 기기 변경 즉시 반영
-     · 데이터는 절대 변경하지 않음(추가/편집은 "기존 화면" 버튼 → openCaseMgrLegacy)
+   정서 본체 스타일의 네이티브 국선 사건 관리 화면(구 iframe React 앱 대체 · 완전 독립).
+   데이터: 정서 Supabase(getSB)의 gukseon_cases 테이블만 읽기/쓰기.
+     · 3패널(진행/종결/보수) 표시 + 실시간(realtime) 구독으로 다른 기기 변경 즉시 반영
    데이터 구조(1행=1사건): { id, data:{ defendant, contact, caseNumber, caseName,
      hearingType, hearingDate, verdictDate, todo, claimed, feeForm{...},
      depositDate, depositAmount, appeal, appealStamped } }
