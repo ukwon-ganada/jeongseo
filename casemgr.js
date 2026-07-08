@@ -63,7 +63,9 @@
     injectShell();
   }
 
-  window.goCaseManager = function () {
+  // 기존 iframe(React) 국선 관리 앱 열기 — 네이티브 화면(gsmgr.js)에서 편집용으로 호출.
+  // 네이티브 전환 완료 전까지 추가/편집은 이 기존 앱에서 계속 가능.
+  window.openCaseMgrLegacy = function () {
     ensureUI();
     var frame = document.getElementById(FRAME_ID);
     // 최초 진입 시에만 로드(이후에는 상태 유지)
@@ -73,6 +75,8 @@
     document.getElementById(SHELL_ID).classList.add('active');
     document.body.style.overflow = 'hidden';
   };
+  // gsmgr.js 가 없을 때(초기)만 대비한 폴백: 네이티브가 로드되면 gsmgr.js 가 goCaseManager 를 덮어씀.
+  if (!window.goCaseManager) window.goCaseManager = window.openCaseMgrLegacy;
 
   window.closeCaseMgr = function () {
     var el = document.getElementById(SHELL_ID);
