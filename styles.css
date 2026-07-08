@@ -1544,7 +1544,9 @@ body.contract-locked .ct-bb-sign{pointer-events:none;color:var(--success)!import
   }
   /* 패널 안 하위 카드·그룹은 은은한 인셋 (패널과 구분되되 과하지 않게) */
   .cl-card,.fs-group{background:#eef3fa;border:1px solid #dfe7f2;box-shadow:none;}
-  .fs-group{border-radius:14px;}
+  /* 라운드 리듬 통일: 패널 20 → 그룹카드 16 → 입력칸 12 (4px 간격) */
+  .cl-card,.fs-group{border-radius:16px;}
+  .cl-card .cl-del{border-radius:50%;}
   /* 섹션 라벨: 흰 패널에서 읽히는 네이비-그레이 */
   .fs-section{color:#41537a;}
 
@@ -1567,7 +1569,7 @@ body.contract-locked .ct-bb-sign{pointer-events:none;color:var(--success)!import
   /* 의뢰인/사건번호 검색창(autofill): 무거운 네이비 → 깨끗한 화이트 글래스(국선 검색창과 통일) */
   .af-searchbox{
     background:rgba(255,255,255,.92)!important;border:1.5px solid rgba(22,38,63,.16)!important;
-    border-radius:999px!important;box-shadow:0 1px 0 rgba(255,255,255,.6) inset,0 8px 20px -16px rgba(20,40,70,.4)!important;
+    border-radius:12px!important;box-shadow:0 1px 0 rgba(255,255,255,.6) inset,0 8px 20px -16px rgba(20,40,70,.4)!important;
   }
   .af-searchbox:focus-within{border-color:#16263f!important;box-shadow:0 0 0 3px rgba(22,38,63,.10)!important;}
   .af-searchbox svg{color:#8a97ab!important;}
@@ -1579,10 +1581,6 @@ body.contract-locked .ct-bb-sign{pointer-events:none;color:var(--success)!import
   /* ── 서면 폼 크롬을 '국선 언어'로 통일 (7종 서면 + 계약서 공통) ── */
   [id$="Form"] .fs-title,#formSheet .fs-title{
     font-family:'Noto Serif KR',serif;font-weight:600;font-size:18px;color:#16263f;letter-spacing:.01em;
-  }
-  [id$="Form"] .fs-title::before,#formSheet .fs-title::before{
-    content:"";display:inline-block;width:6px;height:6px;border-radius:50%;
-    background:linear-gradient(150deg,#33507f,#16263f);margin:0 9px 2px 2px;vertical-align:middle;
   }
   [id$="Form"] .fs-head .fs-close,#formSheet .fs-head .fs-close{
     background:rgba(22,38,63,.06);border-radius:50%;width:34px;height:34px;
