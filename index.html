@@ -1380,6 +1380,8 @@ function showScreen(id){
   document.body.classList.toggle('mode-appeal', id==='screen-appeal');
   window.scrollTo(0,0);
   if(id==='screen-contract'&&window._resetZoom){setTimeout(window._resetZoom,60);}
+  // 홈으로 돌아온 순간, 대기 중이던 새 버전 교체(있으면) 처리 — 작업 중엔 안 튕김
+  if(id==='screen-home'&&window._swMaybeReload){setTimeout(window._swMaybeReload,0);}
 }
 
 /* ═══ 직원 인증 (Supabase Auth · auth.js) ═══
@@ -4434,12 +4436,35 @@ if ('serviceWorker' in navigator) {
     }).catch(function (err) {
       console.log('서비스 워커 등록 실패:', err);
     });
-    // 새 워커가 제어권을 가지면 한 번만 자동 새로고침
-    var refreshed = false;
+    // 새 워커가 제어권을 가지면 자동 새로고침 — 단, 작업 중 튕기지 않도록 '안전할 때'만.
+    // (예전엔 즉시 reload 해서, 새 버전 배포 직후 카드/국선을 누르면 홈으로 튕겼음)
+    var refreshed = false, pendingReload = false;
+    function isSafeToReload() {
+      var a = document.querySelector('.screen.active');
+      if (!a || a.id !== 'screen-home') return false;              // 홈이 아니면 대기
+      if (document.querySelector('.overlay.active,.sl-overlay.active,.terms-overlay.active')) return false;
+      var busy = ['pankyulForm','seonimForm','mgForm','gsmgrScreen','caseMgrScreen',
+                  'historySheet','seonimTypeSheet','typeSheet','actionSheet','moreSheet','signLinkSheet'];
+      for (var i = 0; i < busy.length; i++) {
+        var el = document.getElementById(busy[i]);
+        if (el && el.classList.contains('active')) return false;   // 열린 시트/폼 있으면 대기
+      }
+      return true;
+    }
+    window._swMaybeReload = function () {
+      if (!pendingReload || refreshed) return;
+      if (isSafeToReload()) { refreshed = true; window.location.reload(); }
+    };
     navigator.serviceWorker.addEventListener('controllerchange', function () {
       if (refreshed) return;
-      refreshed = true;
-      window.location.reload();
+      pendingReload = true;
+      window._swMaybeReload();                                     // 지금 홈에서 놀고 있으면 바로, 아니면 대기
+    });
+    // 탭을 잠시 벗어나면(안 보일 때) 조용히 최신 버전으로 교체
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'hidden' && pendingReload && !refreshed) {
+        refreshed = true; window.location.reload();
+      }
     });
   });
 }

@@ -830,6 +830,7 @@
     if (el) el.classList.remove('active');
     document.body.style.overflow = '';
     hideTip();
+    if (window._swMaybeReload) setTimeout(window._swMaybeReload, 0); // 홈 복귀 → 대기 중 새 버전 교체
   };
 
   /* node 검증/하네스용 (브라우저에선 무시) */

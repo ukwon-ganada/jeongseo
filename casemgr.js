@@ -82,5 +82,6 @@
     var el = document.getElementById(SHELL_ID);
     if (el) el.classList.remove('active');
     document.body.style.overflow = '';
+    if (window._swMaybeReload) setTimeout(window._swMaybeReload, 0); // 홈 복귀 → 대기 중 새 버전 교체
   };
 })();
