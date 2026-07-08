@@ -19,7 +19,7 @@
   var STYLE_ID = 'gsmgr-style';
   var TABLE_ID = 'gsmgr-tbl';
 
-  var state = { cases: [], tab: 'active', loaded: false, error: '', pendingReload: false };
+  var state = { cases: [], tab: 'active', loaded: false, error: '', pendingReload: false, query: '' };
   var channel = null;
   var reloadTimer = null;
 
@@ -62,8 +62,37 @@
   function caseDate(c) { return verdictOf(c) || c.hearingDate || ''; }
   // 종결 = 선정취소면 즉시 종결 · 그 외엔 기준 날짜가 오늘 지남(선고든 공판이든). 미래 기일이면 진행.
   function isClosed(c) { return c.hearingType === '선정취소' || reached(caseDate(c)); }
+  // 검색어 매칭: 피고인·사건명·연락처는 부분일치, 사건번호는 공백 무시 부분일치
+  function matchesQuery(c) {
+    var q = (state.query || '').trim();
+    if (!q) return true;
+    var ql = q.toLowerCase();
+    if (String(c.defendant || '').toLowerCase().indexOf(ql) >= 0) return true;
+    if (String(c.caseName || '').toLowerCase().indexOf(ql) >= 0) return true;
+    if (String(c.contact || '').toLowerCase().indexOf(ql) >= 0) return true;
+    var qc = normCode(q).toLowerCase();
+    if (qc && normCode(c.caseNumber).toLowerCase().indexOf(qc) >= 0) return true;
+    return false;
+  }
+  // 검색어 강조(HTML 이스케이프 후 매칭 부분만 <mark>)
+  function hlEsc(text) {
+    var raw = String(text == null ? '' : text);
+    var q = (state.query || '').trim();
+    if (!q) return esc(raw);
+    var lower = raw.toLowerCase(), lq = q.toLowerCase();
+    var i = lower.indexOf(lq);
+    if (i < 0) return esc(raw);
+    var out = '', last = 0;
+    while (i >= 0) {
+      out += esc(raw.slice(last, i)) + '<mark class="gm-hl">' + esc(raw.slice(i, i + q.length)) + '</mark>';
+      last = i + q.length;
+      i = lower.indexOf(lq, last);
+    }
+    return out + esc(raw.slice(last));
+  }
   function panelCases(tab) {
     var arr = state.cases.filter(function (c) {
+      if (!matchesQuery(c)) return false;
       if (tab === 'closed') return isClosed(c);
       if (tab === 'fee') return isClosed(c) && !!c.claimed;
       return !isClosed(c); // active
@@ -120,6 +149,18 @@
       '#' + SHELL_ID + ' .gm-back svg{width:18px;height:18px;}',
       '#' + SHELL_ID + ' .gm-title{font-family:\'Noto Serif KR\',serif;font-size:16px;font-weight:600;color:#16263f;}',
       '#' + SHELL_ID + ' .gm-spacer{flex:1;}',
+      /* 목록 검색창 */
+      '#' + SHELL_ID + ' .gm-search-wrap{flex:1;max-width:420px;margin:0 6px 0 14px;position:relative;display:flex;align-items:center;}',
+      '#' + SHELL_ID + ' .gm-search-ic{position:absolute;left:12px;width:16px;height:16px;color:#8a97ab;pointer-events:none;}',
+      '#' + SHELL_ID + ' .gm-search{width:100%;box-sizing:border-box;height:36px;border:1.5px solid rgba(22,38,63,.16);',
+        'border-radius:999px;padding:0 34px 0 34px;font-size:13.5px;font-family:inherit;color:#1a1a1a;background:#fff;outline:none;}',
+      '#' + SHELL_ID + ' .gm-search::placeholder{color:#9aa6b8;}',
+      '#' + SHELL_ID + ' .gm-search:focus{border-color:#16263f;box-shadow:0 0 0 3px rgba(22,38,63,.10);}',
+      '#' + SHELL_ID + ' .gm-search-x{position:absolute;right:8px;width:22px;height:22px;border:none;background:rgba(22,38,63,.08);',
+        'color:#5b6b86;border-radius:50%;cursor:pointer;font-size:12px;line-height:1;display:flex;align-items:center;justify-content:center;font-family:inherit;}',
+      '#' + SHELL_ID + ' .gm-search-x:hover{background:rgba(22,38,63,.16);color:#16263f;}',
+      /* 검색어 하이라이트 */
+      '#' + SHELL_ID + ' mark.gm-hl{background:#fff2ac;color:inherit;border-radius:3px;padding:0 1px;}',
       '#' + SHELL_ID + ' .gm-edit{border:1.5px solid #16263f;background:#fff;color:#16263f;font-weight:600;',
         'font-size:13px;height:34px;padding:0 14px;border-radius:999px;cursor:pointer;font-family:inherit;}',
       '#' + SHELL_ID + ' .gm-edit:hover{background:#eef2f9;}',
@@ -293,7 +334,9 @@
         '#' + SHELL_ID + ' .gm-body{padding:0 8px 24px;}',
         '#' + SHELL_ID + ' table{font-size:12.5px;}',
         '#' + SHELL_ID + ' thead th,#' + SHELL_ID + ' tbody td{padding:8px 8px;}',
-        '#' + SHELL_ID + ' .gm-title{font-size:15px;}',
+        '#' + SHELL_ID + ' .gm-title{display:none;}',   /* 좁은 화면: 제목 숨겨 검색창 공간 확보 */
+        '#' + SHELL_ID + ' .gm-search-wrap{margin-left:6px;}',
+        '#' + SHELL_ID + ' .gm-search{font-size:16px;}', /* iOS 확대 방지 */
         '#' + SHELL_ID + ' .gm-memo{max-width:120px;}',
         '#' + SHELL_ID + ' .gm-tab{padding:6px 13px 7px;font-size:12px;}',
       '}'
@@ -314,7 +357,11 @@
           '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>홈' +
         '</button>' +
         '<span class="gm-title">국선 사건 관리</span>' +
-        '<span class="gm-spacer"></span>' +
+        '<div class="gm-search-wrap">' +
+          '<svg class="gm-search-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>' +
+          '<input id="gsmgr-search" class="gm-search" type="text" autocomplete="off" placeholder="피고인 · 사건번호 · 사건명 검색" oninput="gsmgrSearch(this.value)">' +
+          '<button class="gm-search-x" id="gsmgr-search-x" onclick="gsmgrClearSearch()" aria-label="지우기" style="display:none">✕</button>' +
+        '</div>' +
         '<button class="gm-add" onclick="gsmgrOpenAdd()">＋ 사건 추가</button>' +
       '</div>' +
       '<div class="gm-tabs" id="gsmgr-tabs"></div>' +
@@ -457,10 +504,18 @@
 
     var rows = panelCases(state.tab);
     if (!rows.length) {
-      body.innerHTML = '<div class="gm-empty">' +
-        (state.tab === 'active' ? '진행 중인 사건이 없습니다.' :
-         state.tab === 'closed' ? '종결된 사건이 없습니다.' : '보수 청구한 사건이 없습니다.') +
-        '</div>';
+      var msg;
+      if (state.query) {
+        // 다른 탭에 결과가 있으면 안내
+        var other = TABS.filter(function (t) { return t.key !== state.tab && panelCases(t.key).length; })
+          .map(function (t) { return t.label + ' ' + panelCases(t.key).length + '건'; });
+        msg = '‘' + esc(state.query) + '’ 검색 결과가 이 탭에 없습니다.' +
+          (other.length ? '<br><span style="color:#41537a">다른 탭: ' + other.join(' · ') + '</span>' : '');
+      } else {
+        msg = (state.tab === 'active' ? '진행 중인 사건이 없습니다.' :
+               state.tab === 'closed' ? '종결된 사건이 없습니다.' : '보수 청구한 사건이 없습니다.');
+      }
+      body.innerHTML = '<div class="gm-empty">' + msg + '</div>';
       return;
     }
     body.innerHTML = '<div class="gm-card"><table id="' + TABLE_ID + '">' +
@@ -486,7 +541,7 @@
   }
 
   function nameCell(c) {
-    return '<span class="gm-name" data-tip="' + esc(c.contact) + '">' + (esc(c.defendant) || '—') + '</span>';
+    return '<span class="gm-name" data-tip="' + esc(c.contact) + '">' + (c.defendant ? hlEsc(c.defendant) : '—') + '</span>';
   }
   function hearingTag(c) {
     var v = verdictOf(c);
@@ -505,8 +560,8 @@
       var ucls = (lv === 'urgent' || lv === 'soon') ? ' u-' + lv : '';
       return '<tr data-id="' + esc(c.id) + '" class="gm-row' + ucls + '">' +
         '<td>' + nameCell(c) + '</td>' +
-        '<td class="gm-code">' + esc(c.caseNumber) + '</td>' +
-        '<td class="gm-clip" title="' + esc(c.caseName) + '">' + esc(c.caseName) + '</td>' +
+        '<td class="gm-code">' + hlEsc(c.caseNumber) + '</td>' +
+        '<td class="gm-clip" title="' + esc(c.caseName) + '">' + hlEsc(c.caseName) + '</td>' +
         '<td>' + hearingTag(c) + dueBadge(c) + '</td>' +
         '<td class="gm-memocell"><div class="gm-memo-edit" contenteditable="true" data-id="' + esc(c.id) + '" data-field="todo" data-ph="메모 입력…">' + esc(c.todo) + '</div></td>' +
       '</tr>';
@@ -514,8 +569,8 @@
     if (tab === 'closed') {
       return '<tr data-id="' + esc(c.id) + '" class="gm-row">' +
         '<td>' + nameCell(c) + '</td>' +
-        '<td class="gm-code">' + esc(c.caseNumber) + '</td>' +
-        '<td class="gm-clip" title="' + esc(c.caseName) + '">' + esc(c.caseName) + '</td>' +
+        '<td class="gm-code">' + hlEsc(c.caseNumber) + '</td>' +
+        '<td class="gm-clip" title="' + esc(c.caseName) + '">' + hlEsc(c.caseName) + '</td>' +
         '<td>' + fmtDate(caseDate(c)) + '</td>' +
         '<td>' + appealCell(c) + '</td>' +
         '<td>' + appealSubmitCell(c) + '</td>' +
@@ -525,7 +580,7 @@
     // fee
     return '<tr data-id="' + esc(c.id) + '" class="gm-row">' +
       '<td>' + nameCell(c) + '</td>' +
-      '<td class="gm-code">' + esc(c.caseNumber) + '</td>' +
+      '<td class="gm-code">' + hlEsc(c.caseNumber) + '</td>' +
       '<td>' + fmtDate(caseDate(c)) + '</td>' +
       '<td>' + claimToggle(c) + '</td>' +
       '<td><input type="date" class="gm-inline-date" data-id="' + esc(c.id) + '" data-field="depositDate" value="' + esc(ymdDash(c.depositDate)) + '"></td>' +
@@ -978,6 +1033,20 @@
 
   /* ── 외부 API ── */
   window.gsmgrTab = function (k) { state.tab = k; render(); };
+
+  // 목록 검색(피고인·사건번호·사건명·연락처) — 입력창은 앱바에 있어 리렌더돼도 유지됨
+  window.gsmgrSearch = function (v) {
+    state.query = v || '';
+    var x = document.getElementById('gsmgr-search-x');
+    if (x) x.style.display = state.query ? 'flex' : 'none';
+    render();
+  };
+  window.gsmgrClearSearch = function () {
+    state.query = '';
+    var inp = document.getElementById('gsmgr-search'); if (inp) { inp.value = ''; inp.focus(); }
+    var x = document.getElementById('gsmgr-search-x'); if (x) x.style.display = 'none';
+    render();
+  };
 
   window.goCaseManager = function () {
     ensureUI();
