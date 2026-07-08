@@ -436,52 +436,52 @@
     injectAddModal();
     addForm = null;
     document.getElementById('gsmgr-add').classList.add('on');
-    renderAddSearch('', null);
+    renderAddSearch();
     setTimeout(function () { var i = document.getElementById('ga-q'); if (i) i.focus(); }, 60);
   };
   window.closeAdd = function () { var m = document.getElementById('gsmgr-add'); if (m) m.classList.remove('on'); };
 
-  /* ── 1단계: 검색 ── */
-  function renderAddSearch(q, rows) {
+  /* ── 1단계: 검색 (입력창은 한 번만 생성 → 타이핑 중 포커스/커서 안 튐. 결과만 갱신) ── */
+  function renderAddSearch() {
     var box = document.getElementById('ga-box');
     if (!box) return;
-    var list = '';
-    if (rows === 'loading') list = '<div class="ga-results"><div class="ga-loading" style="padding:12px 14px">사건 찾는 중…</div></div>';
-    else if (rows && rows.length) {
-      list = '<div class="ga-results">' + rows.map(function (r, i) {
-        var nm = esc(r.l_client || '(이름 없음)');
-        var meta = [esc(r.l_code || ''), esc(cleanCaseName(r.l_name) || '')].filter(Boolean).join(' · ');
-        return '<div class="ga-item" onclick="gsmgrPick(' + i + ')"><div class="ga-nm">' + nm + '</div><div class="ga-meta">' + meta + '</div></div>';
-      }).join('') + '</div>';
-      window._gsmgrRows = rows;
-    } else if (rows && rows.length === 0) list = '<div class="ga-results"><div class="ga-empty">검색 결과가 없습니다. 창고에 없으면 직접 입력하세요.</div></div>';
     box.innerHTML =
       '<div class="ga-h">사건 추가</div>' +
       '<div class="ga-sub">의뢰인 이름 또는 사건번호로 검색하세요.</div>' +
-      '<div class="ga-search"><input id="ga-q" class="ga-input" placeholder="의뢰인 또는 사건번호" value="' + esc(q) + '" autocomplete="off"></div>' +
-      list +
+      '<div class="ga-search"><input id="ga-q" class="ga-input" placeholder="의뢰인 또는 사건번호" autocomplete="off"></div>' +
+      '<div id="ga-reslist"></div>' +
       '<div class="ga-manual"><button onclick="gsmgrManual()">＋ 창고에 없음 · 직접 입력</button></div>' +
       '<div class="ga-btns"><button class="ga-cancel" style="flex:1" onclick="closeAdd()">닫기</button></div>';
     var input = document.getElementById('ga-q');
-    if (input) input.addEventListener('input', function () {
+    input.addEventListener('input', function () {
       var v = input.value.trim();
       clearTimeout(addSearchTimer);
-      if (v.length < 2) { renderAddSearch(v, null); return; }
-      renderAddSearch(v, 'loading');
+      if (v.length < 2) { setResults(''); return; }
+      setResults('<div class="ga-results"><div class="ga-loading" style="padding:12px 14px">사건 찾는 중…</div></div>');
       addSearchTimer = setTimeout(function () { doSearch(v); }, 250);
     });
   }
+  function setResults(html) { var r = document.getElementById('ga-reslist'); if (r) r.innerHTML = html; }
+  function renderResults(rows) {
+    if (!rows || !rows.length) { setResults('<div class="ga-results"><div class="ga-empty">검색 결과가 없습니다. 창고에 없으면 직접 입력하세요.</div></div>'); return; }
+    window._gsmgrRows = rows;
+    setResults('<div class="ga-results">' + rows.map(function (r, i) {
+      var nm = esc(r.l_client || '(이름 없음)');
+      var meta = [esc(r.l_code || ''), esc(cleanCaseName(r.l_name) || '')].filter(Boolean).join(' · ');
+      return '<div class="ga-item" onclick="gsmgrPick(' + i + ')"><div class="ga-nm">' + nm + '</div><div class="ga-meta">' + meta + '</div></div>';
+    }).join('') + '</div>');
+  }
   function doSearch(q) {
     var sb = (typeof getSB === 'function') ? getSB() : null;
-    if (!sb) { renderAddSearch(q, []); return; }
+    if (!sb) { renderResults([]); return; }
     var cq = q.replace(/[,%()]/g, '').trim();
     sb.from('cases').select('l_num,l_code,l_name,l_client,court')
       .or('l_client.ilike.%' + cq + '%,l_code.ilike.%' + cq + '%').limit(8)
       .then(function (res) {
         var cur = document.getElementById('ga-q');
         if (!cur || cur.value.trim() !== q) return; // 입력이 바뀌면 무시
-        renderAddSearch(q, (res && res.data) ? res.data : []);
-      }, function () { renderAddSearch(q, []); });
+        renderResults((res && res.data) ? res.data : []);
+      }, function () { renderResults([]); });
   }
 
   window.gsmgrPick = function (i) {
