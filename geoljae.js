@@ -19,9 +19,9 @@
   'use strict';
 
   var STYLE_ID = 'gj-style';
-  var STAFF_KEY = 'jeongseo_attorneys';      // 서면 공통 직원 명단(gukseon.js와 동일 키)
-  var LAST_KEY  = 'gj_last_staff';           // 마지막으로 고른 '본인' 기억
-  var STAFF_SEED = ['서고은', '양선화', '이예나'];
+  var REQ_KEY  = 'gj_requesters';            // 결재 요청자 명단(전용 키, 추가분 기억)
+  var LAST_KEY = 'gj_last_staff';            // 마지막으로 고른 '본인' 기억
+  var REQ_SEED = ['박종덕', '서석원', '이예나', '한우철'];
 
   var state = { reviews: [], loaded: false, error: '', tab: 'pending', staff: 'all', sort: 'due' };
   var channel = null;
@@ -35,16 +35,22 @@
     return t.getFullYear() + '-' + ('0' + (t.getMonth() + 1)).slice(-2) + '-' + ('0' + t.getDate()).slice(-2);
   }
   function sbc() { return (typeof getSB === 'function') ? getSB() : null; }
-  function loadStaff() {
-    try { var r = localStorage.getItem(STAFF_KEY); var a = r ? JSON.parse(r) : null; if (a && a.length) return a; } catch (e) {}
-    return STAFF_SEED.slice();
+  function loadRequesters() {
+    try { var r = localStorage.getItem(REQ_KEY); var a = r ? JSON.parse(r) : null; if (a && a.length) return a; } catch (e) {}
+    return REQ_SEED.slice();
+  }
+  function addRequester(name) {
+    name = (name || '').trim(); if (!name) return loadRequesters();
+    var list = loadRequesters();
+    if (list.indexOf(name) < 0) { list.push(name); try { localStorage.setItem(REQ_KEY, JSON.stringify(list)); } catch (e) {} }
+    return list;
   }
   function lastStaff() { try { return localStorage.getItem(LAST_KEY) || ''; } catch (e) { return ''; } }
   function rememberStaff(n) { try { localStorage.setItem(LAST_KEY, n); } catch (e) {} }
   // 추후 개인 로그인 도입 시 여기만 세션 사용자로 교체하면 전체가 그대로 동작한다.
   function getRequester() {
-    var sel = document.getElementById('gj-requester');
-    return sel ? (sel.value || '').trim() : '';
+    var el = document.querySelector('#gj-who .gj-who-chip.on');
+    return el ? el.getAttribute('data-name') : '';
   }
 
   /* ── 날짜 ── */
@@ -117,10 +123,17 @@
       /* 요청 폼 보조 */
       '.gj-hint{font-size:12px;color:var(--muted,#8b93a2);margin:-2px 0 8px;}',
       '.gj-req-badge{font-size:11px;font-weight:700;color:#a8863f;}',
+      /* 요청자 선택 칩 */
+      '.gj-who{display:flex;flex-wrap:wrap;gap:8px;}',
+      '.gj-who-chip{padding:9px 16px;border-radius:999px;border:1.5px solid var(--border,#dfe3e8);background:var(--card,#fff);color:var(--ink-soft,#44566f);font:inherit;font-size:14px;font-weight:600;cursor:pointer;}',
+      '.gj-who-chip:hover{border-color:#a8863f;}',
+      '.gj-who-chip.on{background:#16263f;border-color:#16263f;color:#fff;}',
+      '.gj-who-add{padding:9px 15px;border-radius:999px;border:1.5px dashed var(--border,#cfd6df);background:transparent;color:var(--muted,#8b93a2);font:inherit;font-size:13.5px;font-weight:600;cursor:pointer;}',
+      '.gj-who-add:hover{border-color:#a8863f;color:#a8863f;}',
       /* 다크 */
       '@media (prefers-color-scheme:dark){',
-      '.gj-tile,.gj-row,.gj-chip,.gj-check,.gj-del{background:#162232;border-color:#233145;}',
-      '.gj-del{color:#6e7d92;}',
+      '.gj-tile,.gj-row,.gj-chip,.gj-check,.gj-del,.gj-who-chip{background:#162232;border-color:#233145;}',
+      '.gj-del{color:#6e7d92;}.gj-who-chip{color:#aab7c9;}.gj-who-chip.on{background:#33507e;border-color:#33507e;color:#fff;}',
       '.gj-tile .v,.gj-title{color:#eaf0f8;}.gj-chip{color:#aab7c9;}.gj-chip .ct{background:#223146;color:#aab7c9;}',
       '.gj-tabs{background:#131e2c;border-color:#233145;}.gj-tab.on{background:#162232;color:#eaf0f8;}',
       '.gj-type{background:#20304a;border-color:#3a4f70;color:#cbab63;}',
@@ -196,18 +209,10 @@
     var foot = document.getElementById('gj-req-foot');
     if (!body) return;
 
-    var staff = loadStaff();
-    var mine = lastStaff();
-    var opts = staff.map(function (n) {
-      return '<option value="' + esc(n) + '"' + (n === mine ? ' selected' : '') + '>' + esc(n) + '</option>';
-    }).join('');
-
     body.innerHTML =
       '<div class="fs-section">요청자</div>' +
-      '<div class="fs-field"><label class="fs-label">본인 이름</label>' +
-        '<select class="fs-input" id="gj-requester">' + opts +
-        '<option value="__new__">+ 직접 입력…</option></select></div>' +
-      '<input type="text" class="fs-input" id="gj-requester-new" placeholder="이름 입력" style="display:none;margin-top:8px;">' +
+      '<div class="gj-hint">본인 이름을 선택하세요. 없으면 ＋추가로 등록할 수 있어요.</div>' +
+      '<div class="fs-field"><div class="gj-who" id="gj-who"></div></div>' +
 
       '<div class="fs-section">사건</div>' +
       '<div class="gj-hint">의뢰인명 또는 사건번호로 검색하면 사건번호·사건명·기일이 채워집니다.</div>' +
@@ -230,24 +235,37 @@
       foot.querySelector('#gj-req-submit').onclick = submitReq;
     }
 
-    // '직접 입력' 선택 시 텍스트칸 노출
-    var sel = document.getElementById('gj-requester');
-    var newEl = document.getElementById('gj-requester-new');
-    sel.onchange = function () {
-      var isNew = sel.value === '__new__';
-      newEl.style.display = isNew ? 'block' : 'none';
-      if (isNew) newEl.focus();
-    };
+    // 요청자 칩(버튼) — 클릭 선택 + ＋추가. 마지막으로 고른 이름을 기본 선택.
+    var who = document.getElementById('gj-who');
+    function renderWho(selected) {
+      var list = loadRequesters();
+      var html = list.map(function (n) {
+        return '<button type="button" class="gj-who-chip' + (n === selected ? ' on' : '') + '" data-name="' + esc(n) + '">' + esc(n) + '</button>';
+      }).join('');
+      html += '<button type="button" class="gj-who-add" id="gj-who-add">＋ 추가</button>';
+      who.innerHTML = html;
+      Array.prototype.forEach.call(who.querySelectorAll('.gj-who-chip'), function (c) {
+        c.onclick = function () {
+          Array.prototype.forEach.call(who.querySelectorAll('.gj-who-chip'), function (x) { x.classList.remove('on'); });
+          c.classList.add('on');
+        };
+      });
+      document.getElementById('gj-who-add').onclick = function () {
+        var name = prompt('추가할 요청자 이름을 입력하세요.');
+        if (name === null) return;
+        name = name.trim(); if (!name) return;
+        addRequester(name);
+        renderWho(name);   // 방금 추가한 이름을 선택 상태로 다시 그림
+      };
+    }
+    renderWho(lastStaff());
 
     // 사건 자동완성 부착(검색카드가 사건번호 칸 위에 생김)
     if (window.initAutofillFor) initAutofillFor('gj-casenum');
   }
 
   function submitReq() {
-    var sel = document.getElementById('gj-requester');
-    var requester = (sel && sel.value === '__new__')
-      ? (document.getElementById('gj-requester-new').value || '').trim()
-      : getRequester();
+    var requester = getRequester();
     var caseNo = (document.getElementById('gj-casenum').value || '').trim();
     var caseName = (document.getElementById('gj-casename').value || '').trim();
     var nextDate = ymd(document.getElementById('gj-nextdate').value);
