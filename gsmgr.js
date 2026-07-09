@@ -8,7 +8,7 @@
      depositDate, depositAmount, appeal, appealStamped } }
    패널(파생, 저장 안 함):
      · 기준일 = 선고일(verdictDate, 없으면 hearingType='선고'의 hearingDate) 우선, 없으면 (최근)기일
-     · 종결 = 선정취소이거나 '선고기일'이 지남  · 진행 = 그 외(공판기일만 지난 경우·미래 기일·기일 없음 포함)
+     · 종결 = 강제종결(수동)이거나 선정취소이거나 '선고기일'이 지남  · 진행 = 그 외(공판만 지남·미래 기일·기일 없음)
      · 보수 = 종결 && claimed(보수청구 체크) — 필터뷰(종결에도 남음)
    진입점: window.goCaseManager() / window.closeGsmgr()
    ─────────────────────────────────────────────────────────────── */
@@ -60,8 +60,8 @@
   function verdictOf(c) { return c.verdictDate || (c.hearingType === '선고' ? c.hearingDate : ''); }
   // 사건의 기준 날짜 = 선고일 우선, 없으면 (최근)기일
   function caseDate(c) { return verdictOf(c) || c.hearingDate || ''; }
-  // 종결 = 선정취소이거나 '선고기일'이 지났을 때만. 공판기일만 지난 경우는 진행 유지(미래 기일도 진행).
-  function isClosed(c) { return c.hearingType === '선정취소' || reached(verdictOf(c)); }
+  // 종결 = 강제종결(수동)이거나 선정취소이거나 '선고기일'이 지났을 때. 공판기일만 지난 경우는 진행 유지.
+  function isClosed(c) { return c.forceClosed || c.hearingType === '선정취소' || reached(verdictOf(c)); }
   // 검색어 매칭: 피고인·사건명·연락처는 부분일치, 사건번호는 공백 무시 부분일치
   function matchesQuery(c) {
     var q = (state.query || '').trim();
@@ -382,6 +382,14 @@
       '#gsmgr-drawer .ga-save{flex:1;height:48px;border:none;background:linear-gradient(155deg,#2a3d5c,#16263f);color:#fff;',
         'font-weight:700;font-size:15px;border-radius:12px;cursor:pointer;font-family:inherit;box-shadow:0 10px 22px -14px rgba(20,40,70,.8);}',
       '#gsmgr-drawer .ga-save:hover{background:linear-gradient(155deg,#33496d,#1b2e4b);}',
+      /* 강제 종결 버튼(사건 정리) */
+      '#gsmgr-drawer .ga-force{width:100%;height:44px;border:1.5px solid rgba(22,38,63,.18);background:#fff;color:#41537a;',
+        'border-radius:12px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;}',
+      '#gsmgr-drawer .ga-force:hover{border-color:#16263f;color:#16263f;}',
+      '#gsmgr-drawer .ga-forceoff{width:100%;height:44px;border:1.5px solid #cdd6e2;background:#eef1f6;color:#5b6b86;',
+        'border-radius:12px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;}',
+      '#gsmgr-drawer .ga-forceoff:hover{background:#e6ebf3;}',
+      '#gsmgr-drawer .ga-forcehint{font-size:11.5px;color:#8a97ab;margin-top:6px;line-height:1.5;}',
       /* 수감번호/연락처 툴팁 */
       '#' + SHELL_ID + ' .gm-tip{position:fixed;z-index:1200;background:#16263f;color:#fff;font-size:12.5px;',
         'padding:8px 12px;border-radius:10px;box-shadow:0 12px 30px rgba(12,25,45,.4);pointer-events:none;',
@@ -513,7 +521,7 @@
       defendant: d.defendant || '', contact: d.contact || '',
       caseNumber: d.caseNumber || '', caseName: d.caseName || '',
       hearingType: d.hearingType || '공판', hearingDate: d.hearingDate || '',
-      verdictDate: d.verdictDate || '', todo: d.todo || '',
+      verdictDate: d.verdictDate || '', forceClosed: !!d.forceClosed, todo: d.todo || '',
       claimed: !!d.claimed, appeal: d.appeal || '', appealStamped: !!d.appealStamped,
       claimDate: d.claimDate || '', claimAmount: d.claimAmount || '',
       depositDate: d.depositDate || '', depositAmount: d.depositAmount || '',
@@ -1365,6 +1373,11 @@
         '</div>' +
         field('선고기일', '<input id="gd-verdictDate" class="ga-input" type="date" value="' + esc(c.verdictDate) + '">') +
         field('연락처 · 수감번호', '<input id="gd-contact" class="ga-input" value="' + esc(c.contact) + '">') +
+        '<div class="gd-sec" style="margin-top:20px">사건 정리</div>' +
+        (c.forceClosed
+          ? '<button type="button" class="ga-forceoff" onclick="gsmgrUnforceClose()">진행으로 되돌리기</button>'
+          : '<button type="button" class="ga-force" onclick="gsmgrForceClose()">강제로 종결 처리</button>') +
+        '<div class="ga-forcehint">선고·선정취소가 아니어도(취하·각하 등) 수동으로 종결로 보냅니다.</div>' +
       '</div>' +
       '<div class="gd-foot">' +
         '<button class="ga-del" onclick="gsmgrDelete()">휴지통</button>' +
@@ -1385,6 +1398,23 @@
     closeDrawer();
     render();
     commitPatch(c.id, patch); // 동시수정 안전 저장(토스트·재시도 포함)
+  };
+
+  // 강제 종결: 선고·선정취소가 아니어도 수동으로 종결 처리(휴지통/복원과 동일한 즉시-저장, 되돌리기 가능)
+  window.gsmgrForceClose = function () {
+    var c = editState; if (!c) return;
+    if (!window.confirm('이 사건을 종결로 보낼까요? (진행으로 되돌릴 수 있습니다)')) return;
+    c.forceClosed = true; if (c._raw) c._raw.forceClosed = true;   // 낙관적
+    closeDrawer();
+    render();
+    commitPatch(c.id, { forceClosed: true }, 0, function () { gsmgrToast('종결로 옮겼습니다', 'ok'); });
+  };
+  window.gsmgrUnforceClose = function () {
+    var c = editState; if (!c) return;
+    c.forceClosed = false; if (c._raw) c._raw.forceClosed = false; // 낙관적
+    closeDrawer();
+    render();
+    commitPatch(c.id, { forceClosed: false }, 0, function () { gsmgrToast('진행으로 되돌렸습니다', 'ok'); });
   };
 
   window.gsmgrDelete = function () {
