@@ -100,7 +100,9 @@
       '.gj-main{min-width:0;flex:1;}',
       '.gj-l1{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}',
       '.gj-type{font-size:10.5px;font-weight:800;letter-spacing:.03em;color:#a8863f;border:1px solid #e6dcc2;background:#faf6ea;padding:2px 7px;border-radius:6px;}',
+      '.gj-lead{font-size:15.5px;font-weight:800;letter-spacing:-.01em;color:var(--ink,#16263f);}',
       '.gj-title{font-size:15.5px;font-weight:750;letter-spacing:-.01em;color:var(--ink,#16263f);}',
+      '.gj-row.done .gj-lead{text-decoration:line-through;text-decoration-color:#9aa6b8;}',
       '.gj-l2{font-size:12px;color:var(--muted,#8b93a2);margin-top:5px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;}',
       '.gj-l2 .rq{color:#3f5170;font-weight:700;}',
       '.gj-l2 .sep{width:3px;height:3px;border-radius:50%;background:#cbd2db;}',
@@ -134,7 +136,7 @@
       '@media (prefers-color-scheme:dark){',
       '.gj-tile,.gj-row,.gj-chip,.gj-check,.gj-del,.gj-who-chip{background:#162232;border-color:#233145;}',
       '.gj-del{color:#6e7d92;}.gj-who-chip{color:#aab7c9;}.gj-who-chip.on{background:#33507e;border-color:#33507e;color:#fff;}',
-      '.gj-tile .v,.gj-title{color:#eaf0f8;}.gj-chip{color:#aab7c9;}.gj-chip .ct{background:#223146;color:#aab7c9;}',
+      '.gj-tile .v,.gj-title,.gj-lead{color:#eaf0f8;}.gj-chip{color:#aab7c9;}.gj-chip .ct{background:#223146;color:#aab7c9;}',
       '.gj-tabs{background:#131e2c;border-color:#233145;}.gj-tab.on{background:#162232;color:#eaf0f8;}',
       '.gj-type{background:#20304a;border-color:#3a4f70;color:#cbab63;}',
       '.gj-tile.alert{background:#2a1a1a;border-color:#5a2e2e;}.gj-tile.alert .v{color:#e36457;}',
@@ -152,7 +154,7 @@
   function normalize(row) {
     var d = (row && row.data) || {};
     return {
-      id: row.id, requester: d.requester || '', caseNo: d.caseNo || '', caseName: d.caseName || '',
+      id: row.id, requester: d.requester || '', caseNo: d.caseNo || '', caseName: d.caseName || '', clientName: d.clientName || '',
       caseId: d.caseId || '', nextDate: d.nextDate || '', docType: d.docType || '', docTitle: d.docTitle || '',
       dueDate: d.dueDate || '', status: d.status || 'pending', createdAt: d.createdAt || '',
       doneAt: d.doneAt || '', _raw: d, _updatedAt: (row && row.updated_at) || null
@@ -218,6 +220,7 @@
       '<div class="gj-hint">의뢰인명 또는 사건번호로 검색하면 사건번호·사건명·기일이 채워집니다.</div>' +
       '<div class="fs-field"><label class="fs-label">사건번호</label><input type="text" class="fs-input" id="gj-casenum" data-af="l_code" placeholder="2026가합1234"></div>' +
       '<div class="fs-field"><label class="fs-label">사건명</label><input type="text" class="fs-input" id="gj-casename" data-af="l_name" placeholder="대여금 청구"></div>' +
+      '<div class="fs-field"><label class="fs-label">의뢰인</label><input type="text" class="fs-input" id="gj-client" data-af="l_client" placeholder="홍길동"></div>' +
       '<div class="fs-field"><label class="fs-label">가장 임박한 기일</label><input type="text" class="fs-input" id="gj-nextdate" data-af="next_date" placeholder="자동 표시" readonly></div>' +
 
       '<div class="fs-section">서면</div>' +
@@ -268,6 +271,7 @@
     var requester = getRequester();
     var caseNo = (document.getElementById('gj-casenum').value || '').trim();
     var caseName = (document.getElementById('gj-casename').value || '').trim();
+    var clientName = (document.getElementById('gj-client').value || '').trim();
     var nextDate = ymd(document.getElementById('gj-nextdate').value);
     var docTitle = (document.getElementById('gj-doctitle').value || '').trim();
     var dueDate = (document.getElementById('gj-duedate').value || '').trim() || nextDate;
@@ -284,7 +288,7 @@
     var now = new Date().toISOString();
     var id = 'r_' + now.replace(/\D/g, '') + '_' + Math.floor(Math.random() * 1e6);
     var data = {
-      requester: requester, caseNo: caseNo, caseName: caseName,
+      requester: requester, caseNo: caseNo, caseName: caseName, clientName: clientName,
       caseId: '', nextDate: nextDate, docTitle: docTitle,
       dueDate: dueDate, status: 'pending', createdAt: now, doneAt: null
     };
@@ -387,11 +391,11 @@
     if (r.nextDate) meta.push('<span class="mi">기일 ' + esc(r.nextDate) + '</span>');
     if (r.createdAt) meta.push('<span class="mi">올림 ' + esc(shortWhen(r.createdAt)) + '</span>');
     var metaHtml = meta.join('<span class="sep"></span>');
-    var typeTag = r.docType ? '<span class="gj-type">' + esc(r.docType) + '</span>' : '';
+    var lead = r.clientName ? '<span class="gj-lead">' + esc(r.clientName) + '</span>' : '';
     var title = esc(r.docTitle || r.docType || '(제목 없음)');
     return '<div class="gj-row ' + cls + '" data-id="' + esc(r.id) + '">' +
       '<span class="st"></span>' +
-      '<div class="gj-main"><div class="gj-l1">' + typeTag + '<span class="gj-title">' + title + '</span></div>' +
+      '<div class="gj-main"><div class="gj-l1">' + lead + '<span class="gj-title">' + title + '</span></div>' +
         '<div class="gj-l2">' + metaHtml + '</div></div>' +
       '<div class="gj-right"><span class="gj-dday">' + ddayLabel(n) + '</span>' +
         '<div class="gj-acts">' +
