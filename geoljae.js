@@ -100,8 +100,9 @@
       '.gj-main{min-width:0;flex:1;}',
       '.gj-l1{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}',
       '.gj-type{font-size:10.5px;font-weight:800;letter-spacing:.03em;color:#a8863f;border:1px solid #e6dcc2;background:#faf6ea;padding:2px 7px;border-radius:6px;}',
-      '.gj-lead{font-size:15.5px;font-weight:800;letter-spacing:-.01em;color:var(--ink,#16263f);}',
-      '.gj-title{font-size:15.5px;font-weight:750;letter-spacing:-.01em;color:var(--ink,#16263f);}',
+      '.gj-lead{font-size:16.5px;font-weight:800;letter-spacing:-.02em;color:var(--ink,#16263f);}',
+      '.gj-dot{width:3px;height:3px;border-radius:50%;background:#c6ae74;flex:none;}',
+      '.gj-title{font-size:14px;font-weight:600;letter-spacing:-.01em;color:var(--ink-soft,#5a6675);}',
       '.gj-row.done .gj-lead{text-decoration:line-through;text-decoration-color:#9aa6b8;}',
       '.gj-l2{font-size:12px;color:var(--muted,#8b93a2);margin-top:5px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;}',
       '.gj-l2 .rq{color:#3f5170;font-weight:700;}',
@@ -136,7 +137,7 @@
       '@media (prefers-color-scheme:dark){',
       '.gj-tile,.gj-row,.gj-chip,.gj-check,.gj-del,.gj-who-chip{background:#162232;border-color:#233145;}',
       '.gj-del{color:#6e7d92;}.gj-who-chip{color:#aab7c9;}.gj-who-chip.on{background:#33507e;border-color:#33507e;color:#fff;}',
-      '.gj-tile .v,.gj-title,.gj-lead{color:#eaf0f8;}.gj-chip{color:#aab7c9;}.gj-chip .ct{background:#223146;color:#aab7c9;}',
+      '.gj-tile .v,.gj-lead{color:#eaf0f8;}.gj-title{color:#9fb0c6;}.gj-chip{color:#aab7c9;}.gj-chip .ct{background:#223146;color:#aab7c9;}',
       '.gj-tabs{background:#131e2c;border-color:#233145;}.gj-tab.on{background:#162232;color:#eaf0f8;}',
       '.gj-type{background:#20304a;border-color:#3a4f70;color:#cbab63;}',
       '.gj-tile.alert{background:#2a1a1a;border-color:#5a2e2e;}.gj-tile.alert .v{color:#e36457;}',
@@ -391,7 +392,7 @@
     if (r.nextDate) meta.push('<span class="mi">기일 ' + esc(r.nextDate) + '</span>');
     if (r.createdAt) meta.push('<span class="mi">올림 ' + esc(shortWhen(r.createdAt)) + '</span>');
     var metaHtml = meta.join('<span class="sep"></span>');
-    var lead = r.clientName ? '<span class="gj-lead">' + esc(r.clientName) + '</span>' : '';
+    var lead = r.clientName ? '<span class="gj-lead">' + esc(r.clientName) + '</span><span class="gj-dot"></span>' : '';
     var title = esc(r.docTitle || r.docType || '(제목 없음)');
     return '<div class="gj-row ' + cls + '" data-id="' + esc(r.id) + '">' +
       '<span class="st"></span>' +
