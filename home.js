@@ -37,6 +37,8 @@ var MENU = {
   contractList:  { kicker: '관리 · 보관', name: '계약서 목록',   desc: '저장된 계약서를 관리해요.',           icon: 'list',    action: 'openContractList()' },
   appeal:        { kicker: '소송 · 불복', name: '항소장',        desc: '판결에 불복해 다시 다퉈요.',         icon: 'check',   action: 'goAppeal()' },
   caseManager:   { kicker: '사건 · 관리', name: '사건 관리',     desc: '진행 중인 사건을 한눈에 관리해요.', icon: 'grid',    action: 'goCaseManager()' },
+  gyeoljae:      { kicker: '검토 · 결재', name: '결재함',        desc: '확인할 서면을 마감 순으로 모아봐요.', icon: 'check',   action: 'goGyeoljae()' },
+  gyeoljaeReq:   { kicker: '검토 · 요청', name: '결재 요청',      desc: '올린 서면 확인을 요청해요.',         icon: 'file',    action: 'goGyeoljaeReq()' },
   agreement:     { kicker: '합의 · 조정', name: '합의서 작성',   desc: '준비 중인 서비스예요.',             icon: 'users',   soon: true }
 };
 
@@ -47,6 +49,8 @@ var MENU = {
    계약서 목록·국선(사건 관리)은 상단 필로 옮겨 그리드에서 제외.
    새 서면 추가 = MENU 에 한 줄 + 아래 배열에 id 하나 → 카드가 그대로 늘어남 */
 var PC_ORDER = [
+  { id: 'gyeoljae' },
+  { id: 'gyeoljaeReq' },
   { id: 'seonim' },
   { id: 'contractWrite' },
   { id: 'yeollam' },
@@ -65,6 +69,8 @@ var CONTRACT_CARDS = [
 
 /* 전체 기능 화면: 폰 홈에 안 올린 나머지 (표기가 조금 다른 것은 name/desc 덮어씀) */
 var MORE_ORDER = [
+  { id: 'gyeoljae' },
+  { id: 'gyeoljaeReq' },
   { id: 'seonim' },
   { id: 'appeal',  name: '항소장 작성' },
   { id: 'yeollam', name: '열람·복사 신청서', desc: '재판기록 열람·복사' },
