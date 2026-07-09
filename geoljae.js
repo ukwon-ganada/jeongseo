@@ -106,6 +106,10 @@
       '.gj-check{width:30px;height:30px;border-radius:9px;border:1.6px solid var(--border,#dfe3e8);background:var(--card,#fff);cursor:pointer;display:grid;place-items:center;color:transparent;}',
       '.gj-check:hover{border-color:#a8863f;}',
       '.gj-check svg{width:16px;height:16px;}',
+      '.gj-acts{display:flex;gap:7px;align-items:center;}',
+      '.gj-del{width:30px;height:30px;border-radius:9px;border:1.6px solid var(--border,#dfe3e8);background:var(--card,#fff);color:#9aa6b8;cursor:pointer;display:grid;place-items:center;}',
+      '.gj-del:hover{border-color:#c0392b;color:#c0392b;}',
+      '.gj-del svg{width:15px;height:15px;}',
       '.gj-row.done{opacity:.6;}',
       '.gj-row.done .gj-title{text-decoration:line-through;text-decoration-color:#9aa6b8;}',
       '.gj-row.done .gj-check{background:#3e7c59;border-color:#3e7c59;color:#fff;}',
@@ -117,7 +121,8 @@
       '.gj-req-badge{font-size:11px;font-weight:700;color:#a8863f;}',
       /* 다크 */
       '@media (prefers-color-scheme:dark){',
-      '.gj-tile,.gj-row,.gj-chip,.gj-check{background:#162232;border-color:#233145;}',
+      '.gj-tile,.gj-row,.gj-chip,.gj-check,.gj-del{background:#162232;border-color:#233145;}',
+      '.gj-del{color:#6e7d92;}',
       '.gj-tile .v,.gj-title{color:#eaf0f8;}.gj-chip{color:#aab7c9;}.gj-chip .ct{background:#223146;color:#aab7c9;}',
       '.gj-tabs{background:#131e2c;border-color:#233145;}.gj-tab.on{background:#162232;color:#eaf0f8;}',
       '.gj-type{background:#20304a;border-color:#3a4f70;color:#cbab63;}',
@@ -376,8 +381,12 @@
       '<div class="gj-main"><div class="gj-l1">' + typeTag + '<span class="gj-title">' + title + '</span></div>' +
         '<div class="gj-l2">' + metaHtml + '</div></div>' +
       '<div class="gj-right"><span class="gj-dday">' + ddayLabel(n) + '</span>' +
-        '<button class="gj-check" title="' + (done ? '대기로 되돌리기' : '확인함') + '">' +
-          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></button>' +
+        '<div class="gj-acts">' +
+          '<button class="gj-check" title="' + (done ? '대기로 되돌리기' : '확인함') + '">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></button>' +
+          '<button class="gj-del" title="삭제">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6"/></svg></button>' +
+        '</div>' +
       '</div></div>';
   }
 
@@ -394,7 +403,26 @@
       var id = el.getAttribute('data-id');
       var chk = el.querySelector('.gj-check');
       if (chk) chk.onclick = function () { toggleDone(id, el.classList.contains('done')); };
+      var del = el.querySelector('.gj-del');
+      if (del) del.onclick = function () { removeReview(id); };
     });
+  }
+
+  /* ── 삭제: 대기·완료 어디서든 (되돌릴 수 없어 확인 대화상자) ── */
+  function removeReview(id) {
+    var r = find(id); if (!r) return;
+    var label = r.docTitle || r.docType || '이 요청';
+    if (!confirm('“' + label + '”을(를) 삭제할까요?\n되돌릴 수 없습니다.')) return;
+    // 낙관적 로컬 제거 → 즉시 UI
+    state.reviews = state.reviews.filter(function (x) { return x.id !== id; });
+    render();
+    setBadge(pendingList().length);
+
+    var sb = sbc(); if (!sb) return;
+    sb.from('reviews').delete().eq('id', id).then(function (res) {
+      if (res && res.error) { load(); return; }   // 실패 시 서버 상태로 복구
+      if (typeof showToast === 'function') showToast('삭제했습니다.');
+    }, function () { load(); });
   }
 
   /* ── 확인 체크: pending ↔ done (낙관적 잠금 저장) ── */
