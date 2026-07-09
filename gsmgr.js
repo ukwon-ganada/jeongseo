@@ -8,7 +8,7 @@
      depositDate, depositAmount, appeal, appealStamped } }
    패널(파생, 저장 안 함):
      · 기준일 = 선고일(verdictDate, 없으면 hearingType='선고'의 hearingDate) 우선, 없으면 (최근)기일
-     · 종결 = 기준일이 오늘 지남(선고든 공판이든)  · 진행 = 미래 기일이거나 기일 없음
+     · 종결 = 선정취소이거나 '선고기일'이 지남  · 진행 = 그 외(공판기일만 지난 경우·미래 기일·기일 없음 포함)
      · 보수 = 종결 && claimed(보수청구 체크) — 필터뷰(종결에도 남음)
    진입점: window.goCaseManager() / window.closeGsmgr()
    ─────────────────────────────────────────────────────────────── */
@@ -60,8 +60,8 @@
   function verdictOf(c) { return c.verdictDate || (c.hearingType === '선고' ? c.hearingDate : ''); }
   // 사건의 기준 날짜 = 선고일 우선, 없으면 (최근)기일
   function caseDate(c) { return verdictOf(c) || c.hearingDate || ''; }
-  // 종결 = 선정취소면 즉시 종결 · 그 외엔 기준 날짜가 오늘 지남(선고든 공판이든). 미래 기일이면 진행.
-  function isClosed(c) { return c.hearingType === '선정취소' || reached(caseDate(c)); }
+  // 종결 = 선정취소이거나 '선고기일'이 지났을 때만. 공판기일만 지난 경우는 진행 유지(미래 기일도 진행).
+  function isClosed(c) { return c.hearingType === '선정취소' || reached(verdictOf(c)); }
   // 검색어 매칭: 피고인·사건명·연락처는 부분일치, 사건번호는 공백 무시 부분일치
   function matchesQuery(c) {
     var q = (state.query || '').trim();
