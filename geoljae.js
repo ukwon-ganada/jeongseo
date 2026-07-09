@@ -151,8 +151,28 @@
       state.reviews = (res.data || []).map(normalize);
       state.loaded = true;
       render();
+      setBadge(pendingList().length);   // 결재 pill 배지도 함께 갱신
       if (typeof cb === 'function') cb();
     }, function () { state.error = 'err'; state.loaded = true; render(); });
+  }
+
+  /* ── 홈 「결재」 pill 대기 건수 배지 (국선 setPillBadge 방식) ── */
+  function setBadge(n) {
+    var el = document.getElementById('hp-badge-gyeoljae');
+    if (!el) return;
+    if (n > 0) { el.textContent = n > 99 ? '99+' : n; el.hidden = false; }
+    else { el.hidden = true; }
+  }
+  // 결재함을 열지 않아도(홈 복귀·부팅) 대기 건수만 가볍게 세어 배지 갱신
+  function updateBadge() {
+    var sb = sbc(); if (!sb || typeof sb.from !== 'function') return;   // 초기화 중 부분 클라이언트 방어
+    sb.from('reviews').select('id,data').then(function (res) {
+      if (res && res.error) return;
+      var n = (res.data || []).filter(function (r) {
+        var d = (r && r.data) || {}; return (d.status || 'pending') !== 'done';
+      }).length;
+      setBadge(n);
+    }, function () {});
   }
   function scheduleReload() { clearTimeout(reloadTimer); reloadTimer = setTimeout(function () { load(); }, 250); }
   function subscribe() {
@@ -400,5 +420,16 @@
   function find(id) { for (var i = 0; i < state.reviews.length; i++) if (state.reviews[i].id === id) return state.reviews[i]; return null; }
 
   /* ── 외부 노출 ── */
-  window.gyeoljae = { open: open, openReq: openReq };
+  window.gyeoljae = { open: open, openReq: openReq, updateBadge: updateBadge };
+  window.gyeoljaeUpdateBadge = updateBadge;   // showScreen 홈 복귀 훅에서 호출
+
+  /* ── 부팅: 첫 홈 진입에 배지 숫자 표시 (세션 준비까지 몇 번 재시도) ── */
+  (function bootBadge() {
+    var tries = 0;
+    (function attempt() {
+      if (sbc()) { updateBadge(); return; }
+      if (++tries > 20) return;   // ~4초까지 대기
+      setTimeout(attempt, 200);
+    })();
+  })();
 })();
