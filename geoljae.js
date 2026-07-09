@@ -156,7 +156,7 @@
     var d = (row && row.data) || {};
     return {
       id: row.id, requester: d.requester || '', caseNo: d.caseNo || '', caseName: d.caseName || '', clientName: d.clientName || '',
-      caseId: d.caseId || '', nextDate: d.nextDate || '', docType: d.docType || '', docTitle: d.docTitle || '',
+      caseId: d.caseId || '', docType: d.docType || '', docTitle: d.docTitle || '',
       dueDate: d.dueDate || '', status: d.status || 'pending', createdAt: d.createdAt || '',
       doneAt: d.doneAt || '', _raw: d, _updatedAt: (row && row.updated_at) || null
     };
@@ -218,17 +218,16 @@
       '<div class="fs-field"><div class="gj-who" id="gj-who"></div></div>' +
 
       '<div class="fs-section">사건</div>' +
-      '<div class="gj-hint">의뢰인명 또는 사건번호로 검색하면 사건번호·사건명·기일이 채워집니다.</div>' +
+      '<div class="gj-hint">의뢰인명 또는 사건번호로 검색하면 사건번호·사건명이 채워집니다.</div>' +
       '<div class="fs-field"><label class="fs-label">사건번호</label><input type="text" class="fs-input" id="gj-casenum" data-af="l_code" placeholder="2026가합1234"></div>' +
       '<div class="fs-field"><label class="fs-label">사건명</label><input type="text" class="fs-input" id="gj-casename" data-af="l_name" placeholder="대여금 청구"></div>' +
       '<div class="fs-field"><label class="fs-label">의뢰인</label><input type="text" class="fs-input" id="gj-client" data-af="l_client" placeholder="홍길동"></div>' +
-      '<div class="fs-field"><label class="fs-label">가장 임박한 기일</label><input type="text" class="fs-input" id="gj-nextdate" data-af="next_date" placeholder="자동 표시" readonly></div>' +
 
       '<div class="fs-section">서면</div>' +
       '<div class="fs-field"><label class="fs-label">제목</label><input type="text" class="fs-input" id="gj-doctitle" placeholder="예: 원고 제3준비서면"></div>' +
 
       '<div class="fs-section">확인 기한</div>' +
-      '<div class="gj-hint">서고은 변호사가 언제까지 확인해야 하는지. 비워두면 임박한 기일로 저장됩니다.</div>' +
+      '<div class="gj-hint">서고은 변호사가 언제까지 확인해야 하는지 정해 주세요.</div>' +
       '<div class="fs-field"><label class="fs-label">확인 기한</label><input type="date" class="fs-input" id="gj-duedate"></div>';
 
     if (foot) {
@@ -273,9 +272,8 @@
     var caseNo = (document.getElementById('gj-casenum').value || '').trim();
     var caseName = (document.getElementById('gj-casename').value || '').trim();
     var clientName = (document.getElementById('gj-client').value || '').trim();
-    var nextDate = ymd(document.getElementById('gj-nextdate').value);
     var docTitle = (document.getElementById('gj-doctitle').value || '').trim();
-    var dueDate = (document.getElementById('gj-duedate').value || '').trim() || nextDate;
+    var dueDate = (document.getElementById('gj-duedate').value || '').trim();
 
     if (!requester) { alert('요청자(본인 이름)를 선택해 주세요.'); return; }
     if (!docTitle) { alert('서면 제목을 입력해 주세요.'); return; }
@@ -290,7 +288,7 @@
     var id = 'r_' + now.replace(/\D/g, '') + '_' + Math.floor(Math.random() * 1e6);
     var data = {
       requester: requester, caseNo: caseNo, caseName: caseName, clientName: clientName,
-      caseId: '', nextDate: nextDate, docTitle: docTitle,
+      caseId: '', docTitle: docTitle,
       dueDate: dueDate, status: 'pending', createdAt: now, doneAt: null
     };
     sb.from('reviews').upsert({ id: id, data: data, updated_at: now }).then(function (res) {
@@ -389,7 +387,6 @@
     var meta = ['<span class="rq">' + esc(r.requester || '요청자?') + '</span>'];
     if (r.caseNo) meta.push('<span class="mi">' + esc(r.caseNo) + '</span>');
     if (r.caseName) meta.push('<span class="mi">' + esc(r.caseName) + '</span>');
-    if (r.nextDate) meta.push('<span class="mi">기일 ' + esc(r.nextDate) + '</span>');
     if (r.createdAt) meta.push('<span class="mi">올림 ' + esc(shortWhen(r.createdAt)) + '</span>');
     var metaHtml = meta.join('<span class="sep"></span>');
     var lead = r.clientName ? '<span class="gj-lead">' + esc(r.clientName) + '</span><span class="gj-dot"></span>' : '';
