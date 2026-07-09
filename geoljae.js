@@ -22,8 +22,6 @@
   var STAFF_KEY = 'jeongseo_attorneys';      // 서면 공통 직원 명단(gukseon.js와 동일 키)
   var LAST_KEY  = 'gj_last_staff';           // 마지막으로 고른 '본인' 기억
   var STAFF_SEED = ['서고은', '양선화', '이예나'];
-  var DOC_TYPES = ['준비서면', '답변서', '의견서', '항소이유서', '상고이유서',
-                   '증거설명서', '사실조회신청', '신청서', '반소장', '기타'];
 
   var state = { reviews: [], loaded: false, error: '', tab: 'pending', staff: 'all', sort: 'due' };
   var channel = null;
@@ -203,7 +201,6 @@
     var opts = staff.map(function (n) {
       return '<option value="' + esc(n) + '"' + (n === mine ? ' selected' : '') + '>' + esc(n) + '</option>';
     }).join('');
-    var dtList = DOC_TYPES.map(function (t) { return '<option value="' + esc(t) + '">'; }).join('');
 
     body.innerHTML =
       '<div class="fs-section">요청자</div>' +
@@ -219,7 +216,6 @@
       '<div class="fs-field"><label class="fs-label">가장 임박한 기일</label><input type="text" class="fs-input" id="gj-nextdate" data-af="next_date" placeholder="자동 표시" readonly></div>' +
 
       '<div class="fs-section">서면</div>' +
-      '<div class="fs-field"><label class="fs-label">종류</label><input type="text" class="fs-input" id="gj-doctype" list="gj-doctypes" placeholder="준비서면"><datalist id="gj-doctypes">' + dtList + '</datalist></div>' +
       '<div class="fs-field"><label class="fs-label">제목</label><input type="text" class="fs-input" id="gj-doctitle" placeholder="예: 원고 제3준비서면"></div>' +
 
       '<div class="fs-section">확인 기한</div>' +
@@ -255,12 +251,11 @@
     var caseNo = (document.getElementById('gj-casenum').value || '').trim();
     var caseName = (document.getElementById('gj-casename').value || '').trim();
     var nextDate = ymd(document.getElementById('gj-nextdate').value);
-    var docType = (document.getElementById('gj-doctype').value || '').trim();
     var docTitle = (document.getElementById('gj-doctitle').value || '').trim();
     var dueDate = (document.getElementById('gj-duedate').value || '').trim() || nextDate;
 
     if (!requester) { alert('요청자(본인 이름)를 선택해 주세요.'); return; }
-    if (!docTitle && !docType) { alert('어떤 서면인지 종류나 제목을 입력해 주세요.'); return; }
+    if (!docTitle) { alert('서면 제목을 입력해 주세요.'); return; }
 
     var btn = document.getElementById('gj-req-submit');
     if (btn) { btn.disabled = true; btn.textContent = '올리는 중…'; }
@@ -272,7 +267,7 @@
     var id = 'r_' + now.replace(/\D/g, '') + '_' + Math.floor(Math.random() * 1e6);
     var data = {
       requester: requester, caseNo: caseNo, caseName: caseName,
-      caseId: '', nextDate: nextDate, docType: docType, docTitle: docTitle,
+      caseId: '', nextDate: nextDate, docTitle: docTitle,
       dueDate: dueDate, status: 'pending', createdAt: now, doneAt: null
     };
     sb.from('reviews').upsert({ id: id, data: data, updated_at: now }).then(function (res) {
