@@ -131,12 +131,15 @@
 
         <!-- 하늘 위에 겹치는 오버레이 -->
         <div class="hp-overlay">
+          <!-- 우상단 유틸리티 바: 다른 화면으로 이동하는 메뉴 -->
+          <nav class="hp-nav">
+            <span class="hp-pill hp-pill-link" onclick="openContractList()">계약서</span>
+            <span class="hp-pill hp-pill-link" id="hp-pill-gukseon" onclick="goCaseManager()">국선<span class="hp-badge" id="hp-badge-gukseon" hidden></span></span>
+            <span class="hp-pill hp-pill-link" id="hp-pill-gyeoljae" onclick="goGyeoljae()">결재<span class="hp-badge" id="hp-badge-gyeoljae" hidden></span></span>
+          </nav>
           <div class="hp-head">
             <div class="hp-pills">
-              <span class="hp-pill">서면 작성</span>
-              <span class="hp-pill hp-pill-link" onclick="openContractList()">계약서</span>
-              <span class="hp-pill hp-pill-link" id="hp-pill-gukseon" onclick="goCaseManager()">국선<span class="hp-badge" id="hp-badge-gukseon" hidden></span></span>
-              <span class="hp-pill hp-pill-link" id="hp-pill-gyeoljae" onclick="goGyeoljae()">결재<span class="hp-badge" id="hp-badge-gyeoljae" hidden></span></span>
+              <span class="hp-eyebrow">서면 작성</span>
             </div>
             <h1 class="hp-title">법무법인 정서</h1>
           </div>
