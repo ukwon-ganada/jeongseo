@@ -96,8 +96,10 @@
     var builder = sb.from('cases')
       .select('l_num,l_code,l_name,l_client,court,client_position,next_date,next_contents');
     if (mode === 'both'){
+      // PostgREST .or() 는 콤마·괄호로 조건을 구분하므로 값에 그 문자가 있으면 필터식이 깨진다(예: "김, 이") → 제거
+      var likeOr = '%' + String(query).replace(/[,()]/g, ' ').trim() + '%';
       // 의뢰인명(l_client) 또는 사건번호(l_code) 어느 쪽이든 매칭
-      builder = builder.or('l_client.ilike.' + like + ',l_code.ilike.' + like);
+      builder = builder.or('l_client.ilike.' + likeOr + ',l_code.ilike.' + likeOr);
     } else {
       var col = (mode === 'name') ? 'l_client' : 'l_code';
       builder = builder.ilike(col, like);
@@ -432,6 +434,7 @@
   window.initSeonimAutofill = function(){
     injectStyle();
     buildSearchCard(document.getElementById('sj-casenum'), fillSeonimForm); // 폼 맨 위 검색카드 한 곳으로 일원화
+    attachManualLookup(document.getElementById('sj-casenum'), fillSeonimForm); // 사건번호 직접입력/붙여넣기 후 탭 → 자동 조회·채움
   };
 
   /* ── 민가사 선임계 폼 채우기 ──
@@ -487,6 +490,7 @@
   window.initMingasaAutofill = function(){
     injectStyle();
     buildSearchCard(document.getElementById('mg-casenum'), fillMingasaForm); // 폼 맨 위 검색카드 한 곳으로 일원화
+    attachManualLookup(document.getElementById('mg-casenum'), fillMingasaForm); // 사건번호 직접입력/붙여넣기 후 탭 → 자동 조회·채움
   };
 
 })();

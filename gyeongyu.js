@@ -10,7 +10,6 @@ function gyExtractBirth(ssn){
   return d.length>=6 ? d.slice(0,6) : d;
 }
 /* 공용 util.js 위임 (중복 제거) */
-function gyToday(){ return JU.todayISO(); }
 function gyEsc(v){ return JU.esc(v); }
 function openGyeongyu(){
   var s=sjState();

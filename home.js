@@ -21,9 +21,6 @@ var HOME_ICON = {
   users:   '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>',
   grid:    '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>'
 };
-function homeIcon(key, sw) {
-  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="' + (sw || '1.8') + '">' + HOME_ICON[key] + '</svg>';
-}
 function homeIconCls(key, cls, sw) {
   return '<svg class="' + cls + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="' + (sw || '1.8') + '">' + HOME_ICON[key] + '</svg>';
 }

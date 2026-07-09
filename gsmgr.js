@@ -822,7 +822,6 @@
     var cls = t === '선고' ? 'tag-sgo' : (t === '선정취소' ? 'tag-cancel' : 'tag-gongpan');
     return '<span class="gm-tag ' + cls + '">' + esc(t) + '</span>' + fmtDate(c.hearingDate);
   }
-  function yesNo(v) { return v ? '<span class="gm-yes">O</span>' : '<span class="gm-no">—</span>'; }
 
   function trow(tab, c) {
     if (tab === 'active') {
@@ -857,10 +856,6 @@
       '<td><input type="date" class="gm-inline-date" data-id="' + esc(c.id) + '" data-field="depositDate" value="' + esc(ymdDash(c.depositDate)) + '"></td>' +
       '<td><span class="gm-inline" contenteditable="true" data-id="' + esc(c.id) + '" data-field="depositAmount" data-ph="입금액…">' + esc(c.depositAmount) + '</span></td>' +
     '</tr>';
-  }
-  function claimToggle(c) {
-    return '<button type="button" class="gm-toggle' + (c.claimed ? ' on' : '') + '" data-id="' + esc(c.id) +
-      '" onclick="gsmgrToggleClaim(this)">' + (c.claimed ? 'O' : '—') + '</button>';
   }
   // 보수 상태 배지 — 클릭하면 미청구↔청구 토글(청구 시 청구일 자동), 입금일 입력 시 '지급'
   function feeStatusCell(c) {

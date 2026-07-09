@@ -1611,18 +1611,6 @@ function restoreFormData(fd){
 function sc(id,val){var e=document.getElementById(id);if(e)e.checked=!!val;}
 function sv(id,val){var e=document.getElementById(id);if(e&&val!==undefined&&val!==null)e.value=val;}
 function sr(name,val){if(!val)return;var e=document.querySelector('input[name="'+name+'"][value="'+val+'"]');if(e)e.checked=true;}
-function restoreSignature(dataUrl){
-  var canvas=document.getElementById('sigCanvas');if(!canvas)return;
-  var ctx=canvas.getContext('2d');
-  var img=new Image();
-  img.onload=function(){
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    ctx.drawImage(img,0,0,canvas.width,canvas.height);
-    window._hasSig=true;
-    var l=document.getElementById('stampLabel');if(l)l.style.display='none';
-  };
-  img.src=dataUrl;
-}
 
 /* ═══ 서명 완료 계약서: 사건번호·사건명·관할만 수정 + 변경 이력 기록 ═══ */
 async function saveLockedCaseInfo(client, explicit){
@@ -2660,9 +2648,6 @@ async function deleteContract(id){
   }catch(e){showToast('삭제 실패');}
 }
 
-/* ═══ 새 계약서 작성 시 편집 ID 초기화 ═══ */
-function startNewContract(){currentEditId=null;currentRecord=null;}
-
 /* ═══ 통합 입력 폼 ═══ */
 /* 입금계좌 알약 선택 (단일 선택) — 히든 input#f-account 에 smg/hana 값 보관 */
 function setFormAccount(val){
@@ -2995,7 +2980,7 @@ function getClientName(){
   return (n&&n.textContent&&n.textContent!=='의뢰인명')?n.textContent:'';
 }
 function buildFileName(){
-  var parts=['(형사)송무위임계약서'];
+  var parts=['('+(currentDocType||'형사')+')송무위임계약서'];
   var name=getClientName();
   if(name)parts.push(name);
   var caseNum=(data.casenum||'').trim();
@@ -3269,6 +3254,7 @@ async function doAction(type){
     document.body.classList.remove('print-emulate');
     Array.prototype.forEach.call(document.querySelectorAll('[data-account-print],[data-input-print],[data-check-print]'),function(el){el.remove();});
     Array.prototype.forEach.call(document.querySelectorAll('.account-select, #ctContent input[type="text"], #ctContent input[type="checkbox"], #ctContent input[type="radio"]'),function(s){s.style.display='';});
+    applyContractLock(window._lockedContract); // 캡처 도중 임시 해제(disabled=false)한 잠금을 원복 — 실패 시 서명본이 편집 가능 상태로 남지 않도록
     hideLoading();alert('오류가 발생했습니다.\n'+err.message);
   }
 }
@@ -4494,6 +4480,7 @@ if ('serviceWorker' in navigator) {
       if(!cell)return;
       var host=document.getElementById('sj-host');
       if(!host||!host.contains(cell))return;
+      if(host._sjBound)return; // 메인 핸들러가 이미 바인딩됨 → 중복 실행 방지(이 폴백은 메인 스크립트가 실패했을 때만 동작)
       var type=cell.getAttribute('data-edit');
       if(type&&typeof openSjEdit==='function'){
         try{openSjEdit(type);}catch(err){console.log('openSjEdit 오류:',err);}
