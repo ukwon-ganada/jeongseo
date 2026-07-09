@@ -1371,6 +1371,30 @@
   <iframe id="dojangFrame" class="dj-frame" title="자료출력"></iframe>
 </div>
 
+<!-- ═══════════ 결재 요청 (어쏘) ═══════════ -->
+<div id="screen-gyeoljae-req" class="screen">
+  <div class="sj-appbar no-print">
+    <button class="sj-back" onclick="showScreen('screen-home')">‹ 처음으로</button>
+    <div class="sj-title">결재 요청</div>
+  </div>
+  <div class="gj-wrap">
+    <div class="fs-card">
+      <div class="fs-body" id="gj-req-body"></div>
+      <div class="fs-foot" id="gj-req-foot"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ 결재함 (서고은) ═══════════ -->
+<div id="screen-gyeoljae" class="screen">
+  <div class="sj-appbar no-print">
+    <button class="sj-back" onclick="showScreen('screen-home')">‹ 처음으로</button>
+    <div class="sj-title">결재함</div>
+    <button class="sj-print-btn" onclick="goGyeoljaeReq()">＋ 요청</button>
+  </div>
+  <div class="gj-wrap" id="gj-inbox"></div>
+</div>
+
 
 <script>
 
@@ -1405,6 +1429,8 @@ function promptUnlock(){
   if(window.jsAuth) window.jsAuth.showLogin();
 }
 function goHome(){showScreen('screen-home');}
+function goGyeoljae(){showScreen('screen-gyeoljae');if(window.gyeoljae)gyeoljae.open();}
+function goGyeoljaeReq(){showScreen('screen-gyeoljae-req');if(window.gyeoljae)gyeoljae.openReq();}
 function goContract(type){
   closeTypeSheet();
   currentEditId=null;
@@ -4650,6 +4676,7 @@ document.getElementById('ap-host').addEventListener('click',function(e){
 <script src="./geomchal.js"></script>
 <script src="./gukseon.js"></script>
 <script src="./gsmgr.js"></script>
+<script src="./geoljae.js"></script>
 <script src="./pankyul.js"></script>
 <script src="./home.js"></script>
 <script src="./auth.js"></script>
