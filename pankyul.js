@@ -37,23 +37,9 @@
   function sealFor(name) {
     return (name === '서고은' && typeof SEAL_SEOGOEUN !== 'undefined') ? SEAL_SEOGOEUN : '';
   }
-  function loadAttorneys() {
-    try {
-      var raw = localStorage.getItem(ATTORNEYS_KEY);
-      var arr = raw ? JSON.parse(raw) : null;
-      if (arr && arr.length) return arr;
-    } catch (e) {}
-    return ATTORNEYS_SEED.slice();
-  }
-  function saveAttorney(name) {
-    name = (name || '').trim();
-    if (!name) return;
-    var list = loadAttorneys();
-    if (list.indexOf(name) < 0) {
-      list.push(name);
-      try { localStorage.setItem(ATTORNEYS_KEY, JSON.stringify(list)); } catch (e) {}
-    }
-  }
+  // 변호사 명단(localStorage) — 공용 FSDoc.roster 로 위임(동작 동일)
+  function loadAttorneys() { return FSDoc.roster(ATTORNEYS_KEY, ATTORNEYS_SEED).load(); }
+  function saveAttorney(name) { FSDoc.roster(ATTORNEYS_KEY, ATTORNEYS_SEED).save(name); }
 
   /* ══════════════════════════════════════════════════════════════
      서면 렌더 (순수 함수) — HWPX 원본 표를 그대로 재현.
@@ -191,13 +177,7 @@
       '.pk-page{margin:0;box-shadow:none;}' +
       '@page{size:A4;margin:0;}' +
     '}';
-  function injectStyle() {
-    if (document.getElementById(STYLE_ID)) return;
-    var s = document.createElement('style');
-    s.id = STYLE_ID;
-    s.textContent = PK_CSS;
-    document.head.appendChild(s);
-  }
+  function injectStyle() { FSDoc.injectOnce(STYLE_ID, PK_CSS); }
 
   /* ══════════════════════════════════════════════════════════════
      화면 껍데기 주입 (1회) — 입력폼 / 서면

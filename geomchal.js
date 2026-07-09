@@ -283,12 +283,7 @@
         '.gm-page:last-child{page-break-after:auto;}' +
         '@page{size:A4;margin:0;}' +
       '}';
-  function injectStyle() {
-    if (document.getElementById(STYLE_ID)) return;
-    var s = document.createElement('style');
-    s.id = STYLE_ID; s.textContent = GM_CSS;
-    document.head.appendChild(s);
-  }
+  function injectStyle() { FSDoc.injectOnce(STYLE_ID, GM_CSS); }
 
   /* ══════════════════════════════════════════════════════════════
      화면 껍데기 (입력폼 + 서면)

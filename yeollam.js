@@ -38,23 +38,9 @@
     if (!m) return '';
     return m[1] + '년 ' + parseInt(m[2], 10) + '월 ' + parseInt(m[3], 10) + '일';
   }
-  function loadClerks() {
-    try {
-      var raw = localStorage.getItem(CLERKS_KEY);
-      var arr = raw ? JSON.parse(raw) : null;
-      if (arr && arr.length) return arr;
-    } catch (e) {}
-    return CLERKS_SEED.slice();
-  }
-  function saveClerk(name) {
-    name = (name || '').trim();
-    if (!name) return;
-    var list = loadClerks();
-    if (list.indexOf(name) < 0) {
-      list.push(name);
-      try { localStorage.setItem(CLERKS_KEY, JSON.stringify(list)); } catch (e) {}
-    }
-  }
+  // 사무원 명단(localStorage) — 공용 FSDoc.roster 로 위임(동작 동일)
+  function loadClerks() { return FSDoc.roster(CLERKS_KEY, CLERKS_SEED).load(); }
+  function saveClerk(name) { FSDoc.roster(CLERKS_KEY, CLERKS_SEED).save(name); }
 
   /* ══════════════════════════════════════════════════════════════
      서면 렌더 (순수 함수) — 값 객체 v 를 받아 인쇄용 표 HTML 을 돌려준다.
@@ -256,13 +242,7 @@
         '.yl-page{margin:0;box-shadow:none;}' +
         '@page{size:A4;margin:0;}' +
       '}';
-  function injectStyle() {
-    if (document.getElementById(STYLE_ID)) return;
-    var s = document.createElement('style');
-    s.id = STYLE_ID;
-    s.textContent = YL_CSS;
-    document.head.appendChild(s);
-  }
+  function injectStyle() { FSDoc.injectOnce(STYLE_ID, YL_CSS); }
 
   /* ══════════════════════════════════════════════════════════════
      화면 껍데기 주입 (1회) — 갈림길 / 입력폼 / 서면.
