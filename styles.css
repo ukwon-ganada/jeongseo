@@ -97,6 +97,13 @@ html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black)
   /* 헤드라인 블록 */
   .hp-head{position:absolute;top:7vh;left:5vw;max-width:420px;}
   .hp-pills{display:flex;flex-wrap:wrap;align-items:center;gap:8px;}
+  /* '서면 작성' — 버튼이 아니라 이 화면이 무엇인지 알리는 라벨(eyebrow) */
+  .hp-eyebrow{font:600 11px 'IBM Plex Mono',monospace;letter-spacing:.18em;
+    text-transform:uppercase;color:rgba(255,255,255,.72);}
+  /* 우상단 유틸리티 바: 다른 화면 이동 메뉴(계약서·국선·결재) */
+  .hp-nav{position:absolute;top:7vh;right:5vw;display:flex;flex-wrap:wrap;
+    justify-content:flex-end;align-items:center;gap:8px;max-width:60vw;pointer-events:auto;}
+  #hp-pill-gyeoljae{position:relative;}
   .hp-pill{
     display:inline-block;padding:6px 14px;border-radius:999px;
     background:rgba(255,255,255,.22);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
