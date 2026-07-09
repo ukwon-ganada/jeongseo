@@ -66,7 +66,6 @@ var CONTRACT_CARDS = [
 
 /* 전체 기능 화면: 폰 홈에 안 올린 나머지 (표기가 조금 다른 것은 name/desc 덮어씀) */
 var MORE_ORDER = [
-  { id: 'gyeoljae' },
   { id: 'seonim' },
   { id: 'appeal',  name: '항소장 작성' },
   { id: 'yeollam', name: '열람·복사 신청서', desc: '재판기록 열람·복사' },
