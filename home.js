@@ -155,9 +155,9 @@ window.toggleHomeTheme = function () {
 
 /* ── PC 홈 배경 무드(낮·석양·밤) — 선택을 기억 ──
    첫 방문 기본값은 '석양'. 큐레이션된 3종만 제공(랜덤 아님)해 브랜드 톤을 지킨다. */
-var HOME_SKIES = ['day', 'dusk'];
-/* 무드별 실제 배경 사진 (두 이미지 비율 동일 → 크롭 없이 그대로 교체) */
-var SKY_IMG = { day: './hero-city.jpg', dusk: './hero-sunset.jpg' };
+var HOME_SKIES = ['day', 'dusk', 'night'];
+/* 무드별 실제 배경 사진 (모두 세로 포트레이트 → height:auto 로 자연 높이 표시) */
+var SKY_IMG = { day: './hero-city.jpg', dusk: './hero-sunset.jpg', night: './hero-night.jpg' };
 function paintSkyButtons(sky) {
   var btns = document.querySelectorAll('.hp-sky-btn');
   for (var i = 0; i < btns.length; i++) {
