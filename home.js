@@ -155,7 +155,7 @@ window.toggleHomeTheme = function () {
 
 /* ── PC 홈 배경 무드(낮·석양·밤) — 선택을 기억 ──
    첫 방문 기본값은 '석양'. 큐레이션된 3종만 제공(랜덤 아님)해 브랜드 톤을 지킨다. */
-var HOME_SKIES = ['day', 'dusk', 'night'];
+var HOME_SKIES = ['day', 'dusk'];
 function paintSkyButtons(sky) {
   var btns = document.querySelectorAll('.hp-sky-btn');
   for (var i = 0; i < btns.length; i++) {

@@ -104,13 +104,6 @@ html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black)
   .hp-hero[data-sky=dusk] .hp-glow{opacity:.95;mix-blend-mode:screen;
     background:radial-gradient(135% 66% at 60% 44%,rgba(255,176,92,.85) 0%,rgba(255,120,55,.46) 30%,rgba(255,80,70,.12) 55%,rgba(255,80,70,0) 70%);}
 
-  /* 밤: 짙은 남색으로 어둡게, 도시 불빛만 은은히 남긴다 */
-  .hp-hero[data-sky=night]{background-image:linear-gradient(180deg,#050912 0%,#0b1730 46%,#132a52 74%,#05060c 100%);}
-  .hp-hero[data-sky=night] .hp-bg{filter:brightness(.6) saturate(.92) contrast(1.06) hue-rotate(6deg);}
-  .hp-hero[data-sky=night] .hp-grade{opacity:.9;mix-blend-mode:multiply;
-    background:linear-gradient(180deg,#060b1c 0%,#0d1b3a 52%,#122a54 100%);}
-  .hp-hero[data-sky=night] .hp-glow{opacity:.5;mix-blend-mode:screen;
-    background:radial-gradient(90% 40% at 50% 72%,rgba(255,190,120,.30) 0%,rgba(180,150,255,.10) 40%,rgba(0,0,0,0) 66%);}
   @media (prefers-reduced-motion:reduce){.hp-bg,.hp-grade,.hp-glow{transition:none;}}
 
   /* ── 배경 무드 선택 컨트롤(글래스 세그먼트) ── */
