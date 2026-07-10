@@ -126,8 +126,11 @@
   <div class="home-main">
     <!-- PC 홈: 맑은 하늘 위 글래스 카드 (세로 스크롤 히어로) -->
     <div class="home-pc">
-      <div class="hp-hero">
-        <img class="hp-bg" src="./hero-city.jpg" alt="맑은 하늘 아래 도시와 골목" onerror="this.style.display='none'">
+      <div class="hp-hero" data-sky="dusk">
+        <img class="hp-bg" src="./hero-city.jpg" alt="도시와 골목 위로 펼쳐진 하늘" onerror="this.style.display='none'">
+        <!-- 시간대 무드 컬러 그레이딩(석양·밤) — 사진 위에 얹히는 색보정 레이어 -->
+        <div class="hp-grade" aria-hidden="true"></div>
+        <div class="hp-glow" aria-hidden="true"></div>
 
         <!-- 하늘 위에 겹치는 오버레이 -->
         <div class="hp-overlay">
@@ -142,6 +145,21 @@
               <span class="hp-eyebrow">서면 작성</span>
             </div>
             <h1 class="hp-title">법무법인 정서</h1>
+            <!-- 배경 무드 선택(낮·석양·밤) — 선택은 기억됩니다 -->
+            <div class="hp-sky" role="group" aria-label="배경 무드 선택">
+              <button type="button" class="hp-sky-btn" data-sky-set="day" onclick="setHomeSky('day')" aria-label="낮">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4"/><path d="M12 2.5V5M12 19v2.5M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2.5 12H5M19 12h2.5M4.2 19.8L6 18M18 6l1.8-1.8"/></svg>
+                <span>낮</span>
+              </button>
+              <button type="button" class="hp-sky-btn" data-sky-set="dusk" onclick="setHomeSky('dusk')" aria-label="석양">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 18a5 5 0 0 0-10 0"/><line x1="12" y1="2.5" x2="12" y2="6"/><line x1="4.5" y1="9" x2="6.3" y2="10.2"/><line x1="19.5" y1="9" x2="17.7" y2="10.2"/><line x1="2" y1="18" x2="22" y2="18"/><line x1="4" y1="21.5" x2="20" y2="21.5"/></svg>
+                <span>석양</span>
+              </button>
+              <button type="button" class="hp-sky-btn" data-sky-set="night" onclick="setHomeSky('night')" aria-label="밤">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+                <span>밤</span>
+              </button>
+            </div>
           </div>
 
           <div class="doc-grid" id="doc-grid"></div>
