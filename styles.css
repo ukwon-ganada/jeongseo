@@ -1291,6 +1291,19 @@ textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;
 /* 본문 */
 .ap-body{text-indent:2em;margin:13mm 0;text-align:justify;}
 
+/* 항소이유 표(테두리 있음) — 앞 네모(■/□)는 체크칸, 우측은 고정 문구.
+   최장 문구가 한 줄에 들어가도록 10.5pt·nowrap·고정 열너비(148mm, 26/122mm)로 줄넘침 방지 */
+.ap-grounds{border-collapse:collapse;table-layout:fixed;width:148mm;margin:0 0 2mm;font-size:10.5pt;line-height:1.9;}
+.ap-grounds col.ap-gr-c1{width:26mm;}
+.ap-grounds col.ap-gr-c2{width:122mm;}
+.ap-grounds td{border:0.12mm solid #111;padding:1.4mm 2.4mm;vertical-align:middle;font-size:10.5pt;
+  -webkit-print-color-adjust:exact;print-color-adjust:exact;}
+.ap-grounds .ap-gr-lbl{font-weight:700;white-space:nowrap;}
+.ap-grounds .ap-gr-txt{white-space:nowrap;}
+.ap-grounds .ap-gr-box{display:inline-block;margin-right:1.6mm;cursor:pointer;font-weight:400;
+  line-height:1;letter-spacing:0;-webkit-user-select:none;user-select:none;color:#000;}
+.ap-grounds .ap-gr-box:active{opacity:.55;}
+
 /* 서명부 — 양식의 탭 6개(≈84mm) 우측 이동 */
 .ap-sign{margin-top:34mm;padding-left:84mm;}
 .ap-sign .ln{white-space:nowrap;}
