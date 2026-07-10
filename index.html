@@ -4540,7 +4540,7 @@ if ('serviceWorker' in navigator) {
    ▶ 의존: renderSeonim·renderMingasa·sjEsc·sjFmtDate 등 (선임계/민가사와 같은 파일이어야 함)
    ▶ 주의: 항소장 도장(SEAL_SEOGOEUN·SEAL_FIRM)은 뒤쪽 별도 <script>에 있음 → 함께 옮겨야 함 */
 /* ═══════════ 항소장 (형사) 로직 ═══════════ */
-var appealState={casenum:'',casename:'',defendant:'',sentdate:'',writedate:'',court:'',attorneys:['서고은']};
+var appealState={casenum:'',casename:'',defendant:'',sentdate:'',writedate:'',court:'',attorneys:['서고은'],grounds:{fact:true,law:true,sentence:true}};
 
 function _apToday(){var t=new Date();return t.getFullYear()+'-'+('0'+(t.getMonth()+1)).slice(-2)+'-'+('0'+t.getDate()).slice(-2);}
 
@@ -4552,6 +4552,7 @@ function goAppeal(){
   document.getElementById('ap-sentdate').value='';
   document.getElementById('ap-writedate').value=_apToday();
   document.getElementById('ap-court').value='';
+  if(window.appealState) appealState.grounds={fact:true,law:true,sentence:true};
   renderAttChips('ap',['서고은']);
   document.getElementById('appealForm').classList.add('active');
   if(window.initAppealAutofill) initAppealAutofill();
@@ -4583,6 +4584,7 @@ function applyAppealForm(){
   document.querySelectorAll('#ap-att .fs-chip.on').forEach(function(c){atts.push(c.dataset.att);});
   if(!atts.length)atts=['서고은'];
   var prevSeal=(window.appealState&&appealState.seal)||'none';
+  var prevGrounds=(window.appealState&&appealState.grounds)||{fact:true,law:true,sentence:true};
   appealState={
     casenum: document.getElementById('ap-casenum').value.trim(),
     casename: document.getElementById('ap-casename').value.trim(),
@@ -4591,7 +4593,8 @@ function applyAppealForm(){
     writedate: document.getElementById('ap-writedate').value,
     court: document.getElementById('ap-court').value.trim(),
     attorneys: atts,
-    seal: prevSeal
+    seal: prevSeal,
+    grounds: prevGrounds
   };
   closeAppealForm();
   showScreen('screen-appeal');
@@ -4634,6 +4637,23 @@ function renderAppeal(){
     attLines+='<div class="att-line">'+label+nameHtml+'</div>';
   });
 
+  /* 항소이유 표: 앞 네모(■/□)는 체크칸, 우측은 고정 문구 */
+  var g=s.grounds||{fact:true,law:true,sentence:true};
+  var GROUNDS=[
+    {k:'fact',     label:'사실오인', text:'원심은 사실을 오인하여 유죄의 판결을 선고하였습니다.'},
+    {k:'law',      label:'법리오해', text:'원심판결에는 법리를 오해하여 판결에 영향을 미친 위법이 있습니다.'},
+    {k:'sentence', label:'양형부당', text:'원심이 선고한 형량은 너무 과중하여 부당합니다.'}
+  ];
+  var groundsRows='';
+  GROUNDS.forEach(function(gr){
+    var on=!!g[gr.k];
+    groundsRows+='<tr>'
+      +'<td class="ap-gr-lbl"><span class="ap-gr-box'+(on?' on':'')+'" data-ground="'+gr.k+'" role="checkbox" aria-checked="'+(on?'true':'false')+'">'+(on?'■':'□')+'</span>'+gr.label+'</td>'
+      +'<td class="ap-gr-txt">'+gr.text+'</td>'
+    +'</tr>';
+  });
+  var groundsHtml='<table class="ap-grounds"><colgroup><col class="ap-gr-c1"><col class="ap-gr-c2"></colgroup><tbody>'+groundsRows+'</tbody></table>';
+
   var html=''
    +'<div class="ap-doc">'
    +'<div class="ap-title">항 소 장</div>'
@@ -4641,7 +4661,8 @@ function renderAppeal(){
      +'<tr><td class="ap-lbl"><span class="ap-lbl-spread"><span>사</span><span>건</span></span></td><td class="ap-gap"></td><td class="ap-val ap-editable" data-edit="case">'+caseLine+'</td></tr>'
      +'<tr><td class="ap-lbl bold"><span class="ap-lbl-spread"><span>피</span><span>고</span><span>인</span></span></td><td class="ap-gap"></td><td class="ap-val ap-editable" data-edit="defendant">'+sjEsc(s.defendant)+'</td></tr>'
    +'</table>'
-   +'<div class="ap-body ap-editable" data-edit="sentdate">위 사건에 관하여 피고인은 '+sent+' 선고를 받았으나, 피고인은 위 판결에 불복하므로 항소를 제기합니다.</div>'
+   +'<div class="ap-body ap-editable" data-edit="sentdate">위 사건에 관하여 귀원은 '+sent+' 판결 선고를 한 바 있으나, 피고인은 위 판결에 불복이므로 항소를 제기합니다.</div>'
+   +groundsHtml
    +'<div class="ap-sign">'
      +'<div class="ln ap-editable" data-edit="writedate">'+write+'</div>'
      +'<div class="ln">위 피고인의 변호인</div>'
@@ -4659,9 +4680,18 @@ function renderAppeal(){
 
 /* 양식 칸 클릭 → 입력폼 재오픈(전체 수정) */
 document.getElementById('ap-host').addEventListener('click',function(e){
+  var box=e.target.closest('.ap-gr-box');
+  if(box){ toggleAppealGround(box.dataset.ground); return; }
   if(e.target.closest('.ap-sealable')){ openSealSheet(); return; }
   if(e.target.closest('.ap-editable')) editAppeal();
 });
+/* 항소이유 체크칸 토글(■⇄□) — 편집폼 열지 않음 */
+function toggleAppealGround(key){
+  if(!window.appealState) return;
+  if(!appealState.grounds) appealState.grounds={fact:true,law:true,sentence:true};
+  appealState.grounds[key]=!appealState.grounds[key];
+  renderAppeal();
+}
 </script>
 
 <!-- 항소장 도장 선택 시트 (body 직속) -->
