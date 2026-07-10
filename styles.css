@@ -88,30 +88,14 @@ html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black)
     /* 이미지가 없을 때의 하늘 폴백 */
     background-image:linear-gradient(180deg,#2E6FB0 0%,#5B93C9 42%,#9FBFD8 72%,#0C1119 100%);
   }
-  .hp-bg{display:block;width:100%;height:auto;transition:filter .7s ease;}
+  .hp-bg{display:block;width:100%;height:auto;transition:opacity .5s ease;}
 
-  /* ── 시간대 무드: 사진 위에 얹는 컬러 그레이딩 레이어 ──
-     grade = 하늘·도시 전반을 물들이는 색보정 / glow = 지평선 근처 태양광
-     day(기본 사진)에선 둘 다 투명, dusk·night에서만 서서히 켜진다. */
-  .hp-grade,.hp-glow{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .7s ease;}
-
-  /* 석양: 파란 하늘을 세피아로 중화한 뒤 자홍→호박빛으로 다시 물들이고,
-     지평선 위에 태양광 glow를 얹어 황금빛 노을을 만든다. */
+  /* ── 시간대 무드: 낮·석양은 각각 실제 사진으로 교체(비율 동일) ──
+     이미지 로드 실패 시 아래 fallback 그라데이션이 하늘 역할을 한다. */
+  /* 석양: 따뜻한 노을 fallback(사진이 안 뜰 때만 보임) */
   .hp-hero[data-sky=dusk]{background-image:linear-gradient(180deg,#3a1f5c 0%,#8e3b6b 34%,#e0663f 62%,#ffb15e 84%,#12101c 100%);}
-  .hp-hero[data-sky=dusk] .hp-bg{filter:sepia(.62) saturate(1.5) hue-rotate(-18deg) brightness(.96) contrast(1.06);}
-  .hp-hero[data-sky=dusk] .hp-grade{opacity:1;mix-blend-mode:overlay;
-    background:linear-gradient(180deg,#3d1d63 0%,#c23a63 32%,#ff6a30 60%,#ffb45a 82%,#ffd98c 100%);}
-  .hp-hero[data-sky=dusk] .hp-glow{opacity:.95;mix-blend-mode:screen;
-    background:radial-gradient(135% 66% at 60% 44%,rgba(255,176,92,.85) 0%,rgba(255,120,55,.46) 30%,rgba(255,80,70,.12) 55%,rgba(255,80,70,0) 70%);}
 
-  /* 밤: 짙은 남색으로 어둡게, 도시 불빛만 은은히 남긴다 */
-  .hp-hero[data-sky=night]{background-image:linear-gradient(180deg,#050912 0%,#0b1730 46%,#132a52 74%,#05060c 100%);}
-  .hp-hero[data-sky=night] .hp-bg{filter:brightness(.6) saturate(.92) contrast(1.06) hue-rotate(6deg);}
-  .hp-hero[data-sky=night] .hp-grade{opacity:.9;mix-blend-mode:multiply;
-    background:linear-gradient(180deg,#060b1c 0%,#0d1b3a 52%,#122a54 100%);}
-  .hp-hero[data-sky=night] .hp-glow{opacity:.5;mix-blend-mode:screen;
-    background:radial-gradient(90% 40% at 50% 72%,rgba(255,190,120,.30) 0%,rgba(180,150,255,.10) 40%,rgba(0,0,0,0) 66%);}
-  @media (prefers-reduced-motion:reduce){.hp-bg,.hp-grade,.hp-glow{transition:none;}}
+  @media (prefers-reduced-motion:reduce){.hp-bg{transition:none;}}
 
   /* ── 배경 무드 선택 컨트롤(글래스 세그먼트) ── */
   .hp-sky{display:inline-flex;gap:2px;margin-top:16px;padding:3px;border-radius:999px;
