@@ -153,44 +153,6 @@ window.toggleHomeTheme = function () {
   paintHomeKnob();
 };
 
-/* ── PC 홈 배경 무드(낮·석양·밤) — 선택을 기억 ──
-   첫 방문 기본값은 '석양'. 큐레이션된 3종만 제공(랜덤 아님)해 브랜드 톤을 지킨다. */
-var HOME_SKIES = ['day', 'dusk', 'night'];
-/* 무드별 실제 배경 사진 (모두 세로 포트레이트 → height:auto 로 자연 높이 표시) */
-var SKY_IMG = { day: './hero-city.jpg', dusk: './hero-sunset.jpg', night: './hero-night.jpg' };
-function paintSkyButtons(sky) {
-  var btns = document.querySelectorAll('.hp-sky-btn');
-  for (var i = 0; i < btns.length; i++) {
-    var on = btns[i].getAttribute('data-sky-set') === sky;
-    btns[i].classList.toggle('is-active', on);
-    btns[i].setAttribute('aria-pressed', on ? 'true' : 'false');
-  }
-}
-function applyHomeSky(sky) {
-  var hero = document.querySelector('.hp-hero');
-  if (!hero) return;
-  hero.setAttribute('data-sky', sky);
-  var img = hero.querySelector('.hp-bg');
-  if (img && SKY_IMG[sky]) {
-    // 파일명만 비교해 불필요한 재로딩 방지
-    if (img.getAttribute('src') !== SKY_IMG[sky]) img.setAttribute('src', SKY_IMG[sky]);
-  }
-  paintSkyButtons(sky);
-}
-function initHomeSky() {
-  var saved = 'dusk';
-  try {
-    var v = localStorage.getItem('homeSky');
-    if (v && HOME_SKIES.indexOf(v) !== -1) saved = v;
-  } catch (e) {}
-  applyHomeSky(saved);
-}
-window.setHomeSky = function (sky) {
-  if (HOME_SKIES.indexOf(sky) === -1) return;
-  applyHomeSky(sky);
-  try { localStorage.setItem('homeSky', sky); } catch (e) {}
-};
-
 /* ── 합의서(준비중) 안내 토스트 ── */
 var _homeToastTimer;
 window.homeDevToast = function () {
@@ -226,7 +188,6 @@ function renderHome() {
   renderContractSwipe();
   renderMoreScreen();
   initHomeTheme();
-  initHomeSky();
 }
 if (typeof document !== 'undefined') {
   if (document.readyState === 'loading') {
