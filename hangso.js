@@ -35,6 +35,30 @@
   function splitCase(v) { v = String(v || '').trim(); var i = v.indexOf(' '); return i < 0 ? { casenum: v, casename: '' } : { casenum: v.slice(0, i).trim(), casename: v.slice(i + 1).trim() }; }
   // 압축폼: 한 칸의 '법원 재판부' → 마지막 공백 기준 분리(재판부=마지막 토큰, 지원명 포함 법원 대응)
   function splitCourt(v) { v = String(v || '').trim(); var i = v.lastIndexOf(' '); return i < 0 ? { court: v, courtDiv: '' } : { court: v.slice(0, i).trim(), courtDiv: v.slice(i + 1).trim() }; }
+
+  /* ══════════ 사건부호 분류(F) ══════════
+     사건번호의 부호(연도와 번호 사이 한글)로 분야(형사/민가사)·심급(1심/항소심/상고심) 판정.
+     lv 1=1심 → 항소장, 2=항소심(2심) → 상고장, 3=상고심(auto 안함). (대법원 사건부호표 기준) */
+  var CODE_MAP={'가단':[1,'민가사'],'가소':[1,'민가사'],'가합':[1,'민가사'],'감고':[1,'형사'],'감노':[2,'형사'],'감도':[3,'형사'],'감오':[3,'형사'],'고단':[1,'형사'],'고정':[1,'형사'],'고합':[1,'형사'],'나':[2,'민가사'],'노':[2,'형사'],'느단':[1,'민가사'],'느합':[1,'민가사'],'다':[3,'민가사'],'도':[3,'형사'],'드':[1,'민가사'],'드단':[1,'민가사'],'드합':[1,'민가사'],'르':[2,'민가사'],'므':[3,'민가사'],'보고':[1,'형사'],'보노':[2,'형사'],'보도':[3,'형사'],'보오':[3,'형사'],'오':[3,'형사'],'재가단':[1,'민가사'],'재가소':[1,'민가사'],'재가합':[1,'민가사'],'재감고':[1,'형사'],'재감노':[2,'형사'],'재감도':[3,'형사'],'재고단':[1,'형사'],'재고정':[1,'형사'],'재고합':[1,'형사'],'재나':[2,'민가사'],'재노':[2,'형사'],'재느단':[1,'민가사'],'재느합':[1,'민가사'],'재다':[3,'민가사'],'재도':[3,'형사'],'재드':[1,'민가사'],'재드단':[1,'민가사'],'재드합':[1,'민가사'],'재르':[2,'민가사'],'재므':[3,'민가사'],'재즈단':[1,'민가사'],'재즈합':[1,'민가사'],'전고':[1,'형사'],'전노':[2,'형사'],'전도':[3,'형사'],'전오':[3,'형사'],'준재가단':[1,'민가사'],'준재가소':[1,'민가사'],'준재가합':[1,'민가사'],'준재나':[2,'민가사'],'준재느단':[1,'민가사'],'준재느합':[1,'민가사'],'준재다':[3,'민가사'],'준재드':[1,'민가사'],'준재드단':[1,'민가사'],'준재드합':[1,'민가사'],'준재르':[2,'민가사'],'준재므':[3,'민가사'],'즈':[1,'민가사'],'즈단':[1,'민가사'],'즈합':[1,'민가사'],'초치':[1,'형사'],'치고':[1,'형사'],'치노':[2,'형사'],'치도':[3,'형사'],'치오':[3,'형사']};
+  function classifyCase(cn) {
+    var m = String(cn || '').match(/(\d{4})\s*([가-힣]+)/);
+    if (!m) return null;
+    var e = CODE_MAP[m[2]];
+    return e ? { code: m[2], lv: e[0], cat: e[1] } : null;
+  }
+  /* 지위(A): 창고 client_position → 당사자 쌍{first,second}과 의뢰인 쪽(clientSide). 형사/애매하면 null. */
+  function jiwiPair(pos) {
+    var p = String(pos || ''); if (!p) return null;
+    if (/피신청/.test(p)) return { first: '신청인', second: '피신청인', clientSide: 'second' };
+    if (/신청/.test(p)) return { first: '신청인', second: '피신청인', clientSide: 'first' };
+    if (/채무/.test(p)) return { first: '채권자', second: '채무자', clientSide: 'second' };
+    if (/채권/.test(p)) return { first: '채권자', second: '채무자', clientSide: 'first' };
+    if (/피고인|피의자/.test(p)) return null; // 형사
+    if (/피고/.test(p)) return { first: '원고', second: '피고', clientSide: 'second' };
+    if (/원고/.test(p)) return { first: '원고', second: '피고', clientSide: 'first' };
+    return null;
+  }
+  function spacedLabel(w) { return String(w || '').split('').join(' '); } // '신청인'→'신 청 인'
   function hasBatchim(s) { var ch = String(s || '').trim().slice(-1); if (!ch) return true; var c = ch.charCodeAt(0); if (c < 0xAC00 || c > 0xD7A3) return true; return (c - 0xAC00) % 28 !== 0; }
   function dropPara(ctx, text) {
     var re = new RegExp('<hp:p\\b[^>]*>(?:(?!</hp:p>)[\\s\\S])*?' + reEsc(text) + '[\\s\\S]*?</hp:p>');
@@ -113,13 +137,16 @@
        피고 주식회사 비피알코퍼레이션(피항소인) / 인천지방법원 2026.05.20 선고 2026.05.26 송달 /
        원판결표시(2줄) / 항소취지(4줄) / 2026. 7. 11. / 원고(항소인) 소송대리인 / 인천지방법원 민사13단독 귀중 */
   function fillMingaHangso(ctx, c) {
-    // 당사자 지위 라벨: 기본(의뢰인=원고)은 템플릿 그대로(원고 항소인 / 피고 피항소인).
-    // 의뢰인=피고면 스왑 — 피고 라벨은 전각공백 태그로 분리돼 있어 run 구간을 통째로 교체.
-    if (c.side === '피고') {
+    var first = c.pairFirst || '원고', second = c.pairSecond || '피고';
+    // 당사자 지위 라벨(원고/피고 → 실지위). 기본 원고/피고면 손대지 않음.
+    if (first !== '원고') ctx.replace('원       고', spacedLabel(first));
+    if (second !== '피고') ctx.replace('피       고', spacedLabel(second));
+    // 항소인/피항소인 접미사: 의뢰인이 둘째(second)면 스왑 — 둘째 라벨은 전각공백 태그로 분리돼 run 구간 교체.
+    if (c.clientSide === 'second') {
       ctx.replace('(항  소  인)', '(피항소인)');
       ctx.section = ctx.section.replace(/<hp:t>\(피<\/hp:t>[\s\S]*?<hp:t>인\)<\/hp:t>/, '<hp:t>(항소인)</hp:t>');
     }
-    ctx.replace('원고(항소인) 소송대리인', c.side + '(항소인) 소송대리인')
+    ctx.replace('원고(항소인) 소송대리인', (c.clientJiwi || '원고') + '(항소인) 소송대리인')
        .replace('2025가단210684 운송료', (c.casenum || '') + ' ' + (c.casename || ''))
        .replace('엄대봉', c.plaintiff || '').replace('주식회사 비피알코퍼레이션', c.defendant2 || '')
        .replace('인천지방법원에서', (c.court || '') + '에서')
@@ -142,10 +169,19 @@
        작성일 ' 2026. 7. 12.' / 담당변호사 서 고 은(직인 박힘) / 대법원 귀중
      주의: '상고인 이름'은 '피상고인 이름'의 부분문자열 → 피상고인 먼저 치환. */
   function fillMingaSanggo(ctx, c) {
+    // 상고인=의뢰인, 피상고인=상대방(의뢰인 쪽에 따라 이름·주소 배치)
+    var clientName = c.clientSide === 'second' ? c.defendant2 : c.plaintiff;
+    var oppName = c.clientSide === 'second' ? c.plaintiff : c.defendant2;
+    var clientAddr = c.clientSide === 'second' ? c.addr2 : c.addr1;
+    var oppAddr = c.clientSide === 'second' ? c.addr1 : c.addr2;
     ctx.replace('2026나50613  손해배상(기)', (c.casenum || '') + '  ' + (c.casename || ''))
-       .replace('피상고인 이름', c.defendant2 || '').replace('상고인 이름', c.plaintiff || '')
-       .replace('(피상고인 주소입력공간)', c.addr2 || '').replace('(상고인 주소입력공간)', c.addr1 || '')
-       .replace('인천지방법원이', (c.court || '') + '이')
+       .replace('피상고인 이름', oppName || '').replace('상고인 이름', clientName || '')
+       .replace('(피상고인 주소입력공간)', oppAddr || '').replace('(상고인 주소입력공간)', clientAddr || '');
+    // 당사자 지위(원고/피고 → 실지위) — 항소인/피항소인 역할은 기본값 유지
+    if (c.clientJiwi && c.clientJiwi !== '피고') ctx.replace('상 고 인(피고, 항소인)', '상 고 인(' + c.clientJiwi + ', 항소인)');
+    if (c.oppJiwi && c.oppJiwi !== '원고') ctx.replace('피상고인(원고, 피항소인)', '피상고인(' + c.oppJiwi + ', 피항소인)');
+    ctx.replace('인천지방법원이', (c.court || '') + '이')
+       .replace('피고는', (c.clientJiwi || '피고') + (hasBatchim(c.clientJiwi || '피고') ? '은' : '는'))
        .replace('2026. 2. 13.', c.sentDate || '')
        .replace('2026. 7. 12.', c.writeDate || '');
     setLinesInto(ctx, '원 판결의 표시', 2, c.verdictLines);
@@ -162,13 +198,14 @@
       cat: '형사', type: '항소', jiwi: '피고인',
       defendant: '', casenum: '', casename: '', court: '', courtDiv: '', sentDate: '', serveDate: '',
       reasons: REASONS.slice(), result: '항소기각', gukseon: false,
-      plaintiff: '', defendant2: '', side: '원고', verdict: '', purpose: '',
+      plaintiff: '', defendant2: '', side: 'first', pair: { first: '원고', second: '피고' }, verdict: '', purpose: '',
       addr1: '', addr1b: '', addr2: '', addr2b: '',
       attorneys: ['서고은'], writeDate: todayISO(), stamp: true
     };
   }
   function toCfg(s) {
     var atts = (s.attorneys && s.attorneys.length) ? s.attorneys.slice() : ['서고은'];
+    var pair = s.pair || { first: '원고', second: '피고' }, side = s.side || 'first';
     var sentFmt = (s.cat === '민가사') ? (s.type === '상고' ? fmtKDate(s.sentDate) : fmtKDate(s.sentDate)) : (s.type === '상고' ? fmtDot(s.sentDate) : fmtKDate(s.sentDate));
     return {
       cat: s.cat, type: s.type, jiwi: s.jiwi || '피고인',
@@ -176,7 +213,9 @@
       court: s.court, courtDiv: s.courtDiv, sentDate: sentFmt, serveDate: fmtKDate(s.serveDate),
       writeDate: fmtKDate(s.writeDate) || fmtKDate(todayISO()),
       reasons: (s.reasons && s.reasons.length) ? s.reasons.slice() : [], result: s.result || '항소기각', gukseon: !!s.gukseon,
-      plaintiff: HWPXFill.cleanName(s.plaintiff), defendant2: HWPXFill.cleanName(s.defendant2), side: s.side || '원고',
+      plaintiff: HWPXFill.cleanName(s.plaintiff), defendant2: HWPXFill.cleanName(s.defendant2),
+      pairFirst: pair.first, pairSecond: pair.second, clientSide: side,
+      clientJiwi: side === 'first' ? pair.first : pair.second, oppJiwi: side === 'first' ? pair.second : pair.first,
       verdictLines: splitLines(s.verdict), purposeLines: splitLines(s.purpose),
       addr1: s.addr1, addr1b: s.addr1b, addr2: s.addr2, addr2b: s.addr2b,
       attorney: atts[0], attorney2: atts[1] || '', stamp: !!s.stamp,
@@ -232,13 +271,13 @@
             // 형사 당사자
             '<div class="fs-field hs-hyeongsa"><label class="fs-label">피고인 <span class="fs-hint">(국선 표기는 자동 제거)</span></label><input type="text" class="fs-input" id="hs-defendant" data-af="l_client" placeholder="홍길동"></div>' +
             // 민가사 당사자
-            '<div class="hs-pick hs-minga"><span class="hs-pick-l">의뢰인</span><div class="fs-chips" id="hs-side">' +
-              '<span class="fs-chip on" data-v="원고" onclick="hsSide(\'원고\')">원고 측</span>' +
-              '<span class="fs-chip" data-v="피고" onclick="hsSide(\'피고\')">피고 측</span></div></div>' +
-            '<div class="fs-row2 hs-minga"><div class="fs-field"><label class="fs-label">원고</label><input type="text" class="fs-input" id="hs-plaintiff" placeholder="엄대봉"></div>' +
-              '<div class="fs-field"><label class="fs-label">피고</label><input type="text" class="fs-input" id="hs-defendant2" placeholder="주식회사 ○○"></div></div>' +
-            '<div class="fs-row2 hs-minga hs-minga-sanggo"><div class="fs-field"><label class="fs-label">원고(상고인 측) 주소</label><input type="text" class="fs-input" id="hs-addr1" placeholder="주소(선택)"></div>' +
-              '<div class="fs-field"><label class="fs-label">피고(피상고인 측) 주소</label><input type="text" class="fs-input" id="hs-addr2" placeholder="주소(선택)"></div></div>' +
+            '<div class="hs-pick hs-minga"><span class="hs-pick-l">의뢰인 <span class="fs-hint">(지위 자동)</span></span><div class="fs-chips" id="hs-side">' +
+              '<span class="fs-chip on" data-v="first" onclick="hsSide(\'first\')"><span class="hs-p1">원고</span> 측</span>' +
+              '<span class="fs-chip" data-v="second" onclick="hsSide(\'second\')"><span class="hs-p2">피고</span> 측</span></div></div>' +
+            '<div class="fs-row2 hs-minga"><div class="fs-field"><label class="fs-label"><span class="hs-p1">원고</span></label><input type="text" class="fs-input" id="hs-plaintiff" placeholder="엄대봉"></div>' +
+              '<div class="fs-field"><label class="fs-label"><span class="hs-p2">피고</span></label><input type="text" class="fs-input" id="hs-defendant2" placeholder="주식회사 ○○"></div></div>' +
+            '<div class="fs-row2 hs-minga hs-minga-sanggo"><div class="fs-field"><label class="fs-label"><span class="hs-p1">원고</span> 주소</label><input type="text" class="fs-input" id="hs-addr1" placeholder="주소(선택)"></div>' +
+              '<div class="fs-field"><label class="fs-label"><span class="hs-p2">피고</span> 주소</label><input type="text" class="fs-input" id="hs-addr2" placeholder="주소(선택)"></div></div>' +
 
             // 사건번호+사건명 한 칸 · 법원+재판부 한 칸 (압축)
             '<div class="fs-field"><label class="fs-label"><span class="hs-hyeongsa">사건번호 · 죄명</span><span class="hs-minga">사건번호 · 사건명</span> <span class="fs-hint">(사건번호 한 칸 띄우고 사건명)</span></label><input type="text" class="fs-input" id="hs-case" placeholder="2025고단1234 사기"></div>' +
@@ -289,6 +328,28 @@
   window.hsType = function (v) { state.type = v; segOn('hs-type', v); applyClasses(); };
   window.hsSide = function (v) { state.side = v; segOn('hs-side', v); };
   window.hsToggleReason = function (el) { el.classList.toggle('on'); };
+  // 지위 라벨(원고/피고 → 실지위) UI 갱신: 칩·필드 라벨의 .hs-p1/.hs-p2 텍스트 + 의뢰인 쪽 선택
+  function hsApplyPairUI() {
+    var p = state.pair || { first: '원고', second: '피고' };
+    document.querySelectorAll('#hangsoForm .hs-p1').forEach(function (e) { e.textContent = p.first; });
+    document.querySelectorAll('#hangsoForm .hs-p2').forEach(function (e) { e.textContent = p.second; });
+    segOn('hs-side', state.side);
+  }
+  // F: 사건번호 부호 → 분야(형사/민가사)·심급으로 칩 자동선택
+  window.hsApplyCode = function (caseStr) {
+    if (!state) return;
+    var cn = String(caseStr || '').trim().split(/\s+/)[0];
+    var cls = classifyCase(cn); if (!cls) return;
+    window.hsCat(cls.cat);
+    if (cls.lv === 1) window.hsType('항소'); else if (cls.lv === 2) window.hsType('상고');
+  };
+  // A: 창고 지위 → 당사자 쌍·의뢰인 쪽 자동선택(민가사)
+  function hsApplyPosition(pos) {
+    var jp = jiwiPair(pos); if (!jp) return;
+    window.hsCat('민가사');
+    state.pair = { first: jp.first, second: jp.second }; state.side = jp.clientSide;
+    hsApplyPairUI();
+  }
   function segOn(groupId, v) { var g = document.getElementById(groupId); if (g) g.querySelectorAll('[data-v]').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-v') === v); }); }
 
   function fillFormFromState() {
@@ -306,6 +367,7 @@
     document.querySelectorAll('#hs-reasons .fs-chip').forEach(function (c) { c.classList.toggle('on', state.reasons.indexOf(c.getAttribute('data-v')) >= 0); });
     segOn('hs-cat', state.cat); segOn('hs-type', state.type); segOn('hs-side', state.side);
     if (typeof renderAttChips === 'function') renderAttChips('hs', (state.attorneys && state.attorneys.length) ? state.attorneys : ['서고은']);
+    hsApplyPairUI();
     applyClasses();
   }
   function collect() {
@@ -330,7 +392,13 @@
   window.goHangso = function () {
     ensureUI(); state = defaultState(); fillFormFromState();
     document.getElementById('hangsoForm').classList.add('active');
-    if (typeof initAutofillFor === 'function') initAutofillFor('hs-case', { caseCombine: 'hs-case', courtDept: 'hs-court', courtDeptAppend: true, sentDate: 'hs-sentdate' });
+    if (typeof initAutofillFor === 'function') initAutofillFor('hs-case', {
+      caseCombine: 'hs-case', courtDept: 'hs-court', courtDeptAppend: true, sentDate: 'hs-sentdate',
+      onFill: function (row) { window.hsApplyCode(row.l_code); hsApplyPosition(row.client_position); }
+    });
+    // 사건번호 직접입력 후에도 부호로 분야·심급 칩 자동선택(창고 미검색 시에도 동작)
+    var caseEl = document.getElementById('hs-case');
+    if (caseEl && caseEl.dataset.hsCls !== '1') { caseEl.dataset.hsCls = '1'; caseEl.addEventListener('change', function () { window.hsApplyCode(caseEl.value); }); }
   };
   window.closeHangsoForm = function () {
     var f = document.getElementById('hangsoForm'); if (f) f.classList.remove('active');
@@ -361,6 +429,6 @@
 
   /* node 검증용 */
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { fillHangso: fillHangso, fillSanggo: fillSanggo, fillMingaHangso: fillMingaHangso, fillMingaSanggo: fillMingaSanggo, toCfg: toCfg, downloadName: downloadName, setLines: setLines };
+    module.exports = { fillHangso: fillHangso, fillSanggo: fillSanggo, fillMingaHangso: fillMingaHangso, fillMingaSanggo: fillMingaSanggo, toCfg: toCfg, downloadName: downloadName, setLines: setLines, classifyCase: classifyCase, jiwiPair: jiwiPair };
   }
 })();
