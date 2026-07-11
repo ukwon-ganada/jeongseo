@@ -37,7 +37,7 @@ var MENU = {
   chamgo:        { kicker: '형사 · 참고', name: '참고자료',   desc: '탄원서·반성문·합의서 등 참고자료를 제출해요(AI 본문작성).', icon: 'doc',     action: 'goChamgo()', since: '2026-07-11', ai: true },
   contractWrite: { kicker: '거래 · 계약', name: '계약서 작성',   desc: '거래 조건과 책임을 문서로 남겨요.', icon: 'doc',     action: 'openTypeSheet()' },
   contractList:  { kicker: '관리 · 보관', name: '계약서 목록',   desc: '저장된 계약서를 관리해요.',           icon: 'list',    action: 'openContractList()' },
-  appeal:        { kicker: '소송 · 불복', name: '항소·상고장',   desc: '판결에 불복해 다시 다퉈요.',         icon: 'check',   action: 'goHangso()' },
+  appeal:        { kicker: '소송 · 불복', name: '항소·상고장',   desc: '판결에 불복해 다시 다퉈요(민가사 AI 취지작성).', icon: 'check',   action: 'goHangso()', ai: true },
   caseManager:   { kicker: '사건 · 관리', name: '사건 관리',     desc: '진행 중인 사건을 한눈에 관리해요.', icon: 'grid',    action: 'goCaseManager()' },
   gyeoljae:      { kicker: '검토 · 결재', name: '결재함',        desc: '확인할 서면을 마감 순으로 모아봐요.', icon: 'check',   action: 'goGyeoljae()' },
   agreement:     { kicker: '합의 · 조정', name: '합의서 작성',   desc: '준비 중인 서비스예요.',             icon: 'users',   soon: true }

@@ -282,7 +282,26 @@
     '#hangsoForm.is-sanggo .hs-sanggo{display:block;}' +
     '#hangsoForm.is-minga .hs-hyeongsa{display:none;}' +
     '#hangsoForm.is-minga .hs-minga{display:block;}' +
-    '#hangsoForm.is-minga.is-sanggo .hs-minga-sanggo{display:block;}';
+    '#hangsoForm.is-minga.is-sanggo .hs-minga-sanggo{display:block;}' +
+    // PC에서 폼 폭을 넓혀 선고일·송달일·작성일 줄이 가로 스크롤 없이 들어오게
+    '@media (min-width:768px){#hangsoForm .fs-body,#hangsoForm .fs-head,#hangsoForm .fs-foot{max-width:760px;}}' +
+    '#hangsoForm .fs-row2{flex-wrap:nowrap;}' +
+    '#hangsoForm .fs-row2>.fs-field{min-width:0;}' +
+    '#hangsoForm .fs-row2 .fs-input{min-width:0;width:100%;}' +
+    // 판결문 올리기(드롭존) + AI 초안(프리즘) 버튼
+    '#hangsoForm .hs-drop{border:1.5px dashed var(--border,#cdd5e0);border-radius:12px;padding:14px 16px;text-align:center;color:#5a6b86;font-size:13px;cursor:pointer;background:var(--gray-100,#f5f7fa);transition:.15s;}' +
+    '#hangsoForm .hs-drop:hover,#hangsoForm .hs-drop.drag{border-color:#7f9bd6;background:#eef3fb;color:#33507f;}' +
+    '#hangsoForm .hs-ai{display:flex;gap:8px;align-items:center;margin-top:8px;}' +
+    '#hangsoForm .hs-ai-btn{position:relative;isolation:isolate;overflow:hidden;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;padding:9px 16px;border:1px solid rgba(255,255,255,.6);border-radius:999px;font:inherit;font-weight:800;color:#16263f;box-shadow:0 3px 12px -2px rgba(120,140,210,.45),inset 0 1px 0 rgba(255,255,255,.65);cursor:pointer;}' +
+    '#hangsoForm .hs-ai-btn::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;background:linear-gradient(110deg,#ffb3d1,#ffe0ad,#b6f2d8,#b6d8ff,#d9c2ff,#ffb3d1);background-size:200% 100%;animation:hs-ai-flow 4s linear infinite;}' +
+    '#hangsoForm .hs-ai-btn::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:linear-gradient(110deg,transparent 40%,rgba(255,255,255,.7) 50%,transparent 60%);transform:translateX(-140%);animation:hs-ai-sweep 4s ease-in-out infinite;}' +
+    '#hangsoForm .hs-ai-ic{width:13px;height:13px;fill:currentColor;}' +
+    '#hangsoForm .hs-ai-btn:disabled{opacity:.5;cursor:default;}' +
+    '#hangsoForm .hs-ai-btn:disabled::before,#hangsoForm .hs-ai-btn:disabled::after{animation:none;}' +
+    '@keyframes hs-ai-flow{0%{background-position:0% 50%}100%{background-position:-200% 50%}}' +
+    '@keyframes hs-ai-sweep{0%{transform:translateX(-140%)}45%,100%{transform:translateX(140%)}}' +
+    '@media (prefers-reduced-motion:reduce){#hangsoForm .hs-ai-btn::before,#hangsoForm .hs-ai-btn::after{animation:none;}}' +
+    '#hangsoForm .hs-ai-hint{font-size:12px;color:#8a8f98;}';
   function injectStyle() { FSDoc.injectOnce(STYLE_ID, HS_CSS); }
 
   /* ══════════ 화면(입력폼) ══════════ */
@@ -316,9 +335,6 @@
               '<span class="fs-chip" data-v="second" onclick="hsSide(\'second\')"><span class="hs-p2">피고</span> 측</span></div></div>' +
             '<div class="fs-row2 hs-minga"><div class="fs-field"><label class="fs-label"><span class="hs-p1">원고</span></label><input type="text" class="fs-input" id="hs-plaintiff" placeholder="엄대봉"></div>' +
               '<div class="fs-field"><label class="fs-label"><span class="hs-p2">피고</span></label><input type="text" class="fs-input" id="hs-defendant2" placeholder="주식회사 ○○"></div></div>' +
-            '<div class="fs-row2 hs-minga hs-minga-sanggo"><div class="fs-field"><label class="fs-label"><span class="hs-p1">원고</span> 주소</label><input type="text" class="fs-input" id="hs-addr1" placeholder="주소(선택)"></div>' +
-              '<div class="fs-field"><label class="fs-label"><span class="hs-p2">피고</span> 주소</label><input type="text" class="fs-input" id="hs-addr2" placeholder="주소(선택)"></div></div>' +
-
             // 사건번호+사건명 한 칸 · 법원+재판부 한 칸 (압축)
             '<div class="fs-field"><label class="fs-label"><span class="hs-hyeongsa">사건번호 · 죄명</span><span class="hs-minga">사건번호 · 사건명</span> <span class="fs-hint">(사건번호 한 칸 띄우고 사건명)</span></label><input type="text" class="fs-input" id="hs-case" placeholder="2025고단1234 사기"></div>' +
             '<div class="fs-field"><label class="fs-label">원심 법원 · 재판부 <span class="fs-hint">(사건번호로 재판부 자동)</span></label><input type="text" class="fs-input" id="hs-court" data-af="court" placeholder="인천지방법원 형사7단독"></div>' +
@@ -334,10 +350,13 @@
 
             // 민가사 주문·취지
             '<div class="fs-section hs-minga">원 판결의 표시 · 취지</div>' +
-            '<div class="fs-field hs-minga"><label class="fs-label">판결문 PDF <span class="fs-hint">(앞 2페이지의 주문·청구취지만 읽어 AI가 자동 초안)</span></label>' +
-              '<input type="file" id="hs-pdf" accept="application/pdf" style="display:none" onchange="hsPdfPick(event)">' +
-              '<button type="button" class="att-add-btn" onclick="document.getElementById(\'hs-pdf\').click()">📄 판결문 PDF 선택 → AI 초안</button>' +
-              '<div class="fs-hint" id="hs-ai-hint" style="margin-top:6px"></div></div>' +
+            '<div class="fs-field hs-minga"><label class="fs-label">판결문 <span class="fs-hint">(앞 2페이지의 주문·청구취지만 읽어 AI가 초안)</span></label>' +
+              '<input type="file" id="hs-pdf" accept="application/pdf" style="display:none" onchange="hsPdfChoose(event)">' +
+              '<div class="hs-drop" id="hs-drop" onclick="document.getElementById(\'hs-pdf\').click()" ondragover="hsDragOver(event)" ondragleave="hsDragLeave(event)" ondrop="hsDrop(event)">' +
+                '<span id="hs-pdf-name">📎 판결문 올리기 — 클릭하거나 PDF를 여기로 끌어다 놓기</span></div>' +
+              '<div class="hs-ai"><button type="button" class="hs-ai-btn" id="hs-ai-btn" onclick="hsRunAi()" disabled>' +
+                '<svg class="hs-ai-ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l1.7 6.1a3 3 0 0 0 2.2 2.2L22 12l-6.1 1.7a3 3 0 0 0-2.2 2.2L12 22l-1.7-6.1a3 3 0 0 0-2.2-2.2L2 12l6.1-1.7a3 3 0 0 0 2.2-2.2z"/></svg>AI 초안</button>' +
+                '<span class="hs-ai-hint" id="hs-ai-hint"></span></div></div>' +
             '<div class="fs-field hs-minga"><label class="fs-label">원 판결의 표시 <span class="fs-hint">(주문, 한 줄에 한 항목)</span></label><textarea class="fs-input" id="hs-verdict" placeholder="1. 원고의 청구를 기각한다.\n2. 소송비용은 원고가 부담한다."></textarea></div>' +
             '<div class="fs-field hs-minga"><label class="fs-label"><span class="hs-hangso">항소취지</span><span class="hs-sanggo">상고취지</span> <span class="fs-hint">(한 줄에 한 항목)</span></label><textarea class="fs-input" id="hs-purpose" placeholder="1. 제1심판결을 취소한다.\n2. ..."></textarea></div>' +
 
@@ -402,16 +421,39 @@
     var el = document.getElementById(id); if (el) el.value = clean;
   }
   // 판결문 PDF 업로드 → Edge Function(draft-chwiji)로 주문·취지·상대방 AI 초안 → 폼에 채움
-  window.hsPdfPick = function (ev) {
+  // 업로드/AI 분리: 판결문을 먼저 올려두고(pdfFile), AI 초안 버튼을 눌러야 실행
+  var pdfFile = null;
+  function hsSetPdf(f) {
+    if (!f) return;
+    if (!/pdf/i.test(f.type || '') && !/\.pdf$/i.test(f.name || '')) {
+      var h0 = document.getElementById('hs-ai-hint'); if (h0) h0.textContent = 'PDF 파일만 올릴 수 있습니다.'; return;
+    }
+    pdfFile = f;
+    var nm = document.getElementById('hs-pdf-name'); if (nm) nm.textContent = '📄 ' + f.name + ' — 다시 올리려면 클릭';
+    var btn = document.getElementById('hs-ai-btn'); if (btn) btn.disabled = false;
+    var h = document.getElementById('hs-ai-hint'); if (h) h.textContent = '‘AI 초안’ 버튼을 누르세요.';
+  }
+  window.hsPdfChoose = function (ev) {
     var f = ev.target && ev.target.files && ev.target.files[0];
     if (ev.target) ev.target.value = ''; // 같은 파일 재선택 허용
-    if (!f) return;
+    hsSetPdf(f);
+  };
+  window.hsDragOver = function (e) { e.preventDefault(); e.currentTarget.classList.add('drag'); };
+  window.hsDragLeave = function (e) { e.currentTarget.classList.remove('drag'); };
+  window.hsDrop = function (e) {
+    e.preventDefault(); e.currentTarget.classList.remove('drag');
+    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    hsSetPdf(f);
+  };
+  window.hsRunAi = function () {
     var hint = document.getElementById('hs-ai-hint');
+    if (!pdfFile) { if (hint) hint.textContent = '먼저 판결문을 올려주세요.'; return; }
+    var btn = document.getElementById('hs-ai-btn'); if (btn) btn.disabled = true;
     if (hint) hint.textContent = '판결문 앞 ' + HS_PDF_PAGES + '페이지 준비 중…';
     collect();
     var cfg = toCfg(state);
     var clientName = cfg.clientSide === 'second' ? cfg.defendant2 : cfg.plaintiff;
-    firstPagesB64(f, HS_PDF_PAGES).then(function (b64) {
+    firstPagesB64(pdfFile, HS_PDF_PAGES).then(function (b64) {
       if (hint) hint.textContent = 'AI가 주문·청구취지 분석 중… (10~20초)';
       return fetch(fnUrl('draft-chwiji'), {
         method: 'POST',
@@ -423,19 +465,28 @@
         })
       });
     }).then(function (r) { return r.json(); }).then(function (d) {
+      if (btn) btn.disabled = false;
       if (d && d.ok) {
         if (d.verdictLines && d.verdictLines.length) setVal('hs-verdict', d.verdictLines.join('\n'));
         if (d.purposeLines && d.purposeLines.length) setVal('hs-purpose', d.purposeLines.join('\n'));
+        // 상대방 이름은 반대쪽 이름 칸에
         var oppNameId = cfg.clientSide === 'second' ? 'hs-plaintiff' : 'hs-defendant2';
-        var oppAddrId = cfg.clientSide === 'second' ? 'hs-addr1' : 'hs-addr2';
         if (d.oppName) setVal(oppNameId, d.oppName);
-        if (d.oppAddr) setVal(oppAddrId, d.oppAddr);
+        // 주소는 화면 칸 없이 상태에만 저장(자리별 addr1=앞·addr2=뒤) → 상고장 서면에 자동 반영
+        if (cfg.clientSide === 'first') { state.addr1 = d.clientAddr || ''; state.addr2 = d.oppAddr || ''; }
+        else { state.addr1 = d.oppAddr || ''; state.addr2 = d.clientAddr || ''; }
         if (hint) hint.textContent = 'AI 초안 완료 — 반드시 검토·수정 후 다운로드하세요.';
       } else {
         if (hint) hint.textContent = '실패: ' + ((d && d.reason) || 'unknown') + ((d && d.detail) ? ' — ' + d.detail : '') + ' (직접 입력 가능)';
       }
-    }).catch(function (e) { if (hint) hint.textContent = '오류: ' + e.message + ' (직접 입력 가능)'; });
+    }).catch(function (e) { if (btn) btn.disabled = false; if (hint) hint.textContent = '오류: ' + e.message + ' (직접 입력 가능)'; });
   };
+  function hsResetPdfUI() {
+    pdfFile = null;
+    var nm = document.getElementById('hs-pdf-name'); if (nm) nm.textContent = '📎 판결문 올리기 — 클릭하거나 PDF를 여기로 끌어다 놓기';
+    var btn = document.getElementById('hs-ai-btn'); if (btn) btn.disabled = true;
+    var h = document.getElementById('hs-ai-hint'); if (h) h.textContent = '';
+  }
   function segOn(groupId, v) { var g = document.getElementById(groupId); if (g) g.querySelectorAll('[data-v]').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-v') === v); }); }
 
   function fillFormFromState() {
@@ -445,8 +496,8 @@
     setVal('hs-sentdate', state.sentDate);
     setVal('hs-servedate', state.serveDate); setVal('hs-result', state.result || '항소기각');
     setVal('hs-plaintiff', state.plaintiff); setVal('hs-defendant2', state.defendant2);
-    setVal('hs-addr1', state.addr1); setVal('hs-addr2', state.addr2);
     setVal('hs-verdict', state.verdict); setVal('hs-purpose', state.purpose);
+    hsResetPdfUI(); // 판결문 업로드/AI 초안 상태 초기화
     setVal('hs-writedate', state.writeDate || todayISO()); setVal('hs-att-new', '');
     var gk = document.getElementById('hs-gukseon'); if (gk) gk.checked = !!state.gukseon;
     var st = document.getElementById('hs-stamp'); if (st) st.checked = !!state.stamp;
@@ -464,7 +515,7 @@
     state.sentDate = getVal('hs-sentdate');
     state.serveDate = getVal('hs-servedate'); state.result = getVal('hs-result') || '항소기각';
     state.plaintiff = getVal('hs-plaintiff'); state.defendant2 = getVal('hs-defendant2');
-    state.addr1 = getVal('hs-addr1'); state.addr2 = getVal('hs-addr2');
+    // 주소(addr1/addr2)는 화면 칸 없이 AI(hsRunAi)만 채우므로 여기서 건드리지 않음
     state.verdict = getRaw('hs-verdict'); state.purpose = getRaw('hs-purpose');
     state.writeDate = getVal('hs-writedate') || todayISO();
     var rs = []; document.querySelectorAll('#hs-reasons .fs-chip.on').forEach(function (c) { rs.push(c.getAttribute('data-v')); }); state.reasons = rs;
