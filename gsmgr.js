@@ -1109,21 +1109,21 @@
     saveField(id, 'appealStamped', !c.appealStamped);
     render();
   };
-  // 항소장 작성: 국선 화면을 닫고 항소장 폼을 피고인 데이터로 자동채워 연다
+  // 항소장 작성: 국선 화면을 닫고 항소·상고장 폼을 피고인 데이터로 자동채워 연다
   window.gsmgrGoAppeal = function (el) {
     var id = el.getAttribute('data-id');
     var c = state.cases.filter(function (x) { return x.id === id; })[0];
     if (!c) return;
-    if (typeof goAppeal !== 'function') { alert('항소장 화면을 열 수 없습니다.'); return; }
+    if (typeof goHangso !== 'function') { alert('항소·상고장 화면을 열 수 없습니다.'); return; }
     window._gsmgrReturn = true; // 폼에서 '취소' 시 홈이 아니라 국선으로 복귀
     window.closeGsmgr();
-    goAppeal(); // 폼 초기화 + 열기 + 검색카드 장착
+    goHangso(); // 폼 초기화 + 열기(기본 '항소')
     var set = function (fid, val) { var e = document.getElementById(fid); if (e && val) e.value = val; };
-    set('ap-defendant', c.defendant);
-    set('ap-casenum', c.caseNumber);
-    set('ap-casename', c.caseName);
-    set('ap-court', courtOf(c));           // feeForm.court
-    set('ap-sentdate', ymdDash(verdictOf(c))); // 선고일
+    set('hs-defendant', c.defendant);
+    set('hs-casenum', c.caseNumber);
+    set('hs-casename', c.caseName);
+    set('hs-court', courtOf(c));           // feeForm.court
+    set('hs-sentdate', ymdDash(verdictOf(c))); // 선고일
   };
 
   /* ══════════════════════════════════════════════════════════════
