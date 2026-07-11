@@ -170,16 +170,15 @@ html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black)
     display:inline-block;font:600 11px 'IBM Plex Mono',monospace;letter-spacing:.04em;
     padding:3px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.32);color:rgba(255,255,255,.85);
   }
-
-  /* 스크롤 힌트 */
-  .hp-scroll{
-    position:absolute;bottom:16px;left:0;width:100%;
-    display:flex;flex-direction:column;align-items:center;gap:3px;
-    font:400 11px 'IBM Plex Mono',monospace;letter-spacing:.14em;color:rgba(255,255,255,.85);
-    text-shadow:0 1px 8px rgba(20,40,70,.5);
+  /* 신규 서비스 NEW 뱃지 (카드 우상단) */
+  .dc-new{
+    position:absolute;top:14px;right:14px;z-index:2;
+    font:800 10px 'IBM Plex Mono',monospace;letter-spacing:.10em;color:#fff;
+    padding:3px 8px;border-radius:999px;
+    background:linear-gradient(150deg,#d15a42,#a5341f);
+    box-shadow:0 3px 10px rgba(150,55,35,.5),inset 0 1px 0 rgba(255,255,255,.28);
   }
-  .hp-arrow{font-size:15px;animation:hp-bob 1.8s ease-in-out infinite;}
-  @keyframes hp-bob{0%,100%{transform:translateY(0);opacity:.9}50%{transform:translateY(7px);opacity:.5}}
+
 
   /* 하단 마무리 바 (이미지 맨 아래 위에 얹힘) */
   .hp-foot{
@@ -430,6 +429,7 @@ html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black)
 .asheet-item + .asheet-item{border-top:.5px solid var(--gray-200);}
 .asheet-item:active{background:var(--gray-200);}
 .asheet-label{font-size:15.5px;font-weight:500;color:var(--black);}
+.asheet-new{display:inline-block;margin-left:7px;vertical-align:middle;font:800 9.5px/1 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#fff;padding:2px 6px;border-radius:999px;background:linear-gradient(150deg,#d15a42,#a5341f);box-shadow:0 2px 6px rgba(150,55,35,.4);}
 .asheet-ico{width:21px;height:21px;flex-shrink:0;color:var(--gray-700);}
 .asheet-item.danger .asheet-label,.asheet-item.danger .asheet-ico{color:var(--danger);}
 /* 기타 서류 시트: 항목이 많아도 넘치지 않게 */
