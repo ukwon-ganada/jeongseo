@@ -115,6 +115,7 @@
     border:1px solid var(--panel-line); background:rgba(255,255,255,.06); color:var(--txt); font-size:12.5px; }
   .hint{ font-size:11px; opacity:.62; margin-top:10px; line-height:1.5; }
   /* ── 배경 임베드용 오버라이드: 데모 UI 숨김 + 풀블리드 커버(하늘 우선) ── */
+  #wcloud, #wleaf{ display:none !important; }  /* 구름·나뭇잎 SVG왜곡 레이어 제거(성능) — 별똥별·하늘물들임만 유지 */
   .gear,.panel{ display:none !important; }
   html,body{ overflow:hidden !important; background:#05070c !important; }
   .wrap{ inset:0 !important; }
@@ -207,7 +208,7 @@ const skyglow = document.getElementById('skyglow');
 // ── 상태 ──
 const state = {
   k: 0.6,                              // 움직임 강도 (잔잔)
-  cloud:true, leaf:true, petal:true, star:true, skytint:true,
+  cloud:false, leaf:false, petal:false, star:true, skytint:true,
   quality:'high'
 };
 let skyGlowCur = 0;                     // 하늘 물듦 정도(부드럽게 추종)
@@ -231,7 +232,7 @@ function kLabel(k){
 let W=0,H=0,dpr=1;
 function resize(){
   const r = stage.getBoundingClientRect();
-  dpr = Math.min(window.devicePixelRatio||1, 2);
+  dpr = Math.min(window.devicePixelRatio||1, 1.5);
   W = r.width; H = r.height;
   cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr);
   cv.style.width = W+'px'; cv.style.height = H+'px';
