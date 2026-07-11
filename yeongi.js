@@ -221,9 +221,9 @@
     var lw = c.lawyers || ['서고은'];
     var out = [
       P[0], P[1],
-      setT(P[2], '사    건' + c.caseLine),
-      setT(P[3], (ROLE_LABEL[c.frontLabel] || c.frontLabel) + c.frontName),
-      setT(P[4], (ROLE_LABEL[c.backLabel] || c.backLabel) + c.backName),
+      setT(P[2], '사    건    ' + c.caseLine),
+      setT(P[3], partyRow(c.frontLabel, c.frontName)),
+      setT(P[4], partyRow(c.backLabel, c.backName)),
       P[5],
       setT(P[6], c.reason),
       P[7], P[8], P[9],
