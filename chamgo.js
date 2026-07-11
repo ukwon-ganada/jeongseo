@@ -28,13 +28,20 @@
   function fnUrl(name) { return (typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : '') + '/functions/v1/' + name; }
   function cleanCaseName(name) { return String(name || '').replace(/\[전자\]\s*/g, '').trim(); }
   function splitLines(v) { return String(v || '').split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean); }
-  // 제출서류 목록 정규화: 줄바꿈/쉼표로 나눈 뒤, 각 항목의 (숫자)(서류명)만 추려 "숫자. 서류명" 으로 통일
-  //  예) "1. 반성문, 2 탄원서, 2-1합의서" → ["1. 반성문","2. 탄원서","2-1. 합의서"]
+  // 제출서류 목록 정규화: 어떤 형식으로 적어도 (숫자)(서류명) 쌍마다 한 줄씩 "숫자. 서류명" 으로 정리.
+  //  구분자(., 쉼표, 공백, 줄바꿈)는 무시하고 '숫자'가 나오면 새 항목으로 본다.
+  //  예) "1. 탄원서 2반성문 3 합의서"          → ["1. 탄원서","2. 반성문","3. 합의서"]
+  //      "1. 탄원서,  2   합의서   3,합의서 4계좌내역" → ["1. 탄원서","2. 합의서","3. 합의서","4. 계좌내역"]
   function parseDocs(raw) {
-    return String(raw || '').split(/[\n,]/).map(function (s) { return s.replace(/\s+/g, ' ').trim(); }).filter(Boolean).map(function (item) {
-      var m = item.match(/^(\d+(?:-\d+)*)\s*[.)]?\s*(.+)$/);
-      return (m && m[2].trim()) ? (m[1] + '. ' + m[2].trim()) : item;
-    });
+    var s = String(raw || ''), out = [], re = /(\d+(?:-\d+)*)\s*[.,)]?\s*([^\d]*)/g, m;
+    while ((m = re.exec(s))) {
+      if (re.lastIndex === m.index) { re.lastIndex++; continue; }   // 0폭 방지
+      var text = m[2].replace(/^[\s.,)]+/, '').replace(/[\s.,]+$/, '');
+      if (text) out.push(m[1] + '. ' + text);
+    }
+    if (out.length) return out;
+    // 숫자가 전혀 없으면 줄바꿈/쉼표로 나눠 그대로
+    return s.split(/[\n,]/).map(function (x) { return x.trim(); }).filter(Boolean);
   }
   function fmtDate(iso) {
     var p = ('' + iso).split('-'); if (p.length !== 3) return iso;
@@ -77,10 +84,10 @@
   }
 
   function introText(c) {
-    return ' 위 사건에 관하여 ' + c.jiwi + '의 ' + (c.gukseon ? '(국선)' : '') + '변호인은 다음과 같이 참고자료를 제출합니다.';
+    return ' 위 사건에 관하여 ' + c.jiwi + '의 ' + (c.gukseon ? '국선' : '') + '변호인은 다음과 같이 참고자료를 제출합니다.';
   }
   function sigLabel(c) {
-    return '위 ' + c.jiwi + '의 ' + (c.gukseon ? '(국선)' : '') + '변호인';
+    return '위 ' + c.jiwi + '의 ' + (c.gukseon ? '국선' : '') + '변호인';
   }
 
   // 참고자료 채우기 — P: 0제목 1사건 2지위+이름 4도입 6다음 8본문 10목록머리 11목록 14작성일 15서명 16법무법인 17담당변호사 18기관
@@ -292,7 +299,7 @@
               '<div class="fs-field"><label class="fs-label">사건명</label><input type="text" class="fs-input" id="cg-caseline" placeholder="2026고단100539 도로교통법위반"></div>' +
             '</div>' +
             '<div class="fs-field"><label class="fs-label">제출기관 <span class="fs-hint">(법원 재판부 자동, 검찰 검사실은 수기)</span></label><input type="text" class="fs-input" id="cg-court" placeholder="인천지방법원 형사16단독"></div>' +
-            '<div class="fs-field"><label class="fs-label"><input type="checkbox" id="cg-gukseon"> 국선사건 <span class="fs-hint">((국선)변호인 + 법무법인 정서 줄 생략)</span></label></div>' +
+            '<div class="fs-field"><label class="fs-label"><input type="checkbox" id="cg-gukseon"> 국선사건 <span class="fs-hint">(국선변호인 + 법무법인 정서 줄 생략)</span></label></div>' +
 
             '<div class="fs-section">참고자료</div>' +
             '<div class="fs-field"><label class="fs-label">제출서류 <span class="fs-hint">(줄바꿈 또는 쉼표로 구분 · 번호와 서류명만 적으면 자동 정리)</span></label>' +
