@@ -37,7 +37,7 @@ var MENU = {
   chamgo:        { kicker: '형사 · 참고', name: '참고자료',   desc: '탄원서·반성문·합의서 등 참고자료를 제출해요(AI 본문작성).', icon: 'doc',     action: 'goChamgo()', since: '2026-07-11', ai: true },
   contractWrite: { kicker: '거래 · 계약', name: '계약서 작성',   desc: '거래 조건과 책임을 문서로 남겨요.', icon: 'doc',     action: 'openTypeSheet()' },
   contractList:  { kicker: '관리 · 보관', name: '계약서 목록',   desc: '저장된 계약서를 관리해요.',           icon: 'list',    action: 'openContractList()' },
-  appeal:        { kicker: '소송 · 불복', name: '항소장',        desc: '판결에 불복해 다시 다퉈요.',         icon: 'check',   action: 'goAppeal()' },
+  appeal:        { kicker: '소송 · 불복', name: '항소·상고장',   desc: '판결에 불복해 다시 다퉈요.',         icon: 'check',   action: 'goHangso()' },
   caseManager:   { kicker: '사건 · 관리', name: '사건 관리',     desc: '진행 중인 사건을 한눈에 관리해요.', icon: 'grid',    action: 'goCaseManager()' },
   gyeoljae:      { kicker: '검토 · 결재', name: '결재함',        desc: '확인할 서면을 마감 순으로 모아봐요.', icon: 'check',   action: 'goGyeoljae()' },
   agreement:     { kicker: '합의 · 조정', name: '합의서 작성',   desc: '준비 중인 서비스예요.',             icon: 'users',   soon: true }
@@ -71,7 +71,7 @@ var CONTRACT_CARDS = [
 /* 전체 기능 화면: 폰 홈에 안 올린 나머지 (표기가 조금 다른 것은 name/desc 덮어씀) */
 var MORE_ORDER = [
   { id: 'seonim' },
-  { id: 'appeal',  name: '항소장 작성' },
+  { id: 'appeal',  name: '항소·상고장 작성' },
   { id: 'yeollam', name: '열람·복사 신청서', desc: '재판기록 열람·복사' },
   { id: 'gukseon', name: '국선보수증액 신청서', desc: '국선변호보수증액등' },
   { id: 'pankyul', name: '판결등본교부청구', desc: '판결등본 교부 청구' },

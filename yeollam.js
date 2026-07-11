@@ -1,483 +1,294 @@
-/* 법무법인 정서 PWA - 재판기록 열람·복사/출력·복제 신청서 (yeollam.js)
+/* 법무법인 정서 PWA - 재판기록 열람·복사 신청서 (yeollam.js)
    ───────────────────────────────────────────────────────────────
-   독립 모듈. index.html 에는 진입점 버튼 + <script src="yeollam.js"> 만 둔다.
-   화면(갈림길·입력폼·서면)·전용 CSS 는 이 파일이 <body>에 1회 주입한다.
+   독립 모듈. 표준 HWPX 두 종을 채워 한글파일로 다운로드.
+     · 법원: templates/yeollam_court.hwpx  (재판기록 열람·복사/출력·복제 신청서)
+     · 검찰: templates/yeollam_prosecution.hwpx (열람·등사 신청서, 형소법 §266의3)
+   흐름(참고자료·기일연기와 동일): goYeollam() → [입력폼] → [한글 다운로드] (확인창 없음)
 
-   진입점(홈 버튼): onclick="goYeollam()"
-   흐름: goYeollam() → [법원/검찰 갈림길] → 법원 → 입력폼 → 완료 → 서면 → window.print()
+   상단 칩으로 '법원 / 검찰' 전환(템플릿·표시 필드 전환).
+   법원: 신청구분(열람·복사 기본 체크) · 복사방법(신청인 복사설비 기본) ·
+         사용용도(재판/합의/공탁) · 대상기록(편집) · 담당사무원(기억) · 국선(자격 '국선변호인')
+   검찰: 생년월일 · 병행사건번호 · 검찰청 · 서류목록(2건)
+   도장(체크): 담당변호사 첫 번째가 '서고은'일 때 신청인 서명란 이름 위에 직인 겹침
 
-   의존:
-     · showScreen(id)      : index.html 공용 화면 전환 (항소장·계약서와 동일)
-     · SEAL_SEOGOEUN       : 전역 도장 base64 (index.html) — 서고은 선택 시 날인
-     · initAutofillFor()   : autofill.js 범용 자동완성 진입점 (data-af 표준)
-       재판부는 표준 밖 → initAutofillFor(anchor, {courtDept:'칸id'}) 확장 인자로 위임
-       (그 확장 처리는 autofill.js 에 진입점으로 추가 — 통합 단계에서)
+   의존: HWPXFill(hwpxfill.js) · JU(util.js) · FSDoc(fsdoc.js)
+        · renderAttChips/addAttorney/attChipClick(index.html) · initAutofillFor(autofill.js)
+        · window.SEAL_SEOGOEUN(전역 도장, 선택)
    ─────────────────────────────────────────────────────────────── */
 (function () {
   'use strict';
 
-  /* ── 상수 ─────────────────────────────────────────── */
-  var ATTORNEYS = ['서고은', '정필성', '김홍일', '양선화', '우숭민', '이예나', '손영우'];
+  var TPL = { 법원: './templates/yeollam_court.hwpx', 검찰: './templates/yeollam_prosecution.hwpx' };
+  var CLERKS_KEY = 'jeongseo_yeollam_clerks';
   var CLERKS_SEED = ['원가을', '신주연', '최인혜', '강민지'];
-  var CLERKS_KEY = 'jeongseo_yeollam_clerks';   // 사무원 목록 기억(localStorage)
-  var FIRM_TEL = '032-868-7171';
-
   var USE_PRESETS = [
     { key: '재판', text: '재판준비를 위하여' },
     { key: '합의', text: '합의를 위하여' },
     { key: '공탁', text: '공탁을 위하여' }
   ];
-  var TARGET_DEFAULT = '증거기록, 소송기록 일체, 미디어파일 일체(CD 등)';
+  var TARGET_DEFAULT = '증거기록, 소송기록일체, 미디어파일 일체(CD 등)';
+  var REQ = ['열람', '복사', '출력', '복제'];
+  var METHODS = ['법원 복사기', '변호사단체 복사기', '신청인 복사설비', '필사'];
+  var BOX_ON = '☑', BOX_OFF = '□';
 
-  /* ── 작은 도우미 (공용 util.js 위임) ──────────────── */
-  function esc(v) { return JU.esc(v); }
   function todayISO() { return JU.todayISO(); }
-  // 'YYYY-MM-DD' → 'YYYY년 M월 D일'
-  function fmtKDate(iso) {
-    var m = ('' + (iso || '')).match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
-    if (!m) return '';
-    return m[1] + '년 ' + parseInt(m[2], 10) + '월 ' + parseInt(m[3], 10) + '일';
+  function fmtKoDate(iso) { // 'YYYY년 M월 D일' (법원)
+    var m = ('' + (iso || '')).match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+    return m ? m[1] + '년 ' + parseInt(m[2], 10) + '월 ' + parseInt(m[3], 10) + '일' : '';
   }
-  // 사무원 명단(localStorage) — 공용 FSDoc.roster 로 위임(동작 동일)
+  function fmtKDate(iso) { // 'YYYY. M. D.' (검찰)
+    var m = ('' + (iso || '')).match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+    return m ? m[1] + '. ' + parseInt(m[2], 10) + '. ' + parseInt(m[3], 10) + '.' : '';
+  }
+  function ymd(s) { var m = String(s || '').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m ? m[1] + ('0' + m[2]).slice(-2) + ('0' + m[3]).slice(-2) : ''; }
+  function spaced(name) { return String(name || '').trim().split('').join(' '); }
   function loadClerks() { return FSDoc.roster(CLERKS_KEY, CLERKS_SEED).load(); }
-  function saveClerk(name) { FSDoc.roster(CLERKS_KEY, CLERKS_SEED).save(name); }
-
-  /* ══════════════════════════════════════════════════════════════
-     서면 렌더 (순수 함수) — 값 객체 v 를 받아 인쇄용 표 HTML 을 돌려준다.
-     v: { attorney, clerk, position, client, use, casenum, casename,
-          courtDept, target, writeDate }
-     도장: attorney === '서고은' 이고 전역 SEAL_SEOGOEUN 있으면 직인 이미지,
-           그 외 변호사는 날인칸을 비워 실물 날인.
-     ══════════════════════════════════════════════════════════════ */
-  function renderYeollam(v) {
-    v = v || {};
-    var seal = (typeof SEAL_SEOGOEUN !== 'undefined') ? SEAL_SEOGOEUN : '';
-    var stampHTML = (v.attorney === '서고은' && seal)
-      ? '<img class="yl-seal" src="' + seal + '" alt="">'
-      : '<span class="yl-stamp-blank"></span>';
-
-    return '' +
-    '<table class="yl-form">' +
-      '<colgroup>' +
-        '<col style="width:var(--yc0)"><col style="width:var(--yc1)"><col style="width:var(--yc2)">' +
-        '<col style="width:var(--yc3)"><col style="width:var(--yc4)"><col style="width:var(--yc5)"><col style="width:var(--yc6)">' +
-      '</colgroup>' +
-
-      /* r0~r1 : 제목 + 결재란(허/부) */
-      '<tr>' +
-        '<td colspan="5" rowspan="2" class="yl-title"><span class="t">재판기록 열람·복사/출력·복제 신청서</span></td>' +
-        '<td class="yl-appr-h">허</td><td class="yl-appr-h">부</td>' +
-      '</tr>' +
-      '<tr><td class="yl-appr-box"></td><td class="yl-appr-box"></td></tr>' +
-
-      /* r2~r4 : 신청인 블록 */
-      '<tr>' +
-        '<td rowspan="3" class="lbl">신 청 인</td>' +
-        '<td rowspan="2" class="lbl">성 명</td>' +
-        '<td rowspan="2" class="ctr">법무법인 정서<br>담당변호사 ' + esc(v.attorney || '서고은') + '</td>' +
-        '<td colspan="2" class="lbl">전화 번호</td>' +
-        '<td colspan="2" class="ctr">' + esc(FIRM_TEL) + '</td>' +
-      '</tr>' +
-      '<tr>' +
-        '<td colspan="2" class="lbl">담당사무원</td>' +
-        '<td colspan="2" class="ctr">' + esc(v.clerk || '') + '</td>' +
-      '</tr>' +
-      '<tr>' +
-        '<td class="lbl">자 격</td>' +
-        '<td class="ctr" style="white-space:nowrap">' + esc(v.position || '') + ' ' + esc(v.client || '') + '의<br>변호인</td>' +
-        '<td colspan="2" class="lbl">소명자료</td>' +
-        '<td colspan="2" class="ctr">사무원증</td>' +
-      '</tr>' +
-
-      /* r5 : 신청 구분 (열람·복사 기본) */
-      '<tr>' +
-        '<td class="lbl">신 청 구 분</td>' +
-        '<td colspan="6" class="check">' +
-          '<span class="on">☑ 열람</span>&nbsp;&nbsp;&nbsp;' +
-          '<span class="on">☑ 복사</span>&nbsp;&nbsp;&nbsp;□ 출력&nbsp;&nbsp;&nbsp;□ 복제' +
-        '</td>' +
-      '</tr>' +
-
-      /* r6 : 사용 용도 */
-      '<tr>' +
-        '<td class="lbl">사 용 용 도</td>' +
-        '<td colspan="6"><span class="vb">' + esc(v.use || '') + '</span></td>' +
-      '</tr>' +
-
-      /* r7~r8 : 대상 기록 */
-      '<tr>' +
-        '<td rowspan="2" class="lbl">대 상 기 록</td>' +
-        '<td class="lbl">사건번호</td>' +
-        '<td colspan="3" class="lbl">사 건 명</td>' +
-        '<td colspan="2" class="lbl">재 판 부</td>' +
-      '</tr>' +
-      '<tr>' +
-        '<td class="ctr fs9">' + esc(v.casenum || '') + '</td>' +
-        '<td colspan="3" class="ctr fs9">' + esc(v.casename || '') + '</td>' +
-        '<td colspan="2" class="ctr">' + esc(v.courtDept || '') + '</td>' +
-      '</tr>' +
-
-      /* r9 : 복사/출력·복제할 부분 */
-      '<tr>' +
-        '<td class="lbl">복사/출력·<br>복제할 부분</td>' +
-        '<td colspan="6">' + esc(v.target || '') + '</td>' +
-      '</tr>' +
-
-      /* r10 : 복사/출력 방법 */
-      '<tr>' +
-        '<td class="lbl">복사/출력<br>방법</td>' +
-        '<td colspan="6" class="check">□ 법원 복사기&nbsp;&nbsp;&nbsp;□ 변호사단체 복사기&nbsp;&nbsp;&nbsp;' +
-          '<span class="on">☑ 신청인 복사설비</span>&nbsp;&nbsp;&nbsp;□ 필사</td>' +
-      '</tr>' +
-
-      /* r11 : 서약문 (3줄, 원본 재현) */
-      '<tr>' +
-        '<td colspan="7" class="oath">' +
-          '<div class="body">이와 같이 신청하고, 신청인은 열람·복사/출력·복제에 관련된 준수사항을 엄수하며, 열람·복사/출력·복제의 결과물을 통하여 알게 된 개인정보, 영업비밀 등을 개인정보 보호법 등 관계법령 상 정당한 용도 이외로 사용하는 경우 민사상, 형사상 모든 책임을 지겠습니다.</div>' +
-          '<div class="date">' + esc(v.writeDate || '') + '</div>' +
-          '<div class="sign">신청인&nbsp;&nbsp;&nbsp; <span class="yl-sign-anchor">' + esc(v.attorney || '서고은') + stampHTML + '</span>&nbsp;(서명 또는 날인)</div>' +
-        '</td>' +
-      '</tr>' +
-
-      /* r12 : 비고 */
-      '<tr>' +
-        '<td class="lbl">비 고<br>(재판장<br>지정사항 등)</td>' +
-        '<td colspan="6" style="height:12mm"></td>' +
-      '</tr>' +
-
-      /* r13 : 영수 일시 / 영수인 */
-      '<tr>' +
-        '<td class="lbl" style="height:8.2mm">영 수 일 시</td>' +
-        '<td colspan="2">' + (new Date().getFullYear()) + '.&nbsp;&nbsp;&nbsp;.&nbsp;&nbsp;&nbsp;&nbsp;.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:</td>' +
-        '<td class="lbl">영 수 인</td>' +
-        '<td colspan="3" class="ctr">변호사&nbsp; ' + esc(v.attorney || '서고은') + '</td>' +
-      '</tr>' +
-
-      /* r14~r15 : 신청수수료 / 비용 + 수입인지 첩부란 */
-      '<tr>' +
-        '<td class="lbl">신청 수수료</td>' +
-        '<td colspan="2" class="ctr">□ 500 원&nbsp;&nbsp; <span class="on">√ 면 제</span></td>' +
-        '<td colspan="4" rowspan="2" class="ctr">(수 입 인 지&nbsp; 첩 부 란)</td>' +
-      '</tr>' +
-      '<tr>' +
-        '<td class="lbl">복사/출력·<br>복제 비용</td>' +
-        '<td colspan="2" class="ctr">원</td>' +
-      '</tr>' +
-    '</table>' +
-
-    /* 표 아래 준수사항 (고정) */
-    '<div class="yl-rules">' +
-      '<div class="head">※ 준수사항 및 작성요령</div>' +
-      '<ol>' +
-        '<li><b>[개인정보 보호법 제19조]</b> 개인정보처리자로부터 개인정보를 제공받은 자는 다음 각 호의 어느 하나에 해당하는 경우를 제외하고는 개인정보를 제공받은 목적 외의 용도로 이용하거나 이를 제3자에게 제공하여서는 아니 된다. 1. 정보주체로부터 별도의 동의를 받은 경우 2. 다른 법률에 특별한 규정이 있는 경우</li>' +
-        '<li><b>[민사소송법 제162조 ④항]</b> 소송기록을 열람·복사한 사람은 열람·복사에 의하여 알게 된 사항을 이용하여 공공의 질서 또는 선량한 풍속을 해하거나 관계인의 명예 또는 생활의 평온을 해하는 행위를 하여서는 아니 된다.</li>' +
-        '<li>신청인·영수인란은 서명 또는 날인하고, 소송대리인·변호인의 사무원이 열람·복사하는 경우에는 담당사무원란에 그 사무원의 성명을 기재</li>' +
-        '<li>신청수수료는 1건당 500원(수입인지로 납부). 다만, 사건의 당사자 및 그 법정대리인·소송대리인·변호인(사무원 포함)·보조인 등이 그 사건의 계속 중에 열람하는 때에는 신청수수료 면제</li>' +
-        '<li>법원복사기/프린터로 복사/출력하는 경우에는 1장당 50원의 비용을 수입인지로 납부 (다만, 100원 단위 미만 금액은 이를 계산하지 아니함)</li>' +
-        '<li>매체를 지참하여 복제하는 경우에는 700메가바이트 기준 1건마다 500원, 700메가바이트 초과 시 350메가바이트마다 300원의 비용을 수입인지로 납부(매체를 지참하지 아니한 경우 매체 비용은 별도)</li>' +
-        '<li>복사/출력·복제할 부분 란에 복사대상(기록의 일부를 복사/출력·복제하는 경우에는 대상을 열거하여 특정하여야 함) 및 복사/출력을 정확하게 기재하여야 함</li>' +
-        '<li>열람·복사 담당 법원공무원의 처분에 대하여 불복하는 경우에는 이의신청을 할 수 있음</li>' +
-      '</ol>' +
-      '<div class="a2200">A2200</div>' +
-    '</div>';
+  function saveClerk(n) { FSDoc.roster(CLERKS_KEY, CLERKS_SEED).save(n); }
+  // 담당변호사 이름 치환(공백형 '서 고 은' + 일반형 '서고은' 모두)
+  function fillAttorneyName(ctx, att) {
+    if (att && att !== '서고은') ctx.replace('서 고 은', spaced(att)).replace('서고은', att);
   }
 
-  /* ══════════════════════════════════════════════════════════════
-     전용 CSS 주입 (1회) — 목업 실측값 그대로. 서면 표 + 인쇄.
-     ══════════════════════════════════════════════════════════════ */
+  /* ══════════ 법원 채우기 ══════════
+     yeollam_court.hwpx 샘플: 담당변호사 서고은 / 원가을 / 피고인 김용철의 / 변호인 /
+       재판준비를 위해 / 2026노1246 / 마약류관리에관한법률위반(향정) / 제1-1형사부 /
+       증거기록,… / 2026년 7월 11일 / 신청인·영수인 서 고 은 / □ 신청구분·복사방법 */
+  function fillCourt(ctx, c) {
+    ctx.replace('원가을', c.clerk || '')
+       .replace('피고인 김용철의', (c.jiwi || '피고인') + ' ' + (c.defendant || '') + '의')
+       .replace('재판준비를 위해', c.use || '')
+       .replace('2026노1246', c.casenum || '')
+       .replace('마약류관리에관한법률위반(향정)', c.casename || '')
+       .replace('제1-1형사부', c.courtDiv || '')
+       .replace('증거기록, 소송기록일체, 미디어파일 일체(CD 등)', c.target || '')
+       .replace('2026년 7월 11일', c.writeDate || '');
+    // 자격의 '변호인' 셀(단독 문단) → 국선 시 '국선변호인'
+    if (c.gukseon) ctx.replace('<hp:t>변호인</hp:t>', '<hp:t>국선변호인</hp:t>');
+    // 신청구분 체크(기본 열람·복사)
+    REQ.forEach(function (k) { if (c.req.indexOf(k) >= 0) ctx.replace(BOX_OFF + ' ' + k, BOX_ON + ' ' + k); });
+    // 복사방법 체크(기본 신청인 복사설비)
+    METHODS.forEach(function (k) { if (c.methods.indexOf(k) >= 0) ctx.replace(BOX_OFF + ' ' + k, BOX_ON + ' ' + k); });
+    fillAttorneyName(ctx, c.attorney);
+  }
+
+  /* ══════════ 검찰 채우기 ══════════
+     yeollam_prosecution.hwpx 샘플: 담당 변호사 서고은 / 생년월일 840219-2079920 /
+       2026형제36763 / (2026고단101838) / 피고인 김병주 / 죄명 …(향정) /
+       2026. 7. 11. / 신청인 변호사 서 고 은 / 인천지방검찰청 / 기록일체 · 미디어파일일체(cd등) */
+  function fillProsecution(ctx, c) {
+    ctx.replace('840219-2079920', c.birth || '')
+       .replace('2026형제36763', c.casenum || '')
+       .replace('김병주', c.defendant || '')
+       .replace('마약류관리에관한법률위반(향정)', c.casename || '')
+       .replace('2026. 7. 11.', c.writeDate || '')
+       .replace('인천지방검찰청', c.prosOffice || '')
+       .replace('기록일체', c.doc1 || '')
+       .replace('미디어파일일체(cd등)', c.doc2 || '');
+    // 병행 사건번호: 있으면 교체, 없으면 괄호째 제거
+    ctx.replace('(2026고단101838)', c.parallel ? '(' + c.parallel + ')' : '');
+    fillAttorneyName(ctx, c.attorney);
+  }
+
+  /* ══════════ 상태 ══════════ */
+  var state = null;
+  function defaultState() {
+    return {
+      type: '법원', jiwi: '피고인', defendant: '', casenum: '', casename: '',
+      courtDiv: '', clerk: CLERKS_SEED[0], use: USE_PRESETS[0].text, target: TARGET_DEFAULT,
+      req: ['열람', '복사'], methods: ['신청인 복사설비'], gukseon: false,
+      birth: '840219-2079920', parallel: '', prosOffice: '인천지방검찰청',
+      doc1: '기록일체', doc2: '미디어파일일체(CD 등)',
+      attorneys: ['서고은'], writeDate: todayISO(), stamp: true
+    };
+  }
+  function toCfg(s) {
+    var att = (s.attorneys && s.attorneys.length) ? s.attorneys[0] : '서고은';
+    return {
+      type: s.type, jiwi: s.jiwi, defendant: s.defendant, casenum: s.casenum, casename: s.casename,
+      courtDiv: s.courtDiv, clerk: s.clerk, use: s.use, target: s.target,
+      req: s.req.slice(), methods: s.methods.slice(), gukseon: !!s.gukseon,
+      birth: s.birth, parallel: s.parallel, prosOffice: s.prosOffice, doc1: s.doc1, doc2: s.doc2,
+      writeDate: s.type === '검찰' ? (fmtKDate(s.writeDate) || fmtKDate(todayISO())) : (fmtKoDate(s.writeDate) || fmtKoDate(todayISO())),
+      attorney: att, stamp: !!s.stamp
+    };
+  }
+  function downloadName(s) {
+    return HWPXFill.safeName([s.type + '열람복사', s.defendant, s.casenum, ymd(s.writeDate)]);
+  }
+
+  /* ══════════ CSS ══════════ */
   var STYLE_ID = 'yeollam-style';
   var YL_CSS =
-      /* 원본 실측 열너비(mm) */
-      '#screen-yeollam{--yc0:25.4mm;--yc1:29.8mm;--yc2:35.6mm;--yc3:24.7mm;--yc4:12.7mm;--yc5:14.9mm;--yc6:15.6mm;}' +
-      '.yl-wrap{overflow:auto;padding:16px;background:#e9e9ec;min-height:100%;}' +
-      '.yl-page{width:210mm;min-height:297mm;background:#fff;margin:0 auto;' +
-        'padding:16mm 25mm 16mm 25mm;box-shadow:0 2px 14px rgba(0,0,0,.18);' +
-        "font-family:'함초롬바탕','HCR Batang','바탕',Batang,serif;color:#000;}" +
-      '.yl-form{width:158.7mm;border-collapse:collapse;table-layout:fixed;border:0.4mm solid #000;}' +
-      '.yl-form td{border:0.12mm solid #000;padding:0.8mm 1.2mm;vertical-align:middle;' +
-        'font-size:10pt;line-height:1.28;word-break:keep-all;}' +
-      '.yl-form .fs9{font-size:9pt;}' +
-      '.yl-form .lbl{text-align:center;letter-spacing:.06em;}' +
-      '.yl-form .ctr{text-align:center;}' +
-      '.yl-title{text-align:center;overflow:hidden;}' +
-      ".yl-title .t{display:inline-block;white-space:nowrap;font-size:16pt;font-weight:700;" +
-        "font-family:'맑은 고딕','Malgun Gothic',sans-serif;letter-spacing:0;}" +
-      '.yl-appr-h{text-align:center;font-size:9.5pt;height:5mm;}' +
-      '.yl-appr-box{height:12mm;}' +
-      '.yl-form .vb{font-weight:700;}' +
-      '.yl-form .check .on{font-weight:700;}' +
-      '.yl-form .oath{text-align:center;padding:1.8mm 0.5mm 2mm;}' +
-      ".yl-form .oath .body{font-size:12pt;font-weight:700;line-height:1.5;" +
-        "font-family:'맑은 고딕','Malgun Gothic',sans-serif;letter-spacing:-0.062em;}" +
-      '.yl-form .oath .date{font-size:12pt;margin-top:3mm;}' +
-      '.yl-form .oath .sign{font-size:12pt;margin-top:2mm;}' +
-      '.yl-sign-anchor{position:relative;display:inline-block;}' +
-      /* 서고은 직인: 이름 위에 겹쳐 찍음(칸 안 늘림, 빈공간 없음) */
-      '.yl-seal{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:1.8cm;height:1.8cm;z-index:5;pointer-events:none;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
-      /* 그 외 변호사: 실물 날인 여백만 확보 */
-      '.yl-stamp-blank{display:inline-block;width:1.8cm;height:1.2cm;vertical-align:middle;margin-left:2mm;}' +
-      '.yl-rules{width:158.7mm;margin-top:2mm;font-size:9pt;line-height:1.34;text-align:justify;' +
-        "font-family:'함초롬바탕','HCR Batang','바탕',Batang,serif;}" +
-      '.yl-rules .head{font-weight:700;margin-bottom:1mm;}' +
-      '.yl-rules ol{margin:0;padding-left:5.2mm;}' +
-      '.yl-rules li{margin-bottom:.6mm;}' +
-      '.yl-rules .a2200{text-align:right;font-size:8.5pt;margin-top:4mm;letter-spacing:.1em;}' +
-      /* 사용용도 프리셋 칩 (앱 fs-chip 과 어울리는 작은 버튼) */
-      '.yl-use-presets{display:flex;gap:6px;margin-bottom:8px;}' +
-      '.yl-use-chip{padding:4px 12px;border:1px solid var(--border,#e8e8e8);border-radius:16px;' +
-        'background:#fff;color:#555;font-size:12px;cursor:pointer;-webkit-appearance:none;' +
-        'transition:.12s;line-height:1.2;}' +
-      '.yl-use-chip:active{transform:scale(.96);}' +
-      '.yl-use-chip.on{background:var(--black,#1a1a1a);color:#fff;border-color:var(--black,#1a1a1a);}' +
-      /* 입력폼: 화면 전체를 덮는 팝업 (항소장·선임계 폼과 동일) */
-      '#yeollamForm{display:none;position:fixed;inset:0;z-index:1100;background:#fff;flex-direction:column;}' +
-      '#yeollamForm.active{display:flex;}' +
-      /* 법원/검찰 팝업 아이콘 박스 (흑백 미니멀) */
-      '.yl-type-ico{width:40px;height:40px;flex-shrink:0;display:flex;align-items:center;justify-content:center;' +
-        'border:1px solid var(--border,#e8e8e8);border-radius:11px;background:#fff;}' +
-      '.yl-type-ico svg{width:23px;height:23px;stroke:var(--black,#1a1a1a);}' +
-      /* 인쇄: 서면만, 앱 UI 숨김 */
-      '@media print{' +
-        '.yl-wrap{overflow:visible;padding:0;background:#fff;}' +
-        '.yl-page{margin:0;box-shadow:none;}' +
-        '@page{size:A4;margin:0;}' +
-      '}';
+    '#yeollamForm{display:none;position:fixed;inset:0;z-index:1100;background:#fff;flex-direction:column;}' +
+    '#yeollamForm.active{display:flex;}' +
+    '#yeollamForm .yl-pick{display:flex;align-items:center;gap:10px;margin:0 0 9px;}' +
+    '#yeollamForm .yl-pick-l{flex:none;min-width:64px;font-size:13px;color:var(--gray-700,#555);}' +
+    '#yeollamForm .yl-pick .fs-chips{flex:1;gap:6px;}' +
+    '#yeollamForm .fs-chips .fs-chip{padding:6px 13px;font-size:13px;cursor:pointer;}' +
+    '#yeollamForm textarea.fs-input{min-height:64px;resize:vertical;line-height:1.5;}' +
+    '#yeollamForm .yl-checks{display:flex;flex-wrap:wrap;gap:6px;}' +
+    '#yeollamForm .yl-prosecution{display:none;}' +
+    '#yeollamForm.is-prosecution .yl-court{display:none;}' +
+    '#yeollamForm.is-prosecution .yl-prosecution{display:block;}';
   function injectStyle() { FSDoc.injectOnce(STYLE_ID, YL_CSS); }
 
-  /* ══════════════════════════════════════════════════════════════
-     화면 껍데기 주입 (1회) — 갈림길 / 입력폼 / 서면.
-     항소장·계약서와 동일한 공용 클래스(.screen, .sj-appbar, .fs-*) 재사용.
-     ══════════════════════════════════════════════════════════════ */
+  /* ══════════ 화면(입력폼) ══════════ */
   var SHELL_ID = 'yeollam-shell';
+  function chip(group, v, on) { return '<span class="fs-chip' + (on ? ' on' : '') + '" data-v="' + v + '" onclick="ylChip(\'' + group + '\',\'' + v + '\',this)">' + v + '</span>'; }
   function injectShell() {
     if (document.getElementById(SHELL_ID)) return;
-
-    var attOpts = ATTORNEYS.map(function (n) {
-      return '<option value="' + esc(n) + '"' + (n === '서고은' ? ' selected' : '') + '>' + esc(n) + '</option>';
-    }).join('');
-
-    var useChips = USE_PRESETS.map(function (p, i) {
-      return '<button type="button" class="yl-use-chip' + (i === 0 ? ' on' : '') +
-        '" data-use="' + esc(p.text) + '" onclick="ylUsePreset(this)">' + esc(p.key) + '</button>';
-    }).join('');
-
+    var useChips = USE_PRESETS.map(function (p, i) { return '<span class="fs-chip' + (i === 0 ? ' on' : '') + '" data-v="' + p.text + '" onclick="ylUse(this)">' + p.key + '</span>'; }).join('');
+    var reqChips = REQ.map(function (k) { return '<span class="fs-chip' + (k === '열람' || k === '복사' ? ' on' : '') + '" data-v="' + k + '" onclick="ylMulti(this)">' + k + '</span>'; }).join('');
+    var methodChips = METHODS.map(function (k) { return '<span class="fs-chip' + (k === '신청인 복사설비' ? ' on' : '') + '" data-v="' + k + '" onclick="ylMulti(this)">' + k + '</span>'; }).join('');
     var wrap = document.createElement('div');
     wrap.id = SHELL_ID;
     wrap.innerHTML =
-      /* ── 법원/검찰 선택 팝업 (다른 서면과 동일한 .overlay.centered) ── */
-      '<div class="overlay centered" id="yeollamTypeSheet" onclick="if(event.target===this)closeYeollamType()">' +
-        '<div class="sheet">' +
-          '<div class="sh-handle"></div>' +
-          '<div class="sh-head"><div class="sh-title">열람·복사 신청서</div><div class="sh-desc">어디에 신청하나요?</div></div>' +
-          '<div class="sh-div"></div>' +
-          '<div class="type-item" onclick="openYeollamForm(\'법원\')">' +
-            '<div class="yl-type-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M4 10h16"/><path d="M12 3 3.5 8.2h17z"/><path d="M6 10v8M10 10v8M14 10v8M18 10v8"/></svg></div>' +
-            '<div class="type-body"><div class="type-name">법원</div><div class="type-desc">재판기록 열람·복사/출력·복제 신청서</div></div>' +
-            '<div class="type-arrow">›</div>' +
-          '</div>' +
-          '<div class="type-item" onclick="openYeollamForm(\'검찰\')">' +
-            '<div class="yl-type-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 2.5v5.4c0 4.2-3 7.4-7 8.6-4-1.2-7-4.4-7-8.6V5.5z"/></svg></div>' +
-            '<div class="type-body"><div class="type-name">검찰</div><div class="type-desc">열람·등사 신청서</div></div>' +
-            '<div class="type-arrow">›</div>' +
-          '</div>' +
-          '<button class="sh-cancel" onclick="closeYeollamType()">취소</button>' +
-        '</div>' +
-      '</div>' +
-
-      /* ── 입력폼 (오버레이) ── */
       '<div id="yeollamForm">' +
         '<div class="fs-card">' +
-        '<div class="fs-head">' +
-          '<button class="fs-close" onclick="closeYeollamForm()" aria-label="닫기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>' +
-          '<div class="fs-title">열람·복사 신청서 (법원)</div>' +
-        '</div>' +
-        '<div class="fs-body">' +
-          '<div class="fs-section">사건 정보</div>' +
-          '<div class="fs-field"><label class="fs-label">의뢰인</label><input type="text" class="fs-input" id="yl-client" data-af="l_client" placeholder="홍길동"></div>' +
-          '<div class="fs-field"><label class="fs-label">지위</label><input type="text" class="fs-input" id="yl-position" data-af="client_position" placeholder="피고인"></div>' +
-          '<div class="fs-field"><label class="fs-label">사건번호</label><input type="text" class="fs-input" id="yl-casenum" data-af="l_code" placeholder="2024노1234"></div>' +
-          '<div class="fs-field"><label class="fs-label">사건명</label><input type="text" class="fs-input" id="yl-casename" data-af="l_name" placeholder="사기"></div>' +
-          '<div class="fs-field"><label class="fs-label">재판부 <span class="fs-hint">(사건번호로 자동 조회)</span></label><input type="text" class="fs-input" id="yl-courtdept" placeholder="제1형사부"></div>' +
+          '<div class="fs-head">' +
+            '<button class="fs-close" onclick="closeYeollamForm()" aria-label="닫기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>' +
+            '<div class="fs-title">열람·복사 신청서</div>' +
+          '</div>' +
+          '<div class="fs-body">' +
+            '<div class="yl-pick"><span class="yl-pick-l">제출처</span><div class="fs-chips" id="yl-type">' +
+              '<span class="fs-chip on" data-v="법원" onclick="ylType(\'법원\')">법원</span>' +
+              '<span class="fs-chip" data-v="검찰" onclick="ylType(\'검찰\')">검찰</span></div></div>' +
 
-          '<div class="fs-section">신청 내용</div>' +
-          '<div class="fs-field"><label class="fs-label">사용 용도</label>' +
-            '<div class="yl-use-presets">' + useChips + '</div>' +
-            '<input type="text" class="fs-input" id="yl-use" value="' + esc(USE_PRESETS[0].text) + '" oninput="ylUseEdited()"></div>' +
-          '<div class="fs-field"><label class="fs-label">복사/출력·복제할 부분</label><input type="text" class="fs-input" id="yl-target" value="' + esc(TARGET_DEFAULT) + '"></div>' +
-          '<div class="fs-field"><label class="fs-label">작성일 (오늘 자동)</label><input type="date" class="fs-input" id="yl-writedate"></div>' +
+            '<div class="fs-section">사건 정보</div>' +
+            '<div class="yl-pick"><span class="yl-pick-l">지위</span><div class="fs-chips" id="yl-jiwi">' +
+              chip('jiwi', '피고인', true) + chip('jiwi', '피의자', false) + '</div></div>' +
+            '<div class="fs-field"><label class="fs-label">피고인</label><input type="text" class="fs-input" id="yl-defendant" data-af="l_client" placeholder="홍길동"></div>' +
+            '<div class="fs-field"><label class="fs-label">사건번호</label><input type="text" class="fs-input" id="yl-casenum" data-af="l_code" placeholder="2026노1234 / 2026형제12345"></div>' +
+            '<div class="fs-field"><label class="fs-label">사건명 · 죄명</label><input type="text" class="fs-input" id="yl-casename" data-af="l_name" placeholder="사기"></div>' +
+            '<div class="fs-field yl-court"><label class="fs-label">재판부 <span class="fs-hint">(사건번호로 자동 조회)</span></label><input type="text" class="fs-input" id="yl-courtdiv" placeholder="제1형사부"></div>' +
+            '<div class="fs-field yl-prosecution"><label class="fs-label">병행 사건번호 <span class="fs-hint">(선택)</span></label><input type="text" class="fs-input" id="yl-parallel" placeholder="2026고단12345"></div>' +
+            '<div class="fs-field yl-prosecution"><label class="fs-label">검찰청</label><input type="text" class="fs-input" id="yl-prosoffice" placeholder="인천지방검찰청"></div>' +
+            '<div class="fs-field yl-prosecution"><label class="fs-label">담당변호사 생년월일 <span class="fs-hint">(신청인 변호사 기준)</span></label><input type="text" class="fs-input" id="yl-birth" placeholder="840219-2079920"></div>' +
 
-          '<div class="fs-section">신청인</div>' +
-          '<div class="fs-field"><label class="fs-label">담당변호사</label><select class="fs-input" id="yl-attorney">' + attOpts + '</select></div>' +
-          '<div class="fs-field"><label class="fs-label">담당사무원</label>' +
-            '<select class="fs-input" id="yl-clerk"></select>' +
-            '<div class="att-add-row"><input type="text" class="att-add-input" id="yl-clerk-new" placeholder="추가할 사무원 이름"><button type="button" class="att-add-btn" onclick="ylAddClerk()">＋ 추가</button></div></div>' +
-        '</div>' +
-        '<div class="fs-foot">' +
-          '<button class="fs-btn ghost" onclick="closeYeollamForm()">취소</button>' +
-          '<button class="fs-btn primary" onclick="applyYeollamForm()">완료</button>' +
-        '</div>' +
-        '</div>' +
-      '</div>' +
+            '<div class="fs-section yl-court">신청 내용 (법원)</div>' +
+            '<div class="yl-pick yl-court"><span class="yl-pick-l">사용용도</span><div class="fs-chips" id="yl-use">' + useChips + '</div></div>' +
+            '<div class="fs-field yl-court"><label class="fs-label">신청구분 <span class="fs-hint">(기본 열람·복사)</span></label><div class="fs-chips yl-checks" id="yl-req">' + reqChips + '</div></div>' +
+            '<div class="fs-field yl-court"><label class="fs-label">복사/출력 방법 <span class="fs-hint">(기본 신청인 복사설비)</span></label><div class="fs-chips yl-checks" id="yl-methods">' + methodChips + '</div></div>' +
+            '<div class="fs-field yl-court"><label class="fs-label">복사/출력·복제할 부분</label><textarea class="fs-input" id="yl-target">' + TARGET_DEFAULT + '</textarea></div>' +
+            '<div class="fs-field yl-court"><label class="fs-label">담당사무원</label>' +
+              '<select class="fs-input" id="yl-clerk"></select>' +
+              '<div class="att-add-row"><input type="text" class="att-add-input" id="yl-clerk-new" placeholder="추가할 사무원 이름"><button type="button" class="att-add-btn" onclick="ylAddClerk()">＋ 추가</button></div></div>' +
 
-      /* ── 서면(출력) 화면 ── */
-      '<div id="screen-yeollam" class="screen">' +
-        '<div class="sj-appbar no-print">' +
-          '<button class="sj-back" onclick="showScreen(\'screen-home\')">‹ 처음으로</button>' +
-          '<div class="sj-title">열람·복사 신청서</div>' +
-          '<button class="sj-edit-btn" onclick="editYeollam()">수정</button>' +
-          '<button class="sj-print-btn" onclick="window.print()">출력</button>' +
+            '<div class="fs-section yl-prosecution">신청 서류 (검찰)</div>' +
+            '<div class="fs-field yl-prosecution"><label class="fs-label">서류 1</label><input type="text" class="fs-input" id="yl-doc1" placeholder="기록일체"></div>' +
+            '<div class="fs-field yl-prosecution"><label class="fs-label">서류 2</label><input type="text" class="fs-input" id="yl-doc2" placeholder="미디어파일일체(CD 등)"></div>' +
+
+            '<div class="fs-section">서명 · 날인</div>' +
+            '<div class="fs-field yl-court"><label class="fs-label"><input type="checkbox" id="yl-gukseon"> 국선사건 <span class="fs-hint">(자격을 "국선변호인"으로)</span></label></div>' +
+            '<div class="fs-field"><label class="fs-label">담당변호사</label>' +
+              '<div class="fs-chips att-chips" id="yl-att" onclick="attChipClick(event,\'yl\')"></div>' +
+              '<div class="att-add-row"><input type="text" class="att-add-input" id="yl-att-new" placeholder="추가할 변호사 이름"><button type="button" class="att-add-btn" onclick="addAttorney(\'yl\')">＋ 추가</button></div></div>' +
+            '<div class="fs-field"><label class="fs-label">작성일 (오늘 자동)</label><input type="date" class="fs-input" id="yl-writedate"></div>' +
+            '<div class="fs-field"><label class="fs-label"><input type="checkbox" id="yl-stamp"> 서고은 도장 날인 <span class="fs-hint">(담당변호사 첫 번째가 서고은일 때)</span></label></div>' +
+          '</div>' +
+          '<div class="fs-foot">' +
+            '<button class="fs-btn ghost" onclick="closeYeollamForm()">취소</button>' +
+            '<button class="fs-btn primary" onclick="ylDownload()">한글 다운로드</button>' +
+          '</div>' +
         '</div>' +
-        '<div class="yl-wrap"><div class="yl-page"><div id="yl-host"></div></div></div>' +
       '</div>';
-
     document.body.appendChild(wrap);
   }
 
-  /* 사무원 select 채우기 */
-  function fillClerkSelect(selected) {
-    var sel = document.getElementById('yl-clerk');
-    if (!sel) return;
-    var list = loadClerks();
-    sel.innerHTML = list.map(function (n) {
-      return '<option value="' + esc(n) + '"' + (n === selected ? ' selected' : '') + '>' + esc(n) + '</option>';
-    }).join('');
+  /* ══════════ DOM 유틸 ══════════ */
+  function setVal(id, v) { var el = document.getElementById(id); if (el) el.value = v == null ? '' : v; }
+  function getVal(id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; }
+  function getRaw(id) { var el = document.getElementById(id); return el ? el.value : ''; }
+  function fillClerkSelect(sel) {
+    var el = document.getElementById('yl-clerk'); if (!el) return;
+    el.innerHTML = loadClerks().map(function (n) { return '<option value="' + JU.esc(n) + '"' + (n === sel ? ' selected' : '') + '>' + JU.esc(n) + '</option>'; }).join('');
   }
 
-  /* ══════════════════════════════════════════════════════════════
-     상태 & 진입점
-     ══════════════════════════════════════════════════════════════ */
-  var state = null;  // 마지막 완료 값 (수정 시 재사용)
-
-  function ensureUI() { injectStyle(); injectShell(); }
-
-  // 홈 버튼 → 법원/검찰 선택 팝업
-  window.goYeollam = function () {
-    ensureUI();
-    document.getElementById('yeollamTypeSheet').classList.add('active');
+  window.ylType = function (v) {
+    state.type = v;
+    var g = document.getElementById('yl-type');
+    if (g) g.querySelectorAll('[data-v]').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-v') === v); });
+    var f = document.getElementById('yeollamForm'); if (f) f.classList.toggle('is-prosecution', v === '검찰');
+    var t = document.querySelector('#yeollamForm .fs-title'); if (t) t.textContent = v === '검찰' ? '열람·등사 신청서 (검찰)' : '열람·복사 신청서 (법원)';
   };
-  // 팝업 닫기
-  window.closeYeollamType = function () {
-    var el = document.getElementById('yeollamTypeSheet');
-    if (el) el.classList.remove('active');
+  window.ylChip = function (group, v, el) {
+    state[group] = v;
+    var box = el.parentNode; box.querySelectorAll('[data-v]').forEach(function (b) { b.classList.toggle('on', b === el); });
   };
-
-  // 갈림길 → 법원(폼) / 검찰(준비 중)
-  window.openYeollamForm = function (kind) {
-    ensureUI();
-    if (kind === '검찰') {
-      // 검찰 갈림길 → 별도 모듈(geomchal.js)로 위임
-      var _ts2 = document.getElementById('yeollamTypeSheet');
-      if (_ts2) _ts2.classList.remove('active');
-      if (typeof window.openGeomchalForm === 'function') { window.openGeomchalForm(); }
-      else if (typeof showToast === 'function') { showToast('검찰 서면 모듈을 불러오지 못했습니다'); }
-      else { alert('검찰 서면 모듈을 불러오지 못했습니다.'); }
-      return;
-    }
-    // 법원: 선택 팝업 닫고 폼 열기
-    var _ts = document.getElementById('yeollamTypeSheet');
-    if (_ts) _ts.classList.remove('active');
-    // 법원 폼 초기화
-    document.getElementById('yl-client').value = '';
-    document.getElementById('yl-position').value = '';
-    document.getElementById('yl-casenum').value = '';
-    document.getElementById('yl-casename').value = '';
-    document.getElementById('yl-courtdept').value = '';
-    document.getElementById('yl-use').value = USE_PRESETS[0].text;
-    document.getElementById('yl-target').value = TARGET_DEFAULT;
-    document.getElementById('yl-writedate').value = todayISO();
-    document.getElementById('yl-attorney').value = '서고은';
-    fillClerkSelect(CLERKS_SEED[0]);
-    setUseChip(USE_PRESETS[0].text);
-
-    document.getElementById('yeollamForm').classList.add('active');
-    // 자동완성 + 재판부 실시간 조회(재판부는 표준 밖 → 확장 인자로 위임)
-    if (typeof initAutofillFor === 'function') {
-      initAutofillFor('yl-casenum', { courtDept: 'yl-courtdept' });
-    }
+  window.ylUse = function (el) {
+    state.use = el.getAttribute('data-v');
+    el.parentNode.querySelectorAll('[data-v]').forEach(function (b) { b.classList.toggle('on', b === el); });
   };
-
-  window.closeYeollamForm = function () {
-    var f = document.getElementById('yeollamForm');
-    if (f) f.classList.remove('active');
-  };
-
-  /* ── 사용용도 프리셋 ── */
-  window.ylUsePreset = function (btn) {
-    var text = btn.getAttribute('data-use') || '';
-    var inp = document.getElementById('yl-use');
-    if (inp) inp.value = text;
-    setUseChip(text);
-  };
-  // 직접 편집하면 칩 선택 해제
-  window.ylUseEdited = function () {
-    var inp = document.getElementById('yl-use');
-    setUseChip(inp ? inp.value : '');
-  };
-  function setUseChip(text) {
-    var chips = document.querySelectorAll('#yeollamForm .yl-use-chip');
-    for (var i = 0; i < chips.length; i++) {
-      chips[i].classList.toggle('on', chips[i].getAttribute('data-use') === text);
-    }
-  }
-
-  /* ── 사무원 추가 ── */
+  window.ylMulti = function (el) { el.classList.toggle('on'); };
   window.ylAddClerk = function () {
-    var inp = document.getElementById('yl-clerk-new');
-    var name = inp ? inp.value.trim() : '';
-    if (!name) return;
-    saveClerk(name);
-    fillClerkSelect(name);
-    if (inp) inp.value = '';
+    var inp = document.getElementById('yl-clerk-new'); var name = inp ? inp.value.trim() : '';
+    if (!name) return; saveClerk(name); fillClerkSelect(name); if (inp) inp.value = '';
   };
 
-  /* ── 완료 → 서면 렌더 → 출력 화면 ── */
-  window.applyYeollamForm = function () {
-    var clerk = (document.getElementById('yl-clerk') || {}).value || '';
-    saveClerk(clerk);
-    state = {
-      attorney: (document.getElementById('yl-attorney') || {}).value || '서고은',
-      clerk: clerk,
-      position: (document.getElementById('yl-position') || {}).value || '',
-      client: (document.getElementById('yl-client') || {}).value || '',
-      use: (document.getElementById('yl-use') || {}).value || '',
-      casenum: (document.getElementById('yl-casenum') || {}).value || '',
-      casename: (document.getElementById('yl-casename') || {}).value || '',
-      courtDept: (document.getElementById('yl-courtdept') || {}).value || '',
-      target: (document.getElementById('yl-target') || {}).value || '',
-      writeDate: fmtKDate((document.getElementById('yl-writedate') || {}).value || todayISO())
-    };
-    document.getElementById('yl-host').innerHTML = renderYeollam(state);
-    closeYeollamForm();
-    if (typeof showScreen === 'function') showScreen('screen-yeollam');
-  };
-
-  /* ── 수정: 현재 값으로 폼 다시 열기 ── */
-  window.editYeollam = function () {
-    ensureUI();
-    if (!state) { window.openYeollamForm('법원'); return; }
-    document.getElementById('yl-client').value = state.client || '';
-    document.getElementById('yl-position').value = state.position || '';
-    document.getElementById('yl-casenum').value = state.casenum || '';
-    document.getElementById('yl-casename').value = state.casename || '';
-    document.getElementById('yl-courtdept').value = state.courtDept || '';
-    document.getElementById('yl-use').value = state.use || '';
-    document.getElementById('yl-target').value = state.target || '';
-    document.getElementById('yl-attorney').value = state.attorney || '서고은';
-    fillClerkSelect(state.clerk || CLERKS_SEED[0]);
-    setUseChip(state.use || '');
-    // 작성일(한글) → ISO 되돌리기
-    var m = ('' + (state.writeDate || '')).match(/(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일/);
-    document.getElementById('yl-writedate').value = m
-      ? m[1] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[3]).slice(-2) : todayISO();
-    document.getElementById('yeollamForm').classList.add('active');
-    if (typeof initAutofillFor === 'function') {
-      initAutofillFor('yl-casenum', { courtDept: 'yl-courtdept' });
-    }
-  };
-
-  /* node 검증용(브라우저에서는 무시됨) */
-  if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { renderYeollam: renderYeollam, USE_PRESETS: USE_PRESETS, fmtKDate: fmtKDate, YL_CSS: YL_CSS };
+  function fillFormFromState() {
+    setVal('yl-defendant', state.defendant); setVal('yl-casenum', state.casenum);
+    setVal('yl-casename', state.casename); setVal('yl-courtdiv', state.courtDiv);
+    setVal('yl-parallel', state.parallel); setVal('yl-prosoffice', state.prosOffice);
+    setVal('yl-birth', state.birth); setVal('yl-target', state.target);
+    setVal('yl-doc1', state.doc1); setVal('yl-doc2', state.doc2);
+    setVal('yl-writedate', state.writeDate || todayISO());
+    setVal('yl-clerk-new', ''); setVal('yl-att-new', '');
+    fillClerkSelect(state.clerk);
+    document.querySelectorAll('#yl-jiwi [data-v]').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-v') === state.jiwi); });
+    document.querySelectorAll('#yl-use [data-v]').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-v') === state.use); });
+    document.querySelectorAll('#yl-req [data-v]').forEach(function (b) { b.classList.toggle('on', state.req.indexOf(b.getAttribute('data-v')) >= 0); });
+    document.querySelectorAll('#yl-methods [data-v]').forEach(function (b) { b.classList.toggle('on', state.methods.indexOf(b.getAttribute('data-v')) >= 0); });
+    var gk = document.getElementById('yl-gukseon'); if (gk) gk.checked = !!state.gukseon;
+    var st = document.getElementById('yl-stamp'); if (st) st.checked = !!state.stamp;
+    if (typeof renderAttChips === 'function') renderAttChips('yl', (state.attorneys && state.attorneys.length) ? state.attorneys : ['서고은']);
+    window.ylType(state.type);
+  }
+  function collectChips(sel) { var out = []; document.querySelectorAll(sel + ' .fs-chip.on').forEach(function (c) { out.push(c.getAttribute('data-v')); }); return out; }
+  function collect() {
+    state.jiwi = (document.querySelector('#yl-jiwi .fs-chip.on') || {}).getAttribute ? document.querySelector('#yl-jiwi .fs-chip.on').getAttribute('data-v') : state.jiwi;
+    state.defendant = getVal('yl-defendant'); state.casenum = getVal('yl-casenum');
+    state.casename = getVal('yl-casename'); state.courtDiv = getVal('yl-courtdiv');
+    state.parallel = getVal('yl-parallel'); state.prosOffice = getVal('yl-prosoffice') || '인천지방검찰청';
+    state.birth = getVal('yl-birth'); state.target = getRaw('yl-target').trim();
+    state.doc1 = getVal('yl-doc1') || '기록일체'; state.doc2 = getVal('yl-doc2');
+    state.use = (document.querySelector('#yl-use .fs-chip.on') || {}).getAttribute ? document.querySelector('#yl-use .fs-chip.on').getAttribute('data-v') : state.use;
+    state.req = collectChips('#yl-req'); state.methods = collectChips('#yl-methods');
+    state.clerk = getVal('yl-clerk') || CLERKS_SEED[0];
+    state.writeDate = getVal('yl-writedate') || todayISO();
+    var atts = []; document.querySelectorAll('#yl-att .fs-chip.on').forEach(function (c) { atts.push(c.dataset.att); });
+    state.attorneys = atts.length ? atts : ['서고은'];
+    var gk = document.getElementById('yl-gukseon'); state.gukseon = !!(gk && gk.checked);
+    var st = document.getElementById('yl-stamp'); state.stamp = !!(st && st.checked);
   }
 
+  /* ══════════ 진입점 ══════════ */
+  function ensureUI() { injectStyle(); injectShell(); }
+  window.goYeollam = function () {
+    ensureUI(); state = defaultState(); fillFormFromState();
+    document.getElementById('yeollamForm').classList.add('active');
+    if (typeof initAutofillFor === 'function') initAutofillFor('yl-casenum', { courtDept: 'yl-courtdiv' });
+  };
+  window.closeYeollamForm = function () { var f = document.getElementById('yeollamForm'); if (f) f.classList.remove('active'); };
+
+  window.ylDownload = function () {
+    if (!state) state = defaultState();
+    collect();
+    var cfg = toCfg(state);
+    if (!cfg.casenum && !cfg.defendant) { alert('사건번호 또는 피고인을 먼저 입력해주세요.'); return; }
+    var wantSeal = cfg.stamp && cfg.attorney === '서고은' && (typeof window !== 'undefined') && window.SEAL_SEOGOEUN;
+    var anchor = cfg.type === '검찰' ? ('신청인 변호사 ' + spaced(cfg.attorney)) : ('신청인 ' + spaced(cfg.attorney));
+    HWPXFill.build({
+      url: TPL[cfg.type],
+      fill: function (ctx) { (cfg.type === '검찰' ? fillProsecution : fillCourt)(ctx, cfg); },
+      sealDataUrl: wantSeal ? window.SEAL_SEOGOEUN : null,
+      sealAnchor: anchor
+    }).then(function (blob) {
+      HWPXFill.saveBlob(blob, downloadName(state));
+    }).catch(function (e) { alert('HWPX 생성 실패: ' + e.message); });
+  };
+
+  /* node 검증용 */
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { fillCourt: fillCourt, fillProsecution: fillProsecution, toCfg: toCfg, downloadName: downloadName };
+  }
 })();
