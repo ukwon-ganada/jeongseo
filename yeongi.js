@@ -3,10 +3,12 @@
    독립 모듈. index.html 에는 진입점 버튼 + <script src="yeongi.js"> 만 둔다.
    화면(입력폼·출력미리보기)·전용 CSS 는 이 파일이 <body>에 1회 주입한다.
 
-   흐름(다른 서면과 동일한 2단계):
-     goYeongi() → [데이터 입력 폼] → 완료 → [양식(출력) 미리보기 화면] → 한글 다운로드
+   흐름(단일 단계):
+     goYeongi() → [데이터 입력 폼] → [📄 한글 다운로드] (확인창 없음)
      · 사유 작성 = Supabase Edge Function 'draft-yeongi'(Claude) 호출 (API키는 서버 시크릿)
      · 한글 다운로드 = templates/*.hwpx 를 JSZip 으로 채워 다운로드 (시크릿 불필요)
+     · 도장 날인(선택) = 담당변호사 첫 번째가 '서고은'일 때, HWPX에 직인 이미지를 담당변호사
+       '은' 위에 겹쳐 삽입(지름 1.5cm). 체크 해제 시 이미지 없이 기존과 동일한 파일.
 
    검색 자동연동(autofill.js onFill):
      · 이름/사건번호로 검색 → 우리 의뢰인의 지위(원고·피고·신청인·피신청인·채권자·채무자) 자동선택
@@ -258,6 +260,75 @@
     return [head + out.join('') + tail, hdr]; // 동의는 220% 유지(무조건 2페이지)
   }
 
+  /* ── 도장(직인) 이미지 삽입 (HWPX/OWPML) ──
+     · window.SEAL_SEOGOEUN(base64 PNG)을 BinData/image1.png 로 넣고,
+       header refList 에 binData, content.hpf 에 manifest item 을 추가한 뒤,
+       담당변호사('서고은') 문단에 떠 있는(플로팅) 그림 run 을 넣어 '은' 위에 겹친다.
+     · 위치/크기 상수는 아래에서 조정(1.5cm 실제 도장 크기). */
+  var SEAL_MM = 15;                                             // 지름 1.5cm
+  var SEAL_HU = Math.round(SEAL_MM / 10 * 7200 / 2.54);         // ≈4252 HWPUNIT
+  var SEAL_HOFF = 700;   // 오른쪽정렬 기준 가로 미세조정(+오른쪽/−왼쪽) — '은'에 맞춤
+  var SEAL_VOFF = -1150; // 글자 줄 위로 끌어올려 겹치게(−위)
+
+  function dataUrlToU8(u) {
+    var b64 = String(u || '').split(',')[1] || '';
+    var bin = atob(b64), a = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i);
+    return a;
+  }
+  function pngSize(u8) { // PNG IHDR width/height (offset 16..23)
+    if (!u8 || u8.length < 24) return [504, 480];
+    var w = ((u8[16] << 24) | (u8[17] << 16) | (u8[18] << 8) | u8[19]) >>> 0;
+    var h = ((u8[20] << 24) | (u8[21] << 16) | (u8[22] << 8) | u8[23]) >>> 0;
+    return [w || 504, h || 480];
+  }
+  function buildPic(pxW, pxH) {
+    var oW = pxW * 75, oH = pxH * 75, half = Math.round(SEAL_HU / 2); // 96DPI: px×75 = HWPUNIT
+    return '<hp:run charPrIDRef="0">' +
+      '<hp:pic reverse="0" isBWModeOnly="0" id="1932510121" zOrder="20" numberingType="PICTURE" textWrap="IN_FRONT_OF_TEXT" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" href="" groupLevel="0" instid="1932510121">' +
+      '<hp:offset x="0" y="0"/>' +
+      '<hp:orgSz width="' + oW + '" height="' + oH + '"/>' +
+      '<hp:curSz width="' + SEAL_HU + '" height="' + SEAL_HU + '"/>' +
+      '<hp:flip horizontal="0" vertical="0"/>' +
+      '<hp:rotationInfo angle="0" centerX="' + half + '" centerY="' + half + '" rotateimage="1"/>' +
+      '<hp:renderingInfo><hc:transMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:scaMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:rotMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/></hp:renderingInfo>' +
+      '<hc:img binaryItemIDRef="image1" bright="0" contrast="0" effect="REAL_PIC" alpha="0"/>' +
+      '<hp:imgRect><hc:pt0 x="0" y="0"/><hc:pt1 x="' + SEAL_HU + '" y="0"/><hc:pt2 x="' + SEAL_HU + '" y="' + SEAL_HU + '"/><hc:pt3 x="0" y="' + SEAL_HU + '"/></hp:imgRect>' +
+      '<hp:imgClip left="0" right="' + oW + '" top="0" bottom="' + oH + '"/>' +
+      '<hp:inMargin left="0" right="0" top="0" bottom="0"/>' +
+      '<hp:imgDim dimwidth="' + oW + '" dimheight="' + oH + '"/>' +
+      '<hp:sz width="' + SEAL_HU + '" widthRelTo="ABSOLUTE" height="' + SEAL_HU + '" heightRelTo="ABSOLUTE" protect="0"/>' +
+      '<hp:pos treatAsChar="0" affectLSpacing="0" flowWithText="0" allowOverlap="1" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="RIGHT" vertOffset="' + SEAL_VOFF + '" horzOffset="' + SEAL_HOFF + '"/>' +
+      '<hp:outMargin left="0" right="0" top="0" bottom="0"/>' +
+      '<hp:shapeComment/>' +
+      '</hp:pic></hp:run>';
+  }
+  // 담당변호사('서고은') 문단 맨 앞에 그림 run 삽입 (없으면 원본 그대로)
+  function injectSealPic(sec, pic) {
+    var paras = sec.match(PARA_RE) || [];
+    for (var i = 0; i < paras.length; i++) {
+      var t = pText(paras[i]);
+      if (t.indexOf('담당') >= 0 && t.indexOf('서고은') >= 0) {
+        return sec.replace(paras[i], paras[i].replace(/^(<hp:p\b[^>]*>)/, '$1' + pic));
+      }
+    }
+    return sec;
+  }
+  function injectBinData(hdr) {
+    if (hdr.indexOf('<hh:binDataList') >= 0) return hdr;
+    return hdr.replace('<hh:refList>', '<hh:refList><hh:binDataList itemCnt="1"><hh:binData id="1" type="EMBEDDING"/></hh:binDataList>');
+  }
+  function injectHpfManifest(hpf) {
+    if (hpf.indexOf('BinData/image1.png') >= 0) return hpf;
+    return hpf.replace('<opf:manifest>', '<opf:manifest><opf:item id="image1" href="BinData/image1.png" media-type="image/png" isEmbeded="1"/>');
+  }
+  function injectOdfManifest(s) {
+    if (s.indexOf('BinData/image1.png') >= 0) return s;
+    var entry = '<odf:file-entry odf:full-path="BinData/image1.png" odf:media-type="image/png"/>';
+    if (s.indexOf('</odf:manifest>') >= 0) return s.replace('</odf:manifest>', entry + '</odf:manifest>');
+    return s.replace(/<odf:manifest([^>]*)\/>/, '<odf:manifest$1>' + entry + '</odf:manifest>');
+  }
+
   // 템플릿 로드 → 채우기 → Blob
   function loadJSZip() {
     return new Promise(function (res, rej) {
@@ -273,6 +344,8 @@
     var tpl = cfg.caseType === '민사'
       ? (cfg.consent === '동의' ? TPL.consent : TPL.dissent)
       : TPL.criminal;
+    var wantSeal = !!cfg.stamp && cfg.lawyers && cfg.lawyers[0] === '서고은' &&
+      typeof window !== 'undefined' && window.SEAL_SEOGOEUN;
     var Zip;
     return loadJSZip()
       .then(function (JSZip) { Zip = JSZip; return fetch(tpl); })
@@ -283,25 +356,41 @@
           zip.file('Contents/section0.xml').async('string'),
           zip.file('Contents/header.xml').async('string'),
           zip.file('mimetype').async('uint8array'),
+          wantSeal ? zip.file('Contents/content.hpf').async('string') : Promise.resolve(null),
           zip
         ]);
       })
       .then(function (arr) {
-        var sec = arr[0], hdr = arr[1], mime = arr[2], zip = arr[3], out;
+        var sec = arr[0], hdr = arr[1], mime = arr[2], hpf = arr[3], zip = arr[4], out;
         if (cfg.caseType === '민사') {
           out = (cfg.consent === '동의') ? fillCivilConsent(sec, hdr, cfg) : fillCivilDissent(sec, hdr, cfg);
         } else {
           out = fillCriminal(sec, hdr, cfg);
         }
+        sec = out[0]; hdr = out[1];
+        var sealBin = null;
+        if (wantSeal) {
+          var u8 = dataUrlToU8(window.SEAL_SEOGOEUN), wh = pngSize(u8);
+          var sec2 = injectSealPic(sec, buildPic(wh[0], wh[1]));
+          if (sec2 !== sec) {            // 담당변호사 문단을 찾아 삽입 성공한 경우에만
+            sec = sec2;
+            hdr = injectBinData(hdr);
+            hpf = injectHpfManifest(hpf);
+            sealBin = u8;
+          }
+        }
         var zo = new Zip();
         zo.file('mimetype', mime, { compression: 'STORE' });
         var names = Object.keys(zip.files).filter(function (n) { return n !== 'mimetype' && !zip.files[n].dir; });
         return Promise.all(names.map(function (n) {
-          if (n === 'Contents/section0.xml') return Promise.resolve([n, out[0]]);
-          if (n === 'Contents/header.xml') return Promise.resolve([n, out[1]]);
+          if (n === 'Contents/section0.xml') return Promise.resolve([n, sec]);
+          if (n === 'Contents/header.xml') return Promise.resolve([n, hdr]);
+          if (n === 'Contents/content.hpf' && sealBin) return Promise.resolve([n, hpf]);
+          if (n === 'META-INF/manifest.xml' && sealBin) return zip.file(n).async('string').then(function (s) { return [n, injectOdfManifest(s)]; });
           return zip.file(n).async('uint8array').then(function (d) { return [n, d]; });
         })).then(function (entries) {
           entries.forEach(function (e) { zo.file(e[0], e[1]); });
+          if (sealBin) zo.file('BinData/image1.png', sealBin);
           return zo.generateAsync({ type: 'blob', mimeType: 'application/hwp+zip' });
         });
       });
@@ -318,7 +407,7 @@
       client: '', opponent: '', caseLine: '', court: '',
       hearingDt: '', wish: '', memo: '', reason: '',
       attorneys: ['서고은'], attachments: '', date: fmtDate(todayISO()),
-      gukseon: false, consent: '부동의', oppOffice: '', oppLawyer: ''
+      gukseon: false, consent: '부동의', oppOffice: '', oppLawyer: '', stamp: true
     };
   }
   // state → 엔진 cfg
@@ -330,7 +419,8 @@
       hearingDt: s.hearingDt, wish: s.wish, reason: s.reason,
       lawyers: (s.attorneys && s.attorneys.length) ? s.attorneys.slice() : ['서고은'],
       attachments: splitCsv(s.attachments),
-      date: s.date || fmtDate(todayISO())
+      date: s.date || fmtDate(todayISO()),
+      stamp: !!s.stamp
     };
     if (s.caseType === '민사') {
       var pair = PAIR[s.ptype] || PAIR.wongo;
@@ -351,90 +441,6 @@
   function ourRole(s) {
     if (s.caseType !== '민사') return '피고인';
     return (PAIR[s.ptype] || PAIR.wongo)[s.ourIdx];
-  }
-
-  /* ══════════════════════════════════════════════════════════════
-     양식(출력) 미리보기 — HWPX 실제 출력과 동일한 문단 순서·정렬로 렌더.
-       정렬: yg-c 가운데 / yg-l 왼쪽 / yg-r 오른쪽 / yg-j 양쪽 / yg-body 본문(첫줄들여쓰기)
-       (엔진 fill* 이 실제로 쓰는 문자열을 그대로 사용 → 한글 파일과 일치)
-     ══════════════════════════════════════════════════════════════ */
-  function ln(cls, text) { return '<p class="yg-ln ' + cls + '">' + esc(text) + '</p>'; }
-  var GAP = '<div class="yg-gap"></div>', GAP_SM = '<div class="yg-gap-sm"></div>', GAP_LG = '<div class="yg-gap-lg"></div>';
-  function attachBlock(cfg, headText) {
-    if (!cfg.attachments || !cfg.attachments.length) return '';
-    return GAP + ln('yg-c', headText) +
-      cfg.attachments.map(function (a, i) { return ln('yg-l', (i + 1) + '. ' + a); }).join('');
-  }
-  function lwLines(list, cls) { return list.slice(1).map(function (n) { return ln(cls, n); }).join(''); }
-
-  function renderCriminal(cfg) {
-    var lw = cfg.lawyers || ['서고은'], plural = (cfg.parties || []).length > 1;
-    var title = (cfg.titleKind || '') + '기일' + (cfg.titleAction || '변경') + '신청서';
-    var out = ln('yg-c yg-title', title) + GAP +
-      ln('yg-l', '사    건  ' + cfg.caseLine) +
-      ln('yg-l', '피 고 인  ' + (cfg.parties || []).join(', ')) + GAP +
-      '<p class="yg-ln yg-body">' + esc(cfg.reason) + '</p>' +
-      attachBlock(cfg, '첨 부 서 류') + GAP_LG +
-      ln('yg-r', cfg.date) + GAP +
-      ln('yg-r', '위 ' + cfg.role + (plural ? '들' : '') + '의 ' + (cfg.gukseon ? '국선변호인' : '변호인')) +
-      (cfg.gukseon ? '' : ln('yg-r', '법무법인 정서')) +
-      ln('yg-r', '담당변호사 ' + lw[0]) + lwLines(lw, 'yg-r') + GAP +
-      ln('yg-l', cfg.court + ' 귀중');
-    return out;
-  }
-
-  function renderDissent(cfg) {
-    var lw = cfg.lawyers || ['서고은'];
-    var kindWord = cfg.titleKind === '선고' ? '선고' : '변론';
-    var title = (cfg.titleKind || '변론') + '기일' + (cfg.titleAction || '변경') + '신청서';
-    var out = ln('yg-c yg-title', title) + GAP +
-      ln('yg-l', '사    건    ' + cfg.caseLine) +
-      ln('yg-l', partyRow(cfg.frontLabel, cfg.frontName)) +
-      ln('yg-l', partyRow(cfg.backLabel, cfg.backName)) + GAP +
-      '<p class="yg-ln yg-j">' + esc(introCivil(cfg.hearingDt, kindWord)) + '</p>' +
-      GAP_SM + ln('yg-c', '다  음') + GAP_SM +
-      '<p class="yg-ln yg-j">변경신청사유 : ' + esc(cfg.reason) + '</p>' + GAP_SM +
-      ln('yg-l', '※ ' + (cfg.noAgent ? NOAGENT_BODY : DISSENT_BODY)) +
-      (cfg.wish ? ln('yg-l', ' ※희망기일- ' + cfg.wish) : '') +
-      attachBlock(cfg, '첨부서류') + GAP_LG +
-      ln('yg-r', cfg.date) + GAP +
-      ln('yg-r', '위 ' + cfg.role + '의 소송대리인') +
-      ln('yg-r', '법무법인 정서      담당변호사 ' + lw[0]) + lwLines(lw, 'yg-r') + GAP +
-      ln('yg-l', cfg.court + ' 귀중');
-    return out;
-  }
-
-  function renderConsent(cfg) {
-    var lw = cfg.lawyers || ['서고은'];
-    var kindWord = cfg.titleKind === '선고' ? '선고' : '변론';
-    var title = (cfg.titleKind || '') + '기일' + (cfg.titleAction || '변경') + ' 신청서';
-    var ourLabel = cfg.ourIdx === 1 ? cfg.backLabel : cfg.frontLabel;
-    var oppLabel = cfg.ourIdx === 1 ? cfg.frontLabel : cfg.backLabel;
-    var ourBlock = ln('yg-r', '위 ' + ourLabel + '의 소송대리인') + ln('yg-r', '법무법인 정서') +
-      ln('yg-r', '담당 변호사  ' + lw[0]) + lwLines(lw, 'yg-r');
-    var oppBlock = ln('yg-r', '위 ' + oppLabel + '의 소송대리인') + ln('yg-r', cfg.oppOffice || '') +
-      ln('yg-r', '변호사 ' + (cfg.oppLawyer || ''));
-    var consentLine = ln('yg-r', '위 동의함.'), dateLine = ln('yg-r', cfg.date);
-    var sign = cfg.ourIdx === 1
-      ? (consentLine + dateLine + GAP + oppBlock + GAP + ourBlock)
-      : (dateLine + GAP + ourBlock + GAP + consentLine + oppBlock);
-    var out = ln('yg-c yg-title', title) + GAP +
-      ln('yg-l', '사    건    ' + cfg.caseLine) +
-      ln('yg-l', partyRow(cfg.frontLabel, cfg.frontName)) +
-      ln('yg-l', partyRow(cfg.backLabel, cfg.backName)) + GAP +
-      '<p class="yg-ln yg-j">' + esc(introCivil(cfg.hearingDt, kindWord)) + '</p>' +
-      GAP_SM + ln('yg-c', '다  음') + GAP_SM +
-      '<p class="yg-ln yg-j">변경신청사유 : ' + esc(cfg.reason) + '</p>' +
-      attachBlock(cfg, '첨 부 서 류') +
-      (cfg.wish ? ln('yg-l', ' ※희망기일- ' + cfg.wish) : '') + GAP_LG +
-      sign + GAP +
-      ln('yg-l', cfg.court + ' 귀중');
-    return out;
-  }
-
-  function renderYeongi(cfg) {
-    if (cfg.caseType === '민사') return cfg.consent === '동의' ? renderConsent(cfg) : renderDissent(cfg);
-    return renderCriminal(cfg);
   }
 
   /* ══════════════════════════════════════════════════════════════
@@ -461,21 +467,7 @@
     '#yeongiForm .yg-ai{display:flex;gap:8px;align-items:center;margin-top:6px;}' +
     '#yeongiForm .yg-ai-btn{white-space:nowrap;padding:9px 14px;border:1px solid #6a3df0;background:#f3efff;color:#5a2fd6;border-radius:9px;font:inherit;font-weight:600;cursor:pointer;}' +
     '#yeongiForm .yg-ai-btn:disabled{opacity:.6;cursor:default;}' +
-    '#yeongiForm .yg-ai-hint{font-size:12px;color:#8a8f98;}' +
-    /* 출력(양식) 화면 — HWPX 문서와 동일한 느낌(세리프·문단정렬) */
-    '.yg-wrap{overflow:auto;padding:16px;background:#e9e9ec;min-height:100%;}' +
-    ".yg-page{width:210mm;max-width:100%;background:#fff;margin:0 auto;padding:22mm 20mm 18mm;box-shadow:0 2px 14px rgba(0,0,0,.18);color:#000;font-family:'함초롬바탕','바탕','Batang','Noto Serif KR',serif;box-sizing:border-box;}" +
-    '#screen-yeongi .yg-ln{font-size:15px;line-height:1.95;margin:0;white-space:pre-wrap;word-break:break-word;}' +
-    '#screen-yeongi .yg-title{font-size:22px;font-weight:800;letter-spacing:2px;line-height:1.4;}' +
-    '#screen-yeongi .yg-c{text-align:center;}' +
-    '#screen-yeongi .yg-l{text-align:left;}' +
-    '#screen-yeongi .yg-r{text-align:right;}' +
-    '#screen-yeongi .yg-j{text-align:justify;white-space:normal;}' +
-    '#screen-yeongi .yg-body{text-align:justify;text-indent:1.9em;line-height:2.05;white-space:normal;margin:0;font-size:15px;}' +
-    '#screen-yeongi .yg-gap{height:15px;}' +
-    '#screen-yeongi .yg-gap-sm{height:8px;}' +
-    '#screen-yeongi .yg-gap-lg{height:32px;}' +
-    '@media print{.yg-wrap{overflow:visible;padding:0;background:#fff;}.yg-page{margin:0;box-shadow:none;width:auto;padding:15mm;}@page{size:A4;margin:0;}}';
+    '#yeongiForm .yg-ai-hint{font-size:12px;color:#8a8f98;}';
   function injectStyle() { FSDoc.injectOnce(STYLE_ID, YG_CSS); }
 
   /* ══════════════════════════════════════════════════════════════
@@ -539,23 +531,13 @@
               '<div class="att-add-row"><input type="text" class="att-add-input" id="yg-att-new" placeholder="추가할 변호사 이름"><button type="button" class="att-add-btn" onclick="addAttorney(\'yg\')">＋ 추가</button></div></div>' +
             '<div class="fs-field"><label class="fs-label">첨부서류 <span class="fs-hint">(여러 개는 쉼표로, 없으면 비움)</span></label><input type="text" class="fs-input" id="yg-attach" placeholder="퇴직증명서"></div>' +
             '<div class="fs-field"><label class="fs-label">작성일</label><input type="text" class="fs-input" id="yg-date" placeholder="2024. 3. 7."></div>' +
+            '<div class="fs-field"><label class="fs-label"><input type="checkbox" id="yg-stamp"> 서고은 도장 날인 <span class="fs-hint">(담당변호사 첫 번째가 서고은일 때 서명란에 직인)</span></label></div>' +
           '</div>' +
           '<div class="fs-foot">' +
             '<button class="fs-btn ghost" onclick="closeYeongiForm()">취소</button>' +
-            '<button class="fs-btn primary" onclick="applyYeongiForm()">완료</button>' +
+            '<button class="fs-btn primary" onclick="ygDownload()">📄 한글 다운로드</button>' +
           '</div>' +
         '</div>' +
-      '</div>' +
-
-      /* ── 출력(양식) 화면 ── */
-      '<div id="screen-yeongi" class="screen">' +
-        '<div class="sj-appbar no-print">' +
-          '<button class="sj-back" onclick="showScreen(\'screen-home\')">‹ 처음으로</button>' +
-          '<div class="sj-title">기일연기·변경 신청서</div>' +
-          '<button class="sj-edit-btn" onclick="editYeongi()">수정</button>' +
-          '<button class="sj-print-btn" onclick="ygDownload()">한글 다운로드</button>' +
-        '</div>' +
-        '<div class="yg-wrap"><div class="yg-page"><div id="yg-host"></div></div></div>' +
       '</div>';
     document.body.appendChild(wrap);
   }
@@ -636,6 +618,7 @@
     segSet('yg-consent', state.consent);
     setVal('yg-oppoffice', state.oppOffice); setVal('yg-opplawyer', state.oppLawyer);
     var gk = document.getElementById('yg-gukseon'); if (gk) gk.checked = !!state.gukseon;
+    var st = document.getElementById('yg-stamp'); if (st) st.checked = !!state.stamp;
     if (typeof renderAttChips === 'function') renderAttChips('yg', (state.attorneys && state.attorneys.length) ? state.attorneys : ['서고은']);
     applyCaseTypeClass(); updateRoleLabels();
   }
@@ -654,6 +637,7 @@
     var atts = [];
     document.querySelectorAll('#yg-att .fs-chip.on').forEach(function (c) { atts.push(c.dataset.att); });
     state.attorneys = atts.length ? atts : ['서고은'];
+    var st = document.getElementById('yg-stamp'); state.stamp = !!(st && st.checked);
     if (state.caseType === '민사') {
       state.consent = segOn('yg-consent') || '부동의';
       state.oppOffice = getVal('yg-oppoffice'); state.oppLawyer = getVal('yg-opplawyer');
@@ -706,17 +690,6 @@
 
   window.goYeongi = function () { ensureUI(); state = defaultState(); openForm(); };
   window.closeYeongiForm = function () { var f = document.getElementById('yeongiForm'); if (f) f.classList.remove('active'); };
-  window.editYeongi = function () { ensureUI(); if (!state) { window.goYeongi(); return; } openForm(); };
-
-  // 완료 → 미리보기 렌더 → 출력화면
-  window.applyYeongiForm = function () {
-    if (!state) state = defaultState();
-    collect();
-    var host = document.getElementById('yg-host');
-    if (host) host.innerHTML = renderYeongi(toCfg(state));
-    window.closeYeongiForm();
-    if (typeof showScreen === 'function') showScreen('screen-yeongi');
-  };
 
   // ✨ AI작성 (Claude Edge Function 호출)
   window.ygDraft = function () {
@@ -742,14 +715,15 @@
       body: JSON.stringify(payload)
     }).then(function (r) { return r.json(); }).then(function (d) {
       btn.disabled = false;
-      if (d && d.ok && d.reason) { setVal('yg-reason', d.reason); if (hint) hint.textContent = '작성 완료 — 검토·수정 후 완료를 누르세요.'; }
+      if (d && d.ok && d.reason) { setVal('yg-reason', d.reason); if (hint) hint.textContent = '작성 완료 — 검토·수정 후 다운로드하세요.'; }
       else { if (hint) hint.textContent = '작성 실패: ' + ((d && d.reason) || 'unknown') + ' (직접 입력 가능)'; }
     }).catch(function (e) { btn.disabled = false; if (hint) hint.textContent = '오류: ' + e.message; });
   };
 
-  // 한글(HWPX) 다운로드
+  // 📄 한글(HWPX) 다운로드 — 폼 값을 수집해 바로 생성(확인창 없음)
   window.ygDownload = function () {
-    if (!state) return;
+    if (!state) state = defaultState();
+    collect();
     var cfg = toCfg(state);
     if (!cfg.reason) { alert('사유를 먼저 작성해주세요 (✨ 버튼 또는 직접 입력).'); return; }
     buildHwpx(cfg).then(function (blob) {
@@ -766,7 +740,8 @@
     module.exports = {
       fillCriminal: fillCriminal, fillCivilConsent: fillCivilConsent, fillCivilDissent: fillCivilDissent,
       estimateList: estimateList, planPage: planPage, setT: setT, toCfg: toCfg, mapPos: mapPos,
-      renderYeongi: renderYeongi
+      buildPic: buildPic, injectSealPic: injectSealPic, injectBinData: injectBinData,
+      injectHpfManifest: injectHpfManifest, injectOdfManifest: injectOdfManifest, pngSize: pngSize
     };
   }
 })();
