@@ -203,12 +203,25 @@ function renderMoreScreen() {
   box.innerHTML = html;
 }
 
+/* ── 라이브 배경(iframe) — PC 홈에서만 로드 (모바일은 히어로가 숨김이라 3.4MB 낭비 방지) ── */
+function initHeroLive() {
+  var f = document.getElementById('hp-bg-live');
+  if (!f || f.getAttribute('src')) return;
+  try {
+    var pc = window.matchMedia && window.matchMedia('(min-width:768px)').matches;
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+    // PC에서만, 모션 최소화가 아닐 때만 라이브 배경 로드(아니면 정지 하늘 폴백 유지)
+    if (pc && !reduce) f.setAttribute('src', f.getAttribute('data-src'));
+  } catch (e) {}
+}
+
 /* ── 실행: 홈 컨테이너가 있으면 그려 넣는다 ── */
 function renderHome() {
   renderPcGrid();
   renderContractSwipe();
   renderMoreScreen();
   initHomeTheme();
+  initHeroLive();
 }
 if (typeof document !== 'undefined') {
   if (document.readyState === 'loading') {

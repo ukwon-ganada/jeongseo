@@ -84,11 +84,11 @@ html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black)
   /* 히어로: 배경 이미지가 자연 높이로 페이지를 채우고, 오버레이가 그 위에 겹침 */
   .hp-hero{
     position:relative;width:100%;min-height:100vh;
-    background:#0C1119;
-    /* 이미지가 없을 때의 하늘 폴백 */
-    background-image:linear-gradient(180deg,#2E6FB0 0%,#5B93C9 42%,#9FBFD8 72%,#0C1119 100%);
+    /* 라이브 배경(iframe)이 로드되기 전/모션 최소화 시 보이는 정지 하늘 폴백 */
+    background:#0C1119 url("hero-city.jpg") center 18%/cover no-repeat;
   }
-  .hp-bg{display:block;width:100%;height:auto;}
+  /* 라이브 배경(iframe) — 히어로를 꽉 채우는 애니메이션 하늘. 오버레이는 그 위에 */
+  .hp-bg{position:absolute;inset:0;width:100%;height:100%;border:0;display:block;pointer-events:none;background:#0C1119;}
 
   /* 하늘(첫 화면) 위에 겹치는 오버레이 */
   .hp-overlay{position:absolute;top:0;left:0;width:100%;height:100vh;color:#fff;pointer-events:none;}
