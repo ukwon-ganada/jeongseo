@@ -571,7 +571,7 @@
             '</div>' +
             '<div class="fs-field"><label class="fs-label">사유 메모 <span class="fs-hint">(간단히 적으면 AI가 정서 문체로 작성)</span></label>' +
               '<textarea class="fs-input" id="yg-memo" placeholder="예: 같은날 다른 재판 있음 / 담당변호사 퇴사 / 기록등사 지연"></textarea>' +
-              '<div class="yg-ai"><button type="button" class="yg-ai-btn" id="yg-ai-btn" onclick="ygDraft()">✨ AI작성</button><span class="yg-ai-hint" id="yg-ai-hint"></span></div></div>' +
+              '<div class="yg-ai"><button type="button" class="yg-ai-btn" id="yg-ai-btn" onclick="ygDraft()">AI작성</button><span class="yg-ai-hint" id="yg-ai-hint"></span></div></div>' +
             '<div class="fs-field"><label class="fs-label">사유 <span class="fs-hint">(검토·수정 후 다운로드)</span></label>' +
               '<textarea class="fs-input" id="yg-reason" placeholder="여기에 사유 문단이 들어갑니다"></textarea></div>' +
             '<div class="yg-pick yg-consent-pick"><span class="yg-pick-l">상대방 동의</span><div class="fs-chips" id="yg-consent">' +
@@ -595,7 +595,7 @@
           '</div>' +
           '<div class="fs-foot">' +
             '<button class="fs-btn ghost" onclick="closeYeongiForm()">취소</button>' +
-            '<button class="fs-btn primary" onclick="ygDownload()">📄 한글 다운로드</button>' +
+            '<button class="fs-btn primary" onclick="ygDownload()">한글 다운로드</button>' +
           '</div>' +
         '</div>' +
       '</div>';
