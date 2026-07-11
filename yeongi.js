@@ -354,78 +354,87 @@
   }
 
   /* ══════════════════════════════════════════════════════════════
-     양식(출력) 미리보기 렌더 — HWPX 내용과 동일 구성의 A4 미리보기.
+     양식(출력) 미리보기 — HWPX 실제 출력과 동일한 문단 순서·정렬로 렌더.
+       정렬: yg-c 가운데 / yg-l 왼쪽 / yg-r 오른쪽 / yg-j 양쪽 / yg-body 본문(첫줄들여쓰기)
+       (엔진 fill* 이 실제로 쓰는 문자열을 그대로 사용 → 한글 파일과 일치)
      ══════════════════════════════════════════════════════════════ */
-  function metaRow(label, val) {
-    return '<div class="yg-meta-row"><span class="yg-meta-l">' + esc(label) + '</span><span class="yg-meta-v">' + esc(val || '') + '</span></div>';
+  function ln(cls, text) { return '<p class="yg-ln ' + cls + '">' + esc(text) + '</p>'; }
+  var GAP = '<div class="yg-gap"></div>', GAP_SM = '<div class="yg-gap-sm"></div>', GAP_LG = '<div class="yg-gap-lg"></div>';
+  function attachBlock(cfg, headText) {
+    if (!cfg.attachments || !cfg.attachments.length) return '';
+    return GAP + ln('yg-c', headText) +
+      cfg.attachments.map(function (a, i) { return ln('yg-l', (i + 1) + '. ' + a); }).join('');
   }
-  function renderYeongi(cfg) {
-    var isCivil = cfg.caseType === '민사';
-    var title = isCivil
-      ? (cfg.titleKind || '') + '기일' + (cfg.titleAction || '변경') + ' 신청서'
-      : (cfg.titleKind || '') + '기일' + (cfg.titleAction || '변경') + '신청서';
+  function lwLines(list, cls) { return list.slice(1).map(function (n) { return ln(cls, n); }).join(''); }
 
-    var rows;
-    if (isCivil) {
-      rows = metaRow('사    건', cfg.caseLine) +
-        metaRow(ROLE_LABEL[cfg.frontLabel] || cfg.frontLabel, cfg.frontName) +
-        metaRow(ROLE_LABEL[cfg.backLabel] || cfg.backLabel, cfg.backName);
-    } else {
-      rows = metaRow('사    건', cfg.caseLine) +
-        metaRow('피 고 인', (cfg.parties || []).join(', '));
-    }
+  function renderCriminal(cfg) {
+    var lw = cfg.lawyers || ['서고은'], plural = (cfg.parties || []).length > 1;
+    var title = (cfg.titleKind || '') + '기일' + (cfg.titleAction || '변경') + '신청서';
+    var out = ln('yg-c yg-title', title) + GAP +
+      ln('yg-l', '사    건  ' + cfg.caseLine) +
+      ln('yg-l', '피 고 인  ' + (cfg.parties || []).join(', ')) + GAP +
+      '<p class="yg-ln yg-body">' + esc(cfg.reason) + '</p>' +
+      attachBlock(cfg, '첨 부 서 류') + GAP_LG +
+      ln('yg-r', cfg.date) + GAP +
+      ln('yg-r', '위 ' + cfg.role + (plural ? '들' : '') + '의 ' + (cfg.gukseon ? '국선변호인' : '변호인')) +
+      (cfg.gukseon ? '' : ln('yg-r', '법무법인 정서')) +
+      ln('yg-r', '담당변호사 ' + lw[0]) + lwLines(lw, 'yg-r') + GAP +
+      ln('yg-l', cfg.court + ' 귀중');
+    return out;
+  }
 
-    var body = '';
-    if (isCivil) {
-      var kindWord = cfg.titleKind === '선고' ? '선고' : '변론';
-      body += '<p class="yg-p yg-intro">' + esc(introCivil(cfg.hearingDt, kindWord)) + '</p>';
-      body += '<p class="yg-p">변경신청사유 : ' + esc(cfg.reason) + '</p>';
-      if (cfg.wish) body += '<p class="yg-p yg-wish"> ※희망기일- ' + esc(cfg.wish) + '</p>';
-    } else {
-      body += '<p class="yg-p">' + esc(cfg.reason) + '</p>';
-    }
-
-    var attach = '';
-    if (cfg.attachments && cfg.attachments.length) {
-      attach = '<div class="yg-attach"><div class="yg-attach-h">첨 부 서 류</div>' +
-        cfg.attachments.map(function (a, i) { return '<div class="yg-attach-i">' + (i + 1) + '. ' + esc(a) + '</div>'; }).join('') +
-        '</div>';
-    }
-
+  function renderDissent(cfg) {
     var lw = cfg.lawyers || ['서고은'];
-    function moreLines(list) { return list.slice(1).map(function (n) { return '<div class="yg-sign-more">' + esc(n) + '</div>'; }).join(''); }
-    var sign;
-    if (isCivil) {
-      var ourSign = '<div class="yg-sign-block">' +
-        '<div>위 ' + esc(cfg.role) + '의 소송대리인</div>' +
-        '<div>법무법인 정서</div>' +
-        '<div>담당 변호사  ' + esc(lw[0]) + '</div>' + moreLines(lw) + '</div>';
-      if (cfg.consent === '동의') {
-        var oppLabel = cfg.ourIdx === 1 ? cfg.frontLabel : cfg.backLabel;
-        var oppSign = '<div class="yg-sign-block">' +
-          '<div>위 ' + esc(oppLabel) + '의 소송대리인</div>' +
-          '<div>' + esc(cfg.oppOffice || '') + '</div>' +
-          '<div>변호사 ' + esc(cfg.oppLawyer || '') + '</div></div>';
-        var consentLine = '<div class="yg-consent">위 동의함.</div>';
-        sign = cfg.ourIdx === 1 ? (consentLine + oppSign + ourSign) : (ourSign + consentLine + oppSign);
-      } else {
-        sign = ourSign;
-      }
-    } else {
-      var plural = (cfg.parties || []).length > 1;
-      var vname = '위 ' + esc(cfg.role) + (plural ? '들' : '') + '의 ' + (cfg.gukseon ? '국선변호인' : '변호인');
-      sign = '<div class="yg-sign-block"><div>' + vname + '</div>' +
-        (cfg.gukseon ? '' : '<div>법무법인 정서</div>') +
-        '<div>담당변호사 ' + esc(lw[0]) + '</div>' + moreLines(lw) + '</div>';
-    }
+    var kindWord = cfg.titleKind === '선고' ? '선고' : '변론';
+    var title = (cfg.titleKind || '변론') + '기일' + (cfg.titleAction || '변경') + '신청서';
+    var out = ln('yg-c yg-title', title) + GAP +
+      ln('yg-l', '사    건    ' + cfg.caseLine) +
+      ln('yg-l', partyRow(cfg.frontLabel, cfg.frontName)) +
+      ln('yg-l', partyRow(cfg.backLabel, cfg.backName)) + GAP +
+      '<p class="yg-ln yg-j">' + esc(introCivil(cfg.hearingDt, kindWord)) + '</p>' +
+      GAP_SM + ln('yg-c', '다  음') + GAP_SM +
+      '<p class="yg-ln yg-j">변경신청사유 : ' + esc(cfg.reason) + '</p>' + GAP_SM +
+      ln('yg-l', '※ ' + (cfg.noAgent ? NOAGENT_BODY : DISSENT_BODY)) +
+      (cfg.wish ? ln('yg-l', ' ※희망기일- ' + cfg.wish) : '') +
+      attachBlock(cfg, '첨부서류') + GAP_LG +
+      ln('yg-r', cfg.date) + GAP +
+      ln('yg-r', '위 ' + cfg.role + '의 소송대리인') +
+      ln('yg-r', '법무법인 정서      담당변호사 ' + lw[0]) + lwLines(lw, 'yg-r') + GAP +
+      ln('yg-l', cfg.court + ' 귀중');
+    return out;
+  }
 
-    return '<h2 class="yg-doc-title">' + esc(title) + '</h2>' +
-      '<div class="yg-meta">' + rows + '</div>' +
-      '<div class="yg-doc-body">' + body + '</div>' +
-      attach +
-      '<p class="yg-doc-date">' + esc(cfg.date) + '</p>' +
-      '<div class="yg-doc-sign">' + sign + '</div>' +
-      '<p class="yg-doc-court">' + esc(cfg.court) + ' 귀중</p>';
+  function renderConsent(cfg) {
+    var lw = cfg.lawyers || ['서고은'];
+    var kindWord = cfg.titleKind === '선고' ? '선고' : '변론';
+    var title = (cfg.titleKind || '') + '기일' + (cfg.titleAction || '변경') + ' 신청서';
+    var ourLabel = cfg.ourIdx === 1 ? cfg.backLabel : cfg.frontLabel;
+    var oppLabel = cfg.ourIdx === 1 ? cfg.frontLabel : cfg.backLabel;
+    var ourBlock = ln('yg-r', '위 ' + ourLabel + '의 소송대리인') + ln('yg-r', '법무법인 정서') +
+      ln('yg-r', '담당 변호사  ' + lw[0]) + lwLines(lw, 'yg-r');
+    var oppBlock = ln('yg-r', '위 ' + oppLabel + '의 소송대리인') + ln('yg-r', cfg.oppOffice || '') +
+      ln('yg-r', '변호사 ' + (cfg.oppLawyer || ''));
+    var consentLine = ln('yg-r', '위 동의함.'), dateLine = ln('yg-r', cfg.date);
+    var sign = cfg.ourIdx === 1
+      ? (consentLine + dateLine + GAP + oppBlock + GAP + ourBlock)
+      : (dateLine + GAP + ourBlock + GAP + consentLine + oppBlock);
+    var out = ln('yg-c yg-title', title) + GAP +
+      ln('yg-l', '사    건    ' + cfg.caseLine) +
+      ln('yg-l', partyRow(cfg.frontLabel, cfg.frontName)) +
+      ln('yg-l', partyRow(cfg.backLabel, cfg.backName)) + GAP +
+      '<p class="yg-ln yg-j">' + esc(introCivil(cfg.hearingDt, kindWord)) + '</p>' +
+      GAP_SM + ln('yg-c', '다  음') + GAP_SM +
+      '<p class="yg-ln yg-j">변경신청사유 : ' + esc(cfg.reason) + '</p>' +
+      attachBlock(cfg, '첨 부 서 류') +
+      (cfg.wish ? ln('yg-l', ' ※희망기일- ' + cfg.wish) : '') + GAP_LG +
+      sign + GAP +
+      ln('yg-l', cfg.court + ' 귀중');
+    return out;
+  }
+
+  function renderYeongi(cfg) {
+    if (cfg.caseType === '민사') return cfg.consent === '동의' ? renderConsent(cfg) : renderDissent(cfg);
+    return renderCriminal(cfg);
   }
 
   /* ══════════════════════════════════════════════════════════════
@@ -436,14 +445,16 @@
     /* 입력폼 오버레이 */
     '#yeongiForm{display:none;position:fixed;inset:0;z-index:1100;background:#fff;flex-direction:column;}' +
     '#yeongiForm.active{display:flex;}' +
-    '#yeongiForm .yg-seg{display:flex;gap:6px;flex-wrap:wrap;}' +
-    '#yeongiForm .yg-seg button{flex:1 1 auto;min-width:56px;padding:9px 10px;border:1px solid #d0d3da;background:#f6f7f9;border-radius:9px;font:inherit;font-size:14px;color:#333;cursor:pointer;}' +
-    '#yeongiForm .yg-seg button.on{background:#2b6fff;border-color:#2b6fff;color:#fff;font-weight:600;}' +
+    /* 선택칸: 기존 서면과 동일한 알약(fs-chip) — 라벨을 왼쪽에 붙여 한 줄로 컴팩트하게 */
+    '#yeongiForm .yg-pick{display:flex;align-items:center;gap:10px;margin:0 0 9px;}' +
+    '#yeongiForm .yg-pick-l{flex:none;min-width:52px;font-size:13px;color:var(--gray-700,#555);}' +
+    '#yeongiForm .yg-pick .fs-chips{flex:1;gap:6px;}' +
+    '#yeongiForm .fs-chips .fs-chip{padding:6px 13px;font-size:13px;}' +
     '#yeongiForm .yg-row2{display:flex;gap:10px;}' +
     '#yeongiForm .yg-row2>.fs-field{flex:1;min-width:0;}' +
     '#yeongiForm .yg-civil,#yeongiForm .yg-crim,#yeongiForm .yg-consent-opp{display:none;}' +
     '#yeongiForm.is-civil .yg-civil{display:block;}' +
-    '#yeongiForm.is-civil .yg-row2.yg-civil{display:flex;}' +
+    '#yeongiForm.is-civil .yg-row2.yg-civil,#yeongiForm.is-civil .yg-pick.yg-civil{display:flex;}' +
     '#yeongiForm.is-crim .yg-crim{display:block;}' +
     '#yeongiForm.show-opp .yg-consent-opp{display:block;}' +
     '#yeongiForm textarea.fs-input{min-height:92px;resize:vertical;line-height:1.5;}' +
@@ -451,26 +462,19 @@
     '#yeongiForm .yg-ai-btn{white-space:nowrap;padding:9px 14px;border:1px solid #6a3df0;background:#f3efff;color:#5a2fd6;border-radius:9px;font:inherit;font-weight:600;cursor:pointer;}' +
     '#yeongiForm .yg-ai-btn:disabled{opacity:.6;cursor:default;}' +
     '#yeongiForm .yg-ai-hint{font-size:12px;color:#8a8f98;}' +
-    /* 출력(양식) 화면 */
+    /* 출력(양식) 화면 — HWPX 문서와 동일한 느낌(세리프·문단정렬) */
     '.yg-wrap{overflow:auto;padding:16px;background:#e9e9ec;min-height:100%;}' +
-    ".yg-page{width:210mm;max-width:100%;background:#fff;margin:0 auto;padding:22mm 20mm 18mm;box-shadow:0 2px 14px rgba(0,0,0,.18);color:#000;font-family:'바탕','Batang','맑은 고딕','Malgun Gothic',serif;box-sizing:border-box;}" +
-    '#screen-yeongi .yg-doc-title{text-align:center;font-size:24px;font-weight:800;letter-spacing:2px;margin:0 0 30px;}' +
-    '#screen-yeongi .yg-meta{margin:0 0 24px;}' +
-    '#screen-yeongi .yg-meta-row{display:flex;font-size:15px;line-height:1.9;}' +
-    '#screen-yeongi .yg-meta-l{white-space:pre;flex:none;min-width:96px;font-weight:600;}' +
-    '#screen-yeongi .yg-meta-v{flex:1 1 auto;}' +
-    '#screen-yeongi .yg-doc-body{margin:0 0 26px;}' +
-    '#screen-yeongi .yg-p{font-size:15px;line-height:2.0;margin:0 0 12px;text-align:justify;}' +
-    '#screen-yeongi .yg-wish{color:#333;}' +
-    '#screen-yeongi .yg-attach{margin:0 0 24px;font-size:15px;line-height:1.9;}' +
-    '#screen-yeongi .yg-attach-h{font-weight:700;letter-spacing:2px;margin-bottom:4px;}' +
-    '#screen-yeongi .yg-attach-i{padding-left:8px;}' +
-    '#screen-yeongi .yg-doc-date{text-align:center;font-size:16px;letter-spacing:1px;margin:26px 0 20px;}' +
-    '#screen-yeongi .yg-doc-sign{text-align:right;font-size:15px;line-height:1.9;margin:0 0 22px;padding-right:6mm;}' +
-    '#screen-yeongi .yg-sign-block{margin:0 0 14px;}' +
-    '#screen-yeongi .yg-sign-more{}' +
-    '#screen-yeongi .yg-consent{text-align:center;font-size:16px;font-weight:600;margin:20px 0;}' +
-    '#screen-yeongi .yg-doc-court{text-align:center;font-size:20px;font-weight:700;letter-spacing:6px;margin:18px 0 0;}' +
+    ".yg-page{width:210mm;max-width:100%;background:#fff;margin:0 auto;padding:22mm 20mm 18mm;box-shadow:0 2px 14px rgba(0,0,0,.18);color:#000;font-family:'함초롬바탕','바탕','Batang','Noto Serif KR',serif;box-sizing:border-box;}" +
+    '#screen-yeongi .yg-ln{font-size:15px;line-height:1.95;margin:0;white-space:pre-wrap;word-break:break-word;}' +
+    '#screen-yeongi .yg-title{font-size:22px;font-weight:800;letter-spacing:2px;line-height:1.4;}' +
+    '#screen-yeongi .yg-c{text-align:center;}' +
+    '#screen-yeongi .yg-l{text-align:left;}' +
+    '#screen-yeongi .yg-r{text-align:right;}' +
+    '#screen-yeongi .yg-j{text-align:justify;white-space:normal;}' +
+    '#screen-yeongi .yg-body{text-align:justify;text-indent:1.9em;line-height:2.05;white-space:normal;margin:0;font-size:15px;}' +
+    '#screen-yeongi .yg-gap{height:15px;}' +
+    '#screen-yeongi .yg-gap-sm{height:8px;}' +
+    '#screen-yeongi .yg-gap-lg{height:32px;}' +
     '@media print{.yg-wrap{overflow:visible;padding:0;background:#fff;}.yg-page{margin:0;box-shadow:none;width:auto;padding:15mm;}@page{size:A4;margin:0;}}';
   function injectStyle() { FSDoc.injectOnce(STYLE_ID, YG_CSS); }
 
@@ -491,14 +495,13 @@
             '<div class="fs-title">기일연기·변경 신청서</div>' +
           '</div>' +
           '<div class="fs-body">' +
-            '<div class="fs-section">신청 종류</div>' +
-            '<div class="fs-field"><label class="fs-label">사건 구분</label><div class="yg-seg" id="yg-casetype">' +
-              '<button data-v="형사" class="on" onclick="ygCaseType(\'형사\')">형사</button>' +
-              '<button data-v="민사" onclick="ygCaseType(\'민사\')">민사</button></div></div>' +
-            '<div class="fs-field"><label class="fs-label">기일 종류</label><div class="yg-seg" id="yg-kind"></div></div>' +
-            '<div class="fs-field"><label class="fs-label">동작</label><div class="yg-seg" id="yg-action">' +
-              '<button data-v="변경" class="on" onclick="ygAction(\'변경\')">변경</button>' +
-              '<button data-v="연기" onclick="ygAction(\'연기\')">연기</button></div></div>' +
+            '<div class="yg-pick"><span class="yg-pick-l">사건 구분</span><div class="fs-chips" id="yg-casetype">' +
+              '<span class="fs-chip on" data-v="형사" onclick="ygCaseType(\'형사\')">형사</span>' +
+              '<span class="fs-chip" data-v="민사" onclick="ygCaseType(\'민사\')">민사</span></div></div>' +
+            '<div class="yg-pick"><span class="yg-pick-l">기일 종류</span><div class="fs-chips" id="yg-kind"></div></div>' +
+            '<div class="yg-pick"><span class="yg-pick-l">신청 구분</span><div class="fs-chips" id="yg-action">' +
+              '<span class="fs-chip on" data-v="변경" onclick="ygAction(\'변경\')">변경</span>' +
+              '<span class="fs-chip" data-v="연기" onclick="ygAction(\'연기\')">연기</span></div></div>' +
 
             '<div class="fs-section">사건 정보</div>' +
             '<div class="yg-row2">' +
@@ -514,15 +517,15 @@
               '<div class="fs-field"><label class="fs-label">지정된 기일 <span class="fs-hint">(검색 시 자동, 시각 수기)</span></label><input type="text" class="fs-input" id="yg-hearingdt" placeholder="2024. 3. 22. 10:00"></div>' +
               '<div class="fs-field"><label class="fs-label">희망기일</label><input type="text" class="fs-input" id="yg-wish" placeholder="2024. 4. 12., 4. 19."></div>' +
             '</div>' +
-            '<div class="fs-field"><label class="fs-label">사유 메모 <span class="fs-hint">(간단히 적으면 클로드가 정서 문체로 작성)</span></label>' +
+            '<div class="fs-field"><label class="fs-label">사유 메모 <span class="fs-hint">(간단히 적으면 AI가 정서 문체로 작성)</span></label>' +
               '<textarea class="fs-input" id="yg-memo" placeholder="예: 같은날 다른 재판 있음 / 담당변호사 퇴사 / 기록등사 지연"></textarea>' +
-              '<div class="yg-ai"><button type="button" class="yg-ai-btn" id="yg-ai-btn" onclick="ygDraft()">✨ 클로드로 사유 작성</button><span class="yg-ai-hint" id="yg-ai-hint"></span></div></div>' +
+              '<div class="yg-ai"><button type="button" class="yg-ai-btn" id="yg-ai-btn" onclick="ygDraft()">✨ AI작성</button><span class="yg-ai-hint" id="yg-ai-hint"></span></div></div>' +
             '<div class="fs-field"><label class="fs-label">연기/변경 사유 <span class="fs-hint">(검토·수정 후 다운로드)</span></label>' +
               '<textarea class="fs-input" id="yg-reason" placeholder="여기에 사유 문단이 들어갑니다"></textarea></div>' +
-            '<div class="fs-field yg-civil"><label class="fs-label">상대방 동의</label><div class="yg-seg" id="yg-consent">' +
-              '<button data-v="동의" onclick="ygConsent(\'동의\')">동의</button>' +
-              '<button data-v="부동의" class="on" onclick="ygConsent(\'부동의\')">부동의</button>' +
-              '<button data-v="대리인부존재" onclick="ygConsent(\'대리인부존재\')">대리인 없음</button></div></div>' +
+            '<div class="yg-pick yg-civil"><span class="yg-pick-l">상대방 동의</span><div class="fs-chips" id="yg-consent">' +
+              '<span class="fs-chip" data-v="동의" onclick="ygConsent(\'동의\')">동의</span>' +
+              '<span class="fs-chip on" data-v="부동의" onclick="ygConsent(\'부동의\')">부동의</span>' +
+              '<span class="fs-chip" data-v="대리인부존재" onclick="ygConsent(\'대리인부존재\')">대리인 없음</span></div></div>' +
             '<div class="yg-consent-opp">' +
               '<div class="yg-row2">' +
                 '<div class="fs-field"><label class="fs-label">상대방 사무소</label><input type="text" class="fs-input" id="yg-oppoffice" placeholder="법률사무소 ○○"></div>' +
@@ -562,11 +565,11 @@
   function getVal(id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; }
   function segSet(groupId, v) {
     var g = document.getElementById(groupId); if (!g) return;
-    g.querySelectorAll('button').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-v') === v); });
+    g.querySelectorAll('[data-v]').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-v') === v); });
   }
   function segOn(groupId) {
     var g = document.getElementById(groupId); if (!g) return '';
-    var b = g.querySelector('button.on'); return b ? b.getAttribute('data-v') : '';
+    var b = g.querySelector('[data-v].on'); return b ? b.getAttribute('data-v') : '';
   }
   function fmtDate(iso) {
     var p = ('' + iso).split('-'); if (p.length !== 3) return iso;
@@ -583,7 +586,7 @@
     var g = document.getElementById('yg-kind'); if (!g) return;
     g.innerHTML = kindOptions(caseType).map(function (o) {
       var on = (o[0] === selected);
-      return '<button data-v="' + o[0] + '"' + (on ? ' class="on"' : '') + ' onclick="ygKind(\'' + o[0] + '\')">' + o[1] + '</button>';
+      return '<span class="fs-chip' + (on ? ' on' : '') + '" data-v="' + o[0] + '" onclick="ygKind(\'' + o[0] + '\')">' + o[1] + '</span>';
     }).join('');
   }
   // 지위에 따라 라벨 갱신(민사: 의뢰인=우리지위 / 상대방=반대지위)
@@ -715,7 +718,7 @@
     if (typeof showScreen === 'function') showScreen('screen-yeongi');
   };
 
-  // ✨ 클로드로 사유 작성
+  // ✨ AI작성 (Claude Edge Function 호출)
   window.ygDraft = function () {
     var btn = document.getElementById('yg-ai-btn'), hint = document.getElementById('yg-ai-hint');
     var memo = getVal('yg-memo');
@@ -726,7 +729,7 @@
       ? (ourRole(state) + '의 소송대리인')
       : '피고인의 변호인';
     var hearingKind = kind === '선고' ? '선고' : (caseType === '민사' ? '변론' : '공판');
-    btn.disabled = true; if (hint) hint.textContent = '클로드가 작성 중…';
+    btn.disabled = true; if (hint) hint.textContent = 'AI가 작성 중…';
     var payload = {
       caseType: caseType, role: role,
       hearingKind: hearingKind, action: segOn('yg-action'),
