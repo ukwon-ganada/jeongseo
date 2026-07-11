@@ -4,7 +4,7 @@
    표: 5열(각 33.4mm) × 11행, 전체 167.0 × 240.3mm, 셀 테두리 SOLID 0.15mm 균일.
    행높이(mm): 제목25.5 / 재판부·사건번호·사건명·피고인 각10.5 / 본문105.1 /
                청구인(2행) 각10.5 / 청구사유소명16.2 / 귀중15.5 / 영수13.5
-   글자: 제목20pt bold, 본문 12pt, 청구사유 주석 9pt, 귀중 15pt.
+   글자: 제목25pt bold, 본문 12pt, 청구사유 주석 9pt, 귀중 15pt.
 
    진입점(홈 버튼): onclick="goPankyul()"
    흐름: goPankyul() → 입력폼 → 완료 → 서면 → window.print()
@@ -143,7 +143,7 @@
       'font-size:12pt;line-height:1.3;word-break:keep-all;text-align:center;}' +
     /* 제목: 원본처럼 셀 너비를 넓게 채우도록 자간 확대(폰트 무관), 가운데 정렬 유지
        (text-indent 로 끝 자간분 보정해 좌우 대칭) */
-    ".pk-title{font-size:20pt;font-weight:700;letter-spacing:1.1em;text-indent:1.1em;" +
+    ".pk-title{font-size:25pt;font-weight:700;letter-spacing:1.1em;text-indent:1.1em;" +
       "font-family:'맑은 고딕','Malgun Gothic','Apple SD Gothic Neo',sans-serif;}" +
     /* 라벨/값 */
     '.pk-lbl{letter-spacing:0.05em;}' +
