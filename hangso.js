@@ -202,11 +202,13 @@
   }
 
   /* ══════════ 민가사 상고장 ══════════
-     minga_sanggo.hwpx(placeholder 템플릿): 사건 '2026나50613  손해배상(기)' /
-       상고인(피고,항소인) '상고인 이름' + '(상고인 주소입력공간)' /
-       피상고인(원고,피항소인) '피상고인 이름' + '(피상고인 주소입력공간)' /
-       intro '인천지방법원이 2026. 2. 13.에 선고한…' / 원판결표시·상고취지(빈 슬롯) /
-       작성일 ' 2026. 7. 12.' / 담당변호사 서 고 은(직인 박힘) / 대법원 귀중
+     minga_sanggo.hwpx(f8f672e7 양식): 사건 '2026나50613  손해배상(기)' /
+       상고인 → '상고인 이름' + '(피고, 항소인)' + '(상고인 주소입력공간)' /
+       피상고인 → '피상고인 이름' + '(원고, 피항소인)' + '(피상고인 주소입력공간)' /
+         (구 양식과 달리 지위 라벨이 이름 '아래' 별도 문단으로 분리됨)
+       intro '인천지방법원이 2026. 2. 13.에 선고한…' /
+       원판결표시(샘플 3줄)·상고취지(샘플 2줄) → 빈 슬롯이 아니라 샘플 문구가 박혀 있어 setLines로 교체 /
+       작성일 ' 2026. 7. 12.' / 담당변호사 서 고 은(직인 image1 박힘) / 대법원 귀중
      주의: '상고인 이름'은 '피상고인 이름'의 부분문자열 → 피상고인 먼저 치환. */
   function fillMingaSanggo(ctx, c) {
     // 상고인=의뢰인, 피상고인=상대방(의뢰인 쪽에 따라 이름·주소 배치)
@@ -217,15 +219,16 @@
     ctx.replace('2026나50613  손해배상(기)', (c.casenum || '') + '  ' + (c.casename || ''))
        .replace('피상고인 이름', oppName || '').replace('상고인 이름', clientName || '')
        .replace('(피상고인 주소입력공간)', oppAddr || '').replace('(상고인 주소입력공간)', clientAddr || '');
-    // 당사자 지위(원고/피고 → 실지위) — 항소인/피항소인 역할은 기본값 유지
-    if (c.clientJiwi && c.clientJiwi !== '피고') ctx.replace('상 고 인(피고, 항소인)', '상 고 인(' + c.clientJiwi + ', 항소인)');
-    if (c.oppJiwi && c.oppJiwi !== '원고') ctx.replace('피상고인(원고, 피항소인)', '피상고인(' + c.oppJiwi + ', 피항소인)');
+    // 당사자 지위 라벨(이름 아래 별도 문단) — 원고/피고 → 실지위. 항소인/피항소인 역할은 기본값 유지
+    if (c.clientJiwi && c.clientJiwi !== '피고') ctx.replace('(피고, 항소인)', '(' + c.clientJiwi + ', 항소인)');
+    if (c.oppJiwi && c.oppJiwi !== '원고') ctx.replace('(원고, 피항소인)', '(' + c.oppJiwi + ', 피항소인)');
     ctx.replace('인천지방법원이', (c.court || '') + '이')
        .replace('피고는', (c.clientJiwi || '피고') + (hasBatchim(c.clientJiwi || '피고') ? '은' : '는'))
        .replace('2026. 2. 13.', c.sentDate || '')
        .replace('2026. 7. 12.', c.writeDate || '');
-    setLinesInto(ctx, '원 판결의 표시', 2, c.verdictLines);
-    setLinesInto(ctx, '상 고 취 지', 4, c.purposeLines);
+    // 원판결의 표시(샘플 3줄)·상고취지(샘플 2줄): 박힌 샘플 문구를 AI/입력 줄로 교체
+    setLines(ctx, '1. 원고의 항소를 기각한다.', 3, c.verdictLines);
+    setLines(ctx, '1. 원심판결을 파기한다.', 2, c.purposeLines);
     if (c.attorney !== '서고은') ctx.replace('서 고 은', spaced(c.attorney)).replace('서고은', c.attorney);
     // 도장(image1)은 템플릿에 서고은 '은' 위로 박혀 있음 → 날인 원하면 유지, 아니면 제거
     if (!c.keepSeal) ctx.stripSeal();
