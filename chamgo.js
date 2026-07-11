@@ -47,7 +47,20 @@
     var i = -1;
     return p.replace(/<hp:t>[\s\S]*?<\/hp:t>/g, function (m) { i++; return i === n ? '<hp:t>' + xmlEsc(txt) + '</hp:t>' : m; });
   }
-  function setBody(p, txt) { return setNthT(setNthT(p, 1, ''), 0, txt); }
+  // 본문 채우기: 첫 <hp:t> 안의 선행 태그(들여쓰기 <hp:tab> 등)는 보존하고 텍스트만 교체, 2번째 run 비움
+  function setBody(p, txt) {
+    var first = true;
+    p = p.replace(/<hp:t>([\s\S]*?)<\/hp:t>/, function (m, inner) {
+      var lead = (inner.match(/^(?:<[^>]+>)*/) || [''])[0]; // 탭 등 선행 태그
+      return '<hp:t>' + lead + xmlEsc(txt) + '</hp:t>';
+    });
+    var i = -1;
+    return p.replace(/<hp:t>[\s\S]*?<\/hp:t>/g, function (m) { i++; return i === 1 ? '<hp:t></hp:t>' : m; });
+  }
+  // 참고자료 목록의 자동번호 제거(직접 지정 방식) — ppr15 heading NUMBER→NONE
+  function killListNumber(hdr) {
+    return hdr.replace(/(<hh:paraPr id="15"[\s\S]*?)<hh:heading type="NUMBER" idRef="1" level="0"\/>/, '$1<hh:heading type="NONE" idRef="0" level="0"/>');
+  }
 
   function introText(c) {
     return ' 위 사건에 관하여 ' + c.jiwi + '의 ' + (c.gukseon ? '(국선)' : '') + '변호인은 다음과 같이 참고자료를 제출합니다.';
@@ -86,7 +99,7 @@
     out.push(setT(P[17], '담당변호사 ' + lw[0]));
     for (var k = 1; k < lw.length; k++) out.push(setT(P[17], lw[k]));
     out.push(setT(P[18], c.court + ' 귀중'));
-    return [head + out.join('') + tail, hdr];
+    return [head + out.join('') + tail, killListNumber(hdr)];
   }
 
   /* ── 도장(직인) 삽입 — yeongi 와 동일 규칙 ── */
