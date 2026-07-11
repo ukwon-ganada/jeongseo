@@ -351,9 +351,10 @@ const SCHEMA = {
     verdictLines: { type: "array", items: { type: "string" }, description: "원 판결의 표시(주문) 각 항, 예: '1. 원고의 청구를 기각한다.'" },
     purposeLines: { type: "array", items: { type: "string" }, description: "항소취지 또는 상고취지 각 항" },
     oppName: { type: "string", description: "상대방(피항소인/피상고인) 이름. 없으면 빈 문자열" },
-    oppAddr: { type: "string", description: "상대방 주소. 없으면 빈 문자열" },
+    oppAddr: { type: "string", description: "상대방(피항소인/피상고인) 주소. 판결문 당사자표시에서. 없으면 빈 문자열" },
+    clientAddr: { type: "string", description: "의뢰인(항소인/상고인) 쪽 주소. 판결문 당사자표시에서. 없으면 빈 문자열" },
   },
-  required: ["verdictLines", "purposeLines", "oppName", "oppAddr"],
+  required: ["verdictLines", "purposeLines", "oppName", "oppAddr", "clientAddr"],
   additionalProperties: false,
 };
 
@@ -376,7 +377,7 @@ function buildUserText(p: Record<string, unknown>): string {
   c.push("첨부된 판결문 PDF의 '주문·청구취지'까지만 읽고(그 뒤 '이유'는 무시), 위 지침에 맞춰 다음을 JSON으로 출력하세요:");
   c.push("- verdictLines: 판결문 주문을 항 번호 그대로 정확히 옮긴 각 줄");
   c.push(`- purposeLines: ${type === "상고" ? "상고취지" : "항소취지"} 초안(지침 형식 + 판결문의 실제 금액·날짜)`);
-  c.push("- oppName / oppAddr: 판결문에서 찾은 상대방 이름·주소(없으면 빈 문자열)");
+  c.push("- oppName: 상대방 이름 / oppAddr: 상대방 주소 / clientAddr: 의뢰인 쪽 주소 (판결문 당사자표시에서, 없으면 빈 문자열)");
   return c.join("\n");
 }
 
