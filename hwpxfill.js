@@ -92,6 +92,36 @@
     }
     return sec;
   }
+  /* ── 템플릿에 이미 박힌 도장(image1) 제어 ── */
+  var _sealId = 1932510200;
+  // image1 을 참조하는 도장 그림(pic)들을 모두 제거(도장 끄기/다른 변호사)
+  function stripBakedSeals(sec) {
+    return sec.replace(/<hp:pic\b(?:(?!<\/hp:pic>)[\s\S])*?binaryItemIDRef="image1"(?:(?!<\/hp:pic>)[\s\S])*?<\/hp:pic>/g, '');
+  }
+  // 템플릿에 든 image1 을 참조하는 도장 그림 run(정위치 스타일과 동일, offset 만 지정)
+  function bakedSealRun(hoff, voff) {
+    var id = ++_sealId;
+    return '<hp:run charPrIDRef="0"><hp:pic id="' + id + '" zOrder="20" numberingType="PICTURE" textWrap="IN_FRONT_OF_TEXT" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" href="" groupLevel="0" instid="' + id + '" reverse="0">' +
+      '<hp:offset x="0" y="0"/><hp:orgSz width="37800" height="36000"/><hp:curSz width="4252" height="4252"/>' +
+      '<hp:flip horizontal="0" vertical="0"/><hp:rotationInfo angle="0" centerX="2126" centerY="2126" rotateimage="1"/>' +
+      '<hp:renderingInfo><hc:transMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:scaMatrix e1="0.112487" e2="0" e3="0" e4="0" e5="0.118111" e6="0"/><hc:rotMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/></hp:renderingInfo>' +
+      '<hc:img binaryItemIDRef="image1" bright="0" contrast="0" effect="REAL_PIC" alpha="0"/>' +
+      '<hp:imgRect><hc:pt0 x="0" y="0"/><hc:pt1 x="4252" y="0"/><hc:pt2 x="4252" y="4252"/><hc:pt3 x="0" y="4252"/></hp:imgRect>' +
+      '<hp:imgClip left="0" right="37800" top="0" bottom="36000"/><hp:inMargin left="0" right="0" top="0" bottom="0"/><hp:imgDim dimwidth="37800" dimheight="36000"/>' +
+      '<hp:sz width="4252" widthRelTo="ABSOLUTE" height="4252" heightRelTo="ABSOLUTE" protect="0"/>' +
+      '<hp:pos treatAsChar="0" affectLSpacing="0" flowWithText="0" allowOverlap="1" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="RIGHT" vertOffset="' + voff + '" horzOffset="' + hoff + '"/>' +
+      '<hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:shapeComment/></hp:pic></hp:run>';
+  }
+  function addBakedSeal(sec, anchor, hoff, voff) {
+    var paras = sec.match(PARA_RE) || [], want = normalize(anchor), run = bakedSealRun(hoff, voff);
+    for (var i = 0; i < paras.length; i++) {
+      if (normalize(paras[i]).indexOf(want) >= 0) {
+        return sec.replace(paras[i], paras[i].replace(/^(<hp:p\b[^>]*>)/, '$1' + run));
+      }
+    }
+    return sec;
+  }
+
   function injectBinData(hdr) {
     if (hdr.indexOf('<hh:binDataList') >= 0) return hdr;
     return hdr.replace('<hh:refList>', '<hh:refList><hh:binDataList itemCnt="1"><hh:binData id="1" type="EMBEDDING"/></hh:binDataList>');
@@ -130,7 +160,11 @@
           section: arr[0],
           esc: xmlEsc,
           replace: function (a, b) { if (a != null) ctx.section = ctx.section.split(a).join(b == null ? '' : b); return ctx; },
-          replaceOnce: function (a, b) { if (a != null) { var i = ctx.section.indexOf(a); if (i >= 0) ctx.section = ctx.section.slice(0, i) + (b == null ? '' : b) + ctx.section.slice(i + a.length); } return ctx; }
+          replaceOnce: function (a, b) { if (a != null) { var i = ctx.section.indexOf(a); if (i >= 0) ctx.section = ctx.section.slice(0, i) + (b == null ? '' : b) + ctx.section.slice(i + a.length); } return ctx; },
+          // 템플릿에 이미 박힌 도장(image1) 제거 — 도장 끄기/서고은 외 변호사
+          stripSeal: function () { ctx.section = stripBakedSeals(ctx.section); return ctx; },
+          // 도장 추가(템플릿 image1 재사용) — anchor 문단 위에 겹침. off={h,v}
+          addSeal: function (anchor, off) { off = off || {}; ctx.section = addBakedSeal(ctx.section, anchor, off.h == null ? 5650 : off.h, off.v == null ? -1150 : off.v); return ctx; }
         };
         opts.fill(ctx);
 
@@ -169,7 +203,10 @@
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
   }
 
-  window.HWPXFill = { build: build, esc: xmlEsc, safeName: safeName, saveBlob: saveBlob, loadJSZip: loadJSZip };
+  // 의뢰인 이름에서 '(국선 …)' 주석 제거 — 서면엔 이름만
+  function cleanName(s) { return String(s == null ? '' : s).replace(/\s*\(국선[^)]*\)\s*/g, ' ').replace(/\s+/g, ' ').trim(); }
+
+  window.HWPXFill = { build: build, esc: xmlEsc, safeName: safeName, saveBlob: saveBlob, cleanName: cleanName, loadJSZip: loadJSZip };
 
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = { xmlEsc: xmlEsc, normalize: normalize, safeName: safeName };

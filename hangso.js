@@ -111,7 +111,7 @@
     var atts = (s.attorneys && s.attorneys.length) ? s.attorneys.slice() : ['서고은'];
     var sent = s.type === '상고' ? fmtDot(s.sentDate) : fmtKDate(s.sentDate);
     return {
-      type: s.type, jiwi: s.jiwi || '피고인', defendant: s.defendant, casenum: s.casenum, casename: s.casename,
+      type: s.type, jiwi: s.jiwi || '피고인', defendant: HWPXFill.cleanName(s.defendant), casenum: s.casenum, casename: s.casename,
       court: s.court, courtDiv: s.courtDiv, sentDate: sent,
       writeDate: fmtKDate(s.writeDate) || fmtKDate(todayISO()),
       reasons: (s.reasons && s.reasons.length) ? s.reasons.slice() : [],
