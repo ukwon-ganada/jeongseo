@@ -355,7 +355,7 @@
               '<div class="hs-drop" id="hs-drop" onclick="document.getElementById(\'hs-pdf\').click()" ondragover="hsDragOver(event)" ondragleave="hsDragLeave(event)" ondrop="hsDrop(event)">' +
                 '<span id="hs-pdf-name">📎 판결문 올리기 — 클릭하거나 PDF를 여기로 끌어다 놓기</span></div>' +
               '<div class="hs-ai"><button type="button" class="hs-ai-btn" id="hs-ai-btn" onclick="hsRunAi()" disabled>' +
-                '<svg class="hs-ai-ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l1.7 6.1a3 3 0 0 0 2.2 2.2L22 12l-6.1 1.7a3 3 0 0 0-2.2 2.2L12 22l-1.7-6.1a3 3 0 0 0-2.2-2.2L2 12l6.1-1.7a3 3 0 0 0 2.2-2.2z"/></svg>AI 초안</button>' +
+                '<svg class="hs-ai-ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l1.7 6.1a3 3 0 0 0 2.2 2.2L22 12l-6.1 1.7a3 3 0 0 0-2.2 2.2L12 22l-1.7-6.1a3 3 0 0 0-2.2-2.2L2 12l6.1-1.7a3 3 0 0 0 2.2-2.2z"/></svg>AI</button>' +
                 '<span class="hs-ai-hint" id="hs-ai-hint"></span></div></div>' +
             '<div class="fs-field hs-minga"><label class="fs-label">원 판결의 표시 <span class="fs-hint">(주문, 한 줄에 한 항목)</span></label><textarea class="fs-input" id="hs-verdict" placeholder="1. 원고의 청구를 기각한다.\n2. 소송비용은 원고가 부담한다."></textarea></div>' +
             '<div class="fs-field hs-minga"><label class="fs-label"><span class="hs-hangso">항소취지</span><span class="hs-sanggo">상고취지</span> <span class="fs-hint">(한 줄에 한 항목)</span></label><textarea class="fs-input" id="hs-purpose" placeholder="1. 제1심판결을 취소한다.\n2. ..."></textarea></div>' +
@@ -431,7 +431,7 @@
     pdfFile = f;
     var nm = document.getElementById('hs-pdf-name'); if (nm) nm.textContent = '📄 ' + f.name + ' — 다시 올리려면 클릭';
     var btn = document.getElementById('hs-ai-btn'); if (btn) btn.disabled = false;
-    var h = document.getElementById('hs-ai-hint'); if (h) h.textContent = '‘AI 초안’ 버튼을 누르세요.';
+    var h = document.getElementById('hs-ai-hint'); if (h) h.textContent = '‘AI’ 버튼을 누르세요.';
   }
   window.hsPdfChoose = function (ev) {
     var f = ev.target && ev.target.files && ev.target.files[0];
