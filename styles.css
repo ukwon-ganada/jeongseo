@@ -178,6 +178,16 @@ html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black)
     background:linear-gradient(150deg,#d15a42,#a5341f);
     box-shadow:0 3px 10px rgba(150,55,35,.5),inset 0 1px 0 rgba(255,255,255,.28);
   }
+  /* 카드 하단 줄: 좌 CTA · 우 AI 표식 */
+  .dc-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+  /* AI 활용 표식 — 조용한 무채색 서리유리 칩 (미니멀·글래스 테마와 통일) */
+  .dc-ai{
+    display:inline-flex;align-items:center;gap:4px;flex-shrink:0;
+    font:600 9.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;
+    color:rgba(233,242,252,.72);padding:3px 8px 3px 6px;border-radius:999px;
+    background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);
+  }
+  .dc-ai-ic{width:11px;height:11px;opacity:.92;}
 
 
   /* 하단 마무리 바 (이미지 맨 아래 위에 얹힘) */
