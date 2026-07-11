@@ -289,8 +289,15 @@
     '#hangsoForm .fs-row2>.fs-field{min-width:0;}' +
     '#hangsoForm .fs-row2 .fs-input{min-width:0;width:100%;}' +
     // 판결문 올리기(드롭존) + AI 초안(프리즘) 버튼
-    '#hangsoForm .hs-drop{border:1.5px dashed var(--border,#cdd5e0);border-radius:12px;padding:14px 16px;text-align:center;color:#5a6b86;font-size:13px;cursor:pointer;background:var(--gray-100,#f5f7fa);transition:.15s;}' +
-    '#hangsoForm .hs-drop:hover,#hangsoForm .hs-drop.drag{border-color:#7f9bd6;background:#eef3fb;color:#33507f;}' +
+    '#hangsoForm .hs-drop{border:1px solid var(--border,#e7e9ee);border-radius:14px;padding:30px 20px;text-align:center;cursor:pointer;background:#fff;transition:border-color .18s,background .18s;}' +
+    '#hangsoForm .hs-drop:hover{border-color:#b9c1d0;background:#fcfcfd;}' +
+    '#hangsoForm .hs-drop.drag{border-color:#33507f;background:#f4f8fd;}' +
+    '#hangsoForm .hs-drop-ic{color:#aeb6c4;margin-bottom:10px;line-height:0;transition:color .18s;}' +
+    '#hangsoForm .hs-drop:hover .hs-drop-ic{color:#8b95a8;}' +
+    '#hangsoForm .hs-drop.drag .hs-drop-ic,#hangsoForm .hs-drop.has-file .hs-drop-ic{color:#33507f;}' +
+    '#hangsoForm .hs-drop-ic svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;}' +
+    '#hangsoForm .hs-drop-t1{font-size:14.5px;font-weight:600;letter-spacing:-.01em;color:#1f2a3c;}' +
+    '#hangsoForm .hs-drop-t2{font-size:11.5px;color:#98a1b2;margin-top:5px;}' +
     '#hangsoForm .hs-ai{display:flex;gap:8px;align-items:center;margin-top:8px;}' +
     '#hangsoForm .hs-ai-btn{position:relative;isolation:isolate;overflow:hidden;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;padding:9px 16px;border:1px solid rgba(255,255,255,.6);border-radius:999px;font:inherit;font-weight:800;color:#16263f;box-shadow:0 3px 12px -2px rgba(120,140,210,.45),inset 0 1px 0 rgba(255,255,255,.65);cursor:pointer;}' +
     '#hangsoForm .hs-ai-btn::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;background:linear-gradient(110deg,#ffb3d1,#ffe0ad,#b6f2d8,#b6d8ff,#d9c2ff,#ffb3d1);background-size:200% 100%;animation:hs-ai-flow 4s linear infinite;}' +
@@ -353,7 +360,9 @@
             '<div class="fs-field hs-minga"><label class="fs-label">판결문 <span class="fs-hint">(앞 2페이지의 주문·청구취지만 읽어 AI가 초안)</span></label>' +
               '<input type="file" id="hs-pdf" accept="application/pdf" style="display:none" onchange="hsPdfChoose(event)">' +
               '<div class="hs-drop" id="hs-drop" onclick="document.getElementById(\'hs-pdf\').click()" ondragover="hsDragOver(event)" ondragleave="hsDragLeave(event)" ondrop="hsDrop(event)">' +
-                '<span id="hs-pdf-name">📎 판결문 올리기 — 클릭하거나 PDF를 여기로 끌어다 놓기</span></div>' +
+                '<div class="hs-drop-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M8 8l4-4 4 4"/><path d="M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"/></svg></div>' +
+                '<div class="hs-drop-t1" id="hs-pdf-name">판결문 올리기</div>' +
+                '<div class="hs-drop-t2" id="hs-pdf-sub">클릭 또는 드래그하여 PDF 첨부</div></div>' +
               '<div class="hs-ai"><button type="button" class="hs-ai-btn" id="hs-ai-btn" onclick="hsRunAi()" disabled>' +
                 '<svg class="hs-ai-ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l1.7 6.1a3 3 0 0 0 2.2 2.2L22 12l-6.1 1.7a3 3 0 0 0-2.2 2.2L12 22l-1.7-6.1a3 3 0 0 0-2.2-2.2L2 12l6.1-1.7a3 3 0 0 0 2.2-2.2z"/></svg>AI</button>' +
                 '<span class="hs-ai-hint" id="hs-ai-hint"></span></div></div>' +
@@ -429,7 +438,9 @@
       var h0 = document.getElementById('hs-ai-hint'); if (h0) h0.textContent = 'PDF 파일만 올릴 수 있습니다.'; return;
     }
     pdfFile = f;
-    var nm = document.getElementById('hs-pdf-name'); if (nm) nm.textContent = '📄 ' + f.name + ' — 다시 올리려면 클릭';
+    var nm = document.getElementById('hs-pdf-name'); if (nm) nm.textContent = f.name;
+    var sub = document.getElementById('hs-pdf-sub'); if (sub) sub.textContent = '다시 올리려면 클릭';
+    var dz = document.getElementById('hs-drop'); if (dz) dz.classList.add('has-file');
     var btn = document.getElementById('hs-ai-btn'); if (btn) btn.disabled = false;
     var h = document.getElementById('hs-ai-hint'); if (h) h.textContent = '‘AI’ 버튼을 누르세요.';
   }
@@ -483,7 +494,9 @@
   };
   function hsResetPdfUI() {
     pdfFile = null;
-    var nm = document.getElementById('hs-pdf-name'); if (nm) nm.textContent = '📎 판결문 올리기 — 클릭하거나 PDF를 여기로 끌어다 놓기';
+    var nm = document.getElementById('hs-pdf-name'); if (nm) nm.textContent = '판결문 올리기';
+    var sub = document.getElementById('hs-pdf-sub'); if (sub) sub.textContent = '클릭 또는 드래그하여 PDF 첨부';
+    var dz = document.getElementById('hs-drop'); if (dz) dz.classList.remove('has-file');
     var btn = document.getElementById('hs-ai-btn'); if (btn) btn.disabled = true;
     var h = document.getElementById('hs-ai-hint'); if (h) h.textContent = '';
   }
