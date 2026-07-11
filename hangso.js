@@ -69,6 +69,36 @@
     var m = String(casenum || '').match(/\d{4}\s*([가-힣]+)/);
     return m && /^(재|준재)?(드|느|즈|르|므)/.test(m[1]) ? 'gasa_hangso' : 'minsa_hangso';
   }
+  // 판결문 앞 N페이지만 잘라 전송(주문·청구취지는 1~2페이지에 있음 → 속도·비용·실패 방지)
+  var HS_PDF_PAGES = 2;
+  function loadPdfLib() {
+    return new Promise(function (res, rej) {
+      if (window.PDFLib) return res(window.PDFLib);
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js';
+      s.onload = function () { res(window.PDFLib); };
+      s.onerror = function () { rej(new Error('PDF 라이브러리 로드 실패')); };
+      document.head.appendChild(s);
+    });
+  }
+  function u8ToB64(u8) { var C = 0x8000, s = ''; for (var i = 0; i < u8.length; i += C) s += String.fromCharCode.apply(null, u8.subarray(i, i + C)); return btoa(s); }
+  function readArrayBuffer(file) { return new Promise(function (res, rej) { var r = new FileReader(); r.onload = function () { res(r.result); }; r.onerror = function () { rej(new Error('PDF 읽기 실패')); }; r.readAsArrayBuffer(file); }); }
+  // 앞 N페이지만 담은 새 PDF의 base64 반환
+  function firstPagesB64(file, n) {
+    return Promise.all([loadPdfLib(), readArrayBuffer(file)]).then(function (a) {
+      var L = a[0];
+      return L.PDFDocument.load(a[1], { ignoreEncryption: true }).then(function (src) {
+        var take = Math.min(n, src.getPageCount());
+        return L.PDFDocument.create().then(function (out) {
+          var idx = []; for (var i = 0; i < take; i++) idx.push(i);
+          return out.copyPages(src, idx).then(function (pages) {
+            pages.forEach(function (p) { out.addPage(p); });
+            return out.save().then(function (bytes) { return u8ToB64(bytes); });
+          });
+        });
+      });
+    });
+  }
   function hasBatchim(s) { var ch = String(s || '').trim().slice(-1); if (!ch) return true; var c = ch.charCodeAt(0); if (c < 0xAC00 || c > 0xD7A3) return true; return (c - 0xAC00) % 28 !== 0; }
   function dropPara(ctx, text) {
     var re = new RegExp('<hp:p\\b[^>]*>(?:(?!</hp:p>)[\\s\\S])*?' + reEsc(text) + '[\\s\\S]*?</hp:p>');
@@ -304,7 +334,7 @@
 
             // 민가사 주문·취지
             '<div class="fs-section hs-minga">원 판결의 표시 · 취지</div>' +
-            '<div class="fs-field hs-minga"><label class="fs-label">판결문 PDF <span class="fs-hint">(업로드하면 주문·취지·상대방을 AI가 자동 초안)</span></label>' +
+            '<div class="fs-field hs-minga"><label class="fs-label">판결문 PDF <span class="fs-hint">(앞 2페이지의 주문·청구취지만 읽어 AI가 자동 초안)</span></label>' +
               '<input type="file" id="hs-pdf" accept="application/pdf" style="display:none" onchange="hsPdfPick(event)">' +
               '<button type="button" class="att-add-btn" onclick="document.getElementById(\'hs-pdf\').click()">📄 판결문 PDF 선택 → AI 초안</button>' +
               '<div class="fs-hint" id="hs-ai-hint" style="margin-top:6px"></div></div>' +
@@ -373,17 +403,17 @@
   }
   // 판결문 PDF 업로드 → Edge Function(draft-chwiji)로 주문·취지·상대방 AI 초안 → 폼에 채움
   window.hsPdfPick = function (ev) {
-    var f = ev.target && ev.target.files && ev.target.files[0]; if (!f) return;
+    var f = ev.target && ev.target.files && ev.target.files[0];
+    if (ev.target) ev.target.value = ''; // 같은 파일 재선택 허용
+    if (!f) return;
     var hint = document.getElementById('hs-ai-hint');
-    if (hint) hint.textContent = 'AI가 판결문을 읽는 중… (10~40초)';
+    if (hint) hint.textContent = '판결문 앞 ' + HS_PDF_PAGES + '페이지 준비 중…';
     collect();
     var cfg = toCfg(state);
     var clientName = cfg.clientSide === 'second' ? cfg.defendant2 : cfg.plaintiff;
-    var reader = new FileReader();
-    reader.onload = function () {
-      var b64 = String(reader.result || '').split(',')[1] || '';
-      if (!b64) { if (hint) hint.textContent = 'PDF 읽기 실패'; return; }
-      fetch(fnUrl('draft-chwiji'), {
+    firstPagesB64(f, HS_PDF_PAGES).then(function (b64) {
+      if (hint) hint.textContent = 'AI가 주문·청구취지 분석 중… (10~20초)';
+      return fetch(fnUrl('draft-chwiji'), {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'apikey': apiKey() },
         body: JSON.stringify({
@@ -391,22 +421,20 @@
           casenum: cfg.casenum, casename: cfg.casename, court: cfg.court,
           clientJiwi: cfg.clientJiwi, oppJiwi: cfg.oppJiwi, clientName: clientName
         })
-      }).then(function (r) { return r.json(); }).then(function (d) {
-        if (d && d.ok) {
-          if (d.verdictLines && d.verdictLines.length) setVal('hs-verdict', d.verdictLines.join('\n'));
-          if (d.purposeLines && d.purposeLines.length) setVal('hs-purpose', d.purposeLines.join('\n'));
-          // 상대방 이름·주소: 의뢰인 반대쪽 칸에
-          var oppNameId = cfg.clientSide === 'second' ? 'hs-plaintiff' : 'hs-defendant2';
-          var oppAddrId = cfg.clientSide === 'second' ? 'hs-addr1' : 'hs-addr2';
-          if (d.oppName) setVal(oppNameId, d.oppName);
-          if (d.oppAddr) setVal(oppAddrId, d.oppAddr);
-          if (hint) hint.textContent = 'AI 초안 완료 — 반드시 검토·수정 후 다운로드하세요.';
-        } else {
-          if (hint) hint.textContent = '실패: ' + ((d && d.reason) || 'unknown') + ' (직접 입력 가능)';
-        }
-      }).catch(function (e) { if (hint) hint.textContent = '오류: ' + e.message + ' (직접 입력 가능)'; });
-    };
-    reader.readAsDataURL(f);
+      });
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      if (d && d.ok) {
+        if (d.verdictLines && d.verdictLines.length) setVal('hs-verdict', d.verdictLines.join('\n'));
+        if (d.purposeLines && d.purposeLines.length) setVal('hs-purpose', d.purposeLines.join('\n'));
+        var oppNameId = cfg.clientSide === 'second' ? 'hs-plaintiff' : 'hs-defendant2';
+        var oppAddrId = cfg.clientSide === 'second' ? 'hs-addr1' : 'hs-addr2';
+        if (d.oppName) setVal(oppNameId, d.oppName);
+        if (d.oppAddr) setVal(oppAddrId, d.oppAddr);
+        if (hint) hint.textContent = 'AI 초안 완료 — 반드시 검토·수정 후 다운로드하세요.';
+      } else {
+        if (hint) hint.textContent = '실패: ' + ((d && d.reason) || 'unknown') + ((d && d.detail) ? ' — ' + d.detail : '') + ' (직접 입력 가능)';
+      }
+    }).catch(function (e) { if (hint) hint.textContent = '오류: ' + e.message + ' (직접 입력 가능)'; });
   };
   function segOn(groupId, v) { var g = document.getElementById(groupId); if (g) g.querySelectorAll('[data-v]').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-v') === v); }); }
 
