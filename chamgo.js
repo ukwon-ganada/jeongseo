@@ -269,9 +269,15 @@
     '#chamgoForm .cg-row2>.fs-field{flex:1;min-width:0;}' +
     '#chamgoForm textarea.fs-input{min-height:80px;resize:vertical;line-height:1.5;}' +
     '#chamgoForm textarea.cg-body{min-height:120px;}' +
-    '#chamgoForm .cg-ai{display:flex;gap:8px;align-items:center;margin-top:6px;}' +
-    '#chamgoForm .cg-ai-btn{white-space:nowrap;padding:9px 14px;border:1px solid #6a3df0;background:#f3efff;color:#5a2fd6;border-radius:9px;font:inherit;font-weight:600;cursor:pointer;}' +
-    '#chamgoForm .cg-ai-btn:disabled{opacity:.6;cursor:default;}' +
+    '#chamgoForm .cg-ai{display:flex;gap:8px;align-items:center;margin:10px 0 12px;}' +
+    '#chamgoForm .cg-ai-btn{position:relative;isolation:isolate;overflow:hidden;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;padding:9px 16px;border:none;border-radius:999px;font:inherit;font-weight:700;color:#5a2fd6;background:#fff;box-shadow:0 2px 10px rgba(150,170,230,.28);cursor:pointer;}' +
+    '#chamgoForm .cg-ai-btn::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1.6px;z-index:-1;background:linear-gradient(110deg,#ff5fa2,#ff9e5e,#3fd9a8,#5fb0ff,#a06bff);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:cg-ai-hue 3.4s linear infinite;}' +
+    '#chamgoForm .cg-ai-btn::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:linear-gradient(110deg,transparent 40%,rgba(255,255,255,.6) 50%,transparent 60%);transform:translateX(-140%);animation:cg-ai-sweep 3.4s ease-in-out infinite;}' +
+    '#chamgoForm .cg-ai-ic{width:13px;height:13px;fill:currentColor;}' +
+    '#chamgoForm .cg-ai-btn:disabled{opacity:.55;cursor:default;}' +
+    '@keyframes cg-ai-hue{to{filter:hue-rotate(360deg);}}' +
+    '@keyframes cg-ai-sweep{0%{transform:translateX(-140%)}45%,100%{transform:translateX(140%)}}' +
+    '@media (prefers-reduced-motion:reduce){#chamgoForm .cg-ai-btn::before,#chamgoForm .cg-ai-btn::after{animation:none;}}' +
     '#chamgoForm .cg-ai-hint{font-size:12px;color:#8a8f98;}';
   function injectStyle() { FSDoc.injectOnce(STYLE_ID, CG_CSS); }
 
@@ -310,7 +316,7 @@
               '<span class="fs-chip on" data-v="간단" onclick="cgLength(\'간단\')">간단</span>' +
               '<span class="fs-chip" data-v="길게" onclick="cgLength(\'길게\')">길게</span></div></div>' +
             '<div class="fs-field"><label class="fs-label">본문 <span class="fs-hint">(AI작성 후 검토·수정)</span></label>' +
-              '<div class="cg-ai"><button type="button" class="cg-ai-btn" id="cg-ai-btn" onclick="cgDraft()">AI작성</button><span class="cg-ai-hint" id="cg-ai-hint"></span></div>' +
+              '<div class="cg-ai"><button type="button" class="cg-ai-btn" id="cg-ai-btn" onclick="cgDraft()"><svg class="cg-ai-ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l1.7 6.1a3 3 0 0 0 2.2 2.2L22 12l-6.1 1.7a3 3 0 0 0-2.2 2.2L12 22l-1.7-6.1a3 3 0 0 0-2.2-2.2L2 12l6.1-1.7a3 3 0 0 0 2.2-2.2z"/></svg>AI</button><span class="cg-ai-hint" id="cg-ai-hint"></span></div>' +
               '<textarea class="fs-input cg-body" id="cg-reason" placeholder="여기에 참고자료 본문이 들어갑니다"></textarea></div>' +
 
             '<div class="fs-section">서명 · 날인</div>' +
