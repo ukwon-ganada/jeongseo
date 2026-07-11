@@ -392,7 +392,10 @@ async function callClaude(pdfB64: string, userText: string): Promise<Record<stri
     headers: { "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 4000,
+      max_tokens: 8000,
+      // sonnet-5는 thinking 미지정 시 adaptive(사고)가 기본 ON → 사고가 max_tokens를
+      // 다 써버려 JSON 본문을 못 내는 문제가 있음. 추출 작업이므로 사고를 끄고 속도·안정성 확보.
+      thinking: { type: "disabled" },
       system: SYSTEM,
       output_config: { format: { type: "json_schema", schema: SCHEMA } },
       messages: [{ role: "user", content }],
@@ -405,6 +408,7 @@ async function callClaude(pdfB64: string, userText: string): Promise<Record<stri
   const data = await res.json();
   const parts = Array.isArray(data?.content) ? data.content : [];
   const text = parts.filter((b: { type?: string }) => b?.type === "text").map((b: { text?: string }) => b.text || "").join("").trim();
+  if (!text) throw new Error("empty_text stop_reason=" + String(data?.stop_reason));
   try { return JSON.parse(text); } catch { throw new Error("parse: " + text.slice(0, 200)); }
 }
 
