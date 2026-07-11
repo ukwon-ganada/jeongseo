@@ -28,6 +28,14 @@
   function fnUrl(name) { return (typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : '') + '/functions/v1/' + name; }
   function cleanCaseName(name) { return String(name || '').replace(/\[전자\]\s*/g, '').trim(); }
   function splitLines(v) { return String(v || '').split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean); }
+  // 제출서류 목록 정규화: 줄바꿈/쉼표로 나눈 뒤, 각 항목의 (숫자)(서류명)만 추려 "숫자. 서류명" 으로 통일
+  //  예) "1. 반성문, 2 탄원서, 2-1합의서" → ["1. 반성문","2. 탄원서","2-1. 합의서"]
+  function parseDocs(raw) {
+    return String(raw || '').split(/[\n,]/).map(function (s) { return s.replace(/\s+/g, ' ').trim(); }).filter(Boolean).map(function (item) {
+      var m = item.match(/^(\d+(?:-\d+)*)\s*[.)]?\s*(.+)$/);
+      return (m && m[2].trim()) ? (m[1] + '. ' + m[2].trim()) : item;
+    });
+  }
   function fmtDate(iso) {
     var p = ('' + iso).split('-'); if (p.length !== 3) return iso;
     return p[0] + '. ' + parseInt(p[1], 10) + '. ' + parseInt(p[2], 10) + '.';
@@ -60,6 +68,12 @@
   // 참고자료 목록의 자동번호 제거(직접 지정 방식) — ppr15 heading NUMBER→NONE
   function killListNumber(hdr) {
     return hdr.replace(/(<hh:paraPr id="15"[\s\S]*?)<hh:heading type="NUMBER" idRef="1" level="0"\/>/, '$1<hh:heading type="NONE" idRef="0" level="0"/>');
+  }
+  // 서명 세트(작성일 ppr16 · 서명/담당변호사 ppr17)를 '다음 문단과 함께' 로 묶어
+  //  페이지를 넘길 때 {작성일·서명·기관 귀중} 이 통째로 다음 페이지로 넘어가게 한다.
+  function keepSetTogether(hdr) {
+    return hdr.replace(/(<hh:paraPr id="1[67]"[\s\S]*?<hh:breakSetting[^>]*?)keepWithNext="0" keepLines="0"/g,
+      '$1keepWithNext="1" keepLines="1"');
   }
 
   function introText(c) {
@@ -99,7 +113,7 @@
     out.push(setT(P[17], '담당변호사 ' + lw[0]));
     for (var k = 1; k < lw.length; k++) out.push(setT(P[17], lw[k]));
     out.push(setT(P[18], c.court + ' 귀중'));
-    return [head + out.join('') + tail, killListNumber(hdr)];
+    return [head + out.join('') + tail, keepSetTogether(killListNumber(hdr))];
   }
 
   /* ── 도장(직인) 삽입 — yeongi 와 동일 규칙 ── */
@@ -225,7 +239,7 @@
   function toCfg(s) {
     return {
       jiwi: s.jiwi, name: s.client, caseLine: s.caseLine, court: s.court, gukseon: !!s.gukseon,
-      docsList: splitLines(s.docs), reason: s.reason,
+      docsList: parseDocs(s.docs), reason: s.reason,
       lawyers: (s.attorneys && s.attorneys.length) ? s.attorneys.slice() : ['서고은'],
       date: s.date || fmtDate(todayISO()), stamp: !!s.stamp
     };
@@ -281,8 +295,8 @@
             '<div class="fs-field"><label class="fs-label"><input type="checkbox" id="cg-gukseon"> 국선사건 <span class="fs-hint">((국선)변호인 + 법무법인 정서 줄 생략)</span></label></div>' +
 
             '<div class="fs-section">참고자료</div>' +
-            '<div class="fs-field"><label class="fs-label">제출서류 <span class="fs-hint">(한 줄에 하나, 번호 직접 입력 — 하단 목록 그대로)</span></label>' +
-              '<textarea class="fs-input" id="cg-docs" placeholder="1. 탄원서&#10;2. 반성문&#10;3. 합의서"></textarea></div>' +
+            '<div class="fs-field"><label class="fs-label">제출서류 <span class="fs-hint">(줄바꿈 또는 쉼표로 구분 · 번호와 서류명만 적으면 자동 정리)</span></label>' +
+              '<textarea class="fs-input" id="cg-docs" placeholder="1. 탄원서, 2 반성문, 2-1합의서  → 1. 탄원서 / 2. 반성문 / 2-1. 합의서"></textarea></div>' +
             '<div class="fs-field"><label class="fs-label">사정 메모 <span class="fs-hint">(선택 — 피고인 사정·갱생 등, 길게 본문에 반영)</span></label>' +
               '<textarea class="fs-input" id="cg-memo" placeholder="예: 초범 / 부모 부양 / 마약예방교육 이수 / 피해자와 합의"></textarea></div>' +
             '<div class="cg-pick"><span class="cg-pick-l">본문 길이</span><div class="fs-chips" id="cg-length">' +
@@ -391,7 +405,7 @@
   // AI 본문 작성
   window.cgDraft = function () {
     var btn = document.getElementById('cg-ai-btn'), hint = document.getElementById('cg-ai-hint');
-    var docs = splitLines(getRaw('cg-docs'));
+    var docs = parseDocs(getRaw('cg-docs'));
     if (!docs.length && !getVal('cg-memo')) { if (hint) hint.textContent = '제출서류나 사정 메모를 먼저 적어주세요.'; return; }
     btn.disabled = true; if (hint) hint.textContent = 'AI가 작성 중…';
     var payload = {
