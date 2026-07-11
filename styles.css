@@ -87,8 +87,9 @@ html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black)
     /* 라이브 배경(iframe)이 로드되기 전/모션 최소화 시 보이는 정지 하늘 폴백 */
     background:#0C1119 url("hero-city.jpg") center 18%/cover no-repeat;
   }
-  /* 라이브 배경(iframe) — 히어로를 꽉 채우는 애니메이션 하늘. 오버레이는 그 위에 */
-  .hp-bg{position:absolute;inset:0;width:100%;height:100%;border:0;display:block;pointer-events:none;background:#0C1119;}
+  /* 라이브 배경(iframe) — 원본 9:16 장면을 폭에 맞춰 세로로 길게(장면 전체 + 스크롤).
+     기존 정적 이미지(width:100%/height:auto)와 같은 흐름을 재현해 오버레이·마무리바가 그대로 얹힘 */
+  .hp-bg{display:block;width:100%;height:calc(100vw * 16 / 9);border:0;pointer-events:none;background:#0C1119;}
 
   /* 하늘(첫 화면) 위에 겹치는 오버레이 */
   .hp-overlay{position:absolute;top:0;left:0;width:100%;height:100vh;color:#fff;pointer-events:none;}
