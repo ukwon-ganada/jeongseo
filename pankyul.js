@@ -39,18 +39,20 @@
        작성일 2026. 7. 11. / 법원 인천지방법원 / 변호사 서 고 은 / (국선변호인)  */
   function fillPankyul(ctx, c) {
     ctx.replace('형사7단독', c.courtDiv || '')
-       .replace('2026고단850', c.casenum || '')
-       .replace('도박장소개설방조', c.casename || '')
-       .replace('강세희', c.defendant || '')
-       .replace('2026.06.25.', c.sentDate || '')
-       .replace('2026. 7. 11.', c.writeDate || '')
+       .replace('2026고단485', c.casenum || '')
+       .replace('마약류관리에관한법률위반(향정)', c.casename || '')
+       .replace('채윤휘빈센트 (국선 채윤휘빈센트)', c.defendant || '')
+       .replace('2026.06.26.', c.sentDate || '')
+       .replace('2026. 7. 12.', c.writeDate || '')
        .replace('인천지방법원', c.court || '');
-    // 국선: 국선이면 '(국선변호인)' 유지, 아니면 제거
+    // 국선: 국선이면 '(국선변호인)' 유지, 아니면 제거(현행 템플릿엔 없으므로 무영향)
     if (!c.gukseon) ctx.replace('(국선변호인)', '');
     // 변호사 이름(공백형 '서 고 은' + 영수란 '서고은') 치환
     if (c.attorney && c.attorney !== '서고은') {
       ctx.replace('서 고 은', spaced(c.attorney)).replace('서고은', c.attorney);
     }
+    // 도장: 서고은+날인 선택이면 템플릿 도장 유지, 아니면 제거
+    if (!c.keepSeal) ctx.stripSeal();
   }
 
   /* ══════════ 상태 ══════════ */
@@ -65,10 +67,11 @@
   function toCfg(s) {
     var att = (s.attorneys && s.attorneys.length) ? s.attorneys[0] : '서고은';
     return {
-      defendant: s.defendant, casenum: s.casenum, casename: s.casename,
+      defendant: HWPXFill.cleanName(s.defendant), casenum: s.casenum, casename: s.casename,
       court: s.court, courtDiv: s.courtDiv,
       sentDate: fmtDotDate(s.sentDate), writeDate: fmtKDate(s.writeDate) || fmtKDate(todayISO()),
-      gukseon: !!s.gukseon, attorney: att, stamp: !!s.stamp
+      gukseon: !!s.gukseon, attorney: att, stamp: !!s.stamp,
+      keepSeal: !!s.stamp && att === '서고은'
     };
   }
   function downloadName(s) {
@@ -163,12 +166,9 @@
     collect();
     var cfg = toCfg(state);
     if (!cfg.casenum && !cfg.defendant) { alert('사건번호 또는 피고인을 먼저 입력해주세요.'); return; }
-    var wantSeal = cfg.stamp && cfg.attorney === '서고은' && (typeof window !== 'undefined') && window.SEAL_SEOGOEUN;
     HWPXFill.build({
       url: TPL,
-      fill: function (ctx) { fillPankyul(ctx, cfg); },
-      sealDataUrl: wantSeal ? window.SEAL_SEOGOEUN : null,
-      sealAnchor: '변호사 ' + spaced(cfg.attorney)
+      fill: function (ctx) { fillPankyul(ctx, cfg); }
     }).then(function (blob) {
       HWPXFill.saveBlob(blob, downloadName(state));
     }).catch(function (e) { alert('HWPX 생성 실패: ' + e.message); });
