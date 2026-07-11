@@ -350,6 +350,13 @@
     state.pair = { first: jp.first, second: jp.second }; state.side = jp.clientSide;
     hsApplyPairUI();
   }
+  // 의뢰인 이름 자동채우기: 형사는 피고인 칸(data-af로 이미 채워짐), 민가사는 지위(쪽)에 맞는 칸
+  function hsFillClientName(name) {
+    var clean = HWPXFill.cleanName(name); if (!clean) return;
+    if (state.cat === '형사') { var d = document.getElementById('hs-defendant'); if (d) d.value = clean; return; }
+    var id = state.side === 'second' ? 'hs-defendant2' : 'hs-plaintiff';
+    var el = document.getElementById(id); if (el) el.value = clean;
+  }
   function segOn(groupId, v) { var g = document.getElementById(groupId); if (g) g.querySelectorAll('[data-v]').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-v') === v); }); }
 
   function fillFormFromState() {
@@ -394,7 +401,7 @@
     document.getElementById('hangsoForm').classList.add('active');
     if (typeof initAutofillFor === 'function') initAutofillFor('hs-case', {
       caseCombine: 'hs-case', courtDept: 'hs-court', courtDeptAppend: true, sentDate: 'hs-sentdate',
-      onFill: function (row) { window.hsApplyCode(row.l_code); hsApplyPosition(row.client_position); }
+      onFill: function (row) { window.hsApplyCode(row.l_code); hsApplyPosition(row.client_position); hsFillClientName(row.l_client); }
     });
     // 사건번호 직접입력 후에도 부호로 분야·심급 칩 자동선택(창고 미검색 시에도 동작)
     var caseEl = document.getElementById('hs-case');
