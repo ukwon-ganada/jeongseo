@@ -59,6 +59,16 @@
     return null;
   }
   function spacedLabel(w) { return String(w || '').split('').join(' '); } // '신청인'→'신 청 인'
+
+  // 취지 AI 초안: Edge Function URL + 지침키 선택
+  function fnUrl(name) { return (typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : '') + '/functions/v1/' + name; }
+  function apiKey() { return (typeof SUPABASE_KEY !== 'undefined' ? SUPABASE_KEY : ''); }
+  // 상고→상고지침, 항소→가사부호면 가사항소지침 아니면 민사항소지침
+  function pickGuide(type, casenum) {
+    if (type === '상고') return 'sanggo';
+    var m = String(casenum || '').match(/\d{4}\s*([가-힣]+)/);
+    return m && /^(재|준재)?(드|느|즈|르|므)/.test(m[1]) ? 'gasa_hangso' : 'minsa_hangso';
+  }
   function hasBatchim(s) { var ch = String(s || '').trim().slice(-1); if (!ch) return true; var c = ch.charCodeAt(0); if (c < 0xAC00 || c > 0xD7A3) return true; return (c - 0xAC00) % 28 !== 0; }
   function dropPara(ctx, text) {
     var re = new RegExp('<hp:p\\b[^>]*>(?:(?!</hp:p>)[\\s\\S])*?' + reEsc(text) + '[\\s\\S]*?</hp:p>');
@@ -293,7 +303,11 @@
             '<div class="fs-field hs-hyeongsa hs-sanggo"><label class="fs-label">원심 결과</label><input type="text" class="fs-input" id="hs-result" value="항소기각" placeholder="항소기각"></div>' +
 
             // 민가사 주문·취지
-            '<div class="fs-section hs-minga">원 판결의 표시 · 취지 <span class="fs-hint">(판결문 보고 입력, 추후 AI 자동)</span></div>' +
+            '<div class="fs-section hs-minga">원 판결의 표시 · 취지</div>' +
+            '<div class="fs-field hs-minga"><label class="fs-label">판결문 PDF <span class="fs-hint">(업로드하면 주문·취지·상대방을 AI가 자동 초안)</span></label>' +
+              '<input type="file" id="hs-pdf" accept="application/pdf" style="display:none" onchange="hsPdfPick(event)">' +
+              '<button type="button" class="att-add-btn" onclick="document.getElementById(\'hs-pdf\').click()">📄 판결문 PDF 선택 → AI 초안</button>' +
+              '<div class="fs-hint" id="hs-ai-hint" style="margin-top:6px"></div></div>' +
             '<div class="fs-field hs-minga"><label class="fs-label">원 판결의 표시 <span class="fs-hint">(주문, 한 줄에 한 항목)</span></label><textarea class="fs-input" id="hs-verdict" placeholder="1. 원고의 청구를 기각한다.\n2. 소송비용은 원고가 부담한다."></textarea></div>' +
             '<div class="fs-field hs-minga"><label class="fs-label"><span class="hs-hangso">항소취지</span><span class="hs-sanggo">상고취지</span> <span class="fs-hint">(한 줄에 한 항목)</span></label><textarea class="fs-input" id="hs-purpose" placeholder="1. 제1심판결을 취소한다.\n2. ..."></textarea></div>' +
 
@@ -357,6 +371,43 @@
     var id = state.side === 'second' ? 'hs-defendant2' : 'hs-plaintiff';
     var el = document.getElementById(id); if (el) el.value = clean;
   }
+  // 판결문 PDF 업로드 → Edge Function(draft-chwiji)로 주문·취지·상대방 AI 초안 → 폼에 채움
+  window.hsPdfPick = function (ev) {
+    var f = ev.target && ev.target.files && ev.target.files[0]; if (!f) return;
+    var hint = document.getElementById('hs-ai-hint');
+    if (hint) hint.textContent = 'AI가 판결문을 읽는 중… (10~40초)';
+    collect();
+    var cfg = toCfg(state);
+    var clientName = cfg.clientSide === 'second' ? cfg.defendant2 : cfg.plaintiff;
+    var reader = new FileReader();
+    reader.onload = function () {
+      var b64 = String(reader.result || '').split(',')[1] || '';
+      if (!b64) { if (hint) hint.textContent = 'PDF 읽기 실패'; return; }
+      fetch(fnUrl('draft-chwiji'), {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'apikey': apiKey() },
+        body: JSON.stringify({
+          pdf: b64, type: cfg.type, guideKey: pickGuide(cfg.type, cfg.casenum),
+          casenum: cfg.casenum, casename: cfg.casename, court: cfg.court,
+          clientJiwi: cfg.clientJiwi, oppJiwi: cfg.oppJiwi, clientName: clientName
+        })
+      }).then(function (r) { return r.json(); }).then(function (d) {
+        if (d && d.ok) {
+          if (d.verdictLines && d.verdictLines.length) setVal('hs-verdict', d.verdictLines.join('\n'));
+          if (d.purposeLines && d.purposeLines.length) setVal('hs-purpose', d.purposeLines.join('\n'));
+          // 상대방 이름·주소: 의뢰인 반대쪽 칸에
+          var oppNameId = cfg.clientSide === 'second' ? 'hs-plaintiff' : 'hs-defendant2';
+          var oppAddrId = cfg.clientSide === 'second' ? 'hs-addr1' : 'hs-addr2';
+          if (d.oppName) setVal(oppNameId, d.oppName);
+          if (d.oppAddr) setVal(oppAddrId, d.oppAddr);
+          if (hint) hint.textContent = 'AI 초안 완료 — 반드시 검토·수정 후 다운로드하세요.';
+        } else {
+          if (hint) hint.textContent = '실패: ' + ((d && d.reason) || 'unknown') + ' (직접 입력 가능)';
+        }
+      }).catch(function (e) { if (hint) hint.textContent = '오류: ' + e.message + ' (직접 입력 가능)'; });
+    };
+    reader.readAsDataURL(f);
+  };
   function segOn(groupId, v) { var g = document.getElementById(groupId); if (g) g.querySelectorAll('[data-v]').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-v') === v); }); }
 
   function fillFormFromState() {
