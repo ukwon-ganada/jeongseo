@@ -34,6 +34,7 @@ var MENU = {
   gukseon:       { kicker: '보수 · 증액', name: '국선보수증액',   desc: '국선변호 보수 증액을 청구해요.',     icon: 'file',    action: 'goGukseon()' },
   pankyul:       { kicker: '판결 · 수령', name: '판결등본교부',   desc: '확정된 판결등본을 받아요.',           icon: 'check',   action: 'goPankyul()' },
   yeongi:        { kicker: '기일 · 연기', name: '기일 연기·보정',   desc: '기일 연기·변경, 보정기한 연기를 신청해요(AI 사유작성).', icon: 'doc',     action: 'goYeongi()' },
+  chamgo:        { kicker: '형사 · 참고', name: '참고자료',   desc: '탄원서·반성문·합의서 등 참고자료를 제출해요(AI 본문작성).', icon: 'doc',     action: 'goChamgo()' },
   contractWrite: { kicker: '거래 · 계약', name: '계약서 작성',   desc: '거래 조건과 책임을 문서로 남겨요.', icon: 'doc',     action: 'openTypeSheet()' },
   contractList:  { kicker: '관리 · 보관', name: '계약서 목록',   desc: '저장된 계약서를 관리해요.',           icon: 'list',    action: 'openContractList()' },
   appeal:        { kicker: '소송 · 불복', name: '항소장',        desc: '판결에 불복해 다시 다퉈요.',         icon: 'check',   action: 'goAppeal()' },
@@ -55,6 +56,7 @@ var PC_ORDER = [
   { id: 'appeal' },
   { id: 'pankyul' },
   { id: 'yeongi' },
+  { id: 'chamgo' },
   { id: 'dojang', kicker: '자료 · 출력', name: '자료출력' },
   { id: 'gukseon' }
 ];
@@ -74,6 +76,7 @@ var MORE_ORDER = [
   { id: 'gukseon', name: '국선보수증액 신청서', desc: '국선변호보수증액등' },
   { id: 'pankyul', name: '판결등본교부청구', desc: '판결등본 교부 청구' },
   { id: 'yeongi', name: '기일 연기·보정', desc: '기일 연기·변경, 보정기한 연기 (AI 사유작성)' },
+  { id: 'chamgo', name: '참고자료', desc: '탄원서·반성문·합의서 등 (AI 본문작성)' },
   { id: 'dojang' }
 ];
 
