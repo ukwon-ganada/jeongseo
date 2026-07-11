@@ -315,10 +315,11 @@
     var cfg = toCfg(state);
     if (!cfg.casenum && !cfg.defendant) { alert('사건번호 또는 피고인을 먼저 입력해주세요.'); return; }
     var opts = { url: TPL[cfg.type], fill: function (ctx) { (cfg.type === '검찰' ? fillProsecution : fillCourt)(ctx, cfg); } };
-    // 검찰 + 도장 날인이면 사무원 막도장(이름 도장) 생성 → 위임장/서약서 서명란에 겹침
-    if (cfg.type === '검찰' && cfg.stamp && cfg.clerk && typeof window.makeOvalSeal === 'function') {
+    // 검찰 + 도장 날인이면 사무원 막도장(이름 도장) 생성 → 서약서 사무원 서명란에 겹침
+    // 위치: 사무원 '주민등록번호(생년월일)' 문단에 앵커, 오른쪽정렬 오프셋(가로 32535·세로 2535)
+    if (cfg.type === '검찰' && cfg.stamp && cfg.clerk && cfg.clerkBirth && typeof window.makeOvalSeal === 'function') {
       var dataUrl = window.makeOvalSeal(cfg.clerk);
-      if (dataUrl) opts.nameSeal = { dataUrl: dataUrl, anchor: cfg.clerk + '(서명 또는 날인)', off: { h: 2835, v: -2200 } };
+      if (dataUrl) opts.nameSeal = { dataUrl: dataUrl, anchor: '주민등록번호(생년월일) : ' + cfg.clerkBirth, off: { h: 32535, v: 2535 } };
     }
     HWPXFill.build(opts).then(function (blob) {
       HWPXFill.saveBlob(blob, downloadName(state));
