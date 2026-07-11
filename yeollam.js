@@ -47,6 +47,33 @@
   function fillAttorneyName(ctx, att) {
     if (att && att !== '서고은') ctx.replace('서 고 은', spaced(att)).replace('서고은', att);
   }
+  // 압축폼: 한 칸의 '사건번호 사건명' → 첫 공백 기준 분리(사건번호=첫 토큰)
+  function splitCase(v) { v = String(v || '').trim(); var i = v.indexOf(' '); return i < 0 ? { casenum: v, casename: '' } : { casenum: v.slice(0, i).trim(), casename: v.slice(i + 1).trim() }; }
+  // 콤마 구분 문자열 → 항목 배열(각 항목 trim, 빈 항목 제거)
+  function splitDocs(v) { return String(v || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean); }
+
+  /* ── 검찰 '서류 등의 표목' 표: 콤마 목록을 각 행(순번1~)에 순서대로 채움 ──
+     표를 '서류 등의 표목' 헤더로 특정(같은 col1/row2 셀이 다른 표에도 있어 범위 한정 필수).
+     서류 열은 colAddr="1", 데이터행 rowAddr는 2부터. 샘플 2행은 목록이 적으면 비움. */
+  function setRunText(tc, text) {
+    if (/<hp:run\b[^>]*\/>/.test(tc)) return tc.replace(/<hp:run\b([^>]*)\/>/, '<hp:run$1><hp:t>' + HWPXFill.esc(text) + '</hp:t></hp:run>');
+    return tc.replace(/<hp:t>[\s\S]*?<\/hp:t>/, '<hp:t>' + HWPXFill.esc(text) + '</hp:t>');
+  }
+  function setCellByAddr(tbl, col, row, text) {
+    var marker = '<hp:cellAddr colAddr="' + col + '" rowAddr="' + row + '"/>';
+    var mpos = tbl.indexOf(marker); if (mpos < 0) return tbl;
+    var tcStart = tbl.lastIndexOf('<hp:tc', mpos), tcEnd = tbl.indexOf('</hp:tc>', mpos) + 8;
+    if (tcStart < 0 || tcEnd < 8) return tbl;
+    return tbl.slice(0, tcStart) + setRunText(tbl.slice(tcStart, tcEnd), text) + tbl.slice(tcEnd);
+  }
+  function fillDocTable(ctx, items) {
+    var s = ctx.section, hpos = s.indexOf('서류 등의 표목'); if (hpos < 0) return;
+    var tstart = s.lastIndexOf('<hp:tbl', hpos), tend = s.indexOf('</hp:tbl>', hpos) + 9;
+    if (tstart < 0 || tend < 9) return;
+    var tbl = s.slice(tstart, tend), n = Math.max(items.length, 2); // 샘플 2행(기록일체·미디어)은 최소 비움
+    for (var i = 0; i < n; i++) tbl = setCellByAddr(tbl, 1, i + 2, items[i] || '');
+    ctx.section = s.slice(0, tstart) + tbl + s.slice(tend);
+  }
 
   /* ── 담당사무원 명단(이름+생년월일) ── */
   function loadClerks() {
@@ -101,13 +128,12 @@
        .replace('마약류관리에관한법률위반(향정)', c.casename || '')
        .replace('2026. 7. 12.', c.writeDot || '')          // 1페이지·수수료 날짜
        .replace('2026년 7월 12일', c.writeKo || '')          // 서약서·위임장 날짜
-       .replace('기록일체', c.doc1 || '')
-       .replace('미디어파일일체(CD 등)', c.doc2 || '')
        .replace('원가을', c.clerk || '')                     // 담당사무원(서약서·위임장)
        .replace('94.11.03', c.clerkBirth || '');            // 사무원 생년월일
-    // 검찰청·검사실
-    if (c.prosecutor) ctx.replace('인천지방검찰청  검사실', (c.prosOffice || '') + ' ' + c.prosecutor + ' 검사실');
-    else ctx.replace('인천지방검찰청', c.prosOffice || '');
+    // 신청 서류: 콤마 목록을 '서류 등의 표목' 표 각 행에 순서대로
+    fillDocTable(ctx, c.docs || []);
+    // 검찰청(검사 이름 없이 검찰청만) — 4개 서식의 '인천지방검찰청'을 모두 치환
+    ctx.replace('인천지방검찰청', c.prosOffice || '인천지방검찰청');
     fillAttorneyName(ctx, c.attorney);
     // 서고은 직인(image1): 템플릿에 정위치로 박혀 있음 → 유지 or 제거(막도장은 build 에서 image2 로 추가)
     if (!c.keepSeal) ctx.stripSeal();
@@ -120,8 +146,8 @@
       type: '법원', jiwi: '피고인', defendant: '', casenum: '', casename: '',
       courtDiv: '', clerk: CLERKS_SEED[0].name, use: USE_PRESETS[0].text, target: TARGET_DEFAULT,
       req: ['열람', '복사'], methods: ['신청인 복사설비'], gukseon: false,
-      birth: '840219-2079920', prosOffice: '인천지방검찰청', prosecutor: '',
-      doc1: '기록일체', doc2: '미디어파일일체(CD 등)',
+      birth: '840219-2079920', prosOffice: '인천지방검찰청',
+      docs: '기록일체, 미디어파일일체(CD 등)',
       attorneys: ['서고은'], writeDate: todayISO(), stamp: true
     };
   }
@@ -131,8 +157,8 @@
       type: s.type, jiwi: s.jiwi, defendant: clean(s.defendant), casenum: s.casenum, casename: s.casename,
       courtDiv: s.courtDiv, clerk: s.clerk, clerkBirth: clerkBirth(s.clerk), use: s.use, target: s.target,
       req: s.req.slice(), methods: s.methods.slice(), gukseon: !!s.gukseon,
-      birth: s.birth, prosOffice: s.prosOffice || '인천지방검찰청', prosecutor: s.prosecutor || '',
-      doc1: s.doc1 || '기록일체', doc2: s.doc2,
+      birth: s.birth, prosOffice: s.prosOffice || '인천지방검찰청',
+      docs: splitDocs(s.docs),
       writeKo: fmtKoDate(s.writeDate) || fmtKoDate(todayISO()),
       writeDot: fmtDotDate(s.writeDate) || fmtDotDate(todayISO()),
       attorney: att, stamp: !!s.stamp, keepSeal: !!s.stamp && att === '서고은'
@@ -186,12 +212,10 @@
             '<div class="yl-pick"><span class="yl-pick-l">지위</span><div class="fs-chips" id="yl-jiwi">' +
               chip('jiwi', '피고인', true) + chip('jiwi', '피의자', false) + '</div></div>' +
             '<div class="fs-field"><label class="fs-label">의뢰인 성명 <span class="fs-hint">(국선 표기는 자동 제거)</span></label><input type="text" class="fs-input" id="yl-defendant" data-af="l_client" placeholder="홍길동"></div>' +
-            '<div class="fs-field"><label class="fs-label">사건번호</label><input type="text" class="fs-input" id="yl-casenum" data-af="l_code" placeholder="2026고단1234"></div>' +
-            '<div class="fs-field"><label class="fs-label">사건명 · 죄명</label><input type="text" class="fs-input" id="yl-casename" data-af="l_name" placeholder="사기"></div>' +
+            '<div class="fs-field"><label class="fs-label">사건번호 · 사건명 <span class="fs-hint">(사건번호 한 칸 띄우고 사건명)</span></label><input type="text" class="fs-input" id="yl-case" placeholder="2026고단1234 마약류관리에관한법률위반(향정)"></div>' +
             '<div class="fs-field yl-court"><label class="fs-label">재판부 <span class="fs-hint">(사건번호로 자동 조회)</span></label><input type="text" class="fs-input" id="yl-courtdiv" placeholder="형사1단독"></div>' +
-            '<div class="fs-field yl-prosecution"><label class="fs-label">검찰청</label><input type="text" class="fs-input" id="yl-prosoffice" placeholder="인천지방검찰청"></div>' +
-            '<div class="fs-field yl-prosecution"><label class="fs-label">검사 <span class="fs-hint">(검사실, 예: 홍길동)</span></label><input type="text" class="fs-input" id="yl-prosecutor" placeholder="담당검사 이름"></div>' +
-            '<div class="fs-field yl-prosecution"><label class="fs-label">담당변호사 생년월일 <span class="fs-hint">(신청인 변호사)</span></label><input type="text" class="fs-input" id="yl-birth" placeholder="840219-2079920"></div>' +
+            '<div class="fs-row2 yl-prosecution"><div class="fs-field"><label class="fs-label">검찰청</label><input type="text" class="fs-input" id="yl-prosoffice" placeholder="인천지방검찰청"></div>' +
+              '<div class="fs-field"><label class="fs-label">담당변호사 생년월일</label><input type="text" class="fs-input" id="yl-birth" placeholder="840219-2079920"></div></div>' +
 
             '<div class="fs-section yl-court">신청 내용 (법원)</div>' +
             '<div class="yl-pick yl-court"><span class="yl-pick-l">사용용도</span><div class="fs-chips" id="yl-use">' + useChips + '</div></div>' +
@@ -200,8 +224,7 @@
             '<div class="fs-field yl-court"><label class="fs-label">복사/출력·복제할 부분</label><textarea class="fs-input" id="yl-target">' + TARGET_DEFAULT + '</textarea></div>' +
 
             '<div class="fs-section yl-prosecution">신청 서류 (검찰)</div>' +
-            '<div class="fs-field yl-prosecution"><label class="fs-label">서류 1</label><input type="text" class="fs-input" id="yl-doc1" placeholder="기록일체"></div>' +
-            '<div class="fs-field yl-prosecution"><label class="fs-label">서류 2</label><input type="text" class="fs-input" id="yl-doc2" placeholder="미디어파일일체(CD 등)"></div>' +
+            '<div class="fs-field yl-prosecution"><label class="fs-label">서류 목록 <span class="fs-hint">(콤마로 구분, 순서대로 표 각 칸에 채움)</span></label><input type="text" class="fs-input" id="yl-docs" placeholder="기록일체, 미디어파일일체(CD 등)"></div>' +
 
             '<div class="fs-section">담당사무원 <span class="fs-hint">(검찰 위임장·서약서에 이름·생년월일 사용)</span></div>' +
             '<div class="fs-field"><label class="fs-label">사무원 선택</label>' +
@@ -264,11 +287,12 @@
   };
 
   function fillFormFromState() {
-    setVal('yl-defendant', state.defendant); setVal('yl-casenum', state.casenum);
-    setVal('yl-casename', state.casename); setVal('yl-courtdiv', state.courtDiv);
-    setVal('yl-prosoffice', state.prosOffice); setVal('yl-prosecutor', state.prosecutor);
+    setVal('yl-defendant', state.defendant);
+    setVal('yl-case', [state.casenum, state.casename].filter(Boolean).join(' '));
+    setVal('yl-courtdiv', state.courtDiv);
+    setVal('yl-prosoffice', state.prosOffice);
     setVal('yl-birth', state.birth); setVal('yl-target', state.target);
-    setVal('yl-doc1', state.doc1); setVal('yl-doc2', state.doc2);
+    setVal('yl-docs', state.docs);
     setVal('yl-writedate', state.writeDate || todayISO());
     setVal('yl-clerk-new', ''); setVal('yl-clerk-birth', ''); setVal('yl-att-new', '');
     fillClerkSelect(state.clerk);
@@ -285,11 +309,12 @@
   function pickOn(sel, fallback) { var el = document.querySelector(sel + ' .fs-chip.on'); return el ? el.getAttribute('data-v') : fallback; }
   function collect() {
     state.jiwi = pickOn('#yl-jiwi', state.jiwi);
-    state.defendant = getVal('yl-defendant'); state.casenum = getVal('yl-casenum');
-    state.casename = getVal('yl-casename'); state.courtDiv = getVal('yl-courtdiv');
-    state.prosOffice = getVal('yl-prosoffice') || '인천지방검찰청'; state.prosecutor = getVal('yl-prosecutor');
+    state.defendant = getVal('yl-defendant');
+    var _cs = splitCase(getVal('yl-case')); state.casenum = _cs.casenum; state.casename = _cs.casename;
+    state.courtDiv = getVal('yl-courtdiv');
+    state.prosOffice = getVal('yl-prosoffice') || '인천지방검찰청';
     state.birth = getVal('yl-birth'); state.target = getRaw('yl-target').trim();
-    state.doc1 = getVal('yl-doc1') || '기록일체'; state.doc2 = getVal('yl-doc2');
+    state.docs = getVal('yl-docs');
     state.use = pickOn('#yl-use', state.use);
     state.req = collectChips('#yl-req'); state.methods = collectChips('#yl-methods');
     state.clerk = getVal('yl-clerk') || CLERKS_SEED[0].name;
@@ -305,7 +330,7 @@
   window.goYeollam = function () {
     ensureUI(); state = defaultState(); fillFormFromState();
     document.getElementById('yeollamForm').classList.add('active');
-    if (typeof initAutofillFor === 'function') initAutofillFor('yl-casenum', { courtDept: 'yl-courtdiv' });
+    if (typeof initAutofillFor === 'function') initAutofillFor('yl-case', { caseCombine: 'yl-case', courtDept: 'yl-courtdiv' });
   };
   window.closeYeollamForm = function () { var f = document.getElementById('yeollamForm'); if (f) f.classList.remove('active'); };
 
