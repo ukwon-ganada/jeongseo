@@ -1124,6 +1124,8 @@
     set('hs-case', [c.caseNumber, c.caseName].filter(Boolean).join(' '));
     set('hs-court', courtOf(c));           // feeForm.court (재판부는 사건번호 조회로 보강)
     set('hs-sentdate', ymdDash(verdictOf(c))); // 선고일
+    // 사건번호 부호로 분야·심급 칩 자동선택(F)
+    if (typeof window.hsApplyCode === 'function') window.hsApplyCode(c.caseNumber);
   };
 
   /* ══════════════════════════════════════════════════════════════
