@@ -1120,9 +1120,9 @@
     goHangso(); // 폼 초기화 + 열기(기본 '항소')
     var set = function (fid, val) { var e = document.getElementById(fid); if (e && val) e.value = val; };
     set('hs-defendant', c.defendant);
-    set('hs-casenum', c.caseNumber);
-    set('hs-casename', c.caseName);
-    set('hs-court', courtOf(c));           // feeForm.court
+    // 압축폼: 사건번호+사건명은 한 칸(hs-case), 법원+재판부는 한 칸(hs-court)
+    set('hs-case', [c.caseNumber, c.caseName].filter(Boolean).join(' '));
+    set('hs-court', courtOf(c));           // feeForm.court (재판부는 사건번호 조회로 보강)
     set('hs-sentdate', ymdDash(verdictOf(c))); // 선고일
   };
 

@@ -31,6 +31,10 @@
   function reEsc(s) { return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
   function xe(s) { return HWPXFill.esc(s); }
   function splitLines(v) { return String(v || '').split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean); }
+  // 압축폼: 한 칸의 '사건번호 사건명' → 첫 공백 기준 분리(사건번호=첫 토큰)
+  function splitCase(v) { v = String(v || '').trim(); var i = v.indexOf(' '); return i < 0 ? { casenum: v, casename: '' } : { casenum: v.slice(0, i).trim(), casename: v.slice(i + 1).trim() }; }
+  // 압축폼: 한 칸의 '법원 재판부' → 마지막 공백 기준 분리(재판부=마지막 토큰, 지원명 포함 법원 대응)
+  function splitCourt(v) { v = String(v || '').trim(); var i = v.lastIndexOf(' '); return i < 0 ? { court: v, courtDiv: '' } : { court: v.slice(0, i).trim(), courtDiv: v.slice(i + 1).trim() }; }
   function hasBatchim(s) { var ch = String(s || '').trim().slice(-1); if (!ch) return true; var c = ch.charCodeAt(0); if (c < 0xAC00 || c > 0xD7A3) return true; return (c - 0xAC00) % 28 !== 0; }
   function dropPara(ctx, text) {
     var re = new RegExp('<hp:p\\b[^>]*>(?:(?!</hp:p>)[\\s\\S])*?' + reEsc(text) + '[\\s\\S]*?</hp:p>');
@@ -59,6 +63,25 @@
     var rebuilt = use.map(function (l) { return setParaText(paras[start], l); }).join('');
     var s = ctx.section, bs = s.indexOf(paras[start]), last = paras[start + sampleCount - 1], be = s.indexOf(last) + last.length;
     ctx.section = s.slice(0, bs) + rebuilt + s.slice(be);
+  }
+  /* 빈 문단(header 아래 빈 줄)에 사용자 줄을 채워 넣기 — minga_sanggo(placeholder) 전용.
+     빈 run(<hp:run .../>)에 <hp:t>텍스트</hp:t>를 넣어 재구성. header 아래 count개 슬롯을 소비. */
+  function fillEmptyParaLine(tpl, text) { return tpl.replace(/<hp:run\b([^>]*)\/>/, '<hp:run$1><hp:t>' + xe(text) + '</hp:t></hp:run>'); }
+  function setLinesInto(ctx, headerText, count, lines) {
+    var s = ctx.section, paras = s.match(/<hp:p\b[\s\S]*?<\/hp:p>/g) || [], header = null;
+    for (var i = 0; i < paras.length; i++) { if (paraText(paras[i]).indexOf(headerText) >= 0) { header = paras[i]; break; } }
+    if (!header) return;
+    var hpos = s.indexOf(header); if (hpos < 0) return;
+    var after = hpos + header.length, rest = s.slice(after), cursor = 0, slotFirst = null;
+    for (var k = 0; k < count; k++) {
+      var sub = rest.slice(cursor), m = sub.match(/<hp:p\b[\s\S]*?<\/hp:p>/);
+      if (!m) return;
+      if (k === 0) slotFirst = m[0];
+      cursor += sub.indexOf(m[0]) + m[0].length;
+    }
+    var use = (lines && lines.length) ? lines : [''];
+    var rebuilt = use.map(function (l) { return fillEmptyParaLine(slotFirst, l); }).join('');
+    ctx.section = s.slice(0, after) + rebuilt + rest.slice(cursor);
   }
 
   /* ══════════ 형사 항소장 ══════════ */
@@ -112,23 +135,24 @@
   }
 
   /* ══════════ 민가사 상고장 ══════════
-     minga_sanggo.hwpx 샘플: 2024나76935 임대차보증금 / 상고인(피고, 항소인) 차지만 +주소 /
-       피상고인(원고, 피항소인) 김경범 +주소 / 수원지방법원 2025.11.19 선고 2025.11.24 송달 /
-       원판결표시(2줄) / 상고취지(2줄) / 2025. 12. 5. / 대법원 귀중 */
+     minga_sanggo.hwpx(placeholder 템플릿): 사건 '2026나50613  손해배상(기)' /
+       상고인(피고,항소인) '상고인 이름' + '(상고인 주소입력공간)' /
+       피상고인(원고,피항소인) '피상고인 이름' + '(피상고인 주소입력공간)' /
+       intro '인천지방법원이 2026. 2. 13.에 선고한…' / 원판결표시·상고취지(빈 슬롯) /
+       작성일 ' 2026. 7. 12.' / 담당변호사 서 고 은(직인 박힘) / 대법원 귀중
+     주의: '상고인 이름'은 '피상고인 이름'의 부분문자열 → 피상고인 먼저 치환. */
   function fillMingaSanggo(ctx, c) {
-    ctx.replace('2024나76935  임대차보증금', (c.casenum || '') + '  ' + (c.casename || ''))
-       .replace('차지만', c.plaintiff || '').replace('김경범', c.defendant2 || '')
-       .replace('부산 강서구 명지오션시티10로 16, 209동 302호', c.addr1 || '')
-       .replace('(명지동, 영어도시퀸덤1차)', c.addr1b || '')
-       .replace('수원시 장안구 장안로 232, 107동 309호', c.addr2 || '')
-       .replace('(정자동, 동신아파트)', c.addr2b || '')
-       .replace('수원지방법원이', (c.court || '') + '이')
-       .replace('2025. 11. 19.', c.sentDate || '').replace('2025. 11. 24.', c.serveDate || '')
-       .replace('2025.  12.   5.', c.writeDate || '');
-    setLines(ctx, '1. 피고의 항소를 각하한다.', 2, c.verdictLines);
-    setLines(ctx, '1. 원심판결을 파기하고', 2, c.purposeLines);
+    ctx.replace('2026나50613  손해배상(기)', (c.casenum || '') + '  ' + (c.casename || ''))
+       .replace('피상고인 이름', c.defendant2 || '').replace('상고인 이름', c.plaintiff || '')
+       .replace('(피상고인 주소입력공간)', c.addr2 || '').replace('(상고인 주소입력공간)', c.addr1 || '')
+       .replace('인천지방법원이', (c.court || '') + '이')
+       .replace('2026. 2. 13.', c.sentDate || '')
+       .replace('2026. 7. 12.', c.writeDate || '');
+    setLinesInto(ctx, '원 판결의 표시', 2, c.verdictLines);
+    setLinesInto(ctx, '상 고 취 지', 4, c.purposeLines);
     if (c.attorney !== '서고은') ctx.replace('서 고 은', spaced(c.attorney)).replace('서고은', c.attorney);
-    if (c.attorney2) ctx.replace('양 선 화', spaced(c.attorney2)).replace('양선화', c.attorney2); else dropPara(ctx, '양 선 화');
+    // 도장(image1)은 템플릿에 서고은 '은' 위로 박혀 있음 → 날인 원하면 유지, 아니면 제거
+    if (!c.keepSeal) ctx.stripSeal();
   }
 
   /* ══════════ 상태 ══════════ */
@@ -155,7 +179,8 @@
       plaintiff: HWPXFill.cleanName(s.plaintiff), defendant2: HWPXFill.cleanName(s.defendant2), side: s.side || '원고',
       verdictLines: splitLines(s.verdict), purposeLines: splitLines(s.purpose),
       addr1: s.addr1, addr1b: s.addr1b, addr2: s.addr2, addr2b: s.addr2b,
-      attorney: atts[0], attorney2: atts[1] || '', stamp: !!s.stamp
+      attorney: atts[0], attorney2: atts[1] || '', stamp: !!s.stamp,
+      keepSeal: !!s.stamp && atts[0] === '서고은'
     };
   }
   function downloadName(s) {
@@ -210,17 +235,18 @@
             '<div class="hs-pick hs-minga"><span class="hs-pick-l">의뢰인</span><div class="fs-chips" id="hs-side">' +
               '<span class="fs-chip on" data-v="원고" onclick="hsSide(\'원고\')">원고 측</span>' +
               '<span class="fs-chip" data-v="피고" onclick="hsSide(\'피고\')">피고 측</span></div></div>' +
-            '<div class="fs-field hs-minga"><label class="fs-label">원고</label><input type="text" class="fs-input" id="hs-plaintiff" placeholder="엄대봉"></div>' +
-            '<div class="fs-field hs-minga"><label class="fs-label">피고</label><input type="text" class="fs-input" id="hs-defendant2" placeholder="주식회사 ○○"></div>' +
-            '<div class="fs-field hs-minga hs-minga-sanggo"><label class="fs-label">원고(상고인 측) 주소 <span class="fs-hint">(선택, 없으면 비움)</span></label><input type="text" class="fs-input" id="hs-addr1" placeholder="주소"></div>' +
-            '<div class="fs-field hs-minga hs-minga-sanggo"><label class="fs-label">피고(피상고인 측) 주소 <span class="fs-hint">(선택)</span></label><input type="text" class="fs-input" id="hs-addr2" placeholder="주소"></div>' +
+            '<div class="fs-row2 hs-minga"><div class="fs-field"><label class="fs-label">원고</label><input type="text" class="fs-input" id="hs-plaintiff" placeholder="엄대봉"></div>' +
+              '<div class="fs-field"><label class="fs-label">피고</label><input type="text" class="fs-input" id="hs-defendant2" placeholder="주식회사 ○○"></div></div>' +
+            '<div class="fs-row2 hs-minga hs-minga-sanggo"><div class="fs-field"><label class="fs-label">원고(상고인 측) 주소</label><input type="text" class="fs-input" id="hs-addr1" placeholder="주소(선택)"></div>' +
+              '<div class="fs-field"><label class="fs-label">피고(피상고인 측) 주소</label><input type="text" class="fs-input" id="hs-addr2" placeholder="주소(선택)"></div></div>' +
 
-            '<div class="fs-field"><label class="fs-label">사건번호</label><input type="text" class="fs-input" id="hs-casenum" data-af="l_code" placeholder="2025고단1234 / 2025가단1234"></div>' +
-            '<div class="fs-field"><label class="fs-label"><span class="hs-hyeongsa">죄명</span><span class="hs-minga">사건명</span></label><input type="text" class="fs-input" id="hs-casename" data-af="l_name" placeholder="사기 / 손해배상"></div>' +
-            '<div class="fs-field"><label class="fs-label">원심 법원</label><input type="text" class="fs-input" id="hs-court" data-af="court" placeholder="인천지방법원"></div>' +
-            '<div class="fs-field"><label class="fs-label">원심 재판부 <span class="fs-hint">(사건번호로 자동 조회)</span></label><input type="text" class="fs-input" id="hs-courtdiv" placeholder="형사7단독 / 민사13단독"></div>' +
-            '<div class="fs-field"><label class="fs-label">원심 선고일 <span class="fs-hint">(사건번호로 자동 조회)</span></label><input type="date" class="fs-input" id="hs-sentdate"></div>' +
-            '<div class="fs-field hs-minga"><label class="fs-label">판결정본 송달일</label><input type="date" class="fs-input" id="hs-servedate"></div>' +
+            // 사건번호+사건명 한 칸 · 법원+재판부 한 칸 (압축)
+            '<div class="fs-field"><label class="fs-label"><span class="hs-hyeongsa">사건번호 · 죄명</span><span class="hs-minga">사건번호 · 사건명</span> <span class="fs-hint">(사건번호 한 칸 띄우고 사건명)</span></label><input type="text" class="fs-input" id="hs-case" placeholder="2025고단1234 사기"></div>' +
+            '<div class="fs-field"><label class="fs-label">원심 법원 · 재판부 <span class="fs-hint">(사건번호로 재판부 자동)</span></label><input type="text" class="fs-input" id="hs-court" data-af="court" placeholder="인천지방법원 형사7단독"></div>' +
+            // 선고일 · (송달일 민가사) · 작성일 한 줄
+            '<div class="fs-row2"><div class="fs-field"><label class="fs-label">원심 선고일</label><input type="date" class="fs-input" id="hs-sentdate"></div>' +
+              '<div class="fs-field hs-minga"><label class="fs-label">송달일</label><input type="date" class="fs-input" id="hs-servedate"></div>' +
+              '<div class="fs-field"><label class="fs-label">작성일 <span class="fs-hint">(오늘)</span></label><input type="date" class="fs-input" id="hs-writedate"></div></div>' +
 
             // 형사 항소이유 / 상고 원심결과
             '<div class="fs-section hs-hyeongsa hs-hangso">항소이유 <span class="fs-hint">(선택 = ■ 표시)</span></div>' +
@@ -237,7 +263,6 @@
             '<div class="fs-field"><label class="fs-label">담당변호사 <span class="fs-hint">(여러 명 선택 시 순서대로)</span></label>' +
               '<div class="fs-chips att-chips" id="hs-att" onclick="attChipClick(event,\'hs\')"></div>' +
               '<div class="att-add-row"><input type="text" class="att-add-input" id="hs-att-new" placeholder="추가할 변호사 이름"><button type="button" class="att-add-btn" onclick="addAttorney(\'hs\')">＋ 추가</button></div></div>' +
-            '<div class="fs-field"><label class="fs-label">작성일 (오늘 자동)</label><input type="date" class="fs-input" id="hs-writedate"></div>' +
             '<div class="fs-field"><label class="fs-label"><input type="checkbox" id="hs-stamp"> 서고은 도장 날인 <span class="fs-hint">(담당변호사 첫 번째가 서고은일 때)</span></label></div>' +
           '</div>' +
           '<div class="fs-foot">' +
@@ -267,8 +292,10 @@
   function segOn(groupId, v) { var g = document.getElementById(groupId); if (g) g.querySelectorAll('[data-v]').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-v') === v); }); }
 
   function fillFormFromState() {
-    setVal('hs-defendant', state.defendant); setVal('hs-casenum', state.casenum); setVal('hs-casename', state.casename);
-    setVal('hs-court', state.court); setVal('hs-courtdiv', state.courtDiv); setVal('hs-sentdate', state.sentDate);
+    setVal('hs-defendant', state.defendant);
+    setVal('hs-case', [state.casenum, state.casename].filter(Boolean).join(' '));
+    setVal('hs-court', [state.court, state.courtDiv].filter(Boolean).join(' '));
+    setVal('hs-sentdate', state.sentDate);
     setVal('hs-servedate', state.serveDate); setVal('hs-result', state.result || '항소기각');
     setVal('hs-plaintiff', state.plaintiff); setVal('hs-defendant2', state.defendant2);
     setVal('hs-addr1', state.addr1); setVal('hs-addr2', state.addr2);
@@ -283,8 +310,10 @@
   }
   function collect() {
     state.jiwi = '피고인';
-    state.defendant = getVal('hs-defendant'); state.casenum = getVal('hs-casenum'); state.casename = getVal('hs-casename');
-    state.court = getVal('hs-court'); state.courtDiv = getVal('hs-courtdiv'); state.sentDate = getVal('hs-sentdate');
+    state.defendant = getVal('hs-defendant');
+    var _cs = splitCase(getVal('hs-case')); state.casenum = _cs.casenum; state.casename = _cs.casename;
+    var _cd = splitCourt(getVal('hs-court')); state.court = _cd.court; state.courtDiv = _cd.courtDiv;
+    state.sentDate = getVal('hs-sentdate');
     state.serveDate = getVal('hs-servedate'); state.result = getVal('hs-result') || '항소기각';
     state.plaintiff = getVal('hs-plaintiff'); state.defendant2 = getVal('hs-defendant2');
     state.addr1 = getVal('hs-addr1'); state.addr2 = getVal('hs-addr2');
@@ -301,7 +330,7 @@
   window.goHangso = function () {
     ensureUI(); state = defaultState(); fillFormFromState();
     document.getElementById('hangsoForm').classList.add('active');
-    if (typeof initAutofillFor === 'function') initAutofillFor('hs-casenum', { courtDept: 'hs-courtdiv', sentDate: 'hs-sentdate' });
+    if (typeof initAutofillFor === 'function') initAutofillFor('hs-case', { caseCombine: 'hs-case', courtDept: 'hs-court', courtDeptAppend: true, sentDate: 'hs-sentdate' });
   };
   window.closeHangsoForm = function () {
     var f = document.getElementById('hangsoForm'); if (f) f.classList.remove('active');
@@ -318,12 +347,14 @@
     var fill = cfg.cat === '민가사'
       ? (cfg.type === '상고' ? fillMingaSanggo : fillMingaHangso)
       : (cfg.type === '상고' ? fillSanggo : fillHangso);
-    var wantSeal = cfg.stamp && cfg.attorney === '서고은' && (typeof window !== 'undefined') && window.SEAL_SEOGOEUN;
+    // 민가사 상고장은 템플릿에 도장이 박혀 있어 주입하지 않음(fillMingaSanggo가 유지/제거) → 이중날인 방지
+    var baked = cfg.cat === '민가사' && cfg.type === '상고';
+    var wantSeal = !baked && cfg.stamp && cfg.attorney === '서고은' && (typeof window !== 'undefined') && window.SEAL_SEOGOEUN;
     HWPXFill.build({
       url: tpl,
       fill: function (ctx) { fill(ctx, cfg); },
       sealDataUrl: wantSeal ? window.SEAL_SEOGOEUN : null,
-      sealAnchor: (cfg.cat === '민가사' ? '담당변호사 ' : '담당변호사 ') + spaced(cfg.attorney)
+      sealAnchor: '담당변호사 ' + spaced(cfg.attorney)
     }).then(function (blob) { HWPXFill.saveBlob(blob, downloadName(state)); })
       .catch(function (e) { alert('HWPX 생성 실패: ' + e.message); });
   };

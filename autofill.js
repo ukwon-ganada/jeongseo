@@ -340,7 +340,8 @@
     if (!anchor || anchor.dataset.afManual === '1') return;
     anchor.dataset.afManual = '1';
     anchor.addEventListener('change', function(){
-      var code = (anchor.value || '').trim();
+      // 압축폼에선 한 칸에 '사건번호 사건명'이 들어오므로 첫 토큰(사건번호)으로 조회
+      var code = (anchor.value || '').trim().split(/\s+/)[0];
       if (!code) return;
       var sb = (typeof getSB === 'function') ? getSB() : null;
       if (!sb) return;
@@ -364,6 +365,11 @@
     // 한 건의 사건 행으로 폼 전체를 채우는 공통 루틴(검색카드 선택 · 사건번호 직접입력 공용)
     function doFill(row){
       fillByDataAttr(body, row);
+      // 압축폼: 사건번호+사건명을 한 칸(caseCombine)에 '사건번호 사건명'으로 합쳐 채움
+      if (opts && opts.caseCombine){
+        var cc = document.getElementById(opts.caseCombine);
+        if (cc){ var cv = [row.l_code, cleanCaseName(row.l_name)].filter(Boolean).join(' '); if (cv) cc.value = cv; }
+      }
       // 커스텀 후처리(선택): 폼이 열 조합(사건번호+사건명 등)이나 지위 자동선택을 직접 처리할 때
       if (opts && typeof opts.onFill === 'function') { try { opts.onFill(row); } catch (e) { console.warn('[autofill] onFill 오류:', e); } }
       // 선고일: 창고 값(next_date, 선고기일일 때)으로 즉시 채움 — 가장 빠르고 정확
@@ -376,7 +382,15 @@
         var applyLookup = function(res){
           if (opts.courtDept && res.court_dept){
             var dEl = document.getElementById(opts.courtDept);
-            if (dEl) dEl.value = res.court_dept;
+            if (dEl){
+              // 압축폼: 재판부 칸에 이미 '법원'이 들어있으면 뒤에 재판부를 덧붙여 '법원 재판부'로
+              if (opts.courtDeptAppend){
+                var base = (dEl.value || '').trim();
+                if (base.indexOf(res.court_dept) < 0) dEl.value = (base ? base + ' ' : '') + res.court_dept;
+              } else {
+                dEl.value = res.court_dept;
+              }
+            }
           }
           if (opts.sentDate && res.judgment_date){
             var sEl = document.getElementById(opts.sentDate);

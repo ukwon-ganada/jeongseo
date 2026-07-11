@@ -32,6 +32,10 @@
     return m ? m[1] + ('0' + m[2]).slice(-2) + ('0' + m[3]).slice(-2) : '';
   }
   function spaced(name) { return String(name || '').trim().split('').join(' '); }
+  // 압축폼: 한 칸의 '사건번호 사건명' → 첫 공백 기준 분리(사건번호=첫 토큰)
+  function splitCase(v) { v = String(v || '').trim(); var i = v.indexOf(' '); return i < 0 ? { casenum: v, casename: '' } : { casenum: v.slice(0, i).trim(), casename: v.slice(i + 1).trim() }; }
+  // 압축폼: 한 칸의 '법원 재판부' → 마지막 공백 기준 분리(재판부=마지막 토큰)
+  function splitCourt(v) { v = String(v || '').trim(); var i = v.lastIndexOf(' '); return i < 0 ? { court: v, courtDiv: '' } : { court: v.slice(0, i).trim(), courtDiv: v.slice(i + 1).trim() }; }
 
   /* ══════════ HWPX 채우기 — 템플릿 샘플값을 사용자 값으로 앵커 치환 ══════════
      templates/pankyul.hwpx 샘플: 재판부 형사7단독 / 사건번호 2026고단850 /
@@ -102,18 +106,16 @@
           '<div class="fs-body">' +
             '<div class="fs-section">사건 정보</div>' +
             '<div class="fs-field"><label class="fs-label">피고인</label><input type="text" class="fs-input" id="pk-defendant" data-af="l_client" placeholder="홍길동"></div>' +
-            '<div class="fs-field"><label class="fs-label">사건번호</label><input type="text" class="fs-input" id="pk-casenum" data-af="l_code" placeholder="2026고단1234"></div>' +
-            '<div class="fs-field"><label class="fs-label">사건명</label><input type="text" class="fs-input" id="pk-casename" data-af="l_name" placeholder="사기"></div>' +
-            '<div class="fs-field"><label class="fs-label">법원</label><input type="text" class="fs-input" id="pk-court" data-af="court" placeholder="인천지방법원"></div>' +
-            '<div class="fs-field"><label class="fs-label">재판부 <span class="fs-hint">(사건번호로 자동 조회)</span></label><input type="text" class="fs-input" id="pk-courtdiv" placeholder="형사7단독"></div>' +
-            '<div class="fs-field"><label class="fs-label">선고일 <span class="fs-hint">(사건번호로 자동 조회)</span></label><input type="date" class="fs-input" id="pk-sentdate"></div>' +
+            '<div class="fs-field"><label class="fs-label">사건번호 · 사건명 <span class="fs-hint">(사건번호 한 칸 띄우고 사건명)</span></label><input type="text" class="fs-input" id="pk-case" placeholder="2026고단1234 사기"></div>' +
+            '<div class="fs-field"><label class="fs-label">법원 · 재판부 <span class="fs-hint">(사건번호로 재판부 자동)</span></label><input type="text" class="fs-input" id="pk-court" data-af="court" placeholder="인천지방법원 형사7단독"></div>' +
+            '<div class="fs-row2"><div class="fs-field"><label class="fs-label">선고일 <span class="fs-hint">(자동)</span></label><input type="date" class="fs-input" id="pk-sentdate"></div>' +
+              '<div class="fs-field"><label class="fs-label">작성일 <span class="fs-hint">(오늘)</span></label><input type="date" class="fs-input" id="pk-writedate"></div></div>' +
 
             '<div class="fs-section">청구인 · 서명</div>' +
             '<div class="fs-field"><label class="fs-label"><input type="checkbox" id="pk-gukseon"> 국선사건 <span class="fs-hint">(선택 시 "국선변호인" 표기)</span></label></div>' +
             '<div class="fs-field"><label class="fs-label">담당변호사</label>' +
               '<div class="fs-chips att-chips" id="pk-att" onclick="attChipClick(event,\'pk\')"></div>' +
               '<div class="att-add-row"><input type="text" class="att-add-input" id="pk-att-new" placeholder="추가할 변호사 이름"><button type="button" class="att-add-btn" onclick="addAttorney(\'pk\')">＋ 추가</button></div></div>' +
-            '<div class="fs-field"><label class="fs-label">작성일 (오늘 자동)</label><input type="date" class="fs-input" id="pk-writedate"></div>' +
             '<div class="fs-field"><label class="fs-label"><input type="checkbox" id="pk-stamp"> 서고은 도장 날인 <span class="fs-hint">(담당변호사 첫 번째가 서고은일 때)</span></label></div>' +
           '</div>' +
           '<div class="fs-foot">' +
@@ -130,9 +132,10 @@
   function getVal(id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; }
 
   function fillFormFromState() {
-    setVal('pk-defendant', state.defendant); setVal('pk-casenum', state.casenum);
-    setVal('pk-casename', state.casename); setVal('pk-court', state.court);
-    setVal('pk-courtdiv', state.courtDiv); setVal('pk-sentdate', state.sentDate);
+    setVal('pk-defendant', state.defendant);
+    setVal('pk-case', [state.casenum, state.casename].filter(Boolean).join(' '));
+    setVal('pk-court', [state.court, state.courtDiv].filter(Boolean).join(' '));
+    setVal('pk-sentdate', state.sentDate);
     setVal('pk-writedate', state.writeDate || todayISO());
     setVal('pk-att-new', '');
     var gk = document.getElementById('pk-gukseon'); if (gk) gk.checked = !!state.gukseon;
@@ -140,9 +143,10 @@
     if (typeof renderAttChips === 'function') renderAttChips('pk', (state.attorneys && state.attorneys.length) ? state.attorneys : ['서고은']);
   }
   function collect() {
-    state.defendant = getVal('pk-defendant'); state.casenum = getVal('pk-casenum');
-    state.casename = getVal('pk-casename'); state.court = getVal('pk-court');
-    state.courtDiv = getVal('pk-courtdiv'); state.sentDate = getVal('pk-sentdate');
+    state.defendant = getVal('pk-defendant');
+    var _cs = splitCase(getVal('pk-case')); state.casenum = _cs.casenum; state.casename = _cs.casename;
+    var _cd = splitCourt(getVal('pk-court')); state.court = _cd.court; state.courtDiv = _cd.courtDiv;
+    state.sentDate = getVal('pk-sentdate');
     state.writeDate = getVal('pk-writedate') || todayISO();
     var atts = [];
     document.querySelectorAll('#pk-att .fs-chip.on').forEach(function (c) { atts.push(c.dataset.att); });
@@ -157,7 +161,7 @@
     ensureUI(); state = defaultState(); fillFormFromState();
     document.getElementById('pankyulForm').classList.add('active');
     if (typeof initAutofillFor === 'function') {
-      initAutofillFor('pk-casenum', { courtDept: 'pk-courtdiv', sentDate: 'pk-sentdate' });
+      initAutofillFor('pk-case', { caseCombine: 'pk-case', courtDept: 'pk-court', courtDeptAppend: true, sentDate: 'pk-sentdate' });
     }
   };
   window.closePankyulForm = function () { var f = document.getElementById('pankyulForm'); if (f) f.classList.remove('active'); };
