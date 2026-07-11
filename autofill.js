@@ -364,6 +364,8 @@
     // 한 건의 사건 행으로 폼 전체를 채우는 공통 루틴(검색카드 선택 · 사건번호 직접입력 공용)
     function doFill(row){
       fillByDataAttr(body, row);
+      // 커스텀 후처리(선택): 폼이 열 조합(사건번호+사건명 등)이나 지위 자동선택을 직접 처리할 때
+      if (opts && typeof opts.onFill === 'function') { try { opts.onFill(row); } catch (e) { console.warn('[autofill] onFill 오류:', e); } }
       // 선고일: 창고 값(next_date, 선고기일일 때)으로 즉시 채움 — 가장 빠르고 정확
       if (opts && opts.sentDate){
         var jd = judgmentFromRow(row);
