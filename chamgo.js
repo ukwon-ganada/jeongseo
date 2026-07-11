@@ -5,7 +5,7 @@
 
    흐름(기일연기와 동일한 단일 단계):
      goChamgo() → [데이터 입력 폼] → [한글 다운로드] (확인창 없음)
-     · 본문 작성 = Edge Function 'draft-yeongi'(caseType='참고자료', 간단/길게) 호출
+     · 본문 작성 = Edge Function 'draft-chamgo'(간단/길게) 호출
      · 한글 다운로드 = templates/chamgo.hwpx 를 JSZip 으로 채워 다운로드
      · 도장 날인(선택) = 담당변호사 첫 번째가 '서고은'일 때 서명란에 직인 삽입
 
@@ -413,7 +413,7 @@
       length: segOn('cg-length') || '간단', docs: docs, memo: getVal('cg-memo'),
       caseName: getVal('cg-caseline')
     };
-    fetch(fnUrl('draft-yeongi'), {
+    fetch(fnUrl('draft-chamgo'), {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'apikey': (typeof SUPABASE_KEY !== 'undefined' ? SUPABASE_KEY : '') },
       body: JSON.stringify(payload)
