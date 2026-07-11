@@ -181,10 +181,16 @@
     // 당사자 지위 라벨(원고/피고 → 실지위). 기본 원고/피고면 손대지 않음.
     if (first !== '원고') ctx.replace('원       고', spacedLabel(first));
     if (second !== '피고') ctx.replace('피       고', spacedLabel(second));
-    // 항소인/피항소인 접미사: 의뢰인이 둘째(second)면 스왑 — 둘째 라벨은 전각공백 태그로 분리돼 run 구간 교체.
+    // 항소인/피항소인 접미사: 의뢰인이 둘째(second, 피고쪽)면 원고↔피고 라벨을 교환.
+    // 표준양식 라벨 구조: 원고쪽 '(항  소  인)'(연속), 피고쪽 '(피<fwSpace>항<fwSpace>소<fwSpace>인)'(전각공백).
     if (c.clientSide === 'second') {
-      ctx.replace('(항  소  인)', '(피항소인)');
-      ctx.section = ctx.section.replace(/<hp:t>\(피<\/hp:t>[\s\S]*?<hp:t>인\)<\/hp:t>/, '<hp:t>(항소인)</hp:t>');
+      var TOK = '';
+      // ① 피고쪽 (피항소인) → 임시토큰 (전각공백/공백 모두 허용)
+      ctx.section = ctx.section.replace(/\(피(?:<hp:fwSpace\/>|\s)*항(?:<hp:fwSpace\/>|\s)*소(?:<hp:fwSpace\/>|\s)*인\)/, TOK);
+      // ② 원고쪽 (항  소  인) → 피항소인(전각공백 스타일 유지)
+      ctx.replace('(항  소  인)', '(피<hp:fwSpace/>항<hp:fwSpace/>소<hp:fwSpace/>인)');
+      // ③ 임시토큰(구 피고 위치) → 항소인
+      ctx.section = ctx.section.replace(TOK, '(항  소  인)');
     }
     ctx.replace('원고(항소인) 소송대리인', (c.clientJiwi || '원고') + '(항소인) 소송대리인')
        .replace('2025가단210684 운송료', (c.casenum || '') + ' ' + (c.casename || ''))
