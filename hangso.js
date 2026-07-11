@@ -31,6 +31,19 @@
   function ymd(s) { var m = String(s || '').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m ? m[1] + ('0' + m[2]).slice(-2) + ('0' + m[3]).slice(-2) : ''; }
   function spaced(name) { return String(name || '').trim().split('').join(' '); }
   function reEsc(s) { return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+  function hasBatchim(s) { // 마지막 글자 받침 유무(조사 은/는 선택용)
+    var ch = String(s || '').trim().slice(-1); if (!ch) return true;
+    var code = ch.charCodeAt(0);
+    if (code < 0xAC00 || code > 0xD7A3) return true;
+    return (code - 0xAC00) % 28 !== 0;
+  }
+  // 당사자 지위 반영(기본 '피고인'): 라벨(공백형)·주어(은/는)·나머지(소유격 등) 모두 치환
+  function fillParty(ctx, jiwi) {
+    if (!jiwi || jiwi === '피고인') return;
+    ctx.replace('피 고 인', spaced(jiwi));
+    ctx.replace('피고인은', jiwi + (hasBatchim(jiwi) ? '은' : '는'));
+    ctx.replace('피고인', jiwi);
+  }
   // 특정 텍스트가 든 <hp:p> 문단 통째로 제거(국선 시 '법무법인 정서'·불필요한 2번째 변호사 줄)
   function dropPara(ctx, text) {
     var re = new RegExp('<hp:p\\b[^>]*>(?:(?!</hp:p>)[\\s\\S])*?' + reEsc(text) + '[\\s\\S]*?</hp:p>');
@@ -60,6 +73,7 @@
     if (c.gukseon) dropPara(ctx, '법무법인 정서');
     // 담당변호사(단독 서명)
     if (c.attorney !== '서고은') ctx.replace('서 고 은', spaced(c.attorney));
+    fillParty(ctx, c.jiwi);
   }
 
   /* ══════════ 상고장 채우기 ══════════
@@ -81,13 +95,14 @@
     if (c.attorney !== '서고은') ctx.replace('서 고 은', spaced(c.attorney));
     if (c.attorney2) ctx.replace('우 숭 민', spaced(c.attorney2));
     else dropPara(ctx, '우 숭 민');
+    fillParty(ctx, c.jiwi);
   }
 
   /* ══════════ 상태 ══════════ */
   var state = null;
   function defaultState() {
     return {
-      type: '항소', defendant: '', casenum: '', casename: '', court: '', courtDiv: '',
+      type: '항소', jiwi: '피고인', defendant: '', casenum: '', casename: '', court: '', courtDiv: '',
       sentDate: '', reasons: REASONS.slice(), result: '항소기각',
       gukseon: false, attorneys: ['서고은'], writeDate: todayISO(), stamp: true
     };
@@ -96,7 +111,7 @@
     var atts = (s.attorneys && s.attorneys.length) ? s.attorneys.slice() : ['서고은'];
     var sent = s.type === '상고' ? fmtDot(s.sentDate) : fmtKDate(s.sentDate);
     return {
-      type: s.type, defendant: s.defendant, casenum: s.casenum, casename: s.casename,
+      type: s.type, jiwi: s.jiwi || '피고인', defendant: s.defendant, casenum: s.casenum, casename: s.casename,
       court: s.court, courtDiv: s.courtDiv, sentDate: sent,
       writeDate: fmtKDate(s.writeDate) || fmtKDate(todayISO()),
       reasons: (s.reasons && s.reasons.length) ? s.reasons.slice() : [],
@@ -144,7 +159,8 @@
               '<span class="fs-chip" data-v="상고" onclick="hsType(\'상고\')">상고장</span></div></div>' +
 
             '<div class="fs-section">사건 정보</div>' +
-            '<div class="fs-field"><label class="fs-label">피고인</label><input type="text" class="fs-input" id="hs-defendant" data-af="l_client" placeholder="홍길동"></div>' +
+            '<div class="fs-field"><label class="fs-label">의뢰인 지위 <span class="fs-hint">(원고·피고·피고인 등, 사건에서 자동)</span></label><input type="text" class="fs-input" id="hs-jiwi" data-af="client_position" placeholder="피고인"></div>' +
+            '<div class="fs-field"><label class="fs-label">의뢰인 성명</label><input type="text" class="fs-input" id="hs-defendant" data-af="l_client" placeholder="홍길동"></div>' +
             '<div class="fs-field"><label class="fs-label">사건번호</label><input type="text" class="fs-input" id="hs-casenum" data-af="l_code" placeholder="2025고단1234"></div>' +
             '<div class="fs-field"><label class="fs-label">죄명</label><input type="text" class="fs-input" id="hs-casename" data-af="l_name" placeholder="사기"></div>' +
             '<div class="fs-field"><label class="fs-label">원심 법원</label><input type="text" class="fs-input" id="hs-court" data-af="court" placeholder="인천지방법원"></div>' +
@@ -187,7 +203,7 @@
   window.hsToggleReason = function (el) { el.classList.toggle('on'); };
 
   function fillFormFromState() {
-    setVal('hs-defendant', state.defendant); setVal('hs-casenum', state.casenum);
+    setVal('hs-jiwi', state.jiwi || '피고인'); setVal('hs-defendant', state.defendant); setVal('hs-casenum', state.casenum);
     setVal('hs-casename', state.casename); setVal('hs-court', state.court);
     setVal('hs-courtdiv', state.courtDiv); setVal('hs-sentdate', state.sentDate);
     setVal('hs-result', state.result || '항소기각');
@@ -202,6 +218,7 @@
     window.hsType(state.type);
   }
   function collect() {
+    state.jiwi = getVal('hs-jiwi') || '피고인';
     state.defendant = getVal('hs-defendant'); state.casenum = getVal('hs-casenum');
     state.casename = getVal('hs-casename'); state.court = getVal('hs-court');
     state.courtDiv = getVal('hs-courtdiv'); state.sentDate = getVal('hs-sentdate');
