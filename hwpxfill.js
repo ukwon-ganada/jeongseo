@@ -126,6 +126,49 @@
     if (hdr.indexOf('<hh:binDataList') >= 0) return hdr;
     return hdr.replace('<hh:refList>', '<hh:refList><hh:binDataList itemCnt="1"><hh:binData id="1" type="EMBEDDING"/></hh:binDataList>');
   }
+
+  /* ── 막도장(사무원 이름 도장) = 두 번째 임베드 이미지(image2) ──
+     타원 10×15mm, 템플릿 image1(서고은 직인) 옆에 image2 로 추가한다. */
+  function nameSealRun(pxW, pxH, hoff, voff) {
+    var oW = pxW * 75, oH = pxH * 75, W = 2835, H = 4252, id = ++_sealId;   // 10mm×15mm
+    return '<hp:run charPrIDRef="0"><hp:pic id="' + id + '" zOrder="21" numberingType="PICTURE" textWrap="IN_FRONT_OF_TEXT" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" href="" groupLevel="0" instid="' + id + '" reverse="0">' +
+      '<hp:offset x="0" y="0"/><hp:orgSz width="' + oW + '" height="' + oH + '"/><hp:curSz width="' + W + '" height="' + H + '"/>' +
+      '<hp:flip horizontal="0" vertical="0"/><hp:rotationInfo angle="0" centerX="' + Math.round(W / 2) + '" centerY="' + Math.round(H / 2) + '" rotateimage="1"/>' +
+      '<hp:renderingInfo><hc:transMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:scaMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:rotMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/></hp:renderingInfo>' +
+      '<hc:img binaryItemIDRef="image2" bright="0" contrast="0" effect="REAL_PIC" alpha="0"/>' +
+      '<hp:imgRect><hc:pt0 x="0" y="0"/><hc:pt1 x="' + W + '" y="0"/><hc:pt2 x="' + W + '" y="' + H + '"/><hc:pt3 x="0" y="' + H + '"/></hp:imgRect>' +
+      '<hp:imgClip left="0" right="' + oW + '" top="0" bottom="' + oH + '"/><hp:inMargin left="0" right="0" top="0" bottom="0"/><hp:imgDim dimwidth="' + oW + '" dimheight="' + oH + '"/>' +
+      '<hp:sz width="' + W + '" widthRelTo="ABSOLUTE" height="' + H + '" heightRelTo="ABSOLUTE" protect="0"/>' +
+      '<hp:pos treatAsChar="0" affectLSpacing="0" flowWithText="0" allowOverlap="1" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="RIGHT" vertOffset="' + voff + '" horzOffset="' + hoff + '"/>' +
+      '<hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:shapeComment/></hp:pic></hp:run>';
+  }
+  function addNameSeal(sec, anchor, hoff, voff, wh) {
+    var paras = sec.match(PARA_RE) || [], want = normalize(anchor), run = nameSealRun(wh[0], wh[1], hoff, voff);
+    for (var i = 0; i < paras.length; i++) {
+      if (normalize(paras[i]).indexOf(want) >= 0) return sec.replace(paras[i], paras[i].replace(/^(<hp:p\b[^>]*>)/, '$1' + run));
+    }
+    return sec;
+  }
+  // header binDataList 에 image2(id=2) 추가(기존 itemCnt 증가). 없으면 새로 만든다.
+  function injectBinData2(hdr) {
+    if (/<hh:binData\b[^>]*id="2"/.test(hdr)) return hdr;
+    if (hdr.indexOf('<hh:binDataList') >= 0) {
+      return hdr.replace(/<hh:binDataList itemCnt="(\d+)">([\s\S]*?)<\/hh:binDataList>/, function (m, cnt, inner) {
+        return '<hh:binDataList itemCnt="' + (parseInt(cnt, 10) + 1) + '">' + inner + '<hh:binData id="2" type="EMBEDDING"/></hh:binDataList>';
+      });
+    }
+    return hdr.replace('<hh:refList>', '<hh:refList><hh:binDataList itemCnt="1"><hh:binData id="2" type="EMBEDDING"/></hh:binDataList>');
+  }
+  function injectHpfManifest2(hpf) {
+    if (hpf.indexOf('BinData/image2.png') >= 0) return hpf;
+    return hpf.replace('<opf:manifest>', '<opf:manifest><opf:item id="image2" href="BinData/image2.png" media-type="image/png" isEmbeded="1"/>');
+  }
+  function injectOdfManifest2(s) {
+    if (s.indexOf('BinData/image2.png') >= 0) return s;
+    var entry = '<odf:file-entry odf:full-path="BinData/image2.png" odf:media-type="image/png"/>';
+    if (s.indexOf('</odf:manifest>') >= 0) return s.replace('</odf:manifest>', entry + '</odf:manifest>');
+    return s.replace(/<odf:manifest([^>]*)\/>/, '<odf:manifest$1>' + entry + '</odf:manifest>');
+  }
   function injectHpfManifest(hpf) {
     if (hpf.indexOf('BinData/image1.png') >= 0) return hpf;
     return hpf.replace('<opf:manifest>', '<opf:manifest><opf:item id="image1" href="BinData/image1.png" media-type="image/png" isEmbeded="1"/>');
@@ -151,7 +194,7 @@
           zip.file('Contents/section0.xml').async('string'),
           zip.file('Contents/header.xml').async('string'),
           zip.file('mimetype').async('uint8array'),
-          wantSeal ? zip.file('Contents/content.hpf').async('string') : Promise.resolve(null),
+          (wantSeal || (opts.nameSeal && opts.nameSeal.dataUrl)) ? zip.file('Contents/content.hpf').async('string') : Promise.resolve(null),
           zip
         ]);
       })
@@ -168,11 +211,18 @@
         };
         opts.fill(ctx);
 
-        var sec = ctx.section, hdr = arr[1], mime = arr[2], hpf = arr[3], zip = arr[4], sealBin = null;
+        var sec = ctx.section, hdr = arr[1], mime = arr[2], hpf = arr[3], zip = arr[4], sealBin = null, nameBin = null;
+        // ① 서고은 직인(image1) 코드 삽입 경로(sealDataUrl 넘긴 경우 — 항소/상고 등)
         if (wantSeal) {
           var u8 = dataUrlToU8(opts.sealDataUrl), wh = pngSize(u8);
           var sec2 = injectSealPic(sec, buildPic(wh[0], wh[1], hoff, voff), opts.sealAnchor);
           if (sec2 !== sec) { sec = sec2; hdr = injectBinData(hdr); hpf = injectHpfManifest(hpf); sealBin = u8; }
+        }
+        // ② 막도장(사무원 이름 도장, image2) — 검찰 위임장/서약서
+        if (opts.nameSeal && opts.nameSeal.dataUrl) {
+          var ns = opts.nameSeal, nsu8 = dataUrlToU8(ns.dataUrl), nswh = pngSize(nsu8), nso = ns.off || {};
+          var sec3 = addNameSeal(sec, ns.anchor, nso.h == null ? 2835 : nso.h, nso.v == null ? -2200 : nso.v, nswh);
+          if (sec3 !== sec) { sec = sec3; hdr = injectBinData2(hdr); hpf = injectHpfManifest2(hpf); nameBin = nsu8; }
         }
         var zo = new Zip();
         zo.file('mimetype', mime, { compression: 'STORE' });
@@ -180,12 +230,17 @@
         return Promise.all(names.map(function (n) {
           if (n === 'Contents/section0.xml') return Promise.resolve([n, sec]);
           if (n === 'Contents/header.xml') return Promise.resolve([n, hdr]);
-          if (n === 'Contents/content.hpf' && sealBin) return Promise.resolve([n, hpf]);
-          if (n === 'META-INF/manifest.xml' && sealBin) return zip.file(n).async('string').then(function (s) { return [n, injectOdfManifest(s)]; });
+          if (n === 'Contents/content.hpf' && (sealBin || nameBin)) return Promise.resolve([n, hpf]);
+          if (n === 'META-INF/manifest.xml' && (sealBin || nameBin)) return zip.file(n).async('string').then(function (s) {
+            if (sealBin) s = injectOdfManifest(s);
+            if (nameBin) s = injectOdfManifest2(s);
+            return [n, s];
+          });
           return zip.file(n).async('uint8array').then(function (d) { return [n, d]; });
         })).then(function (entries) {
           entries.forEach(function (e) { zo.file(e[0], e[1]); });
           if (sealBin) zo.file('BinData/image1.png', sealBin);
+          if (nameBin) zo.file('BinData/image2.png', nameBin);
           return zo.generateAsync({ type: 'blob', mimeType: 'application/hwp+zip' });
         });
       });

@@ -97,23 +97,20 @@
   function fillProsecution(ctx, c) {
     ctx.replace('840219-2079920', c.birth || '')
        .replace('2026고단485', c.casenum || '')
-       .replace('채윤휘빈센트 (국선 채윤휘빈센트)', c.defendant || '')
        .replace('채윤휘빈센트', c.defendant || '')
        .replace('마약류관리에관한법률위반(향정)', c.casename || '')
-       .replace('2026. 7. 12.', c.writeDot || '')
-       .replace('인천지방검찰청', c.prosOffice || '')
-       .replace('홍길동', c.prosecutor || '')
+       .replace('2026. 7. 12.', c.writeDot || '')          // 1페이지·수수료 날짜
+       .replace('2026년 7월 12일', c.writeKo || '')          // 서약서·위임장 날짜
        .replace('기록일체', c.doc1 || '')
-       .replace('미디어파일일체(CD 등)', c.doc2 || '');
-    // 서약서·위임장의 <> 마커(이스케이프 저장) — 날짜·사무원·생년월일 연동
-    ctx.replace('&lt;2026년 7월 11일&gt;', c.writeKo || '')
-       .replace('&lt;원가을&gt;', c.clerk || '')
-       .replace('&lt;94.11.03&gt;', c.clerkBirth || '')
-       .replace('&lt;별지&gt;', '별지');
+       .replace('미디어파일일체(CD 등)', c.doc2 || '')
+       .replace('원가을', c.clerk || '')                     // 담당사무원(서약서·위임장)
+       .replace('94.11.03', c.clerkBirth || '');            // 사무원 생년월일
+    // 검찰청·검사실
+    if (c.prosecutor) ctx.replace('인천지방검찰청  검사실', (c.prosOffice || '') + ' ' + c.prosecutor + ' 검사실');
+    else ctx.replace('인천지방검찰청', c.prosOffice || '');
     fillAttorneyName(ctx, c.attorney);
-    // 도장: 유지 시 1페이지 신청인 서명란에도 추가, 아니면 전부 제거
-    if (c.keepSeal) ctx.addSeal('신청인 변호사 ' + spaced(c.attorney), { h: 5650, v: -1150 });
-    else ctx.stripSeal();
+    // 서고은 직인(image1): 템플릿에 정위치로 박혀 있음 → 유지 or 제거(막도장은 build 에서 image2 로 추가)
+    if (!c.keepSeal) ctx.stripSeal();
   }
 
   /* ══════════ 상태 ══════════ */
@@ -138,7 +135,7 @@
       doc1: s.doc1 || '기록일체', doc2: s.doc2,
       writeKo: fmtKoDate(s.writeDate) || fmtKoDate(todayISO()),
       writeDot: fmtDotDate(s.writeDate) || fmtDotDate(todayISO()),
-      attorney: att, keepSeal: !!s.stamp && att === '서고은'
+      attorney: att, stamp: !!s.stamp, keepSeal: !!s.stamp && att === '서고은'
     };
   }
   function downloadName(s) {
@@ -317,10 +314,13 @@
     collect();
     var cfg = toCfg(state);
     if (!cfg.casenum && !cfg.defendant) { alert('사건번호 또는 피고인을 먼저 입력해주세요.'); return; }
-    HWPXFill.build({
-      url: TPL[cfg.type],
-      fill: function (ctx) { (cfg.type === '검찰' ? fillProsecution : fillCourt)(ctx, cfg); }
-    }).then(function (blob) {
+    var opts = { url: TPL[cfg.type], fill: function (ctx) { (cfg.type === '검찰' ? fillProsecution : fillCourt)(ctx, cfg); } };
+    // 검찰 + 도장 날인이면 사무원 막도장(이름 도장) 생성 → 위임장/서약서 서명란에 겹침
+    if (cfg.type === '검찰' && cfg.stamp && cfg.clerk && typeof window.makeOvalSeal === 'function') {
+      var dataUrl = window.makeOvalSeal(cfg.clerk);
+      if (dataUrl) opts.nameSeal = { dataUrl: dataUrl, anchor: cfg.clerk + '(서명 또는 날인)', off: { h: 2835, v: -2200 } };
+    }
+    HWPXFill.build(opts).then(function (blob) {
       HWPXFill.saveBlob(blob, downloadName(state));
     }).catch(function (e) { alert('HWPX 생성 실패: ' + e.message); });
   };

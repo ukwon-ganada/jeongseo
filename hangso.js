@@ -159,8 +159,7 @@
               '<span class="fs-chip" data-v="상고" onclick="hsType(\'상고\')">상고장</span></div></div>' +
 
             '<div class="fs-section">사건 정보</div>' +
-            '<div class="fs-field"><label class="fs-label">의뢰인 지위 <span class="fs-hint">(원고·피고·피고인 등, 사건에서 자동)</span></label><input type="text" class="fs-input" id="hs-jiwi" data-af="client_position" placeholder="피고인"></div>' +
-            '<div class="fs-field"><label class="fs-label">의뢰인 성명</label><input type="text" class="fs-input" id="hs-defendant" data-af="l_client" placeholder="홍길동"></div>' +
+            '<div class="fs-field"><label class="fs-label">피고인 <span class="fs-hint">(국선 표기는 자동 제거)</span></label><input type="text" class="fs-input" id="hs-defendant" data-af="l_client" placeholder="홍길동"></div>' +
             '<div class="fs-field"><label class="fs-label">사건번호</label><input type="text" class="fs-input" id="hs-casenum" data-af="l_code" placeholder="2025고단1234"></div>' +
             '<div class="fs-field"><label class="fs-label">죄명</label><input type="text" class="fs-input" id="hs-casename" data-af="l_name" placeholder="사기"></div>' +
             '<div class="fs-field"><label class="fs-label">원심 법원</label><input type="text" class="fs-input" id="hs-court" data-af="court" placeholder="인천지방법원"></div>' +
@@ -203,7 +202,7 @@
   window.hsToggleReason = function (el) { el.classList.toggle('on'); };
 
   function fillFormFromState() {
-    setVal('hs-jiwi', state.jiwi || '피고인'); setVal('hs-defendant', state.defendant); setVal('hs-casenum', state.casenum);
+    setVal('hs-defendant', state.defendant); setVal('hs-casenum', state.casenum);
     setVal('hs-casename', state.casename); setVal('hs-court', state.court);
     setVal('hs-courtdiv', state.courtDiv); setVal('hs-sentdate', state.sentDate);
     setVal('hs-result', state.result || '항소기각');
@@ -218,7 +217,7 @@
     window.hsType(state.type);
   }
   function collect() {
-    state.jiwi = getVal('hs-jiwi') || '피고인';
+    state.jiwi = '피고인';   // 형사 항소·상고: 지위 피고인 고정(민가사는 별도 서면)
     state.defendant = getVal('hs-defendant'); state.casenum = getVal('hs-casenum');
     state.casename = getVal('hs-casename'); state.court = getVal('hs-court');
     state.courtDiv = getVal('hs-courtdiv'); state.sentDate = getVal('hs-sentdate');
