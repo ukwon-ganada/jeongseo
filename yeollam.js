@@ -100,14 +100,16 @@
   function saveAtts(list) { try { localStorage.setItem(ATTS_KEY, JSON.stringify(list)); } catch (e) {} }
   function addAttEntry(name, jumin) {
     name = (name || '').trim(); if (!name) return;
+    if (typeof window !== 'undefined' && window.LawyerStore) { window.LawyerStore.setJumin(name, jumin); return; }
     var list = loadAtts(), found = false;
     for (var i = 0; i < list.length; i++) { if (list[i].name === name) { if (jumin) list[i].jumin = jumin; found = true; break; } }
     if (!found) list.push({ name: name, jumin: (jumin || '').trim() });
     saveAtts(list);
   }
-  function attJumin(name) { var list = loadAtts(); for (var i = 0; i < list.length; i++) { if (list[i].name === name) return list[i].jumin || ''; } return ''; }
-  // 표시용 명단: 사무소 공용 변호사(ALL_ATTORNEYS) + 저장된 명단 이름의 합집합
+  function attJumin(name) { if (typeof window !== 'undefined' && window.LawyerStore) return window.LawyerStore.juminOf(name); var list = loadAtts(); for (var i = 0; i < list.length; i++) { if (list[i].name === name) return list[i].jumin || ''; } return ''; }
+  // 표시용 명단: 중앙관리 저장소(LawyerStore) 우선, 없으면 공용 명단+로컬 합집합
   function attNames() {
+    if (typeof window !== 'undefined' && window.LawyerStore) return window.LawyerStore.activeNames();
     var stored = loadAtts(), names = [];
     var firm = (typeof window !== 'undefined' && window.ALL_ATTORNEYS) ? window.ALL_ATTORNEYS : ['서고은'];
     firm.forEach(function (n) { if (names.indexOf(n) < 0) names.push(n); });
