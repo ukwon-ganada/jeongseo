@@ -421,6 +421,7 @@
     var docs = parseDocs(getRaw('cg-docs'));
     if (!docs.length && !getVal('cg-memo')) { if (hint) hint.textContent = '제출서류나 사정 메모를 먼저 적어주세요.'; return; }
     btn.disabled = true; if (hint) hint.textContent = 'AI가 작성 중…';
+    if (window.aiFieldStart) aiFieldStart('cg-reason', 'AI가 본문을 작성하고 있어요');
     var payload = {
       caseType: '참고자료', jiwi: segOn('cg-jiwi') || state.jiwi, name: getVal('cg-client'),
       length: segOn('cg-length') || '간단', docs: docs, memo: getVal('cg-memo'),
@@ -432,9 +433,9 @@
       body: JSON.stringify(payload)
     }).then(function (r) { return r.json(); }).then(function (d) {
       btn.disabled = false;
-      if (d && d.ok && d.reason) { setVal('cg-reason', d.reason); if (hint) hint.textContent = '작성 완료 — 검토·수정 후 다운로드하세요.'; }
-      else { if (hint) hint.textContent = '작성 실패: ' + ((d && d.reason) || 'unknown') + ' (직접 입력 가능)'; }
-    }).catch(function (e) { btn.disabled = false; if (hint) hint.textContent = '오류: ' + e.message; });
+      if (d && d.ok && d.reason) { aiFieldDone('cg-reason', d.reason); if (hint) hint.textContent = '작성 완료 — 검토·수정 후 다운로드하세요.'; }
+      else { aiFieldStop('cg-reason'); if (hint) hint.textContent = '작성 실패: ' + ((d && d.reason) || 'unknown') + ' (직접 입력 가능)'; }
+    }).catch(function (e) { btn.disabled = false; aiFieldStop('cg-reason'); if (hint) hint.textContent = '오류: ' + e.message; });
   };
 
   // 한글 다운로드

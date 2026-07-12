@@ -1036,6 +1036,56 @@ body.print-emulate #special-extra,body.print-emulate #cv-special-extra,body.prin
 .fs-input{width:100%;height:48px;border:1px solid var(--border);border-radius:var(--r-lg);padding:0 16px;font-size:16px;font-family:var(--font);outline:none;background:var(--gray-100);transition:all 0.15s;}
 .fs-input:focus{border-color:var(--hero);background:#fff;}
 textarea.fs-input{height:auto;min-height:80px;padding:12px 16px;resize:vertical;line-height:1.5;}
+
+/* ===== AI 작성 중 — 대상 입력칸 로딩 상태(프리즘 흐르는 테두리) =====
+   .ai-field: AI가 채우는 textarea를 감싸는 래퍼(평소엔 그냥 통과).
+   .is-writing 일 때만 프리즘 링·글로우·뱃지가 켜지고 텍스트는 잠시 감춤. */
+.ai-field{position:relative;display:block;}
+.ai-field-badge{
+  position:absolute;top:9px;right:9px;z-index:3;pointer-events:none;
+  display:none;align-items:center;gap:4px;
+  padding:4px 10px 4px 8px;border-radius:999px;
+  font:700 11px var(--font);letter-spacing:.01em;color:#6a5491;
+  background:rgba(255,255,255,.86);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);
+  box-shadow:0 2px 9px rgba(120,120,190,.22),inset 0 0 0 1px rgba(255,255,255,.7);
+}
+.ai-field-spark{width:12px;height:12px;fill:#b07fe0;animation:aiSpark 1.6s ease-in-out infinite;}
+.ai-field.is-writing .ai-field-badge{display:inline-flex;animation:aiBadgeIn .3s ease;}
+/* 흐르는 프리즘 테두리 링(1.4px, 마스크로 링만) */
+.ai-field.is-writing::before{
+  content:"";position:absolute;inset:0;border-radius:12px;padding:1.4px;z-index:2;pointer-events:none;
+  background:linear-gradient(110deg,#ffb3d1,#ffe0ad,#b6f2d8,#b6d8ff,#d9c2ff,#ffb3d1);
+  background-size:220% 100%;
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+          mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;
+  animation:aiFlow 3.4s linear infinite;
+}
+/* 은은한 외곽 글로우 */
+.ai-field.is-writing::after{
+  content:"";position:absolute;inset:-2px;border-radius:14px;z-index:0;pointer-events:none;
+  background:linear-gradient(110deg,#ffb3d1,#b6d8ff,#d9c2ff);
+  filter:blur(10px);opacity:.24;animation:aiGlow 3.4s ease-in-out infinite;
+}
+/* 생성 중엔 흰 배경 + 테두리는 링에 양보, 기존 텍스트는 잠시 감춤 */
+.ai-field.is-writing textarea.fs-input{
+  background:#fff!important;border-color:transparent!important;
+  color:transparent!important;caret-color:transparent;
+}
+.ai-field.is-writing textarea.fs-input::placeholder{color:#b7a7cf;opacity:.95;}
+.ai-field.is-writing textarea.fs-input::-webkit-input-placeholder{color:#b7a7cf;opacity:.95;}
+/* 완료 시 텍스트 부드러운 페이드인 */
+.ai-fadein{animation:aiFadeIn .45s ease;}
+@keyframes aiFlow{to{background-position:220% 0;}}
+@keyframes aiGlow{0%,100%{opacity:.18;}50%{opacity:.30;}}
+@keyframes aiSpark{0%,100%{transform:scale(1);opacity:.9;}50%{transform:scale(1.18);opacity:1;}}
+@keyframes aiBadgeIn{from{opacity:0;transform:translateY(-3px);}to{opacity:1;transform:none;}}
+@keyframes aiFadeIn{from{opacity:0;}to{opacity:1;}}
+@media (prefers-reduced-motion:reduce){
+  .ai-field.is-writing::before,.ai-field.is-writing::after,.ai-field-spark{animation:none;}
+  .ai-fadein{animation:none;}
+}
+
 .fs-row2{display:flex;gap:10px;}
 .fs-row2>.fs-field{flex:1;}
 .fs-chips{display:flex;flex-wrap:wrap;gap:8px;}
