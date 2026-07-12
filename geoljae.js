@@ -181,6 +181,7 @@
     if (!el) return;
     if (n > 0) { el.textContent = n > 99 ? '99+' : n; el.hidden = false; }
     else { el.hidden = true; }
+    if (typeof window.hpSyncMenuDot === 'function') window.hpSyncMenuDot();
   }
   // 결재함을 열지 않아도(홈 복귀·부팅) 대기 건수만 가볍게 세어 배지 갱신
   function updateBadge() {

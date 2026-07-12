@@ -231,14 +231,21 @@ if (typeof document !== 'undefined') {
   }
 }
 
-/* ── 홈 우상단 설정(톱니) 드롭다운 메뉴 (PC) ── */
+/* ── 홈 우상단 세줄(햄버거) 드롭다운 메뉴 (PC) ── */
 function toggleSettingsMenu(e) { if (e) e.stopPropagation(); var m = document.getElementById('settingsMenu'); if (m) m.classList.toggle('open'); }
 function closeSettingsMenu() { var m = document.getElementById('settingsMenu'); if (m) m.classList.remove('open'); }
+// 국선·결재 알림이 하나라도 있으면 햄버거에 빨간 점 표시(닫힌 메뉴 안의 알림을 알림)
+function hpSyncMenuDot() {
+  var dot = document.getElementById('hp-ham-dot'); if (!dot) return;
+  var g = document.getElementById('hp-badge-gukseon'), j = document.getElementById('hp-badge-gyeoljae');
+  dot.hidden = !((g && !g.hidden) || (j && !j.hidden));
+}
+if (typeof window !== 'undefined') window.hpSyncMenuDot = hpSyncMenuDot;
 if (typeof document !== 'undefined') {
   document.addEventListener('click', function (e) {
     var m = document.getElementById('settingsMenu');
     if (!m || !m.classList.contains('open')) return;
-    if (e.target.closest && e.target.closest('.hp-gear-wrap')) return;
+    if (e.target.closest && e.target.closest('.hp-menu-wrap')) return;
     m.classList.remove('open');
   });
 }

@@ -131,21 +131,22 @@
 
         <!-- 하늘 위에 겹치는 오버레이 -->
         <div class="hp-overlay">
-          <!-- 우상단 통합 글래스 콘솔: 계약서·국선·결재·설정(⚙) -->
-          <nav class="hp-console" aria-label="바로가기">
-            <button class="cs-item" onclick="openContractList()">계약서</button>
-            <button class="cs-item" id="hp-pill-gukseon" onclick="goCaseManager()">국선<span class="hp-badge" id="hp-badge-gukseon" hidden></span></button>
-            <button class="cs-item" id="hp-pill-gyeoljae" onclick="goGyeoljae()">결재<span class="hp-badge" id="hp-badge-gyeoljae" hidden></span></button>
-            <div class="hp-gear-wrap">
-              <button class="cs-item cs-gear" onclick="toggleSettingsMenu(event)" aria-label="설정" aria-haspopup="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M4.4 4.4l2.1 2.1M17.5 17.5l2.1 2.1M2.5 12h3M18.5 12h3M4.4 19.6l2.1-2.1M17.5 6.5l2.1-2.1"/></svg></button>
-              <div class="hp-settings-menu" id="settingsMenu" role="menu">
-                <div class="hsm-item" role="menuitem" onclick="closeSettingsMenu();openLawyerAdmin();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>변호사 관리</div>
-              </div>
+          <!-- 우상단: 세줄(햄버거) 메뉴 → 국선·결재·직원관리 -->
+          <div class="hp-menu-wrap">
+            <button class="hp-hamburger" onclick="toggleSettingsMenu(event)" aria-label="메뉴" aria-haspopup="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+              <span class="hp-ham-dot" id="hp-ham-dot" hidden></span>
+            </button>
+            <div class="hp-settings-menu" id="settingsMenu" role="menu">
+              <div class="hsm-item" role="menuitem" onclick="closeSettingsMenu();goCaseManager();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>국선<span class="hp-badge" id="hp-badge-gukseon" hidden></span></div>
+              <div class="hsm-item" role="menuitem" onclick="closeSettingsMenu();goGyeoljae();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L20 5"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg>결재<span class="hp-badge" id="hp-badge-gyeoljae" hidden></span></div>
+              <div class="hsm-item" role="menuitem" onclick="closeSettingsMenu();openLawyerAdmin();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>직원관리</div>
             </div>
-          </nav>
+          </div>
           <div class="hp-head">
             <div class="hp-pills">
               <span class="hp-eyebrow">서면 작성</span>
+              <button class="hp-cta" onclick="openContractList()">계약서</button>
             </div>
             <h1 class="hp-title">법무법인 정서</h1>
           </div>
