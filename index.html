@@ -1204,6 +1204,8 @@
     <div class="list-search"><input type="text" id="listSearch" placeholder="의뢰인명·사건번호·사건명 검색" oninput="renderContractList()"></div>
     <div id="listContainer"></div>
   </div>
+  <!-- PC 전용 계약 대장 콘솔(모바일에선 CSS로 숨김) -->
+  <div class="list-pc" id="listPC"></div>
 </div>
 
 <div class="save-toast" id="saveToast"></div>
@@ -2467,6 +2469,7 @@ async function loadContractList(){
   }
 }
 function renderContractList(){
+  try{if(window.ContractReg&&window.ContractReg.render)window.ContractReg.render();}catch(e){}  // PC 계약 대장 병행 렌더(모바일 무관)
   var box=document.getElementById('listContainer');
   var q=(document.getElementById('listSearch').value||'').trim().toLowerCase();
   var items=listCache;
@@ -4710,6 +4713,7 @@ function toggleAppealGround(key){
 <script src="./util.js"></script>
 <script src="./fsdoc.js"></script>
 <script src="./lawyers.js"></script>
+<script src="./contractreg.js"></script>
 <script src="./gyeongyu.js"></script>
 <script src="./autofill.js"></script>
 <script src="./hwpxfill.js"></script>
