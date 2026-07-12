@@ -168,7 +168,7 @@
     if (c.gukseon) ctx.replace('위 피고인의 변호인', '위 피고인의 국선변호인');
     if (c.gukseon) dropPara(ctx, '법무법인 정서');
     if (c.attorney !== '서고은') ctx.replace('서 고 은', spaced(c.attorney));
-    if (c.attorney2) ctx.replace('우 숭 민', spaced(c.attorney2)); else dropPara(ctx, '우 숭 민');
+    dropPara(ctx, '우 숭 민');   // 둘째 변호사 자리(구 '우숭민') 항상 제거
     fillParty(ctx, c.jiwi);
   }
 
@@ -202,7 +202,7 @@
     setLines(ctx, '1. 제1심판결을 취소한다.', 4, c.purposeLines);
     // 담당변호사(첫줄 서 고 은, 둘째줄 우 숭 민)
     if (c.attorney !== '서고은') ctx.replace('서 고 은', spaced(c.attorney));
-    if (c.attorney2) ctx.replace('우 숭 민', spaced(c.attorney2)); else dropPara(ctx, '우 숭 민');
+    dropPara(ctx, '우 숭 민');   // 둘째 변호사 자리(구 '우숭민') 항상 제거
     // 마무리줄: 법원 재판부 한 칸
     ctx.replace('인천지방법원 민사13단독 귀중', (c.court || '') + (c.courtDiv ? ' ' + c.courtDiv : '') + ' 귀중');
   }
