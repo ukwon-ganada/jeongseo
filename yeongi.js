@@ -435,7 +435,7 @@
       ptype: 'wongo', ourIdx: 0,
       client: '', opponent: '', caseLine: '', court: '',
       hearingDt: '', wish: '', memo: '', reason: '', bojeongDate: '',
-      attorneys: ['서고은'], attachments: '', date: fmtDate(todayISO()),
+      attorneys: ['서고은'], attachments: '대법원 나의 사건 검색', date: fmtDate(todayISO()),
       gukseon: false, consent: '부동의', oppOffice: '', oppLawyer: '', stamp: true
     };
   }
@@ -783,6 +783,7 @@
     var kind = segOn('yg-kind');
     var role = caseType === '형사' ? '피고인의 변호인' : (ourRole(state) + '의 소송대리인');
     btn.disabled = true; if (hint) hint.textContent = 'AI가 작성 중…';
+    if (window.aiFieldStart) aiFieldStart('yg-reason', 'AI가 사유를 작성하고 있어요');
     var payload = {
       caseType: caseType, role: role,
       caseName: getVal('yg-caseline'), memo: memo
@@ -800,9 +801,9 @@
       body: JSON.stringify(payload)
     }).then(function (r) { return r.json(); }).then(function (d) {
       btn.disabled = false;
-      if (d && d.ok && d.reason) { setVal('yg-reason', d.reason); if (hint) hint.textContent = '작성 완료 — 검토·수정 후 다운로드하세요.'; }
-      else { if (hint) hint.textContent = '작성 실패: ' + ((d && d.reason) || 'unknown') + ' (직접 입력 가능)'; }
-    }).catch(function (e) { btn.disabled = false; if (hint) hint.textContent = '오류: ' + e.message; });
+      if (d && d.ok && d.reason) { aiFieldDone('yg-reason', d.reason); if (hint) hint.textContent = '작성 완료 — 검토·수정 후 다운로드하세요.'; }
+      else { aiFieldStop('yg-reason'); if (hint) hint.textContent = '작성 실패: ' + ((d && d.reason) || 'unknown') + ' (직접 입력 가능)'; }
+    }).catch(function (e) { btn.disabled = false; aiFieldStop('yg-reason'); if (hint) hint.textContent = '오류: ' + e.message; });
   };
 
   // 📄 한글(HWPX) 다운로드 — 폼 값을 수집해 바로 생성(확인창 없음)

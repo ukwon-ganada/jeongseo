@@ -469,6 +469,10 @@
     var hint = document.getElementById('hs-ai-hint');
     if (!pdfFile) { if (hint) hint.textContent = '먼저 판결문을 올려주세요.'; return; }
     var btn = document.getElementById('hs-ai-btn'); if (btn) btn.disabled = true;
+    if (window.aiFieldStart) {
+      aiFieldStart('hs-verdict', 'AI가 주문·청구취지를 분석하고 있어요');
+      aiFieldStart('hs-purpose', 'AI가 항소·상고취지를 작성하고 있어요');
+    }
     if (hint) hint.textContent = '판결문 앞 ' + HS_PDF_PAGES + '페이지 준비 중…';
     collect();
     var cfg = toCfg(state);
@@ -487,8 +491,8 @@
     }).then(function (r) { return r.json(); }).then(function (d) {
       if (btn) btn.disabled = false;
       if (d && d.ok) {
-        if (d.verdictLines && d.verdictLines.length) setVal('hs-verdict', d.verdictLines.join('\n'));
-        if (d.purposeLines && d.purposeLines.length) setVal('hs-purpose', d.purposeLines.join('\n'));
+        if (d.verdictLines && d.verdictLines.length) aiFieldDone('hs-verdict', d.verdictLines.join('\n')); else aiFieldStop('hs-verdict');
+        if (d.purposeLines && d.purposeLines.length) aiFieldDone('hs-purpose', d.purposeLines.join('\n')); else aiFieldStop('hs-purpose');
         // 상대방 이름은 반대쪽 이름 칸에
         var oppNameId = cfg.clientSide === 'second' ? 'hs-plaintiff' : 'hs-defendant2';
         if (d.oppName) setVal(oppNameId, d.oppName);
@@ -497,9 +501,10 @@
         else { state.addr1 = d.oppAddr || ''; state.addr2 = d.clientAddr || ''; }
         if (hint) hint.textContent = 'AI 초안 완료 — 반드시 검토·수정 후 다운로드하세요.';
       } else {
+        aiFieldStop('hs-verdict'); aiFieldStop('hs-purpose');
         if (hint) hint.textContent = '실패: ' + ((d && d.reason) || 'unknown') + ((d && d.detail) ? ' — ' + d.detail : '') + ' (직접 입력 가능)';
       }
-    }).catch(function (e) { if (btn) btn.disabled = false; if (hint) hint.textContent = '오류: ' + e.message + ' (직접 입력 가능)'; });
+    }).catch(function (e) { if (btn) btn.disabled = false; aiFieldStop('hs-verdict'); aiFieldStop('hs-purpose'); if (hint) hint.textContent = '오류: ' + e.message + ' (직접 입력 가능)'; });
   };
   function hsResetPdfUI() {
     pdfFile = null;
