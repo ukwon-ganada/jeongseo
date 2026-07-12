@@ -136,7 +136,12 @@
             <span class="hp-pill hp-pill-link" onclick="openContractList()">계약서</span>
             <span class="hp-pill hp-pill-link" id="hp-pill-gukseon" onclick="goCaseManager()">국선<span class="hp-badge" id="hp-badge-gukseon" hidden></span></span>
             <span class="hp-pill hp-pill-link" id="hp-pill-gyeoljae" onclick="goGyeoljae()">결재<span class="hp-badge" id="hp-badge-gyeoljae" hidden></span></span>
-            <span class="hp-pill hp-pill-link" onclick="openLawyerAdmin()">변호사</span>
+            <div class="hp-gear-wrap">
+              <button class="hp-gear" onclick="toggleSettingsMenu(event)" aria-label="설정" aria-haspopup="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M4.4 4.4l2.1 2.1M17.5 17.5l2.1 2.1M2.5 12h3M18.5 12h3M4.4 19.6l2.1-2.1M17.5 6.5l2.1-2.1"/></svg></button>
+              <div class="hp-settings-menu" id="settingsMenu" role="menu">
+                <div class="hsm-item" role="menuitem" onclick="closeSettingsMenu();openLawyerAdmin();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>변호사 관리</div>
+              </div>
+            </div>
           </nav>
           <div class="hp-head">
             <div class="hp-pills">
