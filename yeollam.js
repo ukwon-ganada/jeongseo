@@ -90,6 +90,31 @@
   }
   function clerkBirth(name) { var list = loadClerks(); for (var i = 0; i < list.length; i++) { if (list[i].name === name) return list[i].birth || ''; } return ''; }
 
+  /* ── 담당변호사 명단(이름+주민번호) — 검찰 위임장용, 열람등사 전용 ── */
+  var ATTS_KEY = 'jeongseo_yeollam_atts';   // [{name, jumin}]
+  var ATTS_SEED = [{ name: '서고은', jumin: '840219-2079920' }];
+  function loadAtts() {
+    try { var raw = localStorage.getItem(ATTS_KEY); var arr = raw ? JSON.parse(raw) : null; if (arr && arr.length) return arr; } catch (e) {}
+    return ATTS_SEED.slice();
+  }
+  function saveAtts(list) { try { localStorage.setItem(ATTS_KEY, JSON.stringify(list)); } catch (e) {} }
+  function addAttEntry(name, jumin) {
+    name = (name || '').trim(); if (!name) return;
+    var list = loadAtts(), found = false;
+    for (var i = 0; i < list.length; i++) { if (list[i].name === name) { if (jumin) list[i].jumin = jumin; found = true; break; } }
+    if (!found) list.push({ name: name, jumin: (jumin || '').trim() });
+    saveAtts(list);
+  }
+  function attJumin(name) { var list = loadAtts(); for (var i = 0; i < list.length; i++) { if (list[i].name === name) return list[i].jumin || ''; } return ''; }
+  // 표시용 명단: 사무소 공용 변호사(ALL_ATTORNEYS) + 저장된 명단 이름의 합집합
+  function attNames() {
+    var stored = loadAtts(), names = [];
+    var firm = (typeof window !== 'undefined' && window.ALL_ATTORNEYS) ? window.ALL_ATTORNEYS : ['서고은'];
+    firm.forEach(function (n) { if (names.indexOf(n) < 0) names.push(n); });
+    stored.forEach(function (a) { if (names.indexOf(a.name) < 0) names.push(a.name); });
+    return names;
+  }
+
   /* ══════════ 법원 채우기 ══════════
      yeollam_court.hwpx 샘플: 담당변호사 서고은 / 담당사무원 신주연 /
        자격 '피고인 채윤휘빈센트 (국선 채윤휘빈센트)의 변호인' / 재판준비를 위하여 /
@@ -146,18 +171,18 @@
       type: '법원', jiwi: '피고인', defendant: '', casenum: '', casename: '',
       courtDiv: '', clerk: CLERKS_SEED[0].name, use: USE_PRESETS[0].text, target: TARGET_DEFAULT,
       req: ['열람', '복사'], methods: ['신청인 복사설비'], gukseon: false,
-      birth: '840219-2079920', prosOffice: '인천지방검찰청',
+      prosOffice: '인천지방검찰청',
       docs: '기록일체, 미디어파일일체(CD 등)',
-      attorneys: ['서고은'], writeDate: todayISO(), stamp: true
+      attorney: '서고은', writeDate: todayISO(), stamp: true
     };
   }
   function toCfg(s) {
-    var att = (s.attorneys && s.attorneys.length) ? s.attorneys[0] : '서고은';
+    var att = s.attorney || '서고은';
     return {
       type: s.type, jiwi: s.jiwi, defendant: clean(s.defendant), casenum: s.casenum, casename: s.casename,
       courtDiv: s.courtDiv, clerk: s.clerk, clerkBirth: clerkBirth(s.clerk), use: s.use, target: s.target,
       req: s.req.slice(), methods: s.methods.slice(), gukseon: !!s.gukseon,
-      birth: s.birth, prosOffice: s.prosOffice || '인천지방검찰청',
+      birth: attJumin(att), prosOffice: s.prosOffice || '인천지방검찰청',
       docs: splitDocs(s.docs),
       writeKo: fmtKoDate(s.writeDate) || fmtKoDate(todayISO()),
       writeDot: fmtDotDate(s.writeDate) || fmtDotDate(todayISO()),
@@ -214,8 +239,7 @@
             '<div class="fs-field"><label class="fs-label">의뢰인 성명 <span class="fs-hint">(국선 표기는 자동 제거)</span></label><input type="text" class="fs-input" id="yl-defendant" data-af="l_client" placeholder="홍길동"></div>' +
             '<div class="fs-field"><label class="fs-label">사건번호 · 사건명 <span class="fs-hint">(사건번호 한 칸 띄우고 사건명)</span></label><input type="text" class="fs-input" id="yl-case" placeholder="2026고단1234 마약류관리에관한법률위반(향정)"></div>' +
             '<div class="fs-field yl-court"><label class="fs-label">재판부 <span class="fs-hint">(사건번호로 자동 조회)</span></label><input type="text" class="fs-input" id="yl-courtdiv" placeholder="형사1단독"></div>' +
-            '<div class="fs-row2 yl-prosecution"><div class="fs-field"><label class="fs-label">검찰청</label><input type="text" class="fs-input" id="yl-prosoffice" placeholder="인천지방검찰청"></div>' +
-              '<div class="fs-field"><label class="fs-label">담당변호사 생년월일</label><input type="text" class="fs-input" id="yl-birth" placeholder="840219-2079920"></div></div>' +
+            '<div class="fs-field yl-prosecution"><label class="fs-label">검찰청</label><input type="text" class="fs-input" id="yl-prosoffice" placeholder="인천지방검찰청"></div>' +
 
             '<div class="fs-section yl-court">신청 내용 (법원)</div>' +
             '<div class="yl-pick yl-court"><span class="yl-pick-l">사용용도</span><div class="fs-chips" id="yl-use">' + useChips + '</div></div>' +
@@ -228,17 +252,18 @@
 
             '<div class="fs-section">담당사무원 <span class="fs-hint">(검찰 위임장·서약서에 이름·생년월일 사용)</span></div>' +
             '<div class="fs-field"><label class="fs-label">사무원 선택</label>' +
-              '<select class="fs-input" id="yl-clerk" onchange="ylClerkPick()"></select>' +
+              '<div class="fs-chips att-chips" id="yl-clerk-chips" onclick="ylClerkClick(event)"></div>' +
               '<div class="yl-clerk-add"><input type="text" class="att-add-input" id="yl-clerk-new" placeholder="사무원 이름"><input type="text" class="att-add-input" id="yl-clerk-birth" placeholder="생년월일 예:94.11.03"><button type="button" class="att-add-btn" onclick="ylAddClerk()">＋ 추가</button></div>' +
               '<div class="fs-hint" id="yl-clerk-info" style="margin-top:4px"></div></div>' +
 
             '<div class="fs-section">서명 · 날인</div>' +
             '<div class="fs-field yl-court"><label class="fs-label"><input type="checkbox" id="yl-gukseon"> 국선사건 <span class="fs-hint">(자격을 "국선변호인"으로)</span></label></div>' +
-            '<div class="fs-field"><label class="fs-label">담당변호사</label>' +
-              '<div class="fs-chips att-chips" id="yl-att" onclick="attChipClick(event,\'yl\')"></div>' +
-              '<div class="att-add-row"><input type="text" class="att-add-input" id="yl-att-new" placeholder="추가할 변호사 이름"><button type="button" class="att-add-btn" onclick="addAttorney(\'yl\')">＋ 추가</button></div></div>' +
+            '<div class="fs-field"><label class="fs-label">담당변호사 <span class="fs-hint">(검찰 위임장에 주민번호 사용)</span></label>' +
+              '<div class="fs-chips att-chips" id="yl-att" onclick="ylAttClick(event)"></div>' +
+              '<div class="yl-clerk-add"><input type="text" class="att-add-input" id="yl-att-new" placeholder="변호사 이름"><input type="text" class="att-add-input" id="yl-att-jumin" placeholder="주민번호 예:840219-2079920"><button type="button" class="att-add-btn" onclick="ylAddAtt()">＋ 추가</button></div>' +
+              '<div class="fs-hint" id="yl-att-info" style="margin-top:4px"></div></div>' +
             '<div class="fs-field"><label class="fs-label">작성일 (오늘 자동)</label><input type="date" class="fs-input" id="yl-writedate"></div>' +
-            '<div class="fs-field"><label class="fs-label"><input type="checkbox" id="yl-stamp"> 서고은 도장 날인 <span class="fs-hint">(담당변호사 첫 번째가 서고은일 때)</span></label></div>' +
+            '<div class="fs-field"><label class="fs-label"><input type="checkbox" id="yl-stamp"> 서고은 도장 날인 <span class="fs-hint">(담당변호사가 서고은일 때)</span></label></div>' +
           '</div>' +
           '<div class="fs-foot">' +
             '<button class="fs-btn ghost" onclick="closeYeollamForm()">취소</button>' +
@@ -253,16 +278,41 @@
   function setVal(id, v) { var el = document.getElementById(id); if (el) el.value = v == null ? '' : v; }
   function getVal(id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; }
   function getRaw(id) { var el = document.getElementById(id); return el ? el.value : ''; }
-  function fillClerkSelect(sel) {
-    var el = document.getElementById('yl-clerk'); if (!el) return;
-    el.innerHTML = loadClerks().map(function (c) { return '<option value="' + JU.esc(c.name) + '"' + (c.name === sel ? ' selected' : '') + '>' + JU.esc(c.name) + '</option>'; }).join('');
+  // 칩 박스에서 현재 선택(on)된 값
+  function ylSelChip(boxId) { var el = document.querySelector('#' + boxId + ' .fs-chip.on'); return el ? el.getAttribute('data-v') : ''; }
+  function chipHTML(name, on) { return '<div class="fs-chip att-chip' + (on ? ' on' : '') + '" data-v="' + JU.esc(name) + '">' + JU.esc(name) + '</div>'; }
+  // ── 사무원 칩(단일 선택) ──
+  function fillClerkChips(sel) {
+    var box = document.getElementById('yl-clerk-chips'); if (!box) return;
+    box.innerHTML = loadClerks().map(function (c) { return chipHTML(c.name, c.name === sel); }).join('');
     ylClerkInfo();
   }
   function ylClerkInfo() {
-    var name = getVal('yl-clerk'), b = clerkBirth(name), info = document.getElementById('yl-clerk-info');
-    if (info) info.textContent = b ? (name + ' · 생년월일 ' + b) : (name + ' · 생년월일 미등록(추가에서 등록)');
+    var name = ylSelChip('yl-clerk-chips'), b = clerkBirth(name), info = document.getElementById('yl-clerk-info');
+    if (info) info.textContent = name ? (b ? (name + ' · 생년월일 ' + b) : (name + ' · 생년월일 미등록(추가에서 등록)')) : '사무원을 선택하세요';
   }
-  window.ylClerkPick = function () { if (state) state.clerk = getVal('yl-clerk'); ylClerkInfo(); };
+  window.ylClerkClick = function (e) {
+    var c = e.target.closest('.fs-chip'); if (!c) return;
+    document.querySelectorAll('#yl-clerk-chips .fs-chip').forEach(function (x) { x.classList.toggle('on', x === c); });
+    if (state) state.clerk = c.getAttribute('data-v');
+    ylClerkInfo();
+  };
+  // ── 담당변호사 칩(단일 선택 + 주민번호) ──
+  function fillAttChips(sel) {
+    var box = document.getElementById('yl-att'); if (!box) return;
+    box.innerHTML = attNames().map(function (n) { return chipHTML(n, n === sel); }).join('');
+    ylAttInfo();
+  }
+  function ylAttInfo() {
+    var name = ylSelChip('yl-att'), j = attJumin(name), info = document.getElementById('yl-att-info');
+    if (info) info.textContent = name ? (j ? (name + ' · 주민번호 ' + j) : (name + ' · 주민번호 미등록(추가에서 등록)')) : '담당변호사를 선택하세요';
+  }
+  window.ylAttClick = function (e) {
+    var c = e.target.closest('.fs-chip'); if (!c) return;
+    document.querySelectorAll('#yl-att .fs-chip').forEach(function (x) { x.classList.toggle('on', x === c); });
+    if (state) state.attorney = c.getAttribute('data-v');
+    ylAttInfo();
+  };
 
   window.ylType = function (v) {
     state.type = v;
@@ -282,8 +332,15 @@
   window.ylMulti = function (el) { el.classList.toggle('on'); };
   window.ylAddClerk = function () {
     var name = getVal('yl-clerk-new'), birth = getVal('yl-clerk-birth');
-    if (!name) return; addClerkEntry(name, birth); fillClerkSelect(name);
+    if (!name) return; addClerkEntry(name, birth); fillClerkChips(name);
+    if (state) state.clerk = name;
     setVal('yl-clerk-new', ''); setVal('yl-clerk-birth', '');
+  };
+  window.ylAddAtt = function () {
+    var name = getVal('yl-att-new'), jumin = getVal('yl-att-jumin');
+    if (!name) return; addAttEntry(name, jumin); fillAttChips(name);
+    if (state) state.attorney = name;
+    setVal('yl-att-new', ''); setVal('yl-att-jumin', '');
   };
 
   function fillFormFromState() {
@@ -291,18 +348,18 @@
     setVal('yl-case', [state.casenum, state.casename].filter(Boolean).join(' '));
     setVal('yl-courtdiv', state.courtDiv);
     setVal('yl-prosoffice', state.prosOffice);
-    setVal('yl-birth', state.birth); setVal('yl-target', state.target);
+    setVal('yl-target', state.target);
     setVal('yl-docs', state.docs);
     setVal('yl-writedate', state.writeDate || todayISO());
-    setVal('yl-clerk-new', ''); setVal('yl-clerk-birth', ''); setVal('yl-att-new', '');
-    fillClerkSelect(state.clerk);
+    setVal('yl-clerk-new', ''); setVal('yl-clerk-birth', ''); setVal('yl-att-new', ''); setVal('yl-att-jumin', '');
+    fillClerkChips(state.clerk);
+    fillAttChips(state.attorney || '서고은');
     document.querySelectorAll('#yl-jiwi [data-v]').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-v') === state.jiwi); });
     document.querySelectorAll('#yl-use [data-v]').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-v') === state.use); });
     document.querySelectorAll('#yl-req [data-v]').forEach(function (b) { b.classList.toggle('on', state.req.indexOf(b.getAttribute('data-v')) >= 0); });
     document.querySelectorAll('#yl-methods [data-v]').forEach(function (b) { b.classList.toggle('on', state.methods.indexOf(b.getAttribute('data-v')) >= 0); });
     var gk = document.getElementById('yl-gukseon'); if (gk) gk.checked = !!state.gukseon;
     var st = document.getElementById('yl-stamp'); if (st) st.checked = !!state.stamp;
-    if (typeof renderAttChips === 'function') renderAttChips('yl', (state.attorneys && state.attorneys.length) ? state.attorneys : ['서고은']);
     window.ylType(state.type);
   }
   function collectChips(sel) { var out = []; document.querySelectorAll(sel + ' .fs-chip.on').forEach(function (c) { out.push(c.getAttribute('data-v')); }); return out; }
@@ -313,14 +370,13 @@
     var _cs = splitCase(getVal('yl-case')); state.casenum = _cs.casenum; state.casename = _cs.casename;
     state.courtDiv = getVal('yl-courtdiv');
     state.prosOffice = getVal('yl-prosoffice') || '인천지방검찰청';
-    state.birth = getVal('yl-birth'); state.target = getRaw('yl-target').trim();
+    state.target = getRaw('yl-target').trim();
     state.docs = getVal('yl-docs');
     state.use = pickOn('#yl-use', state.use);
     state.req = collectChips('#yl-req'); state.methods = collectChips('#yl-methods');
-    state.clerk = getVal('yl-clerk') || CLERKS_SEED[0].name;
+    state.clerk = ylSelChip('yl-clerk-chips') || state.clerk || CLERKS_SEED[0].name;
     state.writeDate = getVal('yl-writedate') || todayISO();
-    var atts = []; document.querySelectorAll('#yl-att .fs-chip.on').forEach(function (c) { atts.push(c.dataset.att); });
-    state.attorneys = atts.length ? atts : ['서고은'];
+    state.attorney = ylSelChip('yl-att') || state.attorney || '서고은';
     var gk = document.getElementById('yl-gukseon'); state.gukseon = !!(gk && gk.checked);
     var st = document.getElementById('yl-stamp'); state.stamp = !!(st && st.checked);
   }
