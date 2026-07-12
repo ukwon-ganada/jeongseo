@@ -435,7 +435,7 @@
       ptype: 'wongo', ourIdx: 0,
       client: '', opponent: '', caseLine: '', court: '',
       hearingDt: '', wish: '', memo: '', reason: '', bojeongDate: '',
-      attorneys: ['서고은'], attachments: '', date: fmtDate(todayISO()),
+      attorneys: ['서고은'], attachments: '대법원 나의 사건 검색', date: fmtDate(todayISO()),
       gukseon: false, consent: '부동의', oppOffice: '', oppLawyer: '', stamp: true
     };
   }
