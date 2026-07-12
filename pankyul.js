@@ -115,7 +115,7 @@
             '<div class="fs-field"><label class="fs-label"><input type="checkbox" id="pk-gukseon"> 국선사건 <span class="fs-hint">(선택 시 "국선변호인" 표기)</span></label></div>' +
             '<div class="fs-field"><label class="fs-label">담당변호사</label>' +
               '<div class="fs-chips att-chips" id="pk-att" onclick="attChipClick(event,\'pk\')"></div>' +
-              '<div class="att-add-row"><input type="text" class="att-add-input" id="pk-att-new" placeholder="추가할 변호사 이름"><button type="button" class="att-add-btn" onclick="addAttorney(\'pk\')">＋ 추가</button></div></div>' +
+              '</div>' +
             '<div class="fs-field"><label class="fs-label"><input type="checkbox" id="pk-stamp"> 서고은 도장 날인 <span class="fs-hint">(담당변호사 첫 번째가 서고은일 때)</span></label></div>' +
           '</div>' +
           '<div class="fs-foot">' +

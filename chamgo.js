@@ -322,7 +322,7 @@
             '<div class="fs-section">서명 · 날인</div>' +
             '<div class="fs-field"><label class="fs-label">담당변호사 <span class="fs-hint">(여러 명 선택 시 순서대로 나열)</span></label>' +
               '<div class="fs-chips att-chips" id="cg-att" onclick="attChipClick(event,\'cg\')"></div>' +
-              '<div class="att-add-row"><input type="text" class="att-add-input" id="cg-att-new" placeholder="추가할 변호사 이름"><button type="button" class="att-add-btn" onclick="addAttorney(\'cg\')">＋ 추가</button></div></div>' +
+              '</div>' +
             '<div class="fs-field"><label class="fs-label">작성일</label><input type="text" class="fs-input" id="cg-date" placeholder="2026. 7. 11."></div>' +
             '<div class="fs-field"><label class="fs-label"><input type="checkbox" id="cg-stamp"> 서고은 도장 날인 <span class="fs-hint">(담당변호사 첫 번째가 서고은일 때)</span></label></div>' +
           '</div>' +
