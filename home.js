@@ -231,6 +231,18 @@ if (typeof document !== 'undefined') {
   }
 }
 
+/* ── 홈 우상단 설정(톱니) 드롭다운 메뉴 (PC) ── */
+function toggleSettingsMenu(e) { if (e) e.stopPropagation(); var m = document.getElementById('settingsMenu'); if (m) m.classList.toggle('open'); }
+function closeSettingsMenu() { var m = document.getElementById('settingsMenu'); if (m) m.classList.remove('open'); }
+if (typeof document !== 'undefined') {
+  document.addEventListener('click', function (e) {
+    var m = document.getElementById('settingsMenu');
+    if (!m || !m.classList.contains('open')) return;
+    if (e.target.closest && e.target.closest('.hp-gear-wrap')) return;
+    m.classList.remove('open');
+  });
+}
+
 /* node 검증용 (브라우저에선 무시됨) */
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { MENU: MENU, PC_ORDER: PC_ORDER, CONTRACT_CARDS: CONTRACT_CARDS, MORE_ORDER: MORE_ORDER, renderHome: renderHome, renderContractSwipe: renderContractSwipe };

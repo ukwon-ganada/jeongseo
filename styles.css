@@ -113,6 +113,22 @@ html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black)
   }
   .hp-pill-link{cursor:pointer;transition:background .15s,transform .15s;}
   .hp-pill-link:hover{background:rgba(255,255,255,.34);transform:translateY(-1px);}
+  /* 우상단 설정(톱니) — 글래스 원형 버튼 + 라이트 드롭다운 메뉴 */
+  .hp-gear-wrap{position:relative;display:inline-flex;}
+  .hp-gear{width:34px;height:34px;padding:0;border-radius:999px;
+    background:rgba(255,255,255,.22);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    border:1px solid rgba(255,255,255,.4);color:#fff;display:flex;align-items:center;justify-content:center;
+    cursor:pointer;transition:background .15s,transform .2s;}
+  .hp-gear:hover{background:rgba(255,255,255,.34);transform:rotate(35deg);}
+  .hp-gear svg{width:18px;height:18px;}
+  .hp-settings-menu{display:none;position:absolute;top:calc(100% + 8px);right:0;min-width:174px;
+    background:#fff;border-radius:14px;box-shadow:0 12px 32px rgba(0,0,0,.24);padding:6px;z-index:60;}
+  .hp-settings-menu.open{display:block;animation:hsmIn .14s ease;}
+  @keyframes hsmIn{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:translateY(0);}}
+  .hsm-item{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;
+    font-weight:600;font-size:13.5px;line-height:1.2;color:#1c2431;cursor:pointer;white-space:nowrap;letter-spacing:0;}
+  .hsm-item:hover{background:#f2f3f5;}
+  .hsm-item svg{width:17px;height:17px;color:#5a6472;flex:none;}
   /* 국선 pill 주의 배지(임박 기일+미청구) — 있을 때만 표시 */
   #hp-pill-gukseon{position:relative;}
   .hp-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;
