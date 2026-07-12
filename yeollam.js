@@ -262,7 +262,6 @@
             '<div class="fs-field yl-court"><label class="fs-label"><input type="checkbox" id="yl-gukseon"> 국선사건 <span class="fs-hint">(자격을 "국선변호인"으로)</span></label></div>' +
             '<div class="fs-field"><label class="fs-label">담당변호사 <span class="fs-hint">(검찰 위임장에 주민번호 사용)</span></label>' +
               '<div class="fs-chips att-chips" id="yl-att" onclick="ylAttClick(event)"></div>' +
-              '<div class="yl-clerk-add"><input type="text" class="att-add-input" id="yl-att-new" placeholder="변호사 이름"><input type="text" class="att-add-input" id="yl-att-jumin" placeholder="주민번호 예:840219-2079920"><button type="button" class="att-add-btn" onclick="ylAddAtt()">＋ 추가</button></div>' +
               '<div class="fs-hint" id="yl-att-info" style="margin-top:4px"></div></div>' +
             '<div class="fs-field"><label class="fs-label">작성일 (오늘 자동)</label><input type="date" class="fs-input" id="yl-writedate"></div>' +
             '<div class="fs-field"><label class="fs-label"><input type="checkbox" id="yl-stamp"> 서고은 도장 날인 <span class="fs-hint">(담당변호사가 서고은일 때)</span></label></div>' +

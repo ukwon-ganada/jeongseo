@@ -60,7 +60,7 @@
     return (name === '서고은' && typeof SEAL_SEOGOEUN !== 'undefined') ? SEAL_SEOGOEUN : '';
   }
   // 변호사 명단(localStorage) — 공용 FSDoc.roster 로 위임(동작 동일)
-  function loadAttorneys() { return FSDoc.roster(ATTORNEYS_KEY, ATTORNEYS_SEED).load(); }
+  function loadAttorneys() { if (typeof window !== 'undefined' && window.LawyerStore) return window.LawyerStore.activeNames(); return FSDoc.roster(ATTORNEYS_KEY, ATTORNEYS_SEED).load(); }
   function saveAttorney(name) { FSDoc.roster(ATTORNEYS_KEY, ATTORNEYS_SEED).save(name); }
 
   /* ══════════════════════════════════════════════════════════════
@@ -278,7 +278,7 @@
           '<div class="fs-section">신청인</div>' +
           '<div class="fs-field"><label class="fs-label">국선변호인</label>' +
             '<select class="fs-input" id="gk-attorney" onchange="gkAttorneyChanged()"></select>' +
-            '<div class="att-add-row"><input type="text" class="att-add-input" id="gk-attorney-new" placeholder="추가할 변호사 이름"><button type="button" class="att-add-btn" onclick="gkAddAttorney()">＋ 추가</button></div></div>' +
+          '</div>' +
           '<div class="fs-field"><label class="fs-label">주민등록번호</label><input type="text" class="fs-input" id="gk-rrn" placeholder="000000-0000000"></div>' +
           '<div class="fs-field"><label class="fs-label">작성일 (오늘 자동)</label><input type="date" class="fs-input" id="gk-writedate"></div>' +
           '<div class="fs-field"><div class="fs-hint">증액 사유·실비·기타는 다음 화면(서면)에서 직접 체크·기재합니다.</div></div>' +

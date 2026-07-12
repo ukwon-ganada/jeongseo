@@ -594,7 +594,7 @@
             '<div class="fs-section">서명 · 첨부</div>' +
             '<div class="fs-field"><label class="fs-label">담당변호사 <span class="fs-hint">(여러 명 선택 시 순서대로 나열)</span></label>' +
               '<div class="fs-chips att-chips" id="yg-att" onclick="attChipClick(event,\'yg\')"></div>' +
-              '<div class="att-add-row"><input type="text" class="att-add-input" id="yg-att-new" placeholder="추가할 변호사 이름"><button type="button" class="att-add-btn" onclick="addAttorney(\'yg\')">＋ 추가</button></div></div>' +
+              '</div>' +
             '<div class="fs-field yg-hide-bojeong"><label class="fs-label">첨부서류 <span class="fs-hint">(여러 개는 쉼표로, 없으면 비움)</span></label><input type="text" class="fs-input" id="yg-attach" placeholder="퇴직증명서"></div>' +
             '<div class="fs-field"><label class="fs-label">작성일</label><input type="text" class="fs-input" id="yg-date" placeholder="2024. 3. 7."></div>' +
             '<div class="fs-field"><label class="fs-label"><input type="checkbox" id="yg-stamp"> 서고은 도장 날인 <span class="fs-hint">(담당변호사 첫 번째가 서고은일 때 서명란에 직인)</span></label></div>' +

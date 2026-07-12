@@ -382,7 +382,7 @@
             '<div class="fs-field hs-hyeongsa"><label class="fs-label"><input type="checkbox" id="hs-gukseon"> 국선사건 <span class="fs-hint">(변호인 앞 "국선" + "법무법인 정서" 줄 생략)</span></label></div>' +
             '<div class="fs-field"><label class="fs-label">담당변호사 <span class="fs-hint">(여러 명 선택 시 순서대로)</span></label>' +
               '<div class="fs-chips att-chips" id="hs-att" onclick="attChipClick(event,\'hs\')"></div>' +
-              '<div class="att-add-row"><input type="text" class="att-add-input" id="hs-att-new" placeholder="추가할 변호사 이름"><button type="button" class="att-add-btn" onclick="addAttorney(\'hs\')">＋ 추가</button></div></div>' +
+              '</div>' +
             '<div class="fs-field"><label class="fs-label"><input type="checkbox" id="hs-stamp"> 서고은 도장 날인 <span class="fs-hint">(담당변호사 첫 번째가 서고은일 때)</span></label></div>' +
           '</div>' +
           '<div class="fs-foot">' +

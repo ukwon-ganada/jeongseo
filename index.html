@@ -1258,7 +1258,7 @@
     <div class="fs-field"><label class="fs-label">제출기관</label><input type="text" class="fs-input" id="sj-agency" placeholder="○○경찰서 수사과 ○○○ 수사관님"></div>
 
     <div class="fs-section">담당변호사</div>
-    <div class="fs-field"><div class="fs-chips att-chips" id="sj-att"></div><div class="att-add-row"><input type="text" class="att-add-input" id="sj-att-new" placeholder="추가할 변호사 이름"><button type="button" class="att-add-btn" onclick="addAttorney('sj')">＋ 추가</button></div></div>
+    <div class="fs-field"><div class="fs-chips att-chips" id="sj-att"></div></div>
   </div>
   <div class="fs-foot">
     <button class="fs-btn ghost" onclick="closeSeonimForm()">취소</button>
@@ -1307,7 +1307,7 @@
     <div class="fs-field"><label class="fs-label">제출기관 (관할 법원)</label><input type="text" class="fs-input" id="mg-agency" placeholder="인천지방법원"></div>
 
     <div class="fs-section">담당변호사</div>
-    <div class="fs-field"><div class="fs-chips att-chips" id="mg-att"></div><div class="att-add-row"><input type="text" class="att-add-input" id="mg-att-new" placeholder="추가할 변호사 이름"><button type="button" class="att-add-btn" onclick="addAttorney('mg')">＋ 추가</button></div></div>
+    <div class="fs-field"><div class="fs-chips att-chips" id="mg-att"></div></div>
   </div>
   <div class="fs-foot">
     <button class="fs-btn ghost" onclick="closeMgForm()">취소</button>
@@ -1349,7 +1349,7 @@
     <div class="fs-field"><label class="fs-label">제출 법원</label><input type="text" class="fs-input" id="ap-court" placeholder="인천지방법원"></div>
 
     <div class="fs-section">담당변호사 (여러 명 선택 가능)</div>
-    <div class="fs-field"><div class="fs-chips att-chips" id="ap-att"></div><div class="att-add-row"><input type="text" class="att-add-input" id="ap-att-new" placeholder="추가할 변호사 이름"><button type="button" class="att-add-btn" onclick="addAttorney('ap')">＋ 추가</button></div></div>
+    <div class="fs-field"><div class="fs-chips att-chips" id="ap-att"></div></div>
   </div>
   <div class="fs-foot">
     <button class="fs-btn ghost" onclick="closeAppealForm()">취소</button>
@@ -3959,7 +3959,7 @@ function openSjEdit(type){
     html='<div class="fs-chips" id="sjm-role">'+roles.map(function(r){return '<div class="fs-chip'+(r===s.role?' on':'')+'" data-role="'+escapeHtml(r)+'" onclick="sjmPickRole(this)">'+escapeHtml(r)+'</div>';}).join('')+'</div>';
   } else if(type==='att'){
     title='담당변호사';
-    html='<div class="fs-chips att-chips" id="sjm-att"></div><div class="att-add-row"><input type="text" class="att-add-input" id="sjm-att-new" placeholder="추가할 변호사 이름"><button type="button" class="att-add-btn" onclick="addAttorney(\'sjm\')">＋ 추가</button></div>';
+    html='<div class="fs-chips att-chips" id="sjm-att"></div>';
   } else if(type==='clients'){
     title='의뢰인'; var _addfn=mg?'addMgClient':'addClient';
     html='<div id="sjm-cl-list"></div><button type="button" class="att-add-btn" style="width:100%;margin-top:8px" onclick="'+_addfn+'(\'sjm-cl-list\')">＋ 의뢰인 추가</button>';
