@@ -101,26 +101,26 @@ html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black)
   /* '서면 작성' — 버튼이 아니라 이 화면이 무엇인지 알리는 라벨(eyebrow) */
   .hp-eyebrow{font:600 11px 'IBM Plex Mono',monospace;letter-spacing:.18em;
     text-transform:uppercase;color:rgba(255,255,255,.72);}
-  /* ===== 우상단 통합 글래스 콘솔 — 계약서·국선·결재·설정 =====
-     3개가 흩어져 '떠 보이던' 문제를 하나의 글래스 바로 그룹핑해 해결.
-     가로 스캔·배지 상시 노출. 설정(⚙)도 오른쪽 끝 세그먼트로 합류. */
-  .hp-console{position:absolute;top:7vh;right:5vw;display:inline-flex;align-items:stretch;z-index:25;
-    background:rgba(255,255,255,.15);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
-    border:1px solid rgba(255,255,255,.34);border-radius:14px;
-    box-shadow:0 8px 24px rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.4);}
-  .cs-item{position:relative;display:inline-flex;align-items:center;
-    padding:11px 17px;background:transparent;border:0;border-right:1px solid rgba(255,255,255,.18);
-    font:600 12.5px var(--font);letter-spacing:.02em;color:#fff;cursor:pointer;
-    transition:background .16s;white-space:nowrap;}
-  .cs-item:first-child{border-radius:14px 0 0 14px;}
-  .cs-item:hover,.cs-item:focus-visible{background:rgba(255,255,255,.2);outline:none;}
-  .cs-gear{padding:0 15px;border-right:0;border-radius:0 14px 14px 0;}
-  .cs-gear svg{width:17px;height:17px;display:block;transition:transform .2s;}
-  .cs-gear:hover svg{transform:rotate(35deg);}
-  /* 콘솔 안 알림 배지는 라벨 옆 인라인(상시 노출) */
-  .hp-console .hp-badge{position:static;margin-left:7px;}
-  /* 설정(⚙)은 콘솔 오른쪽 끝 세그먼트 — 드롭다운 앵커 */
-  .hp-gear-wrap{position:relative;display:inline-flex;align-items:stretch;}
+  /* ===== 좌상단 CTA 알약(계약서) — '서면 작성' 옆 ===== */
+  .hp-cta{display:inline-flex;align-items:center;padding:5px 13px;border-radius:999px;
+    background:rgba(255,255,255,.2);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    border:1px solid rgba(255,255,255,.42);color:#fff;font:600 11px 'IBM Plex Mono',monospace;
+    letter-spacing:.06em;cursor:pointer;transition:background .15s,transform .15s;}
+  .hp-cta:hover{background:rgba(255,255,255,.34);transform:translateY(-1px);}
+  /* ===== 우상단 세줄(햄버거) 메뉴 → 국선·결재·직원관리 ===== */
+  .hp-menu-wrap{position:absolute;top:7vh;right:5vw;z-index:25;}
+  .hp-hamburger{position:relative;width:42px;height:38px;padding:0;border-radius:12px;
+    background:rgba(255,255,255,.16);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+    border:1px solid rgba(255,255,255,.36);color:#fff;display:flex;align-items:center;justify-content:center;
+    cursor:pointer;transition:background .15s;box-shadow:0 6px 18px rgba(0,0,0,.16);}
+  .hp-hamburger:hover{background:rgba(255,255,255,.3);}
+  .hp-hamburger svg{width:19px;height:19px;}
+  /* 알림 점(국선·결재 대기 있을 때만) */
+  .hp-ham-dot{position:absolute;top:-3px;right:-3px;width:10px;height:10px;border-radius:50%;
+    background:linear-gradient(150deg,#e2624a,#b8402d);box-shadow:0 0 0 2px rgba(12,17,25,.35),0 1px 3px rgba(150,55,35,.5);}
+  .hp-ham-dot[hidden]{display:none;}
+  /* 드롭다운 항목 안 알림 배지는 오른쪽 끝으로 */
+  .hp-settings-menu .hsm-item .hp-badge{margin-left:auto;}
   .hp-settings-menu{display:none;position:absolute;top:calc(100% + 8px);right:0;min-width:174px;
     background:#fff;border-radius:14px;box-shadow:0 12px 32px rgba(0,0,0,.24);padding:6px;z-index:60;}
   .hp-settings-menu.open{display:block;animation:hsmIn .14s ease;}

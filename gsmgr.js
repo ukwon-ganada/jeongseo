@@ -569,6 +569,7 @@
     if (!el) return;
     if (n > 0) { el.textContent = n; el.hidden = false; el.title = '임박 기일·미청구 ' + n + '건'; }
     else { el.hidden = true; el.textContent = ''; }
+    if (typeof window.hpSyncMenuDot === 'function') window.hpSyncMenuDot();
   }
   // 홈에서 호출(로그인 후·홈 복귀 시): 최신 데이터로 배지만 갱신
   window.gsmgrUpdateBadge = function () {
