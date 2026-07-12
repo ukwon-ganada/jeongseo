@@ -1076,22 +1076,11 @@
     window.closeGsmgr();
     goGukseon(); // 폼 초기화 + 열기 + 검색카드 장착
     var set = function (fid, val) { var e = document.getElementById(fid); if (e && val) e.value = val; };
-    set('gk-defendant', c.defendant);
-    set('gk-casenum', c.caseNumber);
-    set('gk-casename', c.caseName);
-    set('gk-court', courtOf(c));
     var ff = (c._raw && c._raw.feeForm) || {};
-    if (ff.courtDiv) set('gk-courtdiv', ff.courtDiv);
-    if (ff.attorney) {
-      var sel = document.getElementById('gk-attorney');
-      if (sel) {
-        var has = false, i;
-        for (i = 0; i < sel.options.length; i++) { if (sel.options[i].value === ff.attorney) has = true; }
-        if (!has) { var o = document.createElement('option'); o.value = ff.attorney; o.textContent = ff.attorney; sel.appendChild(o); }
-        sel.value = ff.attorney;
-      }
-      if (ff.rrn) set('gk-rrn', ff.rrn);
-    }
+    set('gk-defendant', c.defendant);
+    set('gk-case', [c.caseNumber, c.caseName].filter(Boolean).join(' '));   // 사건 = 번호 + 명(한 칸)
+    set('gk-court', [courtOf(c), ff.courtDiv].filter(Boolean).join(' '));    // 법원 = 법원 + 재판부
+    if (ff.attorney && typeof renderAttChips === 'function') renderAttChips('gk', [ff.attorney]);  // 국선변호인 칩(단일 선택)
   };
   // 항소 선택(항소함/항소안함) — 같은 값 다시 누르면 해제(미정)
   window.gsmgrSetAppeal = function (el) {

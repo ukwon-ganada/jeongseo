@@ -56,6 +56,16 @@
   function esc(v) { return JU.esc(v); }
   function todayISO() { return JU.todayISO(); }
   function rrnFor(name) { return RRN_MAP[name] || ''; }
+  // 주민등록번호: 직원관리(LawyerStore) 우선, 없으면 아는 값(RRN_MAP). 입력폼엔 노출 안 함 → 서면에만 표시.
+  function juminOf(name) {
+    if (typeof window !== 'undefined' && window.LawyerStore && window.LawyerStore.juminOf) {
+      var j = window.LawyerStore.juminOf(name); if (j) return j;
+    }
+    return rrnFor(name);
+  }
+  // 사건 '번호 명' · 법원 '법원 재판부' 분리(다른 서면과 동일)
+  function splitCase(v) { v = String(v || '').trim(); var i = v.indexOf(' '); return i < 0 ? { casenum: v, casename: '' } : { casenum: v.slice(0, i).trim(), casename: v.slice(i + 1).trim() }; }
+  function splitCourt(v) { v = String(v || '').trim(); var i = v.lastIndexOf(' '); return i < 0 ? { court: v, courtDiv: '' } : { court: v.slice(0, i).trim(), courtDiv: v.slice(i + 1).trim() }; }
   function sealFor(name) {
     return (name === '서고은' && typeof SEAL_SEOGOEUN !== 'undefined') ? SEAL_SEOGOEUN : '';
   }
@@ -69,7 +79,7 @@
   var state = null;
   function defaultState() {
     var s = {
-      attorney: '서고은', rrn: rrnFor('서고은'),
+      attorney: '서고은', rrn: juminOf('서고은'),
       defendant: '', casenum: '', casename: '',
       court: COURT_DEFAULT, courtDiv: COURTDIV_DEFAULT,
       writeDate: todayISO(),
@@ -270,16 +280,13 @@
         '<div class="fs-body">' +
           '<div class="fs-section">사건 정보</div>' +
           '<div class="fs-field"><label class="fs-label">피고인</label><input type="text" class="fs-input" id="gk-defendant" data-af="l_client" placeholder="홍길동"></div>' +
-          '<div class="fs-field"><label class="fs-label">사건번호</label><input type="text" class="fs-input" id="gk-casenum" data-af="l_code" placeholder="2024고단1234"></div>' +
-          '<div class="fs-field"><label class="fs-label">사건명</label><input type="text" class="fs-input" id="gk-casename" data-af="l_name" placeholder="사기"></div>' +
-          '<div class="fs-field"><label class="fs-label">법원</label><input type="text" class="fs-input" id="gk-court" data-af="court" placeholder="인천지방법원"></div>' +
-          '<div class="fs-field"><label class="fs-label">재판부 <span class="fs-hint">(사건번호로 자동 조회)</span></label><input type="text" class="fs-input" id="gk-courtdiv" placeholder="형사7단독"></div>' +
+          '<div class="fs-field"><label class="fs-label">사건번호 · 사건명 <span class="fs-hint">(사건번호 한 칸 띄우고 사건명)</span></label><input type="text" class="fs-input" id="gk-case" placeholder="2024고단1234 사기"></div>' +
+          '<div class="fs-field"><label class="fs-label">법원 · 재판부 <span class="fs-hint">(사건번호로 재판부 자동)</span></label><input type="text" class="fs-input" id="gk-court" data-af="court" placeholder="인천지방법원 형사7단독"></div>' +
 
           '<div class="fs-section">신청인</div>' +
-          '<div class="fs-field"><label class="fs-label">국선변호인</label>' +
-            '<select class="fs-input" id="gk-attorney" onchange="gkAttorneyChanged()"></select>' +
+          '<div class="fs-field"><label class="fs-label">국선변호인 <span class="fs-hint">(주민등록번호는 직원관리에서 관리)</span></label>' +
+            '<div class="fs-chips att-chips" id="gk-att" onclick="gkAttClick(event)"></div>' +
           '</div>' +
-          '<div class="fs-field"><label class="fs-label">주민등록번호</label><input type="text" class="fs-input" id="gk-rrn" placeholder="000000-0000000"></div>' +
           '<div class="fs-field"><label class="fs-label">작성일 (오늘 자동)</label><input type="date" class="fs-input" id="gk-writedate"></div>' +
           '<div class="fs-field"><div class="fs-hint">증액 사유·실비·기타는 다음 화면(서면)에서 직접 체크·기재합니다.</div></div>' +
         '</div>' +
@@ -304,17 +311,6 @@
     document.body.appendChild(wrap);
   }
 
-  /* 변호사 select 채우기 */
-  function fillAttorneySelect(selected) {
-    var sel = document.getElementById('gk-attorney');
-    if (!sel) return;
-    var list = loadAttorneys();
-    if (selected && list.indexOf(selected) < 0) list = list.concat(selected);
-    sel.innerHTML = list.map(function (n) {
-      return '<option value="' + esc(n) + '"' + (n === selected ? ' selected' : '') + '>' + esc(n) + '</option>';
-    }).join('');
-  }
-
   /* ══════════════════════════════════════════════════════════════
      진입점 & 핸들러
      ══════════════════════════════════════════════════════════════ */
@@ -324,15 +320,11 @@
 
   // 입력폼을 state(사건정보·신청인)로 채운다
   function fillFormFromState() {
-    fillAttorneySelect(state.attorney || '서고은');
     setVal('gk-defendant', state.defendant);
-    setVal('gk-casenum', state.casenum);
-    setVal('gk-casename', state.casename);
-    setVal('gk-court', state.court || COURT_DEFAULT);
-    setVal('gk-courtdiv', state.courtDiv || COURTDIV_DEFAULT);
-    setVal('gk-rrn', state.rrn);
+    setVal('gk-case', [state.casenum, state.casename].filter(Boolean).join(' '));
+    setVal('gk-court', [state.court || COURT_DEFAULT, state.courtDiv || COURTDIV_DEFAULT].filter(Boolean).join(' '));
     setVal('gk-writedate', state.writeDate || todayISO());
-    setVal('gk-attorney-new', '');
+    if (typeof renderAttChips === 'function') renderAttChips('gk', [state.attorney || '서고은']);
   }
 
   function openForm() {
@@ -340,7 +332,7 @@
     fillFormFromState();
     document.getElementById('gukseonForm').classList.add('active');
     if (typeof initAutofillFor === 'function') {
-      initAutofillFor('gk-casenum', { courtDept: 'gk-courtdiv' });
+      initAutofillFor('gk-case', { caseCombine: 'gk-case', courtDept: 'gk-court', courtDeptAppend: true });
     }
   }
 
@@ -357,19 +349,13 @@
     if (window._gsmgrReturn) { window._gsmgrReturn = false; if (window.goCaseManager) window.goCaseManager(); }
   };
 
-  /* ── 신청인: 변호사 선택/추가 ── */
-  window.gkAttorneyChanged = function () {
-    var name = getVal('gk-attorney');
-    setVal('gk-rrn', rrnFor(name));   // 아는 변호사면 주민번호 자동, 아니면 비움
-  };
-  window.gkAddAttorney = function () {
-    var inp = document.getElementById('gk-attorney-new');
-    var name = inp ? inp.value.trim() : '';
-    if (!name) return;
-    saveAttorney(name);
-    fillAttorneySelect(name);
-    setVal('gk-rrn', rrnFor(name));
-    if (inp) inp.value = '';
+  /* ── 신청인: 국선변호인 칩(단일 선택, 다른 서면과 동일한 UI) ── */
+  window.gkAttClick = function (e) {
+    if (e.target.closest('.att-chip-del')) return;
+    var c = e.target.closest('.fs-chip'); if (!c) return;
+    var box = document.getElementById('gk-att'); if (!box) return;
+    box.querySelectorAll('.fs-chip').forEach(function (x) { x.classList.remove('on'); });
+    c.classList.add('on');   // 국선변호인은 1명 → 단일 선택
   };
 
   /* ── 서면 위 직접 조작 (체크·수량·복사·기타·도장) → state 갱신 ── */
@@ -412,14 +398,13 @@
   window.applyGukseonForm = function () {
     window._gsmgrReturn = false; // 완료는 서면으로 진행(국선 복귀 아님)
     if (!state) state = defaultState();
-    var name = getVal('gk-attorney') || '서고은';
+    var onChip = document.querySelector('#gk-att .fs-chip.on');
+    var name = (onChip && onChip.dataset.att) ? onChip.dataset.att : (state.attorney || '서고은');
     state.attorney = name;
-    state.rrn = getVal('gk-rrn');
+    state.rrn = juminOf(name);   // 주민번호는 직원관리(LawyerStore)에서 가져와 서면에만 표시
     state.defendant = getVal('gk-defendant');
-    state.casenum = getVal('gk-casenum');
-    state.casename = getVal('gk-casename');
-    state.court = getVal('gk-court');
-    state.courtDiv = getVal('gk-courtdiv');
+    var _cs = splitCase(getVal('gk-case')); state.casenum = _cs.casenum; state.casename = _cs.casename;
+    var _cd = splitCourt(getVal('gk-court')); state.court = _cd.court; state.courtDiv = _cd.courtDiv;
     state.writeDate = getVal('gk-writedate') || todayISO();
     if (!sealFor(state.attorney)) state.stamped = false;  // 직인 없는 변호사는 실물 날인
     document.getElementById('gk-host').innerHTML = renderGukseon(state);
