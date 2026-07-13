@@ -64,6 +64,8 @@
   }
   function buildPic(pxW, pxH, hoff, voff) {
     var oW = pxW * 75, oH = pxH * 75, half = Math.round(SEAL_HU / 2);
+    // 도장 실제 크기 = orgSz × scaMatrix. 원본 해상도와 무관하게 1.5cm(curSz)로 찍히도록 배율을 curSz/orgSz 로 준다.
+    var sx = (SEAL_HU / oW).toFixed(6), sy = (SEAL_HU / oH).toFixed(6);
     return '<hp:run charPrIDRef="0">' +
       '<hp:pic reverse="0" isBWModeOnly="0" id="1932510121" zOrder="20" numberingType="PICTURE" textWrap="IN_FRONT_OF_TEXT" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" href="" groupLevel="0" instid="1932510121">' +
       '<hp:offset x="0" y="0"/>' +
@@ -71,7 +73,7 @@
       '<hp:curSz width="' + SEAL_HU + '" height="' + SEAL_HU + '"/>' +
       '<hp:flip horizontal="0" vertical="0"/>' +
       '<hp:rotationInfo angle="0" centerX="' + half + '" centerY="' + half + '" rotateimage="1"/>' +
-      '<hp:renderingInfo><hc:transMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:scaMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:rotMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/></hp:renderingInfo>' +
+      '<hp:renderingInfo><hc:transMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:scaMatrix e1="' + sx + '" e2="0" e3="0" e4="0" e5="' + sy + '" e6="0"/><hc:rotMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/></hp:renderingInfo>' +
       '<hc:img binaryItemIDRef="image1" bright="0" contrast="0" effect="REAL_PIC" alpha="0"/>' +
       '<hp:imgRect><hc:pt0 x="0" y="0"/><hc:pt1 x="' + SEAL_HU + '" y="0"/><hc:pt2 x="' + SEAL_HU + '" y="' + SEAL_HU + '"/><hc:pt3 x="0" y="' + SEAL_HU + '"/></hp:imgRect>' +
       '<hp:imgClip left="0" right="' + oW + '" top="0" bottom="' + oH + '"/>' +
@@ -131,10 +133,12 @@
      타원 10×15mm, 템플릿 image1(서고은 직인) 옆에 image2 로 추가한다. */
   function nameSealRun(pxW, pxH, hoff, voff) {
     var oW = pxW * 75, oH = pxH * 75, W = 2835, H = 4252, id = ++_sealId;   // 10mm×15mm
+    // 실제 크기 = orgSz × scaMatrix. 원본 해상도와 무관하게 10×15mm(curSz)로 찍히도록 배율을 curSz/orgSz 로 준다.
+    var sx = (W / oW).toFixed(6), sy = (H / oH).toFixed(6);
     return '<hp:run charPrIDRef="0"><hp:pic id="' + id + '" zOrder="21" numberingType="PICTURE" textWrap="IN_FRONT_OF_TEXT" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" href="" groupLevel="0" instid="' + id + '" reverse="0">' +
       '<hp:offset x="0" y="0"/><hp:orgSz width="' + oW + '" height="' + oH + '"/><hp:curSz width="' + W + '" height="' + H + '"/>' +
       '<hp:flip horizontal="0" vertical="0"/><hp:rotationInfo angle="0" centerX="' + Math.round(W / 2) + '" centerY="' + Math.round(H / 2) + '" rotateimage="1"/>' +
-      '<hp:renderingInfo><hc:transMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:scaMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:rotMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/></hp:renderingInfo>' +
+      '<hp:renderingInfo><hc:transMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:scaMatrix e1="' + sx + '" e2="0" e3="0" e4="0" e5="' + sy + '" e6="0"/><hc:rotMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/></hp:renderingInfo>' +
       '<hc:img binaryItemIDRef="image2" bright="0" contrast="0" effect="REAL_PIC" alpha="0"/>' +
       '<hp:imgRect><hc:pt0 x="0" y="0"/><hc:pt1 x="' + W + '" y="0"/><hc:pt2 x="' + W + '" y="' + H + '"/><hc:pt3 x="0" y="' + H + '"/></hp:imgRect>' +
       '<hp:imgClip left="0" right="' + oW + '" top="0" bottom="' + oH + '"/><hp:inMargin left="0" right="0" top="0" bottom="0"/><hp:imgDim dimwidth="' + oW + '" dimheight="' + oH + '"/>' +
