@@ -214,6 +214,8 @@
       .then(function (arr) {
         var out = fillChamgo(arr[0], arr[1], cfg);
         var sec = out[0], hdr = out[1], mime = arr[2], hpf = arr[3], zip = arr[4], sealBin = null;
+        // 줄 레이아웃 캐시(linesegarray) 제거 — 원문 기준 좌표가 남으면 한글이 '손상/변조'로 차단. 한글이 열 때 재계산.
+        sec = sec.replace(/<hp:linesegarray>[\s\S]*?<\/hp:linesegarray>/g, '').replace(/<hp:linesegarray\s*\/>/g, '');
         if (wantSeal) {
           var u8 = dataUrlToU8(window.SEAL_SEOGOEUN), wh = pngSize(u8);
           var sec2 = injectSealPic(sec, buildPic(wh[0], wh[1]));
