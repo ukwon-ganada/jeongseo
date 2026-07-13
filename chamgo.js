@@ -140,21 +140,21 @@
   function buildPic(pxW, pxH) {
     var oW = pxW * 75, oH = pxH * 75, half = Math.round(SEAL_HU / 2);
     // 도장 실제 크기 = orgSz × scaMatrix. 원본 해상도와 무관하게 1.5cm(curSz)로 찍히도록 배율을 curSz/orgSz 로 준다.
-    var sx = (SEAL_HU / oW).toFixed(6), sy = (SEAL_HU / oH).toFixed(6);
+    var cW = SEAL_HU, cH = Math.round(SEAL_HU * pxH / pxW);   // 너비 1.5cm, 높이는 원본 비율 유지
+    var sx = (cW / oW).toFixed(6), sy = (cH / oH).toFixed(6); // 배율 = 표시/원본
     return '<hp:run charPrIDRef="0">' +
       '<hp:pic reverse="0" isBWModeOnly="0" id="1932510122" zOrder="20" numberingType="PICTURE" textWrap="IN_FRONT_OF_TEXT" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" href="" groupLevel="0" instid="1932510122">' +
       '<hp:offset x="0" y="0"/>' +
       '<hp:orgSz width="' + oW + '" height="' + oH + '"/>' +
-      '<hp:curSz width="' + SEAL_HU + '" height="' + SEAL_HU + '"/>' +
+      '<hp:curSz width="' + cW + '" height="' + cH + '"/>' +
       '<hp:flip horizontal="0" vertical="0"/>' +
-      '<hp:rotationInfo angle="0" centerX="' + half + '" centerY="' + half + '" rotateimage="1"/>' +
+      '<hp:rotationInfo angle="0"/>' +
       '<hp:renderingInfo><hc:transMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:scaMatrix e1="' + sx + '" e2="0" e3="0" e4="0" e5="' + sy + '" e6="0"/><hc:rotMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/></hp:renderingInfo>' +
       '<hc:img binaryItemIDRef="image1" bright="0" contrast="0" effect="REAL_PIC" alpha="0"/>' +
-      '<hp:imgRect><hc:pt0 x="0" y="0"/><hc:pt1 x="' + SEAL_HU + '" y="0"/><hc:pt2 x="' + SEAL_HU + '" y="' + SEAL_HU + '"/><hc:pt3 x="0" y="' + SEAL_HU + '"/></hp:imgRect>' +
+      '<hp:imgRect><hc:pt0 x="0" y="0"/><hc:pt1 x="' + oW + '" y="0"/><hc:pt2 x="' + oW + '" y="' + oH + '"/><hc:pt3 x="0" y="' + oH + '"/></hp:imgRect>' +
       '<hp:imgClip left="0" right="' + oW + '" top="0" bottom="' + oH + '"/>' +
       '<hp:inMargin left="0" right="0" top="0" bottom="0"/>' +
-      '<hp:imgDim dimwidth="' + oW + '" dimheight="' + oH + '"/>' +
-      '<hp:sz width="' + SEAL_HU + '" widthRelTo="ABSOLUTE" height="' + SEAL_HU + '" heightRelTo="ABSOLUTE" protect="0"/>' +
+      '<hp:sz width="' + cW + '" widthRelTo="ABSOLUTE" height="' + cH + '" heightRelTo="ABSOLUTE" protect="0"/>' +
       '<hp:pos treatAsChar="0" affectLSpacing="0" flowWithText="0" allowOverlap="1" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="RIGHT" vertOffset="' + SEAL_VOFF + '" horzOffset="' + SEAL_HOFF + '"/>' +
       '<hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:shapeComment/></hp:pic></hp:run>';
   }
