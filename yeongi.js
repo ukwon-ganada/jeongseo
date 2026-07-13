@@ -399,6 +399,8 @@
           out = fillCriminal(sec, hdr, cfg);
         }
         sec = out[0]; hdr = out[1];
+        // 줄 레이아웃 캐시(linesegarray) 제거 — 원문 기준 좌표가 남으면 한글이 '손상/변조'로 차단. 한글이 열 때 재계산.
+        sec = sec.replace(/<hp:linesegarray>[\s\S]*?<\/hp:linesegarray>/g, '').replace(/<hp:linesegarray\s*\/>/g, '');
         var sealBin = null;
         if (wantSeal) {
           var u8 = dataUrlToU8(window.SEAL_SEOGOEUN), wh = pngSize(u8);
