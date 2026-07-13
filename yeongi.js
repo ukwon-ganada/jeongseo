@@ -311,6 +311,8 @@
   }
   function buildPic(pxW, pxH) {
     var oW = pxW * 75, oH = pxH * 75, half = Math.round(SEAL_HU / 2); // 96DPI: px×75 = HWPUNIT
+    // 도장 실제 크기 = orgSz × scaMatrix. 원본 해상도와 무관하게 1.5cm(curSz)로 찍히도록 배율을 curSz/orgSz 로 준다.
+    var sx = (SEAL_HU / oW).toFixed(6), sy = (SEAL_HU / oH).toFixed(6);
     return '<hp:run charPrIDRef="0">' +
       '<hp:pic reverse="0" isBWModeOnly="0" id="1932510121" zOrder="20" numberingType="PICTURE" textWrap="IN_FRONT_OF_TEXT" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" href="" groupLevel="0" instid="1932510121">' +
       '<hp:offset x="0" y="0"/>' +
@@ -318,7 +320,7 @@
       '<hp:curSz width="' + SEAL_HU + '" height="' + SEAL_HU + '"/>' +
       '<hp:flip horizontal="0" vertical="0"/>' +
       '<hp:rotationInfo angle="0" centerX="' + half + '" centerY="' + half + '" rotateimage="1"/>' +
-      '<hp:renderingInfo><hc:transMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:scaMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:rotMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/></hp:renderingInfo>' +
+      '<hp:renderingInfo><hc:transMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:scaMatrix e1="' + sx + '" e2="0" e3="0" e4="0" e5="' + sy + '" e6="0"/><hc:rotMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/></hp:renderingInfo>' +
       '<hc:img binaryItemIDRef="image1" bright="0" contrast="0" effect="REAL_PIC" alpha="0"/>' +
       '<hp:imgRect><hc:pt0 x="0" y="0"/><hc:pt1 x="' + SEAL_HU + '" y="0"/><hc:pt2 x="' + SEAL_HU + '" y="' + SEAL_HU + '"/><hc:pt3 x="0" y="' + SEAL_HU + '"/></hp:imgRect>' +
       '<hp:imgClip left="0" right="' + oW + '" top="0" bottom="' + oH + '"/>' +
