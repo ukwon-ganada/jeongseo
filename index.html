@@ -4479,13 +4479,24 @@ if ('serviceWorker' in navigator) {
     function isSafeToReload() {
       var a = document.querySelector('.screen.active');
       if (!a || a.id !== 'screen-home') return false;              // 홈이 아니면 대기
-      if (document.querySelector('.overlay.active,.sl-overlay.active,.terms-overlay.active')) return false;
-      var busy = ['pankyulForm','seonimForm','mgForm','gsmgrScreen',
+      if (document.querySelector('.overlay.active,.sl-overlay.active,.terms-overlay.active,.modal-overlay.active')) return false;
+      var ae = document.activeElement;                             // 입력칸 작성 중이면 대기
+      if (ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) return false;
+      // 홈 위에 뜨는 전체화면 폼/시트가 열려 있으면 대기.
+      // (예전엔 이 목록에서 yeongi/hangso/chamgo/gukseon/yeollam 폼이 빠져 있어, 그 카드로 들어가면 홈으로 튕겼음)
+      var busy = ['pankyulForm','yeongiForm','hangsoForm','chamgoForm','gukseonForm','yeollamForm',
+                  'seonimForm','mgForm','gsmgrScreen','gsmgr-drawer','gsmgr-add','lawyerAdmin','lockScreen',
                   'historySheet','seonimTypeSheet','typeSheet','actionSheet','moreSheet','signLinkSheet'];
       for (var i = 0; i < busy.length; i++) {
         var el = document.getElementById(busy[i]);
         if (el && el.classList.contains('active')) return false;   // 열린 시트/폼 있으면 대기
       }
+      // 열거 누락 대비 일반 감지: 화면 중앙을 '홈이 아닌' 요소가 덮고 있으면(폼/오버레이가 위에 있으면) 대기.
+      try {
+        var home = document.getElementById('screen-home');
+        var mid = document.elementFromPoint((window.innerWidth || 0) / 2, (window.innerHeight || 0) / 2);
+        if (home && mid && !home.contains(mid)) return false;
+      } catch (e) { return false; }                                // 판단 불가 시 안전하게 대기
       return true;
     }
     window._swMaybeReload = function () {
