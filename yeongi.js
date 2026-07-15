@@ -134,39 +134,37 @@
     return hdr.replace(re, function (blk) { return blk.replace(/(<hc:intent value=")-?\d+(")/, '$1' + val + '$2'); });
   }
 
-  // ── 형사 ──
+  // ── 형사 (표준양식: 희망기일 P[8] 내장, 첨부서류 없음) ──
+  //  P: 0 제목 · 2 사건 · 3 피고인 · 6 사유 · 8 희망기일 · 9~12 여백 · 13 작성일(DATE필드)
+  //     14 위 피고인의 변호인 · 15 법무법인 정서(국선이면 생략) · 16 담당변호사 · 17 법원 귀중
   function fillCriminal(sec, hdr, c) {
     var P = splitParas(sec), head = headOf(sec, P), tail = tailOf(sec);
     var plural = c.parties.length > 1, gukseon = !!c.gukseon;
     var role = c.role || '피고인', label = ROLE_LABEL[role] || role;
     var title = (c.titleKind || '') + '기일' + (c.titleAction || '변경') + '신청서';
     var p0 = P[0].replace(/<hp:t>[\s\S]*?기일[\s\S]*?신청서<\/hp:t>/, '<hp:t>' + xmlEsc(title) + '</hp:t>');
-    var pCase = setT(P[2], '사    건  ' + c.caseLine);
-    var pParty = setT(P[3], label + '  ' + c.parties.join(', '));
+    // 사건/피고인 행은 라벨(run0) + 값(run1) 2개 run 구조 → 값 run만 치환(옛 값 잔존 방지)
+    var pCase = setNthT(setNthT(P[2], 0, '사    건'), 1, '  ' + c.caseLine);
+    var pParty = setNthT(setNthT(P[3], 0, label), 1, '  ' + c.parties.join(', '));
     var pReason = setT(P[6], c.reason);
-    var pDate = setT(P[12], c.date);
+    // 희망기일: 민사와 동일하게 입력 시 출력, 없으면 빈 줄(템플릿 예시값 제거)
+    var pWish = setT(P[8], c.wish ? '※희망기일 – ' + c.wish : '');
+    // 작성일: DATE 자동필드를 정적 텍스트로 고정(한글이 시스템 날짜로 덮어쓰지 않도록 필드 ctrl 제거)
+    var pDate = setT(P[13], c.date).replace(/<hp:ctrl>[\s\S]*?<\/hp:ctrl>/g, '');
     var sig = '  위 ' + role + (plural ? '들' : '') + '의 ' + (gukseon ? '국선변호인' : '변호인');
-    var pSig = setT(P[13], sig);
+    var pSig = setT(P[14], sig);
     var pCourt = setT(P[17], c.court + ' 귀중');
     var lw = c.lawyers;
-    var pLaw = setRun9(P[15], '담당변호사 ' + lw[0]);
+    // 담당변호사 이름은 P[16]의 두 번째 hp:t(정렬 공백 run 뒤). setNthT로 그 부분만 치환.
+    var pLaw = setNthT(P[16], 1, '담당변호사 ' + lw[0]);
     var extra = [];
-    for (var i = 1; i < lw.length; i++) extra.push(setRun9(P[15], '　　　　　 ' + lw[i]));
+    for (var i = 1; i < lw.length; i++) extra.push(setNthT(P[16], 1, '　　　　　 ' + lw[i]));
 
-    var pWish = c.wish ? setT(P[6], ' ※희망기일- ' + c.wish) : null;
-    var out = [p0, P[1], pCase, pParty, P[4], P[5], pReason];
-    if (pWish) out.push(pWish);
-    out.push(P[7]);
-    var attach = c.attachments || [];
-    if (attach.length) {
-      out.push(setT(P[8], '첨 부 서 류'));
-      for (var j = 0; j < attach.length; j++) out.push(setT(P[9], (j + 1) + '. ' + attach[j]));
-      out.push(P[11]);
-    }
-    out.push(pDate); out.push(pSig);
-    if (!gukseon) out.push(P[14]);
+    var out = [p0, P[1], pCase, pParty, P[4], P[5], pReason, P[7], pWish,
+               P[9], P[10], P[11], P[12], pDate, pSig];
+    if (!gukseon) out.push(P[15]);        // '법무법인 정서' — 국선변호인은 생략
     out.push(pLaw); out = out.concat(extra);
-    out.push(P[16]); out.push(pCourt);
+    out.push(pCourt);
 
     var bodyPpr = (P[6].match(/paraPrIDRef="(\d+)"/) || [])[1];
     hdr = fixIntent(hdr, bodyPpr, 1321);
