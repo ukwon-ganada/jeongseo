@@ -160,9 +160,18 @@
     var extra = [];
     for (var i = 1; i < lw.length; i++) extra.push(setNthT(P[16], 1, '　　　　　 ' + lw[i]));
 
-    var out = [p0, P[1], pCase, pParty, P[4], P[5], pReason, P[7], pWish,
-               P[9], P[10], P[11], P[12], pDate, pSig];
-    if (!gukseon) out.push(P[15]);        // '법무법인 정서' — 국선변호인은 생략
+    var out = [p0, P[1], pCase, pParty, P[4], P[5], pReason, P[7], pWish];
+    // 첨부서류: 표준양식엔 칸이 없어 P[8](본문 줄 스타일)을 복제해 생성. 순서는 민사와 동일(희망기일→첨부→날짜).
+    var attach = c.attachments || [];
+    if (attach.length) {
+      out.push(setT(P[8], '첨 부 서 류'));
+      for (var j = 0; j < attach.length; j++) out.push(setT(P[8], (j + 1) + '. ' + attach[j]));
+      out.push(P[9], P[10]);               // 서명 앞 여백 2줄
+    } else {
+      out.push(P[9], P[10], P[11], P[12]); // 여백 4줄
+    }
+    out.push(pDate, pSig);
+    if (!gukseon) out.push(P[15]);         // '법무법인 정서' — 국선변호인은 생략
     out.push(pLaw); out = out.concat(extra);
     out.push(pCourt);
 
