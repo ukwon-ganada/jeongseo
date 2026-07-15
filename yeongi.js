@@ -134,9 +134,9 @@
     return hdr.replace(re, function (blk) { return blk.replace(/(<hc:intent value=")-?\d+(")/, '$1' + val + '$2'); });
   }
 
-  // ── 형사 (표준양식: 희망기일 P[8] 내장, 첨부서류 없음) ──
-  //  P: 0 제목 · 2 사건 · 3 피고인 · 6 사유 · 8 희망기일 · 9~12 여백 · 13 작성일(DATE필드)
-  //     14 위 피고인의 변호인 · 15 법무법인 정서(국선이면 생략) · 16 담당변호사 · 17 법원 귀중
+  // ── 형사 (표준양식: 희망기일 P[8]·첨부서류 P[11~12] 내장, 도장은 기존 동적 삽입 사용) ──
+  //  P: 0 제목 · 2 사건 · 3 피고인 · 6 사유 · 8 희망기일 · 9~10 여백 · 11 첨부라벨 · 12 첨부항목
+  //     15 작성일 · 16 위 피고인의 변호인 · 17 법무법인 정서(국선이면 생략) · 18 담당변호사 · 19 법원 귀중
   function fillCriminal(sec, hdr, c) {
     var P = splitParas(sec), head = headOf(sec, P), tail = tailOf(sec);
     var plural = c.parties.length > 1, gukseon = !!c.gukseon;
@@ -147,31 +147,29 @@
     var pCase = setNthT(setNthT(P[2], 0, '사    건'), 1, '  ' + c.caseLine);
     var pParty = setNthT(setNthT(P[3], 0, label), 1, '  ' + c.parties.join(', '));
     var pReason = setT(P[6], c.reason);
-    // 희망기일: 민사와 동일하게 입력 시 출력, 없으면 빈 줄(템플릿 예시값 제거)
-    var pWish = setT(P[8], c.wish ? '※희망기일 – ' + c.wish : '');
-    // 작성일: DATE 자동필드를 정적 텍스트로 고정(한글이 시스템 날짜로 덮어쓰지 않도록 필드 ctrl 제거)
-    var pDate = setT(P[13], c.date).replace(/<hp:ctrl>[\s\S]*?<\/hp:ctrl>/g, '');
+    // 희망기일: '※희망기일'(run0) + ' – 값'(run1). 입력 시 값 run만 치환, 없으면 두 run 모두 비움.
+    var pWish = c.wish ? setNthT(P[8], 1, ' – ' + c.wish) : setNthT(setNthT(P[8], 0, ''), 1, '');
+    var pDate = setT(P[15], c.date);
     var sig = '  위 ' + role + (plural ? '들' : '') + '의 ' + (gukseon ? '국선변호인' : '변호인');
-    var pSig = setT(P[14], sig);
-    var pCourt = setT(P[17], c.court + ' 귀중');
+    var pSig = setT(P[16], sig);
+    var pCourt = setT(P[19], c.court + ' 귀중');
     var lw = c.lawyers;
-    // 담당변호사 이름은 P[16]의 두 번째 hp:t(정렬 공백 run 뒤). setNthT로 그 부분만 치환.
-    var pLaw = setNthT(P[16], 1, '담당변호사 ' + lw[0]);
+    // 담당변호사 이름은 P[18]의 두 번째 hp:t(정렬 공백 run 뒤). setNthT로 그 부분만 치환.
+    var pLaw = setNthT(P[18], 1, '담당변호사 ' + lw[0]);
     var extra = [];
-    for (var i = 1; i < lw.length; i++) extra.push(setNthT(P[16], 1, '　　　　　 ' + lw[i]));
+    for (var i = 1; i < lw.length; i++) extra.push(setNthT(P[18], 1, '　　　　　 ' + lw[i]));
 
-    var out = [p0, P[1], pCase, pParty, P[4], P[5], pReason, P[7], pWish];
-    // 첨부서류: 표준양식엔 칸이 없어 P[8](본문 줄 스타일)을 복제해 생성. 순서는 민사와 동일(희망기일→첨부→날짜).
+    var out = [p0, P[1], pCase, pParty, P[4], P[5], pReason, P[7], pWish, P[9], P[10]];
+    // 첨부서류(P[11] 라벨 + P[12] 항목 내장). 첨부 있으면 항목 채우고, 없으면 라벨·항목 모두 빈 줄.
     var attach = c.attachments || [];
     if (attach.length) {
-      out.push(setT(P[8], '첨 부 서 류'));
-      for (var j = 0; j < attach.length; j++) out.push(setT(P[8], (j + 1) + '. ' + attach[j]));
-      out.push(P[9], P[10]);               // 서명 앞 여백 2줄
+      out.push(P[11]);
+      for (var j = 0; j < attach.length; j++) out.push(setT(P[12], (j + 1) + '. ' + attach[j]));
     } else {
-      out.push(P[9], P[10], P[11], P[12]); // 여백 4줄
+      out.push(setT(P[11], ''), setT(P[12], ''));
     }
-    out.push(pDate, pSig);
-    if (!gukseon) out.push(P[15]);         // '법무법인 정서' — 국선변호인은 생략
+    out.push(P[13], P[14], pDate, pSig);
+    if (!gukseon) out.push(P[17]);         // '법무법인 정서' — 국선변호인은 생략
     out.push(pLaw); out = out.concat(extra);
     out.push(pCourt);
 
