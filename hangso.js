@@ -104,6 +104,15 @@
     var re = new RegExp('<hp:p\\b[^>]*>(?:(?!</hp:p>)[\\s\\S])*?' + reEsc(text) + '[\\s\\S]*?</hp:p>');
     ctx.section = ctx.section.replace(re, '');
   }
+  // 표(hp:tbl)를 감싼 문단을 통째로 제거 — 표는 한 문단 안에 들어있고, 셀 내부 문단들도 함께 사라짐.
+  function dropTable(ctx) {
+    var s = ctx.section, i = s.indexOf('<hp:tbl');
+    if (i < 0) return;
+    var ps = s.lastIndexOf('<hp:p ', i); if (ps < 0) return;
+    var te = s.indexOf('</hp:tbl>', i); if (te < 0) return; te += '</hp:tbl>'.length;
+    var pe = s.indexOf('</hp:p>', te); if (pe < 0) return; pe += '</hp:p>'.length;
+    ctx.section = s.slice(0, ps) + s.slice(pe);
+  }
   function uncheckBox(ctx, name) {
     var re = new RegExp('■((?:(?!■)[\\s\\S])*?' + reEsc(name) + ')');
     ctx.section = ctx.section.replace(re, '□$1');
@@ -153,7 +162,11 @@
     ctx.replace('2025고단4209', c.casenum || '').replace('사기', c.casename || '')
        .replace('함 석 훈', spaced(c.defendant)).replace('2026. 7. 9.', c.sentDate || '')
        .replace('2026. 7. 10.', c.writeDate || '').replace('인천지방법원', c.court || '').replace('형사7단독', c.courtDiv || '');
-    REASONS.forEach(function (r) { if (c.reasons.indexOf(r) < 0) uncheckBox(ctx, r); });
+    if (c.reasons.length) {
+      REASONS.forEach(function (r) { if (c.reasons.indexOf(r) < 0) uncheckBox(ctx, r); });
+    } else {
+      dropTable(ctx);            // 항소이유를 하나도 선택하지 않으면 표(항소이유란) 자체를 제거
+    }
     ctx.replace('(국선)변호인', c.gukseon ? '국선변호인' : '변호인');
     if (c.gukseon) dropPara(ctx, '법무법인 정서');
     if (c.attorney !== '서고은') ctx.replace('서 고 은', spaced(c.attorney));
@@ -360,7 +373,7 @@
               '<div class="fs-field"><label class="fs-label">작성일 <span class="fs-hint">(오늘)</span></label><input type="date" class="fs-input" id="hs-writedate"></div></div>' +
 
             // 형사 항소이유 / 상고 원심결과
-            '<div class="fs-section hs-hyeongsa hs-hangso">항소이유 <span class="fs-hint">(선택 = ■ 표시)</span></div>' +
+            '<div class="fs-section hs-hyeongsa hs-hangso">항소이유 <span class="fs-hint">(선택 = ■ 표시 · 모두 미선택 시 항소이유란 생략)</span></div>' +
             '<div class="hs-pick hs-hyeongsa hs-hangso"><div class="fs-chips" id="hs-reasons" style="flex:1">' + reasonChips + '</div></div>' +
             '<div class="fs-field hs-hyeongsa hs-sanggo"><label class="fs-label">원심 결과</label><input type="text" class="fs-input" id="hs-result" value="항소기각" placeholder="항소기각"></div>' +
 
