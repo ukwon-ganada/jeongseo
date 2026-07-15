@@ -153,7 +153,10 @@
     var extra = [];
     for (var i = 1; i < lw.length; i++) extra.push(setRun9(P[15], '　　　　　 ' + lw[i]));
 
-    var out = [p0, P[1], pCase, pParty, P[4], P[5], pReason, P[7]];
+    var pWish = c.wish ? setT(P[6], ' ※희망기일- ' + c.wish) : null;
+    var out = [p0, P[1], pCase, pParty, P[4], P[5], pReason];
+    if (pWish) out.push(pWish);
+    out.push(P[7]);
     var attach = c.attachments || [];
     if (attach.length) {
       out.push(setT(P[8], '첨 부 서 류'));
