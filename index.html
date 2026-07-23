@@ -1283,6 +1283,7 @@
       <div class="fs-chip on" data-ptype="wongo">원고 · 피고</div>
       <div class="fs-chip" data-ptype="sincheong">신청인 · 피신청인</div>
       <div class="fs-chip" data-ptype="chaegwon">채권자 · 채무자</div>
+      <div class="fs-chip" data-ptype="hanggo">항고인 · 상대방</div>
     </div></div>
 
     <div class="fs-section">우리 측(의뢰인) 지위</div>
@@ -4058,7 +4059,8 @@ function renderSeonim(){
 var MG_PARTY_TYPES={
   wongo:    {front:'원고',   back:'피고',    hasThird:false},
   sincheong:{front:'신청인', back:'피신청인', hasThird:true},
-  chaegwon: {front:'채권자', back:'채무자',  hasThird:true}
+  chaegwon: {front:'채권자', back:'채무자',  hasThird:true},
+  hanggo:   {front:'항고인', back:'상대방',  hasThird:true}
 };
 
 function closeMgForm(){document.getElementById('mgForm').classList.remove('active');}
@@ -4070,7 +4072,7 @@ function updateMgOppLabel(){
   var on=document.querySelector('#mg-role .fs-chip.on');
   var role=on?on.dataset.role:def.front;
   var oppLabel=(role===def.front)?def.back:def.front;
-  var sec=document.getElementById('mg-opp-section'); if(sec)sec.textContent='상대방('+oppLabel+')';
+  var sec=document.getElementById('mg-opp-section'); if(sec)sec.textContent=(oppLabel==='상대방')?'상대방':'상대방('+oppLabel+')';
 }
 
 /* 당사자 유형 변경 시: 우리측 지위 칩 라벨·제3자 섹션 갱신 */
