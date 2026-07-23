@@ -777,7 +777,6 @@ body.print-emulate td.js-case-edit{background:transparent!important;box-shadow:n
   .sj-appbar .sj-back{margin-right:auto;}
 }
 .sj-gy-btn{border:none;background:var(--danger);color:#fff;height:38px;padding:0 16px;border-radius:var(--r-pill);font-size:14px;font-weight:600;cursor:pointer;margin-left:8px;;background:#fff;color:var(--black);border:1px solid var(--black);}
-.sj-hwp-btn{height:38px;padding:0 16px;border-radius:var(--r-pill);font-size:14px;font-weight:600;cursor:pointer;margin-left:8px;background:#0b57d0;color:#fff;border:1px solid #0b57d0;}
 .sj-wrap{padding:24px;display:flex;justify-content:center;align-items:flex-start;overflow:auto;}
 .sj-page{background:#fff;box-shadow:0 4px 24px rgba(0,0,0,.12);width:210mm;min-height:297mm;padding:20mm 19.5mm 15mm 19.4mm;box-sizing:border-box;}
 #sj-host{transform-origin:top center;}

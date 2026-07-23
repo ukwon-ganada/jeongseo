@@ -173,50 +173,6 @@
     if (s.indexOf('</odf:manifest>') >= 0) return s.replace('</odf:manifest>', entry + '</odf:manifest>');
     return s.replace(/<odf:manifest([^>]*)\/>/, '<odf:manifest$1>' + entry + '</odf:manifest>');
   }
-
-  /* ── 다중 막도장(image2, image3, …) — 위임인마다 각자 이름 도장(민가사 소송위임장) ──
-     imgRef 를 파라미터화한 것 외에는 nameSealRun/addNameSeal/injectBinData2 와 동일 규칙 */
-  function nameSealRunId(imgRef, pxW, pxH, hoff, voff) {
-    var oW = pxW * 75, oH = pxH * 75, W = 2835, H = 4252, id = ++_sealId;   // 10mm×15mm
-    var sx = (W / oW).toFixed(6), sy = (H / oH).toFixed(6);
-    return '<hp:run charPrIDRef="0"><hp:pic id="' + id + '" zOrder="21" numberingType="PICTURE" textWrap="IN_FRONT_OF_TEXT" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" href="" groupLevel="0" instid="' + id + '" reverse="0">' +
-      '<hp:offset x="0" y="0"/><hp:orgSz width="' + oW + '" height="' + oH + '"/><hp:curSz width="' + W + '" height="' + H + '"/>' +
-      '<hp:flip horizontal="0" vertical="0"/><hp:rotationInfo angle="0"/>' +
-      '<hp:renderingInfo><hc:transMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:scaMatrix e1="' + sx + '" e2="0" e3="0" e4="0" e5="' + sy + '" e6="0"/><hc:rotMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/></hp:renderingInfo>' +
-      '<hc:img binaryItemIDRef="' + imgRef + '" bright="0" contrast="0" effect="REAL_PIC" alpha="0"/>' +
-      '<hp:imgRect><hc:pt0 x="0" y="0"/><hc:pt1 x="' + oW + '" y="0"/><hc:pt2 x="' + oW + '" y="' + oH + '"/><hc:pt3 x="0" y="' + oH + '"/></hp:imgRect>' +
-      '<hp:imgClip left="0" right="' + oW + '" top="0" bottom="' + oH + '"/><hp:inMargin left="0" right="0" top="0" bottom="0"/>' +
-      '<hp:sz width="' + W + '" widthRelTo="ABSOLUTE" height="' + H + '" heightRelTo="ABSOLUTE" protect="0"/>' +
-      '<hp:pos treatAsChar="0" affectLSpacing="0" flowWithText="0" allowOverlap="1" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" vertOffset="' + voff + '" horzOffset="' + hoff + '"/>' +
-      '<hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:shapeComment/></hp:pic></hp:run>';
-  }
-  function addNameSealId(sec, imgRef, anchor, hoff, voff, wh) {
-    var paras = sec.match(PARA_RE) || [], want = normalize(anchor), run = nameSealRunId(imgRef, wh[0], wh[1], hoff, voff);
-    for (var i = 0; i < paras.length; i++) {
-      if (want && normalize(paras[i]).indexOf(want) >= 0) return sec.replace(paras[i], paras[i].replace(/^(<hp:p\b[^>]*>)/, '$1' + run));
-    }
-    return sec;
-  }
-  function injectBinDataId(hdr, id) {
-    if (new RegExp('<hh:binData\\b[^>]*id="' + id + '"').test(hdr)) return hdr;
-    if (hdr.indexOf('<hh:binDataList') >= 0) {
-      return hdr.replace(/<hh:binDataList itemCnt="(\d+)">([\s\S]*?)<\/hh:binDataList>/, function (m, cnt, inner) {
-        return '<hh:binDataList itemCnt="' + (parseInt(cnt, 10) + 1) + '">' + inner + '<hh:binData id="' + id + '" type="EMBEDDING"/></hh:binDataList>';
-      });
-    }
-    return hdr.replace('<hh:refList>', '<hh:refList><hh:binDataList itemCnt="1"><hh:binData id="' + id + '" type="EMBEDDING"/></hh:binDataList>');
-  }
-  function injectHpfManifestId(hpf, id) {
-    if (hpf.indexOf('BinData/image' + id + '.png') >= 0) return hpf;
-    return hpf.replace('<opf:manifest>', '<opf:manifest><opf:item id="image' + id + '" href="BinData/image' + id + '.png" media-type="image/png" isEmbeded="1"/>');
-  }
-  function injectOdfManifestId(s, id) {
-    if (s.indexOf('BinData/image' + id + '.png') >= 0) return s;
-    var entry = '<odf:file-entry odf:full-path="BinData/image' + id + '.png" odf:media-type="image/png"/>';
-    if (s.indexOf('</odf:manifest>') >= 0) return s.replace('</odf:manifest>', entry + '</odf:manifest>');
-    return s.replace(/<odf:manifest([^>]*)\/>/, '<odf:manifest$1>' + entry + '</odf:manifest>');
-  }
-
   function injectHpfManifest(hpf) {
     if (hpf.indexOf('BinData/image1.png') >= 0) return hpf;
     return hpf.replace('<opf:manifest>', '<opf:manifest><opf:item id="image1" href="BinData/image1.png" media-type="image/png" isEmbeded="1"/>');
@@ -242,7 +198,7 @@
           zip.file('Contents/section0.xml').async('string'),
           zip.file('Contents/header.xml').async('string'),
           zip.file('mimetype').async('uint8array'),
-          (wantSeal || (opts.nameSeal && opts.nameSeal.dataUrl) || (opts.nameSeals && opts.nameSeals.length) || (opts.embedImages && opts.embedImages.length)) ? zip.file('Contents/content.hpf').async('string') : Promise.resolve(null),
+          (wantSeal || (opts.nameSeal && opts.nameSeal.dataUrl)) ? zip.file('Contents/content.hpf').async('string') : Promise.resolve(null),
           zip
         ]);
       })
@@ -260,8 +216,6 @@
         opts.fill(ctx);
 
         var sec = ctx.section, hdr = arr[1], mime = arr[2], hpf = arr[3], zip = arr[4], sealBin = null, nameBin = null;
-        // header.xml 후처리(문단모양 등 주입) — 민가사가 좌측정렬 컴팩트 paraPr 추가에 사용
-        if (typeof opts.onHeader === 'function') { var h2 = opts.onHeader(hdr); if (h2) hdr = h2; }
         // ① 서고은 직인(image1) 코드 삽입 경로(sealDataUrl 넘긴 경우 — 항소/상고 등)
         if (wantSeal) {
           var u8 = dataUrlToU8(opts.sealDataUrl), wh = pngSize(u8);
@@ -274,36 +228,16 @@
           var sec3 = addNameSeal(sec, ns.anchor, nso.h == null ? 2835 : nso.h, nso.v == null ? -2200 : nso.v, nswh);
           if (sec3 !== sec) { sec = sec3; hdr = injectBinData2(hdr); hpf = injectHpfManifest2(hpf); nameBin = nsu8; }
         }
-        // ③ 다중 막도장(image2, image3, …) — 민가사 소송위임장 위임인별 도장
-        var nameBins = [];
-        // ③' 인라인 삽입 이미지: 섹션에 pic run 이 이미 들어있고 바이너리/매니페스트만 등록
-        if (opts.embedImages && opts.embedImages.length) {
-          opts.embedImages.forEach(function (im) {
-            if (!im || !im.dataUrl || im.id == null) return;
-            hdr = injectBinDataId(hdr, im.id); hpf = injectHpfManifestId(hpf, im.id);
-            nameBins.push({ id: im.id, u8: dataUrlToU8(im.dataUrl) });
-          });
-        }
-        if (opts.nameSeals && opts.nameSeals.length) {
-          opts.nameSeals.forEach(function (nsi, idx) {
-            if (!nsi || !nsi.dataUrl) return;
-            var id = 2 + idx, ref = 'image' + id;
-            var u8 = dataUrlToU8(nsi.dataUrl), wh = nsi.wh || pngSize(u8), o = nsi.off || {};
-            var secN = addNameSealId(sec, ref, nsi.anchor, o.h == null ? 1000 : o.h, o.v == null ? -1100 : o.v, wh);
-            if (secN !== sec) { sec = secN; hdr = injectBinDataId(hdr, id); hpf = injectHpfManifestId(hpf, id); nameBins.push({ id: id, u8: u8 }); }
-          });
-        }
         var zo = new Zip();
         zo.file('mimetype', mime, { compression: 'STORE' });
         var names = Object.keys(zip.files).filter(function (n) { return n !== 'mimetype' && !zip.files[n].dir; });
         return Promise.all(names.map(function (n) {
           if (n === 'Contents/section0.xml') return Promise.resolve([n, sec]);
           if (n === 'Contents/header.xml') return Promise.resolve([n, hdr]);
-          if (n === 'Contents/content.hpf' && (sealBin || nameBin || nameBins.length)) return Promise.resolve([n, hpf]);
-          if (n === 'META-INF/manifest.xml' && (sealBin || nameBin || nameBins.length)) return zip.file(n).async('string').then(function (s) {
+          if (n === 'Contents/content.hpf' && (sealBin || nameBin)) return Promise.resolve([n, hpf]);
+          if (n === 'META-INF/manifest.xml' && (sealBin || nameBin)) return zip.file(n).async('string').then(function (s) {
             if (sealBin) s = injectOdfManifest(s);
             if (nameBin) s = injectOdfManifest2(s);
-            nameBins.forEach(function (nb) { s = injectOdfManifestId(s, nb.id); });
             return [n, s];
           });
           return zip.file(n).async('uint8array').then(function (d) { return [n, d]; });
@@ -311,7 +245,6 @@
           entries.forEach(function (e) { zo.file(e[0], e[1]); });
           if (sealBin) zo.file('BinData/image1.png', sealBin);
           if (nameBin) zo.file('BinData/image2.png', nameBin);
-          nameBins.forEach(function (nb) { zo.file('BinData/image' + nb.id + '.png', nb.u8); });
           return zo.generateAsync({ type: 'blob', mimeType: 'application/hwp+zip' });
         });
       });
