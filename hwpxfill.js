@@ -242,7 +242,7 @@
           zip.file('Contents/section0.xml').async('string'),
           zip.file('Contents/header.xml').async('string'),
           zip.file('mimetype').async('uint8array'),
-          (wantSeal || (opts.nameSeal && opts.nameSeal.dataUrl) || (opts.nameSeals && opts.nameSeals.length)) ? zip.file('Contents/content.hpf').async('string') : Promise.resolve(null),
+          (wantSeal || (opts.nameSeal && opts.nameSeal.dataUrl) || (opts.nameSeals && opts.nameSeals.length) || (opts.embedImages && opts.embedImages.length)) ? zip.file('Contents/content.hpf').async('string') : Promise.resolve(null),
           zip
         ]);
       })
@@ -276,6 +276,14 @@
         }
         // ③ 다중 막도장(image2, image3, …) — 민가사 소송위임장 위임인별 도장
         var nameBins = [];
+        // ③' 인라인 삽입 이미지: 섹션에 pic run 이 이미 들어있고 바이너리/매니페스트만 등록
+        if (opts.embedImages && opts.embedImages.length) {
+          opts.embedImages.forEach(function (im) {
+            if (!im || !im.dataUrl || im.id == null) return;
+            hdr = injectBinDataId(hdr, im.id); hpf = injectHpfManifestId(hpf, im.id);
+            nameBins.push({ id: im.id, u8: dataUrlToU8(im.dataUrl) });
+          });
+        }
         if (opts.nameSeals && opts.nameSeals.length) {
           opts.nameSeals.forEach(function (nsi, idx) {
             if (!nsi || !nsi.dataUrl) return;
