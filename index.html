@@ -1284,7 +1284,12 @@
       <div class="fs-chip" data-ptype="sincheong">신청인 · 피신청인</div>
       <div class="fs-chip" data-ptype="chaegwon">채권자 · 채무자</div>
       <div class="fs-chip" data-ptype="hanggo">항고인 · 상대방</div>
+      <div class="fs-chip" data-ptype="custom">직접입력</div>
     </div></div>
+    <div id="mg-custom-fields" style="display:none">
+      <div class="fs-field"><input type="text" class="fs-input" id="mg-custom-front" maxlength="20" placeholder="앞쪽 당사자 (예: 항고인 / 청구인 …)" oninput="mgUpdatePartyUI()"></div>
+      <div class="fs-field"><input type="text" class="fs-input" id="mg-custom-back" maxlength="20" placeholder="뒤쪽 당사자 (예: 상대방 / 피청구인 …)" oninput="mgUpdatePartyUI()"></div>
+    </div>
 
     <div class="fs-section">우리 측(의뢰인) 지위</div>
     <div class="fs-field"><div class="fs-chips" id="mg-role">
@@ -3952,14 +3957,14 @@ function openSjEdit(type){
   } else if(type==='agency'){
     title='제출기관'; html='<input type="text" class="modal-input" id="sjm-agency" value="'+escapeHtml(s.agency||'')+'">';
   } else if(type==='opp'){
-    var _od=MG_PARTY_TYPES[s.partyType||'wongo']||MG_PARTY_TYPES.wongo;
+    var _od=mgDef(s);
     var _ol=(s.role===_od.front)?_od.back:_od.front;
-    title='상대방('+_ol+')'; html='<div id="sjm-opp-list"></div><button type="button" class="att-add-btn" style="width:100%;margin-top:8px" onclick="addMgOpp(\'sjm-opp-list\')">＋ 상대방 추가</button>';
+    title=(_ol==='상대방')?'상대방':'상대방('+_ol+')'; html='<div id="sjm-opp-list"></div><button type="button" class="att-add-btn" style="width:100%;margin-top:8px" onclick="addMgOpp(\'sjm-opp-list\')">＋ 상대방 추가</button>';
   } else if(type==='date'){
     title='작성일'; html='<input type="date" class="modal-input" id="sjm-date" value="'+escapeHtml(s.date||'')+'">';
   } else if(type==='role'){
     title='역할'; var roles;
-    if(mg){var _rd=MG_PARTY_TYPES[s.partyType||'wongo']||MG_PARTY_TYPES.wongo; roles=[_rd.front,_rd.back];}
+    if(mg){var _rd=mgDef(s); roles=[_rd.front,_rd.back];}
     else roles=SJ_ROLES_FORM;
     html='<div class="fs-chips" id="sjm-role">'+roles.map(function(r){return '<div class="fs-chip'+(r===s.role?' on':'')+'" data-role="'+escapeHtml(r)+'" onclick="sjmPickRole(this)">'+escapeHtml(r)+'</div>';}).join('')+'</div>';
   } else if(type==='att'){
@@ -4062,23 +4067,44 @@ var MG_PARTY_TYPES={
   chaegwon: {front:'채권자', back:'채무자',  hasThird:true},
   hanggo:   {front:'항고인', back:'상대방',  hasThird:true}
 };
+/* 저장된 상태에서 당사자 유형(front/back/hasThird) 해석. custom이면 사용자가 입력한 라벨 사용 */
+function mgDef(s){
+  s=s||{};
+  if(s.partyType==='custom'){
+    return {front:(s.customFront||'').trim()||'원고', back:(s.customBack||'').trim()||'피고', hasThird:true};
+  }
+  return MG_PARTY_TYPES[s.partyType||'wongo']||MG_PARTY_TYPES.wongo;
+}
+/* 입력 폼(DOM)에서 당사자 유형 해석. ptype 키도 함께 반환 */
+function mgDefFromDOM(){
+  var pon=document.querySelector('#mg-ptype .fs-chip.on');
+  var pt=pon?pon.dataset.ptype:'wongo';
+  if(pt==='custom'){
+    var f=(document.getElementById('mg-custom-front').value||'').trim()||'원고';
+    var b=(document.getElementById('mg-custom-back').value||'').trim()||'피고';
+    return {front:f, back:b, hasThird:true, ptype:'custom'};
+  }
+  var d=MG_PARTY_TYPES[pt]||MG_PARTY_TYPES.wongo;
+  return {front:d.front, back:d.back, hasThird:d.hasThird, ptype:pt};
+}
 
 function closeMgForm(){document.getElementById('mgForm').classList.remove('active');}
 
 /* 상대방 라벨(유형·우리측 지위 반영) */
 function updateMgOppLabel(){
-  var pon=document.querySelector('#mg-ptype .fs-chip.on');
-  var def=MG_PARTY_TYPES[pon?pon.dataset.ptype:'wongo']||MG_PARTY_TYPES.wongo;
+  var def=mgDefFromDOM();
   var on=document.querySelector('#mg-role .fs-chip.on');
   var role=on?on.dataset.role:def.front;
   var oppLabel=(role===def.front)?def.back:def.front;
   var sec=document.getElementById('mg-opp-section'); if(sec)sec.textContent=(oppLabel==='상대방')?'상대방':'상대방('+oppLabel+')';
 }
 
-/* 당사자 유형 변경 시: 우리측 지위 칩 라벨·제3자 섹션 갱신 */
+/* 당사자 유형 변경 시: 우리측 지위 칩 라벨·직접입력 칸·제3자 섹션 갱신 */
 function mgUpdatePartyUI(){
   var pon=document.querySelector('#mg-ptype .fs-chip.on');
-  var def=MG_PARTY_TYPES[pon?pon.dataset.ptype:'wongo']||MG_PARTY_TYPES.wongo;
+  var isCustom=(pon?pon.dataset.ptype:'wongo')==='custom';
+  var cf=document.getElementById('mg-custom-fields'); if(cf)cf.style.display=isCustom?'':'none';
+  var def=mgDefFromDOM();
   var roleChips=document.querySelectorAll('#mg-role .fs-chip');
   var curIdx=0; roleChips.forEach(function(c,i){if(c.classList.contains('on'))curIdx=i;});
   roleChips[0].dataset.role=def.front; roleChips[0].textContent=def.front;
@@ -4243,6 +4269,8 @@ function openMgForm(){
   closeSeonimType();
   document.querySelectorAll('#mg-ptype .fs-chip').forEach(function(c,i){c.classList.toggle('on',i===0);});
   document.querySelectorAll('#mg-role .fs-chip').forEach(function(c,i){c.classList.toggle('on',i===0);});
+  var _cf=document.getElementById('mg-custom-front'); if(_cf)_cf.value='';
+  var _cb=document.getElementById('mg-custom-back');  if(_cb)_cb.value='';
   mgUpdatePartyUI();
   document.getElementById('mg-casenum').value='';
   document.getElementById('mg-casename').value='';
@@ -4272,8 +4300,10 @@ function editMingasa(){
   var s=mingasaState;
   var pt=s.partyType||'wongo';
   document.querySelectorAll('#mg-ptype .fs-chip').forEach(function(c){c.classList.toggle('on',c.dataset.ptype===pt);});
+  var _cf=document.getElementById('mg-custom-front'); if(_cf)_cf.value=(pt==='custom')?(s.customFront||''):'';
+  var _cb=document.getElementById('mg-custom-back');  if(_cb)_cb.value=(pt==='custom')?(s.customBack||''):'';
   mgUpdatePartyUI();
-  var def=MG_PARTY_TYPES[pt]||MG_PARTY_TYPES.wongo;
+  var def=mgDef(s);
   var roleVal=s.role||def.front;
   document.querySelectorAll('#mg-role .fs-chip').forEach(function(c){c.classList.toggle('on',c.dataset.role===roleVal);});
   updateMgOppLabel();
@@ -4293,15 +4323,16 @@ function editMingasa(){
 function applyMgForm(){
   var clients=collectMgClients('#mg-cl-list');
   var thirds=collectThirds('#mg-third-list');
-  var pon=document.querySelector('#mg-ptype .fs-chip.on');
-  var pt=pon?pon.dataset.ptype:'wongo';
-  var def=MG_PARTY_TYPES[pt]||MG_PARTY_TYPES.wongo;
+  var def=mgDefFromDOM();
+  var pt=def.ptype;
   var roleOn=document.querySelector('#mg-role .fs-chip.on');
   var atts=[];
   document.querySelectorAll('#mg-att .fs-chip.on').forEach(function(c){atts.push(c.dataset.att);});
   if(!atts.length)atts=['서고은'];
   mingasaState={
     partyType: pt,
+    customFront: (pt==='custom')?def.front:'',
+    customBack:  (pt==='custom')?def.back:'',
     role: roleOn?roleOn.dataset.role:def.front,
     casenum: document.getElementById('mg-casenum').value.trim(),
     casename: document.getElementById('mg-casename').value.trim(),
@@ -4353,7 +4384,7 @@ function mgWiimanBlock(c){
 }
 function renderMingasa(){
   var s=mingasaState;
-  var def=MG_PARTY_TYPES[s.partyType||'wongo']||MG_PARTY_TYPES.wongo;
+  var def=mgDef(s);
   var clients=(s.clients||[]).map(normalizeMgClient).filter(function(c){return (c.kind==='corp')?(c.corpName||(c.reps&&c.reps.some(function(r){return r.name&&r.name.trim();}))):(c.name&&c.name.trim());});
   var ourNames=clients.map(function(c){return (c.kind==='corp')?sjEsc(displayNameOf(c.corpName)):sjEsc(displayNameOf(c.name));}).join(', ');
   var role=s.role||def.front;
