@@ -482,6 +482,7 @@
     if (p.indexOf('신청인')   >= 0) return { ptype:'sincheong', idx:0 };
     if (p.indexOf('채무자')   >= 0) return { ptype:'chaegwon',  idx:1 };
     if (p.indexOf('채권자')   >= 0) return { ptype:'chaegwon',  idx:0 };
+    if (p.indexOf('항고인')   >= 0) return { ptype:'hanggo',    idx:0 };
     if (p.indexOf('피고') >= 0 && p.indexOf('피고인') < 0) return { ptype:'wongo', idx:1 };
     if (p.indexOf('원고')     >= 0) return { ptype:'wongo', idx:0 };
     return null; // 애매한 지위는 강두가 직접 선택
