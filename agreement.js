@@ -80,6 +80,33 @@
     var i = -1;
     return p.replace(/<hp:t>[\s\S]*?<\/hp:t>/g, function (m) { i++; return i === n ? '<hp:t>' + xmlEsc(txt) + '</hp:t>' : m; });
   }
+  // 기존 run 껍데기(charPr·서식 보존)의 텍스트만 교체 — 선행 <hp:tab> 은 제거(들여쓰기는 문단 속성으로)
+  function runWithText(runXml, text) {
+    var r = String(runXml)
+      .replace(/<hp:tab\b[^>]*\/>/g, '')
+      .replace(/<hp:tab\b[\s\S]*?<\/hp:tab>/g, '');
+    if (/<hp:t>[\s\S]*?<\/hp:t>/.test(r)) {
+      return r.replace(/<hp:t>[\s\S]*?<\/hp:t>/, '<hp:t>' + xmlEsc(text) + '</hp:t>');
+    }
+    return r.replace(/(<hp:run\b[^>]*>)/, '$1<hp:t>' + xmlEsc(text) + '</hp:t>');
+  }
+  // 본문 문단의 paraPrIDRef (헤더 들여쓰기 보정 대상)
+  function bodyParaPrId(sec) {
+    var P = splitParas(sec);
+    for (var i = 0; i < P.length; i++) {
+      if (flat(P[i]).indexOf('위사건과관련하여') === 0) {
+        var m = P[i].match(/paraPrIDRef="(\d+)"/); return m ? m[1] : null;
+      }
+    }
+    return null;
+  }
+  // 본문 문단 첫 줄 들여쓰기 보정: 음수(내어쓰기) intent → 양수(들여쓰기, 한 글자=1200)
+  var FIRST_LINE_INDENT = 1200;
+  function fixHeader(hdr, pid) {
+    if (!pid) return hdr;
+    var re = new RegExp('(<hh:paraPr id="' + pid + '"[\\s\\S]*?<hc:intent value=")[-\\d]+(")');
+    return hdr.replace(re, '$1' + FIRST_LINE_INDENT + '$2');
+  }
 
   /* ══════════ 본문 문안 생성 ══════════ */
   // 지위어(피고인/피의자) + 조사(과/와) + 합의금액 반영
@@ -120,14 +147,22 @@
         out.push(setFirstT(p, raw.replace(/\s*$/, '') + '   ' + victimSp));
       } else if (f.indexOf('연락처') === 0) {                              // 연락처
         out.push(setFirstT(p, raw.replace(/\s*$/, '') + '   ' + c.contact));
-      } else if (f.indexOf('위사건과관련하여') === 0) {                    // 본문(3 run)
-        var q = setNthT(p, 0, ' 위 사건과 관련하여 피해자 ' + c.victim);
-        q = setNthT(q, 1, eunNeun(c.victim));
-        q = setNthT(q, 2, bodyMain(c));
-        out.push(q);
+      } else if (f.indexOf('위사건과관련하여') === 0) {                    // 본문
+        // run 재구성: [일반]"위 사건과 관련하여 피해자 " + [밑줄]이름 + [일반]"은/는 …본문"
+        //  · 이름은 밑줄 run(원본 run1, charPr 18)으로 강조, 조사·본문은 일반 run(charPr 17)
+        //  · 선행 <hp:tab> 제거 → 첫 줄 들여쓰기는 문단 속성(fixHeader)으로 통일
+        var runs = p.match(/<hp:run\b[\s\S]*?<\/hp:run>/g) || [];
+        var normalRun = runs[2] || runs[0];      // 밑줄 없음(charPr 17)
+        var underlineRun = runs[1] || runs[0];   // 밑줄(charPr 18) — 피해자 이름 강조
+        var newRuns =
+          runWithText(normalRun, '위 사건과 관련하여 피해자 ') +
+          runWithText(underlineRun, c.victim) +
+          runWithText(normalRun, eunNeun(c.victim) + bodyMain(c));
+        out.push(p.replace(/<hp:run\b[\s\S]*<\/hp:run>/, newRuns));
       } else if (f.indexOf('(인)') >= 0 && f.indexOf('피해자') >= 0) {      // 서명란
-        var newSig = raw.replace(/피해자[\s\S]*\(인\)/, '피해자        ' + victimSp + '        (인)');
-        out.push(setFirstT(p, newSig));
+        // "피해자 홍길동 (인)" 은 반드시 한 줄 — 좌측 정렬 위치(선행 공백)는 유지, 이름은 원문 그대로
+        var lead = (raw.match(/^\s*/) || [''])[0];
+        out.push(setFirstT(p, lead + '피해자 ' + c.victim + ' (인)'));
       } else if (/^\s*\d{4}\s*\./.test(raw)) {                             // 작성일
         var lead = (raw.match(/^\s*/) || [''])[0];
         out.push(setFirstT(p, lead + fmtDate(c.dateISO)));
@@ -158,18 +193,23 @@
       .then(function (zip) {
         return Promise.all([
           zip.file('Contents/section0.xml').async('string'),
+          zip.file('Contents/header.xml').async('string'),
           zip
         ]).then(function (arr) {
-          var sec = fillDoc(arr[0], cfg);
+          var origSec = arr[0], hdr = arr[1], zip2 = arr[2];
+          var pid = bodyParaPrId(origSec);
+          var sec = fillDoc(origSec, cfg);
           // 줄 레이아웃 캐시 제거 — 원문 좌표가 남으면 한글이 '손상/변조'로 차단. 열 때 재계산.
           sec = sec.replace(/<hp:linesegarray>[\s\S]*?<\/hp:linesegarray>/g, '').replace(/<hp:linesegarray\s*\/>/g, '');
+          hdr = fixHeader(hdr, pid);   // 본문 첫 줄 들여쓰기 보정
           var zo = new Zip();
-          return zip.file('mimetype').async('uint8array').then(function (mime) {
+          return zip2.file('mimetype').async('uint8array').then(function (mime) {
             zo.file('mimetype', mime, { compression: 'STORE' });
-            var names = Object.keys(zip.files).filter(function (n) { return n !== 'mimetype' && !zip.files[n].dir; });
+            var names = Object.keys(zip2.files).filter(function (n) { return n !== 'mimetype' && !zip2.files[n].dir; });
             return Promise.all(names.map(function (n) {
               if (n === 'Contents/section0.xml') return Promise.resolve([n, sec]);
-              return zip.file(n).async('uint8array').then(function (d) { return [n, d]; });
+              if (n === 'Contents/header.xml') return Promise.resolve([n, hdr]);
+              return zip2.file(n).async('uint8array').then(function (d) { return [n, d]; });
             })).then(function (entries) {
               entries.forEach(function (e) { zo.file(e[0], e[1]); });
               return zo.generateAsync({ type: 'blob', mimeType: 'application/hwp+zip' });
@@ -346,7 +386,8 @@
     module.exports = {
       fillDoc: fillDoc, bodyMain: bodyMain, eunNeun: eunNeun, gwaWa: gwaWa,
       hasBatchim: hasBatchim, fmtAmount: fmtAmount, spaced: spaced,
-      toCfg: toCfg, downloadName: downloadName
+      toCfg: toCfg, downloadName: downloadName,
+      bodyParaPrId: bodyParaPrId, fixHeader: fixHeader
     };
   }
 })();
