@@ -40,7 +40,7 @@ var MENU = {
   appeal:        { kicker: '소송 · 불복', name: '항소·상고장',   desc: '판결에 불복해 다시 다퉈요(민가사 AI 취지작성).', icon: 'check',   action: 'goHangso()', ai: true },
   caseManager:   { kicker: '사건 · 관리', name: '사건 관리',     desc: '진행 중인 사건을 한눈에 관리해요.', icon: 'grid',    action: 'goCaseManager()' },
   gyeoljae:      { kicker: '검토 · 결재', name: '결재함',        desc: '확인할 서면을 마감 순으로 모아봐요.', icon: 'check',   action: 'goGyeoljae()' },
-  agreement:     { kicker: '합의 · 조정', name: '합의서 작성',   desc: '준비 중인 서비스예요.',             icon: 'users',   soon: true }
+  agreement:     { kicker: '합의 · 조정', name: '합의서 작성',   desc: '합의서 및 처벌불원서를 작성해요.',   icon: 'users',   action: 'goAgreement()', since: '2026-07-23' }
 };
 
 /* ── ② 화면별 진열 순서 (+ 화면마다 다른 글자는 여기서 지정) ──
@@ -57,6 +57,7 @@ var PC_ORDER = [
   { id: 'pankyul' },
   { id: 'yeongi' },
   { id: 'chamgo' },
+  { id: 'agreement' },
   { id: 'dojang', kicker: '자료 · 출력', name: '자료출력' },
   { id: 'gukseon' }
 ];
@@ -77,6 +78,7 @@ var MORE_ORDER = [
   { id: 'pankyul', name: '판결등본교부청구', desc: '판결등본 교부 청구' },
   { id: 'yeongi', name: '기일 연기·보정', desc: '기일 연기·변경, 보정기한 연기 (AI 사유작성)' },
   { id: 'chamgo', name: '참고자료', desc: '탄원서·반성문·합의서 등 (AI 본문작성)' },
+  { id: 'agreement', name: '합의서 작성', desc: '합의서 및 처벌불원서' },
   { id: 'dojang' }
 ];
 
