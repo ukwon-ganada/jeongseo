@@ -187,7 +187,7 @@
       '<hp:imgRect><hc:pt0 x="0" y="0"/><hc:pt1 x="' + oW + '" y="0"/><hc:pt2 x="' + oW + '" y="' + oH + '"/><hc:pt3 x="0" y="' + oH + '"/></hp:imgRect>' +
       '<hp:imgClip left="0" right="' + oW + '" top="0" bottom="' + oH + '"/><hp:inMargin left="0" right="0" top="0" bottom="0"/>' +
       '<hp:sz width="' + W + '" widthRelTo="ABSOLUTE" height="' + H + '" heightRelTo="ABSOLUTE" protect="0"/>' +
-      '<hp:pos treatAsChar="0" affectLSpacing="0" flowWithText="0" allowOverlap="1" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="RIGHT" vertOffset="' + voff + '" horzOffset="' + hoff + '"/>' +
+      '<hp:pos treatAsChar="0" affectLSpacing="0" flowWithText="0" allowOverlap="1" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" vertOffset="' + voff + '" horzOffset="' + hoff + '"/>' +
       '<hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:shapeComment/></hp:pic></hp:run>';
   }
   function addNameSealId(sec, imgRef, anchor, hoff, voff, wh) {
@@ -260,6 +260,8 @@
         opts.fill(ctx);
 
         var sec = ctx.section, hdr = arr[1], mime = arr[2], hpf = arr[3], zip = arr[4], sealBin = null, nameBin = null;
+        // header.xml 후처리(문단모양 등 주입) — 민가사가 좌측정렬 컴팩트 paraPr 추가에 사용
+        if (typeof opts.onHeader === 'function') { var h2 = opts.onHeader(hdr); if (h2) hdr = h2; }
         // ① 서고은 직인(image1) 코드 삽입 경로(sealDataUrl 넘긴 경우 — 항소/상고 등)
         if (wantSeal) {
           var u8 = dataUrlToU8(opts.sealDataUrl), wh = pngSize(u8);
@@ -279,7 +281,7 @@
             if (!nsi || !nsi.dataUrl) return;
             var id = 2 + idx, ref = 'image' + id;
             var u8 = dataUrlToU8(nsi.dataUrl), wh = nsi.wh || pngSize(u8), o = nsi.off || {};
-            var secN = addNameSealId(sec, ref, nsi.anchor, o.h == null ? 30000 : o.h, o.v == null ? -1700 : o.v, wh);
+            var secN = addNameSealId(sec, ref, nsi.anchor, o.h == null ? 1000 : o.h, o.v == null ? -1100 : o.v, wh);
             if (secN !== sec) { sec = secN; hdr = injectBinDataId(hdr, id); hpf = injectHpfManifestId(hpf, id); nameBins.push({ id: id, u8: u8 }); }
           });
         }
