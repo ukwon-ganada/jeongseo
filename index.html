@@ -1332,6 +1332,7 @@
     <div class="sj-title">변호인선임신고서</div>
     <button class="sj-edit-btn" onclick="editSeonim()">수정</button>
     <button class="sj-gy-btn" onclick="openGyeongyu()">경유작성</button>
+    <button class="sj-hwp-btn" id="sjHwpBtn" onclick="downloadSeonimHwpx()" style="display:none">한글</button>
     <button class="sj-print-btn" onclick="window.print()">출력</button>
   </div>
   <div class="sj-wrap"><div class="sj-page"><div id="sj-host"></div></div></div>
@@ -3940,6 +3941,11 @@ function applySeonimForm(){
 var SJ_ROLES_FORM=['피의자','피고인','고소인','피해자'];
 var sjEditCtx=null;
 function sjState(){return seonimMode==='민가사'?mingasaState:seonimState;}
+/* 한글(HWPX) 다운로드 — 현재는 민·가사 소송위임장 지원 */
+function downloadSeonimHwpx(){
+  if(seonimMode==='민가사'&&window.MingasaHwpx){window.MingasaHwpx.download(mingasaState);}
+  else{alert('한글 다운로드는 민·가사 소송위임장에서 지원됩니다.');}
+}
 function sjRerender(){if(seonimMode==='민가사')renderMingasa();else renderSeonim();}
 
 /* 경유 기능은 ./gyeongyu.js 로 분리됨 (전역 함수 유지) */
@@ -4051,6 +4057,7 @@ function renderSeonim(){
    +'</table>';
   document.getElementById('sj-host').innerHTML=html;
   var _t=document.querySelector('#screen-seonim .sj-title'); if(_t)_t.textContent='변호인선임신고서';
+  var _h=document.getElementById('sjHwpBtn'); if(_h)_h.style.display='none';
   setTimeout(fitSeonimPage,40);
 }
 
@@ -4425,6 +4432,7 @@ function renderMingasa(){
    +'</table>';
   document.getElementById('sj-host').innerHTML=html;
   var _t=document.querySelector('#screen-seonim .sj-title'); if(_t)_t.textContent='소송위임장';
+  var _h=document.getElementById('sjHwpBtn'); if(_h)_h.style.display=(window.MingasaHwpx?'':'none');
   alignPartyLabels();
   setTimeout(function(){alignPartyLabels();fitSeonimPage();},40);
 }
@@ -4761,6 +4769,7 @@ function toggleAppealGround(key){
 <script src="./gyeongyu.js"></script>
 <script src="./autofill.js"></script>
 <script src="./hwpxfill.js"></script>
+<script src="./mingasahwpx.js"></script>
 <script src="./yeollam.js"></script>
 <script src="./hangso.js"></script>
 <script src="./gukseon.js"></script>
