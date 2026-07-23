@@ -237,10 +237,11 @@
       dateISO: s.dateISO || todayISO()
     };
   }
-  function downloadName(s) {
+  function baseName(s) {
     var parts = ['합의서및처벌불원서', s.victim, s.caseLine, ymd(s.dateISO)].filter(Boolean);
-    return parts.join('_').replace(/[\/\\:*?"<>|\n\r]+/g, ' ').replace(/\s+/g, ' ').trim() + '.hwpx';
+    return parts.join('_').replace(/[\/\\:*?"<>|\n\r]+/g, ' ').replace(/\s+/g, ' ').trim();
   }
+  function downloadName(s) { return baseName(s) + '.hwpx'; }
 
   /* ══════════ CSS ══════════ */
   var STYLE_ID = 'agreement-style';
@@ -254,7 +255,30 @@
     '#agreementForm .ag-row2{display:flex;gap:10px;}' +
     '#agreementForm .ag-row2>.fs-field{flex:1;min-width:0;}' +
     '#agreementForm .ag-amt{display:none;}' +
-    '#agreementForm.amt-on .ag-amt{display:block;}';
+    '#agreementForm.amt-on .ag-amt{display:block;}' +
+    // ── 미리보기(오버레이) + A4 문서 렌더 ──
+    '#agreementPreview{display:none;position:fixed;inset:0;z-index:1200;background:#525659;flex-direction:column;}' +
+    '#agreementPreview.active{display:flex;}' +
+    '#agreementPreview .agp-head,#agreementPreview .agp-foot{flex:none;display:flex;align-items:center;gap:8px;background:#2b2d30;color:#fff;padding:10px 14px;}' +
+    '#agreementPreview .agp-head{justify-content:flex-start;}' +
+    '#agreementPreview .agp-head .fs-title{color:#fff;font-size:15px;font-weight:700;}' +
+    '#agreementPreview .agp-head .fs-close{color:#fff;}' +
+    '#agreementPreview .agp-foot{justify-content:flex-end;flex-wrap:wrap;}' +
+    '#agreementPreview .agp-scroll{flex:1;overflow:auto;display:flex;justify-content:center;align-items:flex-start;padding:16px;}' +
+    '#agreementPreview .agp-stage{flex:none;}' +
+    '.agp-page{width:210mm;min-height:297mm;box-sizing:border-box;padding:22mm 26mm;background:#fff;color:#000;' +
+      "font-family:'바탕',Batang,'Noto Serif KR','AppleMyungjo',serif;font-size:12pt;line-height:2.0;box-shadow:0 4px 24px rgba(0,0,0,.4);}" +
+    '.agp-page .agp-title{text-align:center;font-size:19pt;font-weight:700;letter-spacing:.35em;margin:2mm 0 12mm;}' +
+    '.agp-page .agp-line{display:flex;gap:.4em;margin:1.2mm 0;}' +
+    '.agp-page .agp-lbl{flex:0 0 6.2em;white-space:nowrap;}' +
+    '.agp-page .agp-val{flex:1;min-width:0;}' +
+    '.agp-page .agp-sub{margin-right:.6em;}' +
+    '.agp-page .agp-body{text-align:justify;text-indent:1em;margin:8mm 0;line-height:2.1;}' +
+    '.agp-page .agp-body u{text-underline-offset:2px;}' +
+    '.agp-page .agp-gap{height:5mm;}' +
+    '.agp-page .agp-gaplg{height:16mm;}' +
+    '.agp-page .agp-date{text-align:center;letter-spacing:.08em;margin:2mm 0;}' +
+    '.agp-page .agp-sign{text-align:right;padding-right:6mm;margin-top:6mm;letter-spacing:.04em;}';
   function injectStyle() { FSDoc.injectOnce(STYLE_ID, AG_CSS); }
 
   /* ══════════ 화면 껍데기 ══════════ */
@@ -299,12 +323,123 @@
           '</div>' +
           '<div class="fs-foot">' +
             '<button class="fs-btn ghost" onclick="closeAgreementForm()">취소</button>' +
+            '<button class="fs-btn" onclick="agPreview()">미리보기</button>' +
             '<button class="fs-btn primary" onclick="agDownload()">한글 다운로드</button>' +
           '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div id="agreementPreview">' +
+        '<div class="agp-head">' +
+          '<button class="fs-close" onclick="closeAgPreview()" aria-label="닫기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>' +
+          '<div class="fs-title">미리보기</div>' +
+        '</div>' +
+        '<div class="agp-scroll"><div class="agp-stage" id="agp-stage"><div class="agp-page" id="agp-page"></div></div></div>' +
+        '<div class="agp-foot">' +
+          '<button class="fs-btn ghost" onclick="closeAgPreview()">닫기</button>' +
+          '<button class="fs-btn" id="ag-btn-img" onclick="agSaveImage()">사진 다운로드</button>' +
+          '<button class="fs-btn" id="ag-btn-pdf" onclick="agSavePdf()">PDF 다운로드</button>' +
+          '<button class="fs-btn primary" onclick="agDownload()">한글 다운로드</button>' +
         '</div>' +
       '</div>';
     document.body.appendChild(wrap);
   }
+
+  /* ══════════ 미리보기 렌더(표준양식과 동일 레이아웃) ══════════ */
+  function htmlEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function previewHtml(c) {
+    var jiwiLabel = (JIWI_LABEL[c.jiwi] || '피 고 인');
+    var particle = eunNeun(c.victim);
+    var rest = bodyMain(c).replace(/^\s+/, '');   // '피고인과 원만한 …'
+    return '' +
+      '<div class="agp-title">합의서 및 처벌불원서</div>' +
+      '<div class="agp-line"><span class="agp-lbl">사&nbsp;&nbsp;&nbsp;&nbsp;건</span><span class="agp-val">' + htmlEsc(c.caseLine) + '</span></div>' +
+      '<div class="agp-line"><span class="agp-lbl">' + htmlEsc(jiwiLabel) + '</span><span class="agp-val">' + htmlEsc(spaced(c.defendant)) + '</span></div>' +
+      '<div class="agp-line"><span class="agp-lbl">피&nbsp;해&nbsp;자</span><span class="agp-val"><span class="agp-sub">성&nbsp;&nbsp;명</span>' + htmlEsc(spaced(c.victim)) + '</span></div>' +
+      '<div class="agp-line"><span class="agp-lbl"></span><span class="agp-val"><span class="agp-sub">연&nbsp;락&nbsp;처</span>' + htmlEsc(c.contact) + '</span></div>' +
+      '<div class="agp-gap"></div>' +
+      '<div class="agp-body">위 사건과 관련하여 피해자 <u>' + htmlEsc(c.victim) + '</u>' + particle + ' ' + htmlEsc(rest) + '</div>' +
+      '<div class="agp-gaplg"></div>' +
+      '<div class="agp-date">' + htmlEsc(fmtDate(c.dateISO)) + '</div>' +
+      '<div class="agp-gap"></div>' +
+      '<div class="agp-sign">피해자&nbsp;&nbsp;&nbsp;' + htmlEsc(c.victim) + '&nbsp;&nbsp;&nbsp;(인)</div>';
+  }
+  function fitPreview() {
+    var page = document.getElementById('agp-page'), stage = document.getElementById('agp-stage');
+    if (!page || !stage) return;
+    page.style.transform = 'none';
+    var w = page.offsetWidth, h = page.offsetHeight;
+    var avail = (window.innerWidth || 800) - 32;
+    var s = Math.min(1, avail / w);
+    page.style.transformOrigin = 'top left';
+    page.style.transform = s < 1 ? ('scale(' + s + ')') : 'none';
+    stage.style.width = (w * s) + 'px';
+    stage.style.height = (h * s) + 'px';
+  }
+  var _pv = null;
+  window.agPreview = function () {
+    collect();
+    if (!state.victim) { alert('피해자 성명을 입력해 주세요.'); return; }
+    _pv = state;
+    var page = document.getElementById('agp-page');
+    if (page) page.innerHTML = previewHtml(toCfg(state));
+    document.getElementById('agreementPreview').classList.add('active');
+    fitPreview();
+  };
+  window.closeAgPreview = function () { var p = document.getElementById('agreementPreview'); if (p) p.classList.remove('active'); };
+  if (typeof window !== 'undefined' && window.addEventListener) window.addEventListener('resize', function () {
+    var p = document.getElementById('agreementPreview');
+    if (p && p.classList.contains('active')) fitPreview();
+  });
+
+  /* ── PDF/PNG 저장: A4 렌더를 html2canvas 로 캡처 → 앱 공용 유틸 재사용 ── */
+  function captureCanvas() {
+    var page = document.getElementById('agp-page');
+    var pt = page.style.transform, po = page.style.transformOrigin;
+    page.style.transform = 'none';
+    return html2canvas(page, {
+      scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#ffffff',
+      logging: false, windowWidth: page.offsetWidth, windowHeight: page.offsetHeight
+    }).then(function (cv) { page.style.transform = pt; page.style.transformOrigin = po; return cv; })
+      .catch(function (e) { page.style.transform = pt; page.style.transformOrigin = po; throw e; });
+  }
+  function dl(blob, fname) {
+    if (typeof window.directDownload === 'function') return window.directDownload(blob, fname);
+    var url = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href = url; a.download = fname; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+  }
+  function cvToBlob(cv) {
+    return new Promise(function (res) {
+      if (cv.toBlob) cv.toBlob(function (b) { res(b); }, 'image/png');
+      else { var bin = atob(cv.toDataURL('image/png').split(',')[1]), arr = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i); res(new Blob([arr], { type: 'image/png' })); }
+    });
+  }
+  function busy(id, on, txt) { var b = document.getElementById(id); if (b) { b.disabled = on; if (txt != null) b.textContent = txt; } }
+  window.agSaveImage = function () {
+    if (typeof html2canvas !== 'function') { alert('이미지 모듈을 불러오지 못했습니다.'); return; }
+    busy('ag-btn-img', true, '만드는 중…');
+    captureCanvas().then(cvToBlob).then(function (blob) {
+      dl(blob, baseName(_pv || state) + '.png');
+    }).catch(function (e) { alert('사진 저장 실패: ' + (e && e.message ? e.message : e)); })
+      .then(function () { busy('ag-btn-img', false, '사진 다운로드'); });
+  };
+  window.agSavePdf = function () {
+    if (typeof html2canvas !== 'function') { alert('이미지 모듈을 불러오지 못했습니다.'); return; }
+    var jsPDFCtor = (window.jspdf && window.jspdf.jsPDF) ? window.jspdf.jsPDF : (window.jsPDF || null);
+    if (!jsPDFCtor) { alert('PDF 모듈을 불러오지 못했습니다.'); return; }
+    busy('ag-btn-pdf', true, '만드는 중…');
+    captureCanvas().then(function (cv) {
+      var pdf = new jsPDFCtor({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      if (typeof window.addCanvasesToPdf === 'function') {
+        window.addCanvasesToPdf(pdf, [cv], 210, 297);
+      } else {
+        var k = 210 / cv.width, fullH = cv.height * k;
+        pdf.addImage(cv.toDataURL('image/png'), 'PNG', 0, Math.max(0, (297 - fullH) / 2), 210, fullH, undefined, 'FAST');
+      }
+      dl(pdf.output('blob'), baseName(_pv || state) + '.pdf');
+    }).catch(function (e) { alert('PDF 저장 실패: ' + (e && e.message ? e.message : e)); })
+      .then(function () { busy('ag-btn-pdf', false, 'PDF 다운로드'); });
+  };
 
   /* ══════════ DOM 유틸 ══════════ */
   function setVal(id, v) { var el = document.getElementById(id); if (el) el.value = v == null ? '' : v; }
@@ -386,8 +521,8 @@
     module.exports = {
       fillDoc: fillDoc, bodyMain: bodyMain, eunNeun: eunNeun, gwaWa: gwaWa,
       hasBatchim: hasBatchim, fmtAmount: fmtAmount, spaced: spaced,
-      toCfg: toCfg, downloadName: downloadName,
-      bodyParaPrId: bodyParaPrId, fixHeader: fixHeader
+      toCfg: toCfg, downloadName: downloadName, baseName: baseName,
+      bodyParaPrId: bodyParaPrId, fixHeader: fixHeader, previewHtml: previewHtml
     };
   }
 })();
