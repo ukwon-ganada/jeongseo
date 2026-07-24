@@ -94,6 +94,15 @@
     if (d.length <= 10) return d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6);      // 10자리
     return d.slice(0, 3) + '-' + d.slice(3, 7) + '-' + d.slice(7, 11);                       // 11자리
   }
+  // 생년월일 자동 포맷: 19891123 → 1989. 11. 23. (문서 표기와 동일)
+  function fmtBirth(v) {
+    var d = String(v == null ? '' : v).replace(/[^0-9]/g, '').slice(0, 8);
+    if (d.length <= 4) return d;
+    if (d.length <= 6) return d.slice(0, 4) + '. ' + d.slice(4);
+    return d.slice(0, 4) + '. ' + d.slice(4, 6) + '. ' + d.slice(6, 8) + '.';
+  }
+  // 대리인 표시: 형사(피고인·피의자)→변호인, 그 외(민사 등)→소송대리인
+  function deriveAgent(jiwi) { return (jiwi === '피고인' || jiwi === '피의자') ? '변호인' : '소송대리인'; }
   function lastHangul(str) {
     str = String(str || '');
     for (var i = str.length - 1; i >= 0; i--) { var c = str.charCodeAt(i); if (c >= 0xAC00 && c <= 0xD7A3) return c; }
@@ -121,10 +130,15 @@
               .replace(/(<hp:run\b[^>]*>)(?!<hp:t)/, '$1<hp:t>' + xmlEsc(txt) + '</hp:t>');
     }
     var done = false, hitText = false;
-    var res = p.replace(/<hp:t>[\s\S]*?<\/hp:t>/g, function (seg) {
+    var res = p.replace(/<hp:t>([\s\S]*?)<\/hp:t>/g, function (seg, inner) {
       if (tInner(seg).trim()) {
         hitText = true;
-        if (!done) { done = true; return '<hp:t>' + xmlEsc(txt) + '</hp:t>'; }
+        if (!done) {
+          done = true;
+          // 텍스트 앞의 정렬용 탭(<hp:tab/>)은 그대로 살려 위치 보존
+          var lead = (inner.match(/^(?:<hp:tab\b[^>]*\/>)*/) || [''])[0];
+          return '<hp:t>' + lead + xmlEsc(txt) + '</hp:t>';
+        }
         return '<hp:t></hp:t>';
       }
       return seg; // 빈/탭 <hp:t> 유지
@@ -428,7 +442,7 @@
 
             '<div class="fs-section">사건 정보</div>' +
             '<div class="sj-row2">' +
-              '<div class="fs-field"><label class="fs-label">지위</label><input type="text" class="fs-input" id="sj-jiwi" placeholder="피고인" list="sj-jiwi-list"></div>' +
+              '<div class="fs-field"><label class="fs-label">지위</label><input type="text" class="fs-input" id="sj-jiwi" placeholder="피고인" list="sj-jiwi-list" onchange="sjJiwiChange(this)"></div>' +
               '<div class="fs-field"><label class="fs-label">당사자 성명</label><input type="text" class="fs-input" id="sj-party" placeholder="홍길동"></div>' +
             '</div>' +
             '<datalist id="sj-jiwi-list"><option value="피고인"><option value="피의자"><option value="원고"><option value="피고"><option value="신청인"><option value="채권자"></datalist>' +
@@ -442,7 +456,7 @@
             '<div class="fs-section">조회할 사람의 인적사항</div>' +
             '<div class="sj-row2">' +
               '<div class="fs-field"><label class="fs-label">성명</label><input type="text" class="fs-input" id="sj-name" placeholder="신나리"></div>' +
-              '<div class="fs-field"><label class="fs-label">생년월일</label><input type="date" class="fs-input" id="sj-birth"></div>' +
+              '<div class="fs-field"><label class="fs-label">생년월일</label><input type="text" class="fs-input" id="sj-birth" inputmode="numeric" placeholder="19891123 → 1989. 11. 23." oninput="sjBirthInput(this)"></div>' +
             '</div>' +
             '<div class="fs-field"><label class="fs-label">연락처</label><input type="text" class="fs-input" id="sj-phone" placeholder="010-0000-0000" inputmode="numeric" oninput="sjPhoneInput(this)"></div>' +
             '<label class="sj-chk" id="sj-pastwrap" onclick="sjTogglePast()" style="margin-top:2px;"><span class="sj-box"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2"><path d="M4 12l5 5L20 6"/></svg></span>과거(해지) 연락처로 표기</label>' +
@@ -570,6 +584,13 @@
     el.value = fmtPhone(el.value);
     try { var pos = Math.max(0, el.value.length - fromEnd); el.setSelectionRange(pos, pos); } catch (e) {}
   };
+  window.sjBirthInput = function (el) {
+    var fromEnd = el.value.length - (el.selectionStart == null ? el.value.length : el.selectionStart);
+    el.value = fmtBirth(el.value);
+    try { var pos = Math.max(0, el.value.length - fromEnd); el.setSelectionRange(pos, pos); } catch (e) {}
+  };
+  // 지위 변경 시 대리인 표시(변호인/소송대리인) 자동 전환
+  window.sjJiwiChange = function (el) { setVal('sj-agent', deriveAgent((el.value || '').trim())); };
   window.sjTogglePast = function () {
     state.pastPhone = !state.pastPhone;
     var w = document.getElementById('sj-pastwrap'); if (w) w.classList.toggle('on', state.pastPhone);
@@ -592,8 +613,10 @@
     var pos = String(row.client_position || '');
     var jiwi = pos.indexOf('피의자') >= 0 ? '피의자' : (pos.indexOf('원고') >= 0 ? '원고' : (pos.indexOf('피고') >= 0 ? '피고' : '피고인'));
     setVal('sj-jiwi', jiwi);
+    setVal('sj-agent', deriveAgent(jiwi));           // 지위에 맞춰 변호인/소송대리인 자동
     setVal('sj-party', row.l_client || '');
     setVal('sj-caseline', [row.l_code, cleanCaseName(row.l_name)].filter(Boolean).join(' '));
+    setVal('sj-court', row.court || '');             // 법원(재판부는 court-lookup으로 뒤에 덧붙음)
   }
 
   /* ══════════ 상태 ↔ 폼 ══════════ */
@@ -612,7 +635,7 @@
     state.jiwi = getVal('sj-jiwi') || '피고인'; state.agent = getVal('sj-agent') || '변호인';
     state.party = getVal('sj-party'); state.caseLine = getVal('sj-caseline');
     state.lawyer = getVal('sj-lawyer'); state.court = getVal('sj-court');
-    state.name = getVal('sj-name'); state.birthISO = getVal('sj-birth'); state.phone = fmtPhone(getVal('sj-phone'));
+    state.name = getVal('sj-name'); state.birthISO = fmtBirth(getVal('sj-birth')); state.phone = fmtPhone(getVal('sj-phone'));
     state.dateISO = getVal('sj-date') || todayISO();
     state.purpose = getVal('sj-purpose'); state.query = getVal('sj-query');
   }
@@ -622,7 +645,7 @@
     ensureUI();
     fillFormFromState();
     document.getElementById('sasiljoForm').classList.add('active');
-    if (typeof initAutofillFor === 'function') initAutofillFor('sj-party', { onFill: sjOnFill });
+    if (typeof initAutofillFor === 'function') initAutofillFor('sj-party', { onFill: sjOnFill, courtDept: 'sj-court', courtDeptAppend: true });
   }
   window.goSasiljo = function () { ensureUI(); state = defaultState(); openForm(); };
   window.closeSasiljoForm = function () { var f = document.getElementById('sasiljoForm'); if (f) f.classList.remove('active'); };
@@ -649,7 +672,7 @@
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
       fillDoc: fillDoc, buildTable: buildTable, parasFromText: parasFromText,
-      spaced: spaced, fmtDate: fmtDate, fmtPhone: fmtPhone, eunNeun: eunNeun, GANADA: GANADA, CARRIERS: CARRIERS,
+      spaced: spaced, fmtDate: fmtDate, fmtPhone: fmtPhone, fmtBirth: fmtBirth, eunNeun: eunNeun, GANADA: GANADA, CARRIERS: CARRIERS,
       downloadName: downloadName, defaultPurpose: defaultPurpose, defaultQuery: defaultQuery,
       _setState: function (s) { state = s; }, toCfg: toCfg
     };
