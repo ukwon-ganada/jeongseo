@@ -461,7 +461,7 @@
             '<div class="sj-sel-head" style="margin-top:12px;">' +
               '<div class="fs-section" style="margin:0;">선택한 촉탁기관 <span class="sj-sel-count" id="sj-sel-count"></span></div>' +
             '</div>' +
-            '<div class="sj-hint">법인명·대표이사·주소는 제출 전 반드시 확인하세요. <span style="color:#b8860b;">검증 필요</span> 표시는 최신 여부를 재확인해야 하는 항목입니다.</div>' +
+            '<div class="sj-hint">법인명·대표이사·주소는 각 칸에서 바로 수정할 수 있습니다.</div>' +
             '<div id="sj-selected"></div>' +
 
             '<div class="fs-section">조회의 목적</div>' +
@@ -523,10 +523,9 @@
     var html = '';
     state.selected.forEach(function (id, i) {
       var base = CARRIERS[id], v = carrierView(id);
-      var badge = base.conf !== 'high' ? '<span class="sj-badge">검증 필요</span>' : '';
       html += '<div class="sj-card">' +
         '<div class="sj-card-top"><span class="sj-idx">' + (GANADA[i] || (i + 1)) + '.</span>' +
-          '<span class="sj-card-brand">' + htmlEsc(base.brand) + '</span>' + badge +
+          '<span class="sj-card-brand">' + htmlEsc(base.brand) + '</span>' +
           '<button type="button" class="sj-rm" onclick="sjToggle(' + id + ')">삭제</button></div>' +
         '<label class="sj-mini">법인명 · 대표이사</label>' +
         '<div class="sj-row2">' +
