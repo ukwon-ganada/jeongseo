@@ -29,7 +29,7 @@
      3사(major)는 항상 상단·기본선택, 알뜰폰은 rank(이용자 많은 순) 오름차순. */
   var CARRIERS = [
     { brand: 'SK텔레콤',  corp: '에스케이텔레콤 주식회사', ceo: '정재헌', addr: '서울특별시 중구 을지로 65 (을지로2가)', net: ['SKT'], major: true, conf: 'high' },
-    { brand: 'KT',       corp: '주식회사 케이티',        ceo: '박윤영', addr: '경기도 성남시 분당구 불정로 90 (정자동)', net: ['KT'], major: true, conf: 'medium' },
+    { brand: 'KT',       corp: '주식회사 케이티',        ceo: '박윤영', addr: '경기도 성남시 분당구 불정로 90 (정자동)', net: ['KT'], major: true, conf: 'high' },
     { brand: 'LG유플러스', corp: '주식회사 엘지유플러스',   ceo: '홍범식', addr: '서울특별시 용산구 한강대로 32 (한강로3가)', net: ['LGU+'], major: true, conf: 'high' },
 
     { brand: 'KT M모바일',        corp: '주식회사 케이티엠모바일', ceo: '김의현',        addr: '서울특별시 강남구 테헤란로 422 (대치동)', net: ['KT'], conf: 'high' },
@@ -38,13 +38,13 @@
     { brand: '헬로모바일',        corp: '주식회사 엘지헬로비전',   ceo: '송구영',        addr: '서울특별시 마포구 월드컵북로56길 19 (상암동, 드림타워)', net: ['KT', 'LGU+', 'SKT'], conf: 'medium' },
     { brand: 'KB리브모바일',      corp: '주식회사 케이비국민은행', ceo: '이환주',        addr: '서울특별시 영등포구 국제금융로8길 26 (여의도동)', net: ['LGU+', 'KT'], conf: 'high' },
     { brand: '프리티',           corp: '주식회사 프리텔레콤',    ceo: '이석환',        addr: '서울특별시 성동구 성수이로22길 37, 7층 (성수동2가)', net: ['KT', 'LGU+'], conf: 'medium' },
-    { brand: '스노우맨',          corp: '세종텔레콤 주식회사',    ceo: '김형진, 안종석', addr: '경기도 과천시 과천대로7길 12 (갈현동)', net: ['KT', 'SKT'], conf: 'low' },
+    { brand: '스노우맨',          corp: '세종텔레콤 주식회사',    ceo: '김형진, 안종석', addr: '경기도 과천시 과천대로7길 12 (갈현동)', net: ['KT', 'SKT'], conf: 'medium' },
     { brand: '아이즈모바일',      corp: '주식회사 아이즈비전',    ceo: '김상우, 안필성', addr: '서울특별시 동작구 여의대방로62길 1', net: ['SKT', 'KT', 'LGU+'], conf: 'medium' },
     { brand: '이야기모바일',      corp: '주식회사 큰사람커넥트',   ceo: '김병노',        addr: '서울특별시 구로구 디지털로26길 61, 1303호 (구로동, 에이스하이엔드타워2차)', net: ['SKT', 'KT', 'LGU+'], conf: 'medium' },
     { brand: '모빙',             corp: '주식회사 유니컴즈',      ceo: '한송희',        addr: '경기도 군포시 엘에스로166번길 8', net: ['SKT', 'KT', 'LGU+'], conf: 'medium' },
     { brand: '티플러스',          corp: '주식회사 한국케이블텔레콤', ceo: '박종진',       addr: '서울특별시 중구 세종대로 50, 7층 (남대문로4가, 흥국생명빌딩)', net: ['KT', 'LGU+'], conf: 'medium' },
     { brand: 'A모바일',          corp: '주식회사 에넥스텔레콤',   ceo: '문성광',        addr: '서울특별시 강남구 학동로 122 (논현동, 백석빌딩)', net: ['SKT', 'KT'], conf: 'medium' },
-    { brand: '토스모바일',        corp: '토스모바일 주식회사',    ceo: '이승훈',        addr: '', net: ['SKT'], conf: 'low' },
+    { brand: '토스모바일',        corp: '토스모바일 주식회사',    ceo: '이승훈',        addr: '서울특별시 금천구 가산디지털1로 145, 에이스하이엔드타워 3차 19층 1904호', net: ['SKT'], conf: 'high' },
     { brand: '스마텔',           corp: '주식회사 스마텔',       ceo: '고명수',        addr: '경기도 하남시 미사강변중앙로7번안길 25, D동 1009호 (풍산동)', net: ['SKT', 'KT', 'LGU+'], conf: 'medium' },
     { brand: '핀다이렉트',        corp: '주식회사 스테이지파이브', ceo: '서상원',        addr: '서울특별시 송파구 올림픽로35길 123, 6층 (신천동, 향군타워)', net: ['KT'], conf: 'medium' },
     { brand: 'WELL(위너스텔)',    corp: '주식회사 위너스텔',      ceo: '서욱진',        addr: '서울특별시 금천구 디지털로 121, 1303호 (가산동, 에이스가산타워)', net: ['KT'], conf: 'medium' }
