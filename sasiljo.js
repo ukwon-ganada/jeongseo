@@ -76,6 +76,24 @@
     var m = String(dateStr || '').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
     return m ? m[1] + ('0' + m[2]).slice(-2) + ('0' + m[3]).slice(-2) : '';
   }
+  // 전화번호 자동 하이픈: 01012345678 → 010-1234-5678 (휴대폰·서울02·일반 지역번호 대응)
+  function fmtPhone(v) {
+    var d = String(v == null ? '' : v).replace(/[^0-9]/g, '');
+    if (!d) return '';
+    if (d[0] === '1' && d.length === 4) return d;                              // 대표번호(1588 등)
+    if (d[0] === '1' && d.length === 8) return d.slice(0, 4) + '-' + d.slice(4);
+    if (d.indexOf('02') === 0) {                                                // 서울
+      if (d.length <= 2) return d;
+      if (d.length <= 5) return d.slice(0, 2) + '-' + d.slice(2);
+      if (d.length <= 9) return d.slice(0, 2) + '-' + d.slice(2, d.length - 4) + '-' + d.slice(d.length - 4);
+      return d.slice(0, 2) + '-' + d.slice(2, 6) + '-' + d.slice(6, 10);
+    }
+    // 010 등 휴대폰 / 그 외 지역번호(3자리 국번)
+    if (d.length <= 3) return d;
+    if (d.length <= 7) return d.slice(0, 3) + '-' + d.slice(3);
+    if (d.length <= 10) return d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6);      // 10자리
+    return d.slice(0, 3) + '-' + d.slice(3, 7) + '-' + d.slice(7, 11);                       // 11자리
+  }
   function lastHangul(str) {
     str = String(str || '');
     for (var i = str.length - 1; i >= 0; i--) { var c = str.charCodeAt(i); if (c >= 0xAC00 && c <= 0xD7A3) return c; }
@@ -93,11 +111,27 @@
     return t;
   }
   function flat(p) { return plainText(p).replace(/\s+/g, ''); }
-  // 첫 <hp:t> 의 텍스트만 교체(없으면 run 안에 삽입)
+  // <hp:t> 안의 실제 텍스트(탭 등 태그 제거)
+  function tInner(seg) { return seg.replace(/<\/?hp:t>/g, '').replace(/<[^>]+>/g, ''); }
+  // 텍스트가 있는 '첫' <hp:t> 만 교체하고, 뒤따르는 텍스트 <hp:t> 는 비움(중복 방지).
+  //  · 정렬용 탭만 든 빈 <hp:t>(예: 날짜·담당변호사 문단의 선행 탭 런)는 그대로 보존해 위치 유지.
   function setFirstT(p, txt) {
-    if (/<hp:t>[\s\S]*?<\/hp:t>/.test(p)) return p.replace(/<hp:t>[\s\S]*?<\/hp:t>/, '<hp:t>' + xmlEsc(txt) + '</hp:t>');
-    return p.replace(/(<hp:run\b[^>]*)\/>/, '$1><hp:t>' + xmlEsc(txt) + '</hp:t></hp:run>')
-            .replace(/(<hp:run\b[^>]*>)(?!<hp:t)/, '$1<hp:t>' + xmlEsc(txt) + '</hp:t>');
+    if (!/<hp:t>[\s\S]*?<\/hp:t>/.test(p)) {
+      return p.replace(/(<hp:run\b[^>]*)\/>/, '$1><hp:t>' + xmlEsc(txt) + '</hp:t></hp:run>')
+              .replace(/(<hp:run\b[^>]*>)(?!<hp:t)/, '$1<hp:t>' + xmlEsc(txt) + '</hp:t>');
+    }
+    var done = false, hitText = false;
+    var res = p.replace(/<hp:t>[\s\S]*?<\/hp:t>/g, function (seg) {
+      if (tInner(seg).trim()) {
+        hitText = true;
+        if (!done) { done = true; return '<hp:t>' + xmlEsc(txt) + '</hp:t>'; }
+        return '<hp:t></hp:t>';
+      }
+      return seg; // 빈/탭 <hp:t> 유지
+    });
+    if (hitText) return res;
+    // 텍스트 런이 하나도 없으면 첫 <hp:t> 교체
+    return p.replace(/<hp:t>[\s\S]*?<\/hp:t>/, '<hp:t>' + xmlEsc(txt) + '</hp:t>');
   }
   // n번째 <hp:t> 교체(0-base)
   function setNthT(p, n, txt) {
@@ -410,7 +444,7 @@
               '<div class="fs-field"><label class="fs-label">성명</label><input type="text" class="fs-input" id="sj-name" placeholder="신나리"></div>' +
               '<div class="fs-field"><label class="fs-label">생년월일</label><input type="date" class="fs-input" id="sj-birth"></div>' +
             '</div>' +
-            '<div class="fs-field"><label class="fs-label">연락처</label><input type="text" class="fs-input" id="sj-phone" placeholder="010-0000-0000"></div>' +
+            '<div class="fs-field"><label class="fs-label">연락처</label><input type="text" class="fs-input" id="sj-phone" placeholder="010-0000-0000" inputmode="numeric" oninput="sjPhoneInput(this)"></div>' +
             '<label class="sj-chk" id="sj-pastwrap" onclick="sjTogglePast()" style="margin-top:2px;"><span class="sj-box"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2"><path d="M4 12l5 5L20 6"/></svg></span>과거(해지) 연락처로 표기</label>' +
 
             '<div class="fs-section">사실조회촉탁기관 (통신사 선택)</div>' +
@@ -532,6 +566,11 @@
     if (!state.edit[id]) state.edit[id] = {};
     state.edit[id][field] = val;
   };
+  window.sjPhoneInput = function (el) {
+    var fromEnd = el.value.length - (el.selectionStart == null ? el.value.length : el.selectionStart);
+    el.value = fmtPhone(el.value);
+    try { var pos = Math.max(0, el.value.length - fromEnd); el.setSelectionRange(pos, pos); } catch (e) {}
+  };
   window.sjTogglePast = function () {
     state.pastPhone = !state.pastPhone;
     var w = document.getElementById('sj-pastwrap'); if (w) w.classList.toggle('on', state.pastPhone);
@@ -574,7 +613,7 @@
     state.jiwi = getVal('sj-jiwi') || '피고인'; state.agent = getVal('sj-agent') || '변호인';
     state.party = getVal('sj-party'); state.caseLine = getVal('sj-caseline');
     state.lawyer = getVal('sj-lawyer'); state.court = getVal('sj-court');
-    state.name = getVal('sj-name'); state.birthISO = getVal('sj-birth'); state.phone = getVal('sj-phone');
+    state.name = getVal('sj-name'); state.birthISO = getVal('sj-birth'); state.phone = fmtPhone(getVal('sj-phone'));
     state.dateISO = getVal('sj-date') || todayISO();
     state.purpose = getVal('sj-purpose'); state.query = getVal('sj-query');
   }
@@ -611,7 +650,7 @@
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
       fillDoc: fillDoc, buildTable: buildTable, parasFromText: parasFromText,
-      spaced: spaced, fmtDate: fmtDate, eunNeun: eunNeun, GANADA: GANADA, CARRIERS: CARRIERS,
+      spaced: spaced, fmtDate: fmtDate, fmtPhone: fmtPhone, eunNeun: eunNeun, GANADA: GANADA, CARRIERS: CARRIERS,
       downloadName: downloadName, defaultPurpose: defaultPurpose, defaultQuery: defaultQuery,
       _setState: function (s) { state = s; }, toCfg: toCfg
     };
