@@ -35,10 +35,9 @@ var CB_TAB = '형사사건';
 
 var CB_HEADER_ROW = 3;    // 머리글 줄
 var CB_FIRST_ROW = 4;     // 데이터 시작 줄
-var CB_NAME_COL = 3;      // C열 성명 — 데이터 마지막 줄을 찾는 기준
-var CB_INDICT_COL = 15;   // O열 — 전환 뒤 '공 소 장'
-var CB_RECORD_COL = 16;   // P열 — 전환 뒤 '증거기록' (열을 넣으면 여기가 생김)
-var CB_TODO_COL = 19;     // 체크할것 — 열을 넣은 뒤 기준 (원래 R=18 → S=19)
+
+/* 열 번호는 머리글 이름으로 그때그때 찾습니다.
+   왼쪽에 열이 늘어나도(예: 지위 열 추가) 엉뚱한 칸을 건드리지 않게 하기 위함입니다. */
 
 var CB_HEAD_INDICT = '공 소 장';
 var CB_HEAD_RECORD = '증거기록';
@@ -73,13 +72,19 @@ function cbProcess_(dryRun) {
   var sh = ss.getSheetByName(CB_TAB);
   if (!sh) return '[' + CB_TAB + '] 탭을 찾지 못했습니다.';
 
-  var split = isSplit_(sh);          // 이미 열이 나뉘어 있는가
-  var lastRow = lastDataRow_(sh);
+  var cols = cbCols_(sh);
+  if (!cols.indict || !cols.todo || !cols.name) {
+    return '열을 찾지 못했습니다 (공소장=' + cols.indict + ' 체크할것=' + cols.todo
+      + ' 성명=' + cols.name + '). 머리글을 확인해 주세요.';
+  }
+  var split = cols.record > 0;       // '증거기록' 머리글이 따로 있으면 이미 나뉜 것
+
+  var lastRow = lastDataRow_(sh, cols.name);
   if (lastRow < CB_FIRST_ROW) return '데이터가 없습니다.';
   var n = lastRow - CB_FIRST_ROW + 1;
 
-  // 나뉘기 전이면 O열 하나, 나뉜 뒤면 O·P 두 열을 읽는다
-  var src = sh.getRange(CB_FIRST_ROW, CB_INDICT_COL, n, split ? 2 : 1).getValues();
+  // 나뉘기 전이면 공소장 열 하나, 나뉜 뒤면 공소장·증거기록 두 열을 읽는다
+  var src = sh.getRange(CB_FIRST_ROW, cols.indict, n, split ? 2 : 1).getValues();
 
   var pairs = [];                    // 최종적으로 써 넣을 [공소장, 증거기록]
   var moved = [];                    // 체크할것으로 옮길 서면 내역
@@ -118,6 +123,9 @@ function cbProcess_(dryRun) {
   var out = [];
   out.push(dryRun ? '=== 미리보기 (시트는 바뀌지 않았습니다) ===' : '=== 적용 완료 ===');
   out.push('[' + CB_TAB + '] ' + CB_FIRST_ROW + '~' + lastRow + '행  ' + n + '건');
+  out.push('찾은 열 — 공소장 ' + cbLetter_(cols.indict)
+    + (cols.record ? ' / 증거기록 ' + cbLetter_(cols.record) : ' / 증거기록 (아직 없음)')
+    + ' / 체크할것 ' + cbLetter_(cols.todo) + ' / 성명 ' + cbLetter_(cols.name));
   out.push('');
   if (split) {
     out.push('※ 이미 열이 나뉘어 있습니다 — 열은 새로 만들지 않습니다.');
@@ -134,29 +142,34 @@ function cbProcess_(dryRun) {
 
   /* ── 여기부터 실제 변경 ── */
 
-  // ① 열 나누기 (처음 한 번만)
-  if (!split) sh.insertColumnAfter(CB_INDICT_COL);
+  // ① 열 나누기 (처음 한 번만). 새 열이 생기면 그 오른쪽 열 번호가 한 칸씩 밀린다.
+  var recordCol = cols.indict + 1;
+  var todoCol = cols.todo;
+  if (!split) {
+    sh.insertColumnAfter(cols.indict);
+    if (todoCol > cols.indict) todoCol++;
+  }
 
   // ② 머리글
-  sh.getRange(CB_HEADER_ROW, CB_INDICT_COL).setValue(CB_HEAD_INDICT);
-  sh.getRange(CB_HEADER_ROW, CB_RECORD_COL).setValue(CB_HEAD_RECORD);
+  sh.getRange(CB_HEADER_ROW, cols.indict).setValue(CB_HEAD_INDICT);
+  sh.getRange(CB_HEADER_ROW, recordCol).setValue(CB_HEAD_RECORD);
 
   // ③ 서면 내역을 체크할것으로 이동 (원래 내용이 있으면 아래 줄에 붙인다)
   moved.forEach(function (m) {
-    var cell = sh.getRange(m.row, CB_TODO_COL);
+    var cell = sh.getRange(m.row, todoCol);
     var prev = String(cell.getValue() == null ? '' : cell.getValue()).trim();
     cell.setValue(prev ? prev + '\n' + m.text : m.text);
   });
 
   // ④ 체크박스 — 363행 × 2열을 한 번에 (셀마다 반복하면 시간 초과)
-  var box = sh.getRange(CB_FIRST_ROW, CB_INDICT_COL, n, 2);
+  var box = sh.getRange(CB_FIRST_ROW, cols.indict, n, 2);
   box.insertCheckboxes();
   box.setValues(pairs);
   box.setHorizontalAlignment('center').setVerticalAlignment('middle');
 
   // ⑤ 모양
-  sh.setColumnWidth(CB_INDICT_COL, CB_WIDTH);
-  sh.setColumnWidth(CB_RECORD_COL, CB_WIDTH);
+  sh.setColumnWidth(cols.indict, CB_WIDTH);
+  sh.setColumnWidth(recordCol, CB_WIDTH);
 
   // ⑥ 수정로그에 한 줄
   try {
@@ -172,10 +185,24 @@ function cbProcess_(dryRun) {
 
 /* ── 판정 ── */
 
-// 이미 열이 나뉘었는지: 오른쪽 칸 머리글이 '증거기록' 인지로 판단
-function isSplit_(sh) {
-  var head = String(sh.getRange(CB_HEADER_ROW, CB_RECORD_COL).getValue() || '').replace(/\s/g, '');
-  return head.indexOf('증거기록') >= 0;
+/* 머리글 이름으로 열 번호를 찾는다.
+   나뉘기 전 머리글은 '공 소 장 / 증거기록' 한 칸이라 공백을 빼면 '공소장증거기록'.
+   '공소장' 으로 시작하니 indict 로 잡히고, record 는 정확히 '증거기록' 일 때만 잡히므로
+   아직 나뉘지 않았다는 사실이 record === 0 으로 자연스럽게 드러난다. */
+function cbCols_(sh) {
+  var lastCol = sh.getLastColumn();
+  var row = sh.getRange(CB_HEADER_ROW, 1, 1, lastCol).getValues()[0];
+  var out = { indict: 0, record: 0, todo: 0, name: 0 };
+
+  for (var c = 0; c < row.length; c++) {
+    var h = String(row[c] == null ? '' : row[c]).replace(/\s/g, '');
+    if (!h) continue;
+    if (!out.indict && h.indexOf('공소장') === 0) out.indict = c + 1;
+    else if (!out.record && h === '증거기록') out.record = c + 1;
+    else if (!out.todo && h.indexOf('체크할것') === 0) out.todo = c + 1;
+    else if (!out.name && h.indexOf('성명') === 0) out.name = c + 1;
+  }
+  return out;
 }
 
 // 로웨어 서면 제출 내역인지 ('[서면]' 이 있거나 날짜로 시작)
@@ -194,11 +221,19 @@ function mark_(flat, label) {
   return null;
 }
 
-// 성명(C열)이 채워진 마지막 줄까지를 데이터로 본다
-function lastDataRow_(sh) {
+// 열 번호 → 알파벳 (보고용). 다른 파일과 이름이 겹치지 않게 cb 를 붙였다.
+function cbLetter_(c) {
+  if (!c) return '-';
+  var s = '';
+  while (c > 0) { var m = (c - 1) % 26; s = String.fromCharCode(65 + m) + s; c = (c - m - 1) / 26; }
+  return s;
+}
+
+// 성명이 채워진 마지막 줄까지를 데이터로 본다
+function lastDataRow_(sh, nameCol) {
   var last = sh.getLastRow();
   if (last < CB_FIRST_ROW) return CB_FIRST_ROW - 1;
-  var names = sh.getRange(CB_FIRST_ROW, CB_NAME_COL, last - CB_FIRST_ROW + 1, 1).getValues();
+  var names = sh.getRange(CB_FIRST_ROW, nameCol, last - CB_FIRST_ROW + 1, 1).getValues();
   for (var i = names.length - 1; i >= 0; i--) {
     if (String(names[i][0] == null ? '' : names[i][0]).trim()) return CB_FIRST_ROW + i;
   }

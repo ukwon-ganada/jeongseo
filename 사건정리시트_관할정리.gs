@@ -24,10 +24,12 @@
 
 var TARGET_SHEET_ID = '1YCf77KxxotM4RnxePAhO16C7xbwEiHq4SuF5DN5vWto';
 
-// 손볼 탭과 열 위치 (M=13 관할, N=14 재판부)
+// 손볼 탭.
+//   형사사건 — 머리글 이름으로 열을 찾는다. 왼쪽에 열이 늘어나도 안 깨진다.
+//   종결     — 머리글이 없어 열 번호를 직접 적는다 (M=13 관할, N=14 재판부, L=12 사건번호)
 var CLEAN_TARGETS = [
-  { sheet: '형사사건', courtCol: 13, benchCol: 14, firstRow: 4 },
-  { sheet: '종결',     courtCol: 13, benchCol: 14, firstRow: 2 }
+  { sheet: '형사사건', headRow: 3, firstRow: 4 },
+  { sheet: '종결',     headRow: 0, firstRow: 2, courtCol: 13, benchCol: 14, caseCol: 12 }
 ];
 
 /* 전화 국번 → 법원.
@@ -83,14 +85,21 @@ function process_(dryRun) {
     var sh = ss.getSheetByName(t.sheet);
     if (!sh) { lines.push('[' + t.sheet + '] 탭을 찾지 못했습니다 — 건너뜁니다'); return; }
 
-    var first = detectFirstRow_(sh, t);
+    var cols = resolveCleanCols_(sh, t);
+    if (!cols.bench || !cols.court || !cols.caseNo) {
+      lines.push('[' + t.sheet + '] 관할·재판부·사건번호 열을 찾지 못해 건너뜁니다'
+        + ' (관할=' + cols.court + ' 재판부=' + cols.bench + ' 사건번호=' + cols.caseNo + ')');
+      return;
+    }
+
+    var first = t.headRow ? t.headRow + 1 : t.firstRow;
     var last = sh.getLastRow();
     if (last < first) { lines.push('[' + t.sheet + '] 데이터가 없습니다'); return; }
     var n = last - first + 1;
 
-    var benchRange = sh.getRange(first, t.benchCol, n, 1);
-    var courtRange = sh.getRange(first, t.courtCol, n, 1);
-    var caseRange = sh.getRange(first, t.benchCol - 2, n, 1);   // L열 사건번호
+    var benchRange = sh.getRange(first, cols.bench, n, 1);
+    var courtRange = sh.getRange(first, cols.court, n, 1);
+    var caseRange = sh.getRange(first, cols.caseNo, n, 1);
 
     var bench = benchRange.getValues();
     var notes = benchRange.getNotes();
@@ -136,8 +145,10 @@ function process_(dryRun) {
       if (changedBench) { benchRange.setValues(bench); benchRange.setNotes(notes); }
       if (changedCourt) courtRange.setValues(court);
     }
-    lines.push('[' + t.sheet + '] ' + first + '~' + last + '행  재판부 정리 '
-      + changedBench + '건 / 관할 채움 ' + changedCourt + '건');
+    lines.push('[' + t.sheet + '] ' + first + '~' + last + '행'
+      + '  (관할=' + clLetter_(cols.court) + ' 재판부=' + clLetter_(cols.bench)
+      + ' 사건번호=' + clLetter_(cols.caseNo) + ')'
+      + '  재판부 정리 ' + changedBench + '건 / 관할 채움 ' + changedCourt + '건');
   });
 
   var out = [];
@@ -229,13 +240,34 @@ function guessCourt_(caseNo, bench) {
 
 /* ── 도구 ── */
 
-// 머리글 행이 밀렸을 수도 있으니 '재판부'가 적힌 줄을 찾아 그 다음부터 읽음
-function detectFirstRow_(sh, t) {
-  var probe = sh.getRange(1, t.benchCol, Math.min(10, sh.getLastRow()), 1).getValues();
-  for (var i = 0; i < probe.length; i++) {
-    if (String(probe[i][0] || '').replace(/\s/g, '').indexOf('재판부') >= 0) return i + 2;
+// 열 번호를 정한다.
+// 머리글이 있으면 이름으로 찾고(열이 밀려도 안전), 없으면 적어둔 번호를 쓴다.
+//   '관할' 과 '관할경찰서', '사건번호' 와 '경찰사건번호' 가 헷갈리지 않도록
+//   공백을 뺀 머리글이 정확히 일치할 때만 잡는다.
+function resolveCleanCols_(sh, t) {
+  if (!t.headRow) return { court: t.courtCol, bench: t.benchCol, caseNo: t.caseCol };
+
+  var lastCol = sh.getLastColumn();
+  var row = sh.getRange(t.headRow, 1, 1, lastCol).getValues()[0];
+  var out = { court: 0, bench: 0, caseNo: 0 };
+
+  for (var c = 0; c < row.length; c++) {
+    var h = String(row[c] == null ? '' : row[c]).replace(/\s/g, '');
+    if (!h) continue;
+    if (!out.bench && h.indexOf('재판부') === 0) out.bench = c + 1;
+    else if (!out.caseNo && h === '사건번호') out.caseNo = c + 1;
+    else if (!out.court && h === '관할') out.court = c + 1;
   }
-  return t.firstRow;
+  return out;
+}
+
+// 열 번호 → 알파벳 (보고용).
+// 서식 파일에도 같은 일을 하는 colLetter_ 가 있는데, Apps Script 는 파일끼리
+// 전역 이름을 공유하므로 겹치지 않게 다른 이름을 쓴다.
+function clLetter_(c) {
+  var s = '';
+  while (c > 0) { var m = (c - 1) % 26; s = String.fromCharCode(65 + m) + s; c = (c - m - 1) / 26; }
+  return s;
 }
 
 function backupBeforeCleanup_() {
