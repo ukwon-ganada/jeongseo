@@ -32,21 +32,29 @@
 
 var FM_SHEET_ID = '1YCf77KxxotM4RnxePAhO16C7xbwEiHq4SuF5DN5vWto';
 
-/* ── 색 ── */
-var C_HEAD_BG = '#1f3864';   // 머리글 남색
+/* ── 색 — 무채색(검정·흰색·회색)만 씁니다 ──
+   기일 임박은 색상 대신 회색 농도와 글자 굵기로 구분합니다. */
+var C_HEAD_BG = '#000000';   // 머리글 검정
 var C_HEAD_FG = '#ffffff';
-var C_TITLE = '#1f3864';
+var C_TITLE = '#000000';
 var C_RULE = '#d9d9d9';      // 가로 구분선
-var C_BAR = '#1a73e8';       // 왼쪽 색 막대
+var C_BAR = '#000000';       // 왼쪽 막대
 var C_BODY_BG = '#ffffff';
 var C_SUB_BG = '#f2f2f2';    // 안내문 항목명 바탕
 
-var C_D7_BG = '#fce8e6', C_D7_FG = '#c5221f';    // 기일 7일 이내
-var C_D14_BG = '#fef4e5', C_D14_FG = '#b06000';  // 기일 14일 이내
-var C_PAST_FG = '#9e9e9e';                        // 지난 기일
+var C_D7_BG = '#e0e0e0', C_D7_FG = '#000000';    // 기일 7일 이내 — 진한 회색 + 굵게
+var C_D14_BG = '#f2f2f2', C_D14_FG = '#000000';  // 기일 14일 이내 — 연회색
+var C_PAST_FG = '#9e9e9e';                        // 지난 기일 — 회색 글씨
 
 var FONT = '맑은 고딕';
 var SIZE = 10;
+
+// 왼쪽에 고정할 열 수 (번호·구속여부·성명). 0 으로 두면 열 고정을 하지 않습니다.
+var FREEZE_COLS = 3;
+
+// 제목. 병합을 풀면 옆 칸으로 넘쳐 흐르는데, 열 고정선을 넘지는 못합니다.
+// 그래서 고정 범위(A~C) 안에 들어가도록 짧게 씁니다.
+var TITLE_TEXT = '형사사건 관리표';
 
 var BLUE_MARK = '#e8f0fe';   // 지금 칠해져 있는 파란 줄 색
 
@@ -173,10 +181,15 @@ function styleTab_(sh, t, lastRow, lastCol, heads, barRows) {
   // 굳어 있던 조건부 서식도 정리
   sh.setConditionalFormatRules([]);
 
-  // ② 제목 (형사사건 탭만)
+  // ② 열 고정선을 가로지르는 병합을 먼저 푼다.
+  //    (제목 B1:S1 이 병합돼 있으면 구글시트가 열 고정을 거부한다)
+  var unmerged = unmergeStraddling_(sh, FREEZE_COLS);
+  if (unmerged.length) Logger.log('[' + t.name + '] 열 고정을 위해 병합 해제: ' + unmerged.join(', '));
+
+  // ③ 제목 (형사사건 탭만)
   if (t.titleCell) {
     sh.getRange(t.titleCell)
-      .setValue('법무법인 정서 · 형사사건 관리표')
+      .setValue(TITLE_TEXT)
       .setFontSize(14).setFontWeight('bold').setFontColor(C_TITLE)
       .setHorizontalAlignment('left').setBackground(C_BODY_BG);
     sh.setRowHeight(1, 34);
@@ -236,13 +249,21 @@ function styleTab_(sh, t, lastRow, lastCol, heads, barRows) {
   if (dateCol) applyDateRules_(sh, t, n, lastCol, dateCol);
 
   // ⑪ 틀 고정 · 필터 · 눈금선
-  sh.setFrozenRows(t.headRow ? t.headRow : 0);
-  sh.setFrozenColumns(Math.min(3, lastCol));
+  //    하나가 실패해도 나머지 탭 작업이 멈추지 않도록 각각 감싼다
+  try { sh.setFrozenRows(t.headRow ? t.headRow : 0); } catch (err) { logSkip_('행 고정', t.name, err); }
+  try {
+    sh.setFrozenColumns(Math.min(FREEZE_COLS, lastCol));
+  } catch (err) {
+    logSkip_('열 고정', t.name, err);
+    try { sh.setFrozenColumns(0); } catch (e2) { /* 무시 */ }
+  }
   try { sh.setHiddenGridlines(true); } catch (err) { /* 구버전 대비 */ }
   if (t.headRow) {
-    var f = sh.getFilter();
-    if (f) f.remove();
-    sh.getRange(t.headRow, 1, lastRow - t.headRow + 1, lastCol).createFilter();
+    try {
+      var f = sh.getFilter();
+      if (f) f.remove();
+      sh.getRange(t.headRow, 1, lastRow - t.headRow + 1, lastCol).createFilter();
+    } catch (err) { logSkip_('필터', t.name, err); }
   }
   if (t.tabColor) sh.setTabColor(t.tabColor);
 }
@@ -257,7 +278,7 @@ function applyDateRules_(sh, t, n, lastCol, dateCol) {
   var rules = [
     SpreadsheetApp.newConditionalFormatRule()
       .whenFormulaSatisfied('=' + has + ',' + d + '>=TODAY(),' + d + '<=TODAY()+7)')
-      .setBackground(C_D7_BG).setFontColor(C_D7_FG).setRanges([range]).build(),
+      .setBackground(C_D7_BG).setFontColor(C_D7_FG).setBold(true).setRanges([range]).build(),
     SpreadsheetApp.newConditionalFormatRule()
       .whenFormulaSatisfied('=' + has + ',' + d + '>TODAY()+7,' + d + '<=TODAY()+14)')
       .setBackground(C_D14_BG).setFontColor(C_D14_FG).setRanges([range]).build(),
@@ -358,6 +379,29 @@ function blueRows_(sh, t, lastRow) {
     if (String(bg[i][0]).toLowerCase() === BLUE_MARK) rows.push(t.firstRow + i);
   }
   return rows;
+}
+
+// 열 고정선을 가로지르는 병합을 푼다.
+// 구글시트는 '병합된 셀의 일부만 포함된 열'을 고정하지 못한다.
+// 병합을 풀어도 값은 왼쪽 위 칸에 그대로 남는다.
+function unmergeStraddling_(sh, freezeCols) {
+  if (!freezeCols) return [];
+  var undone = [];
+  sh.getRange(1, 1, Math.max(sh.getLastRow(), 1), Math.max(sh.getLastColumn(), 1))
+    .getMergedRanges().forEach(function (m) {
+      var c1 = m.getColumn();
+      var c2 = c1 + m.getNumColumns() - 1;
+      // 고정선(freezeCols 와 그 다음 열 사이)을 걸치고 있으면 푼다
+      if (c1 <= freezeCols && c2 > freezeCols) {
+        undone.push(m.getA1Notation());
+        m.breakApart();
+      }
+    });
+  return undone;
+}
+
+function logSkip_(what, tab, err) {
+  Logger.log('[' + tab + '] ' + what + ' 건너뜀 — ' + err);
 }
 
 function lastRow_(sh, t) {
