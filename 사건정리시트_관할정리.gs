@@ -24,12 +24,13 @@
 
 var TARGET_SHEET_ID = '1YCf77KxxotM4RnxePAhO16C7xbwEiHq4SuF5DN5vWto';
 
-// 손볼 탭.
-//   형사사건 — 머리글 이름으로 열을 찾는다. 왼쪽에 열이 늘어나도 안 깨진다.
-//   종결     — 머리글이 없어 열 번호를 직접 적는다 (M=13 관할, N=14 재판부, L=12 사건번호)
+/* 손볼 탭 — 형사사건 하나뿐입니다.
+   열은 머리글 이름으로 찾으므로 왼쪽에 열이 늘어나도 깨지지 않습니다.
+
+   종결 탭은 대상에서 뺐습니다. 열 배치가 바뀌면서 재판부 열이 아예 없어져
+   관할정리가 할 일이 없고, 옛 열 번호를 그대로 두면 엉뚱한 칸을 건드립니다. */
 var CLEAN_TARGETS = [
-  { sheet: '형사사건', headRow: 3, firstRow: 4 },
-  { sheet: '종결',     headRow: 0, firstRow: 2, courtCol: 13, benchCol: 14, caseCol: 12 }
+  { sheet: '형사사건', headRow: 3, firstRow: 4 }
 ];
 
 /* 전화 국번 → 법원.
@@ -245,8 +246,6 @@ function guessCourt_(caseNo, bench) {
 //   '관할' 과 '관할경찰서', '사건번호' 와 '경찰사건번호' 가 헷갈리지 않도록
 //   공백을 뺀 머리글이 정확히 일치할 때만 잡는다.
 function resolveCleanCols_(sh, t) {
-  if (!t.headRow) return { court: t.courtCol, bench: t.benchCol, caseNo: t.caseCol };
-
   var lastCol = sh.getLastColumn();
   var row = sh.getRange(t.headRow, 1, 1, lastCol).getValues()[0];
   var out = { court: 0, bench: 0, caseNo: 0 };

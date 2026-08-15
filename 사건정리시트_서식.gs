@@ -46,6 +46,14 @@ var C_D7_BG = '#e0e0e0', C_D7_FG = '#000000';    // 기일 7일 이내 — 진�
 var C_D14_BG = '#f2f2f2', C_D14_FG = '#000000';  // 기일 14일 이내 — 연회색
 var C_PAST_FG = '#9e9e9e';                        // 지난 기일 — 회색 글씨
 
+/* 단계 칸에만 쓰는 색. 표 전체는 무채색이고 여기 한 군데만 색이 있어야
+   눈이 바로 갑니다. 지위단계 스크립트의 STAGES 와 같은 값을 씁니다. */
+var FM_STAGES = [
+  { label: '①경찰', bg: '#eceff1', fg: '#37474f' },
+  { label: '②검찰', bg: '#e1f0fa', fg: '#0b4f6c' },
+  { label: '③재판', bg: '#fce8e6', fg: '#b3261e' }
+];
+
 var FONT = '맑은 고딕';
 var SIZE = 10;
 
@@ -59,23 +67,29 @@ var TITLE_TEXT = '형사사건 관리표';
 var BLUE_MARK = '#e8f0fe';   // 지금 칠해져 있는 파란 줄 색
 
 // 왼쪽 정렬할 머리글 (공백 제거 후 부분일치)
-var LEFT_HEADS = ['성명', '사건명', '선임계', '관할경찰서', '담당수사관', '검사',
-  '재판부', '체크할것', '체크', '항소여부', '상고여부', '1심관할법원'];
+var LEFT_HEADS = ['성명', '이름', '사건명', '선임계', '관할경찰서', '담당수사관', '검사',
+  '재판부', '체크할것', '체크', '항소여부', '상고여부', '1심관할법원',
+  '결과', '비고', '법원'];
 
 // 열 너비 (머리글 부분일치 → 픽셀)
 var WIDTHS = [
-  ['성명', 100], ['지위', 90], ['사건명', 230], ['선임계', 120], ['관할경찰서', 110],
-  ['경찰사건번호', 100], ['담당수사관', 120], ['이의여부', 80], ['형제번호', 110],
-  ['검사', 110], ['사건번호', 130], ['관할', 140], ['재판부', 160],
-  ['공소장', 70], ['증거기록', 70], ['기일', 120], ['피해자연락처', 120],
-  ['체크할것', 220], ['항소여부', 130], ['구속여부', 100]
+  ['성명', 100], ['이름', 100], ['지위', 90], ['단계', 80], ['사건명', 230], ['선임계', 120],
+  ['관할경찰서', 110], ['경찰사건번호', 100], ['담당수사관', 120], ['결정', 80],
+  ['이의여부', 80], ['형제번호', 110], ['관할검찰청', 120], ['검사', 110],
+  ['사건번호', 130], ['관할', 140], ['재판부', 160],
+  ['공소장', 70], ['증거기록', 70], ['기일', 120], ['법정', 100],
+  ['피해자연락처', 120], ['체크할것', 220], ['항소여부', 130], ['구속여부', 100],
+  ['법원', 140], ['약식명령일', 110], ['정식재판청구기한', 130],
+  ['결과', 220], ['비고', 200]
 ];
 
-// 탭별 구조: 머리글 줄 / 데이터 시작 줄 / 성명 열
+// 탭별 구조: 머리글 줄 / 데이터 시작 줄 / 성명(이름) 열
+// 종결은 머리글을 넣은 뒤 기준(1행). 아직 안 넣었으면 머리글 처리만 건너뛴다.
 var FM_TABS = [
   { name: '형사사건', headRow: 3, firstRow: 4, nameCol: 3, titleCell: 'B1', tabColor: '#1f3864' },
   { name: '항소사건', headRow: 2, firstRow: 3, nameCol: 3, tabColor: '#0b8043' },
-  { name: '종결', headRow: 0, firstRow: 2, nameCol: 3, tabColor: '#999999' }
+  { name: '약식명령', headRow: 2, firstRow: 3, nameCol: 2, tabColor: '#8e24aa' },
+  { name: '종결', headRow: 1, firstRow: 2, nameCol: 3, tabColor: '#999999' }
 ];
 
 /* ── 실행 ── */
@@ -132,6 +146,13 @@ function fmProcess_(dryRun) {
     var lastCol = Math.max(sh.getLastColumn(), 4);
     if (lastRow < t.firstRow) { out.push('[' + t.name + '] 데이터 없음'); return; }
     var n = lastRow - t.firstRow + 1;
+
+    // 머리글 줄이 실제로 채워져 있는지 본다.
+    // 종결 탭은 머리글을 아직 안 넣었을 수 있어, 빈 줄을 남색으로 칠하지 않도록 한다.
+    var headRow = t.headRow;
+    if (headRow && !hasHeader_(sh, headRow, lastCol)) headRow = 0;
+    t = { name: t.name, headRow: headRow, firstRow: t.firstRow, nameCol: t.nameCol,
+          titleCell: t.titleCell, tabColor: t.tabColor };
 
     var heads = t.headRow ? headMap_(sh, t.headRow, lastCol) : {};
     var barRows = blueRows_(sh, t, lastRow);
@@ -217,8 +238,9 @@ function styleTab_(sh, t, lastRow, lastCol, heads, barRows) {
       if (c) sh.getRange(t.firstRow, c, n, 1).setHorizontalAlignment('left');
     });
   } else {
-    // 머리글이 없는 종결 탭 — 형사사건과 같은 배치로 보고 고정 지정
-    [3, 4, 5, 6, 8, 11, 14, 18].forEach(function (c) {
+    // 아직 머리글이 없는 탭 — 종결의 현재 배치에 맞춰 고정 지정
+    // C 성명 · D 사건명 · E 선임계 · K 결과 · L 비고
+    [3, 4, 5, 11, 12].forEach(function (c) {
       if (c <= lastCol) sh.getRange(t.firstRow, c, n, 1).setHorizontalAlignment('left');
     });
   }
@@ -244,9 +266,8 @@ function styleTab_(sh, t, lastRow, lastCol, heads, barRows) {
       .setBorder(null, true, null, null, null, null, C_BAR, SpreadsheetApp.BorderStyle.SOLID_THICK);
   });
 
-  // ⑩ 기일 조건부 서식 — 매일 저절로 갱신
-  var dateCol = heads['기일'];
-  if (dateCol) applyDateRules_(sh, t, n, lastCol, dateCol);
+  // ⑩ 조건부 서식 — 기일 색(매일 자동 갱신) + 단계 칸 색
+  applyRules_(sh, t, n, lastCol, heads);
 
   // ⑪ 틀 고정 · 필터 · 눈금선
   //    하나가 실패해도 나머지 탭 작업이 멈추지 않도록 각각 감싼다
@@ -268,24 +289,44 @@ function styleTab_(sh, t, lastRow, lastCol, heads, barRows) {
   if (t.tabColor) sh.setTabColor(t.tabColor);
 }
 
-// 기일 문자열 앞 10글자(YYYY-MM-DD)를 날짜로 읽어 색을 넣는다
-function applyDateRules_(sh, t, n, lastCol, dateCol) {
-  var range = sh.getRange(t.firstRow, 1, n, lastCol);
-  var ref = '$' + colLetter_(dateCol) + t.firstRow;
-  var d = 'IFERROR(DATEVALUE(LEFT(' + ref + ',10)),0)';
-  var has = 'AND(' + ref + '<>"",' + d + '>0';
+/* 조건부 서식을 한 번에 다시 세운다.
+     · 기일 — 문자열 앞 10글자(YYYY-MM-DD)를 날짜로 읽어 임박도를 회색 농도로
+     · 단계 — ①경찰 ②검찰 ③재판 칸에만 색
 
-  var rules = [
-    SpreadsheetApp.newConditionalFormatRule()
+   서식 스크립트는 규칙을 통째로 갈아끼우므로, 단계 색도 여기서 함께 세워야
+   서식을 돌린 뒤 색이 사라지지 않는다. 지위단계 스크립트의 색과 같은 값이다. */
+function applyRules_(sh, t, n, lastCol, heads) {
+  var rules = [];
+
+  var dateCol = heads['기일'];
+  if (dateCol) {
+    var wide = sh.getRange(t.firstRow, 1, n, lastCol);
+    var ref = '$' + colLetter_(dateCol) + t.firstRow;
+    var d = 'IFERROR(DATEVALUE(LEFT(' + ref + ',10)),0)';
+    var has = 'AND(' + ref + '<>"",' + d + '>0';
+
+    rules.push(SpreadsheetApp.newConditionalFormatRule()
       .whenFormulaSatisfied('=' + has + ',' + d + '>=TODAY(),' + d + '<=TODAY()+7)')
-      .setBackground(C_D7_BG).setFontColor(C_D7_FG).setBold(true).setRanges([range]).build(),
-    SpreadsheetApp.newConditionalFormatRule()
+      .setBackground(C_D7_BG).setFontColor(C_D7_FG).setBold(true).setRanges([wide]).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule()
       .whenFormulaSatisfied('=' + has + ',' + d + '>TODAY()+7,' + d + '<=TODAY()+14)')
-      .setBackground(C_D14_BG).setFontColor(C_D14_FG).setRanges([range]).build(),
-    SpreadsheetApp.newConditionalFormatRule()
+      .setBackground(C_D14_BG).setFontColor(C_D14_FG).setRanges([wide]).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule()
       .whenFormulaSatisfied('=' + has + ',' + d + '<TODAY())')
-      .setFontColor(C_PAST_FG).setRanges([range]).build()
-  ];
+      .setFontColor(C_PAST_FG).setRanges([wide]).build());
+  }
+
+  var stageCol = heads['단계'];
+  if (stageCol) {
+    var narrow = sh.getRange(t.firstRow, stageCol, n, 1);
+    FM_STAGES.forEach(function (s) {
+      rules.push(SpreadsheetApp.newConditionalFormatRule()
+        .whenTextEqualTo(s.label)
+        .setBackground(s.bg).setFontColor(s.fg).setBold(true)
+        .setRanges([narrow]).build());
+    });
+  }
+
   sh.setConditionalFormatRules(rules);
 }
 
@@ -346,12 +387,27 @@ function valueChecksum_() {
 
 /* ── 도구 ── */
 
+// 그 줄에 글자가 하나라도 있는지 (머리글이 실제로 있는지 판정)
+function hasHeader_(sh, row, lastCol) {
+  if (row < 1 || row > sh.getMaxRows()) return false;
+  var v = sh.getRange(row, 1, 1, lastCol).getValues()[0];
+  for (var i = 0; i < v.length; i++) {
+    if (String(v[i] == null ? '' : v[i]).trim()) return true;
+  }
+  return false;
+}
+
 // 머리글 글자에서 공백을 뺀 뒤, 미리 정한 이름과 부분일치로 열을 찾는다
 function headMap_(sh, headRow, lastCol) {
-  var keys = ['구속여부', '성명', '지위', '사건명', '선임계', '관할경찰서', '경찰사건번호',
-    '담당수사관', '이의여부', '형제번호', '검사', '사건번호', '관할', '재판부',
-    '공소장', '증거기록', '기일', '피해자연락처', '체크할것', '체크', '항소여부',
-    '상고여부', '1심사건번호', '1심관할법원', '법정'];
+  /* 순서가 중요하다. 앞에서부터 부분일치로 잡으므로 구체적인 것을 먼저 둔다.
+     '관할경찰서' 와 '관할검찰청' 을 '관할' 보다 앞에 두지 않으면
+     그 둘이 진짜 '관할' 열로 오인식된다. */
+  var keys = ['구속여부', '성명', '이름', '지위', '단계', '사건명', '선임계',
+    '관할경찰서', '관할검찰청', '경찰사건번호', '담당수사관', '결정', '이의여부',
+    '형제번호', '검사', '사건번호', '관할', '재판부',
+    '공소장', '증거기록', '기일', '법정', '피해자연락처', '체크할것', '체크',
+    '항소여부', '상고여부', '1심사건번호', '1심관할법원',
+    '법원', '약식명령일', '정식재판청구기한', '결과', '비고'];
   var row = sh.getRange(headRow, 1, 1, lastCol).getValues()[0];
   var map = {};
   for (var c = 0; c < row.length; c++) {
