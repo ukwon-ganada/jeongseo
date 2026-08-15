@@ -1,16 +1,20 @@
-/* 법무법인 정서 — 사건정리 구글시트 수정 로그
+/* 법무법인 정서 — 사건정리 구글시트 수정 로그 + 매일 자동 백업
    ───────────────────────────────────────────────────────────────
-   시트에 [수정로그] 탭을 만들고, 누가·언제·어느 탭 어느 칸을·무엇에서 무엇으로
-   바꿨는지 자동으로 쌓습니다. 행/열/탭의 추가·삭제도 함께 기록합니다.
+   ① [수정로그] 탭에 누가·언제·어느 탭 어느 칸을 무엇에서 무엇으로 바꿨는지
+      자동으로 쌓습니다. 행/열/탭의 추가·삭제도 함께 기록합니다.
+   ② 매일 밤 9시에 시트 전체를 통째로 복사해 [사건정리 백업] 폴더에 넣습니다.
+      30일이 지난 백업은 자동으로 휴지통에 보냅니다.
 
    설치 방법
-     1) 사건정리 시트에서 [확장 프로그램] → [Apps Script]
-     2) 기존 코드를 지우고 이 파일 전체를 붙여넣기 → 저장(디스크 아이콘)
-     3) 위쪽 함수 선택창에서 setup 을 고르고 [실행]
-     4) 권한 승인 창이 뜨면 승인 (본인 구글 계정 선택 → 고급 → 이동 → 허용)
-     5) [수정로그] 탭이 생기고 "설치 완료" 한 줄이 적히면 끝
+     1) 저장 (디스크 아이콘 또는 Ctrl+S)  ← 저장해야 함수 목록이 뜹니다
+     2) 위쪽 함수 선택창에서  setup  을 고르고 [실행]
+     3) 권한 승인 (계정 선택 → 고급 → 이동 → 허용)
+        · 시트와 드라이브 접근 권한을 함께 물어봅니다. 백업을 만들려면 필요합니다.
+     4) 실행 로그에 "설치 완료"가 뜨면 끝
 
-   되돌리기(제거): 함수 선택창에서 uninstall 실행 → 기록은 남고 수집만 멈춤
+   확인·중지
+     · 백업을 지금 당장 한 번 받아보고 싶으면  runBackupNow  실행
+     · 전부 중지하려면  uninstall  실행 (이미 쌓인 기록과 백업은 그대로 남습니다)
 
    알아두실 것
      · 편집자 이름은 편집한 사람이 구글 계정으로 로그인해 있어야 남습니다.
@@ -18,13 +22,23 @@
        링크로만 들어와 고치면 '(로그인 정보 없음)'으로 기록됩니다.
        누가 고쳤는지를 확실히 남기려면 공유를 '지정된 사용자'로 바꾸셔야 합니다.
      · 여러 칸을 한 번에 붙여넣으면 '이전 값'은 남지 않습니다(구글 제한).
-     · 스크립트나 되돌리기(Ctrl+Z)로 생긴 변경도 편집으로 기록됩니다.
+     · 구글은 시각을 정확히 21:00에 맞춰주지 않습니다. 21시 전후로 실행됩니다.
    ─────────────────────────────────────────────────────────────── */
 
-var LOG_SHEET = '수정로그';   // 로그 탭 이름
-var MAX_LOG_ROWS = 5000;      // 이 수를 넘으면 오래된 기록부터 지움
-var MAX_LEN = 200;            // 한 칸에 기록할 최대 글자 수
-var LOG_FORMAT_CHANGES = false; // 글꼴·색 등 서식 변경도 남기려면 true
+/* ── 설정 (여기만 바꾸시면 됩니다) ── */
+
+var SHEET_ID = '1YCf77KxxotM4RnxePAhO16C7xbwEiHq4SuF5DN5vWto';  // 사건정리 시트
+var BACKUP_HOUR = 21;              // 백업 시각 (24시간제, 21 = 밤 9시)
+var BACKUP_FOLDER_NAME = '사건정리 백업';
+var BACKUP_KEEP_DAYS = 30;         // 이보다 오래된 백업은 휴지통으로
+var TIMEZONE = 'Asia/Seoul';
+
+var LOG_SHEET = '수정로그';        // 로그 탭 이름
+var MAX_LOG_ROWS = 5000;           // 이 수를 넘으면 오래된 기록부터 지움
+var MAX_LEN = 200;                 // 한 칸에 기록할 최대 글자 수
+var LOG_FORMAT_CHANGES = false;    // 글꼴·색 등 서식 변경도 남기려면 true
+
+/* ─────────────────────────────────────────────────────────────── */
 
 var HEADERS = ['시각', '편집자', '탭', '위치', '이전 값', '새 값', '종류'];
 
@@ -42,30 +56,102 @@ var CHANGE_LABEL = {
 /* ── 설치 / 제거 ── */
 
 function setup() {
-  var ss = SpreadsheetApp.getActive();
+  var ss = book_();
   ensureLogSheet_(ss);
   removeTriggers_();
+
   ScriptApp.newTrigger('logEdit').forSpreadsheet(ss).onEdit().create();
   ScriptApp.newTrigger('logChange').forSpreadsheet(ss).onChange().create();
-  append_(ss, currentUser_(), '-', '-', '', '수정 로그 설치 완료', '설치');
-  try {
-    SpreadsheetApp.getUi().alert('[수정로그] 탭 설치가 끝났습니다.\n이제부터 모든 수정이 자동으로 기록됩니다.');
-  } catch (err) { /* 편집기에서 직접 실행한 경우 알림창이 없음 */ }
+  ScriptApp.newTrigger('dailyBackup').timeBased()
+    .everyDays(1).atHour(BACKUP_HOUR).nearMinute(0).create();
+
+  append_(ss, currentUser_(), '-', '-', '',
+    '수정 로그 설치 + 매일 ' + BACKUP_HOUR + '시 자동 백업 예약', '설치');
+
+  var tz = Session.getScriptTimeZone();
+  var msg = '설치 완료\n'
+    + '· 대상 시트: ' + ss.getName() + '\n'
+    + '· 수정 기록: [' + LOG_SHEET + '] 탭에 자동으로 쌓입니다\n'
+    + '· 자동 백업: 매일 ' + BACKUP_HOUR + '시 전후, [' + BACKUP_FOLDER_NAME + '] 폴더\n'
+    + '· 보관 기간: ' + BACKUP_KEEP_DAYS + '일\n'
+    + '· 프로젝트 시간대: ' + tz
+    + (tz === TIMEZONE ? '' : '  ← ' + TIMEZONE + ' 이 아닙니다. 왼쪽 톱니바퀴(프로젝트 설정)에서 바꿔주세요');
+
+  Logger.log(msg);
+  alert_(msg);
 }
 
 function uninstall() {
   removeTriggers_();
-  append_(SpreadsheetApp.getActive(), currentUser_(), '-', '-', '', '수정 로그 수집 중지', '설치');
+  append_(book_(), currentUser_(), '-', '-', '', '수정 로그·자동 백업 중지', '설치');
+  Logger.log('중지했습니다. 이미 쌓인 기록과 백업 파일은 그대로 남아 있습니다.');
 }
 
 function removeTriggers_() {
+  var mine = { logEdit: 1, logChange: 1, dailyBackup: 1 };
   ScriptApp.getProjectTriggers().forEach(function (t) {
-    var fn = t.getHandlerFunction();
-    if (fn === 'logEdit' || fn === 'logChange') ScriptApp.deleteTrigger(t);
+    if (mine[t.getHandlerFunction()]) ScriptApp.deleteTrigger(t);
   });
 }
 
-/* ── 기록 ── */
+/* ── 매일 자동 백업 ── */
+
+function dailyBackup() {
+  var stamp = Utilities.formatDate(new Date(), TIMEZONE, 'yyyy-MM-dd HH:mm');
+  var name = '[백업] 사건정리 — ' + stamp;
+
+  var folder = backupFolder_();
+  var copy = DriveApp.getFileById(SHEET_ID).makeCopy(name, folder);
+
+  var removed = pruneOldBackups_(folder);
+
+  var note = name + ' 저장'
+    + (removed ? ' / ' + BACKUP_KEEP_DAYS + '일 지난 백업 ' + removed + '건 정리' : '');
+  Logger.log(note + '\n' + copy.getUrl());
+
+  try {
+    append_(book_(), '자동', '-', '-', '', note, '백업');
+  } catch (err) {
+    Logger.log('백업은 됐으나 로그 기록에 실패: ' + err);
+  }
+  return copy.getUrl();
+}
+
+// 지금 한 번 받아보기 (손으로 실행하는 용도)
+function runBackupNow() {
+  var url = dailyBackup();
+  alert_('백업을 만들었습니다.\n\n' + url);
+}
+
+function backupFolder_() {
+  var props = PropertiesService.getScriptProperties();
+  var id = props.getProperty('BACKUP_FOLDER_ID');
+
+  if (id) {
+    try {
+      var f = DriveApp.getFolderById(id);
+      if (!f.isTrashed()) return f;
+    } catch (err) { /* 지워졌으면 아래에서 새로 만듦 */ }
+  }
+
+  var found = DriveApp.getFoldersByName(BACKUP_FOLDER_NAME);
+  var folder = found.hasNext() ? found.next() : DriveApp.createFolder(BACKUP_FOLDER_NAME);
+  props.setProperty('BACKUP_FOLDER_ID', folder.getId());
+  return folder;
+}
+
+function pruneOldBackups_(folder) {
+  var cutoff = new Date().getTime() - BACKUP_KEEP_DAYS * 24 * 60 * 60 * 1000;
+  var files = folder.getFiles();
+  var n = 0;
+  while (files.hasNext()) {
+    var f = files.next();
+    if (f.getDateCreated().getTime() < cutoff) { f.setTrashed(true); n++; }
+  }
+  return n;
+}
+
+/* ── 수정 기록 ── */
 
 // 셀 값이 바뀔 때
 function logEdit(e) {
@@ -73,7 +159,7 @@ function logEdit(e) {
   var sh = e.range.getSheet();
   if (sh.getName() === LOG_SHEET) return;   // 로그 탭 자체 편집은 남기지 않음
 
-  var ss = e.source || SpreadsheetApp.getActive();
+  var ss = e.source || book_();
   var where = e.range.getA1Notation();
   var count = e.range.getNumRows() * e.range.getNumColumns();
 
@@ -95,7 +181,7 @@ function logChange(e) {
   if (e.changeType === 'FORMAT' && !LOG_FORMAT_CHANGES) return;
 
   var label = CHANGE_LABEL[e.changeType] || e.changeType;
-  var ss = SpreadsheetApp.getActive();
+  var ss = book_();
   var name = '-';
   try { name = ss.getActiveSheet().getName(); } catch (err) { /* 탭 삭제 직후 등 */ }
   if (name === LOG_SHEET) return;
@@ -104,6 +190,12 @@ function logChange(e) {
 }
 
 /* ── 내부 도구 ── */
+
+// 대상 시트. ID 를 직접 지정하므로 독립 프로젝트에서도, 시간 기반 실행에서도 동작함
+function book_() {
+  if (SHEET_ID) return SpreadsheetApp.openById(SHEET_ID);
+  return SpreadsheetApp.getActive();
+}
 
 function ensureLogSheet_(ss) {
   var sh = ss.getSheetByName(LOG_SHEET);
@@ -158,7 +250,7 @@ function currentUser_() {
 function cut_(v) {
   if (v === null || v === undefined) return '';
   var s = (v instanceof Date)
-    ? Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm')
+    ? Utilities.formatDate(v, TIMEZONE, 'yyyy-MM-dd HH:mm')
     : String(v);
   s = s.replace(/\n/g, ' ');
   return s.length > MAX_LEN ? s.substring(0, MAX_LEN) + '…' : s;
@@ -171,4 +263,9 @@ function preview_(range) {
     row.forEach(function (v) { if (v !== '') flat.push(v); });
   });
   return cut_(flat.slice(0, 8).join(' / '));
+}
+
+// 시트에 붙은 스크립트일 때만 알림창이 뜸. 독립 프로젝트에서는 실행 로그로 확인
+function alert_(msg) {
+  try { SpreadsheetApp.getUi().alert(msg); } catch (err) { /* 무시 */ }
 }
