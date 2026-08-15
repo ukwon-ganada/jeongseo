@@ -149,7 +149,11 @@ function cbProcess_(dryRun) {
   if (lastRow < first) return '데이터가 없습니다.';
   var n = lastRow - first + 1;
 
-  var src = sh.getRange(first, cols.indict, n, split ? 2 : 1).getValues();
+  /* 공소장·증거기록 값을 읽는다. 두 열이 반드시 붙어 있다고 가정하지 않는다. */
+  var src = [];
+  var colA = sh.getRange(first, cols.indict, n, 1).getValues();
+  var colB = split ? sh.getRange(first, cols.record, n, 1).getValues() : null;
+  for (var k = 0; k < n; k++) src.push(colB ? [colA[k][0], colB[k][0]] : [colA[k][0]]);
 
   var pairs = [], moved = [];
   var cntIndict = 0, cntRecord = 0, kept = 0, converted = 0;
@@ -198,10 +202,13 @@ function cbProcess_(dryRun) {
 
   if (dryRun) return out.join('\n');
 
-  var recordCol = cols.indict + 1;
+  /* 증거기록 열 자리. 이미 있으면 그 자리를 쓴다 —
+     '공소장 바로 오른쪽'으로 계산하면 사이에 다른 열이 끼었을 때 엉뚱한 칸을 덮어쓴다. */
+  var recordCol = cols.record;
   var todoCol = cols.todo;
   if (!split) {
     sh.insertColumnAfter(cols.indict);
+    recordCol = cols.indict + 1;
     if (todoCol > cols.indict) todoCol++;
   }
 
@@ -214,9 +221,18 @@ function cbProcess_(dryRun) {
     cell.setValue(prev ? prev + '\n' + m.text : m.text);
   });
 
-  var box = sh.getRange(first, cols.indict, n, 2);
-  box.insertCheckboxes();
-  box.setValues(pairs);
+  if (recordCol === cols.indict + 1) {
+    var box = sh.getRange(first, cols.indict, n, 2);
+    box.insertCheckboxes();
+    box.setValues(pairs);
+  } else {
+    var ra = sh.getRange(first, cols.indict, n, 1);
+    var rb = sh.getRange(first, recordCol, n, 1);
+    ra.insertCheckboxes();
+    rb.insertCheckboxes();
+    ra.setValues(pairs.map(function (p) { return [p[0]]; }));
+    rb.setValues(pairs.map(function (p) { return [p[1]]; }));
+  }
 
   sh.setColumnWidth(cols.indict, CB_WIDTH);
   sh.setColumnWidth(recordCol, CB_WIDTH);

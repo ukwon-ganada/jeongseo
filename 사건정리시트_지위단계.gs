@@ -321,10 +321,24 @@ function ptParty_(dryRun) {
 
   /* ── 실제 변경 ── */
 
-  var need = (c.role ? 0 : 1) + (c.stage ? 0 : 1);
-  if (need) sh.insertColumnsAfter(c.name + (c.role ? 1 : 0), need);
+  /* 지위·단계 열의 자리를 정한다.
+     이미 있으면 그 자리를 쓰고, 없을 때만 새로 만든다.
+     '성명 바로 오른쪽'으로 계산하면 안 된다 — 성명과 지위 사이에 구속여부 같은
+     다른 열이 끼어 있을 수 있고, 그러면 엉뚱한 칸을 덮어쓰게 된다. */
+  var roleCol, stageCol;
+  if (c.role && c.stage) {
+    roleCol = c.role;
+    stageCol = c.stage;
+  } else if (c.role) {
+    sh.insertColumnAfter(c.role);          // 지위는 있고 단계만 없을 때
+    roleCol = c.role;
+    stageCol = c.role + 1;
+  } else {
+    sh.insertColumnsAfter(c.name, 2);      // 둘 다 없을 때 — 성명 오른쪽에 두 칸
+    roleCol = c.name + 1;
+    stageCol = c.name + 2;
+  }
 
-  var roleCol = c.name + 1, stageCol = c.name + 2;
   sh.getRange(PT_HEADER_ROW, roleCol).setValue(PT_HEAD_ROLE);
   sh.getRange(PT_HEADER_ROW, stageCol).setValue(PT_HEAD_STAGE);
 
