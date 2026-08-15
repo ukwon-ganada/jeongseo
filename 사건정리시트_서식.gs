@@ -32,8 +32,13 @@
      Apps Script 에서 서식정비.gs 를 열고 Ctrl+A → Delete → 이 파일 붙여넣기 → Ctrl+S
 
    [실행]
-     1) previewFormat   무엇이 바뀔지 미리 봅니다. 시트는 안 건드립니다.
-     2) runFormat       실제로 적용합니다. 적용 전 백업을 자동으로 뜹니다.
+     1) previewOnCopy   ★ 눈으로 미리보기 ★
+                        시트를 복사해서 그 복사본에만 서식을 입힙니다.
+                        원본은 전혀 건드리지 않습니다.
+                        실행 로그에 뜨는 링크를 열어 직접 보시고 판단하세요.
+                        마음에 안 들면 그 복사본만 버리면 끝입니다.
+     2) previewFormat   글자로만 요약해서 봅니다 (무엇이 몇 칸 바뀌는지)
+     3) runFormat       원본에 실제로 적용합니다. 적용 전 백업을 자동으로 뜹니다.
      · verifyValues     나중에 언제든 값이 그대로인지 다시 대조합니다.
    ─────────────────────────────────────────────────────────────── */
 
@@ -61,16 +66,36 @@ var FM_TABS = [
 
 /* ── 실행 ── */
 
-function previewFormat() { fmShow_(fmProcess_(true)); }
+/* ★ 눈으로 미리보기 ★
+   시트를 복사한 뒤 그 복사본에만 서식을 입힙니다. 원본은 손대지 않습니다.
+   링크를 열어 직접 보시고, 마음에 들면 runFormat 을, 아니면 복사본을 버리세요. */
+function previewOnCopy() {
+  var stamp = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd HH:mm');
+  var copy = DriveApp.getFileById(FM_SHEET_ID)
+    .makeCopy('[미리보기] 사건정리 — 미니멀 서식 ' + stamp, fmFolder_());
 
+  var body = fmProcess_(false, copy.getId());
+
+  fmShow_('★ 미리보기를 만들었습니다. 원본은 그대로입니다. ★\n\n'
+    + copy.getUrl() + '\n\n'
+    + '이 링크를 열어 직접 보세요.\n'
+    + '  · 마음에 들면  →  runFormat 으로 원본에 적용\n'
+    + '  · 아니면       →  이 미리보기 파일만 지우면 끝\n\n'
+    + body);
+}
+
+// 글자로만 요약 — 시트는 건드리지 않습니다
+function previewFormat() { fmShow_(fmProcess_(true, FM_SHEET_ID)); }
+
+// 원본에 실제 적용
 function runFormat() {
   var backup = fmBackup_();
-  var before = valueChecksum_();
+  var before = valueChecksum_(FM_SHEET_ID);
   PropertiesService.getScriptProperties().setProperty('FM_CHECKSUM', before);
 
-  var body = fmProcess_(false);
+  var body = fmProcess_(false, FM_SHEET_ID);
 
-  var after = valueChecksum_();
+  var after = valueChecksum_(FM_SHEET_ID);
   var verdict = (before === after)
     ? '값 체크섬 일치 — 데이터 변경 없음 (' + after.substring(0, 12) + ')'
     : '!! 값 체크섬 불일치 — 백업으로 되돌리세요 !!\n   전 ' + before + '\n   후 ' + after;
@@ -80,7 +105,7 @@ function runFormat() {
 
 function verifyValues() {
   var saved = PropertiesService.getScriptProperties().getProperty('FM_CHECKSUM');
-  var now = valueChecksum_();
+  var now = valueChecksum_(FM_SHEET_ID);
   fmShow_(!saved
     ? '저장된 체크섬이 없습니다. runFormat 을 실행하면 저장됩니다.\n지금 값 체크섬: ' + now
     : (saved === now
@@ -91,10 +116,11 @@ function verifyValues() {
 
 /* ── 본체 ── */
 
-function fmProcess_(dryRun) {
-  var ss = SpreadsheetApp.openById(FM_SHEET_ID);
+function fmProcess_(dryRun, ssId) {
+  var ss = SpreadsheetApp.openById(ssId);
   var out = [];
-  out.push(dryRun ? '=== 미리보기 (시트는 바뀌지 않았습니다) ===' : '=== 미니멀 서식 적용 완료 ===');
+  out.push(dryRun ? '=== 요약 (시트는 바뀌지 않았습니다) ===' : '=== 미니멀 서식 적용 완료 ===');
+  out.push('대상: ' + ss.getName());
   out.push('글자 크기·정렬·행 높이·열 너비·제목·셀 값은 건드리지 않습니다.');
 
   FM_TABS.forEach(function (t) {
@@ -132,7 +158,8 @@ function fmProcess_(dryRun) {
     fmStyle_(sh, t, lastRow, lastCol, bg);
   });
 
-  if (!dryRun) {
+  // 수정로그는 원본에 적용했을 때만 남긴다 (미리보기 복사본은 기록하지 않음)
+  if (!dryRun && ssId === FM_SHEET_ID) {
     try {
       if (typeof append_ === 'function') append_(ss, fmUser_(), '-', '-', '', '미니멀 서식 적용', '서식');
     } catch (err) { /* 수정로그 없으면 넘어감 */ }
@@ -183,8 +210,8 @@ function fmStyle_(sh, t, lastRow, lastCol, bg) {
 /* ── 값 무변경 확인 ── */
 
 // 표시값이 아니라 실제 값을 본다. 표시 형식을 바꿔도 헛경보가 울리지 않는다.
-function valueChecksum_() {
-  var ss = SpreadsheetApp.openById(FM_SHEET_ID);
+function valueChecksum_(ssId) {
+  var ss = SpreadsheetApp.openById(ssId);
   var parts = [];
   ss.getSheets().forEach(function (sh) {
     var name = sh.getName();
@@ -206,16 +233,19 @@ function valueChecksum_() {
 
 /* ── 도구 ── */
 
+// 백업·미리보기 파일을 담을 폴더
+function fmFolder_() {
+  try {
+    return (typeof backupFolder_ === 'function') ? backupFolder_() : DriveApp.createFolder('사건정리 백업');
+  } catch (err) {
+    return DriveApp.getRootFolder();
+  }
+}
+
 function fmBackup_() {
   var stamp = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd HH:mm');
   var name = '[백업] 사건정리 — ' + stamp + ' (미니멀서식 직전)';
-  var folder;
-  try {
-    folder = (typeof backupFolder_ === 'function') ? backupFolder_() : DriveApp.createFolder('사건정리 백업');
-  } catch (err) {
-    folder = DriveApp.getRootFolder();
-  }
-  return DriveApp.getFileById(FM_SHEET_ID).makeCopy(name, folder).getUrl();
+  return DriveApp.getFileById(FM_SHEET_ID).makeCopy(name, fmFolder_()).getUrl();
 }
 
 function fmUser_() {
