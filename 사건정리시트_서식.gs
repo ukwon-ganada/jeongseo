@@ -23,10 +23,13 @@
      배경을 통째로 흰색으로 칠하지 않고, 연파랑인 칸만 골라 바꿉니다.
        #ff0000 순빨강 5행 · #f4cccc 1행 · #fce8e6 2행  →  전부 유지
 
-   [열 고정은 하지 않습니다]
-     제목이 B1:W1 로 병합돼 있어 열을 고정하려면 병합을 풀어야 하는데,
-     제목을 건드리지 않기로 했으므로 포기합니다.
-     (지난번 '병합된 셀의 일부만 포함된 열은 고정할 수 없습니다' 오류가 이것입니다)
+   [머리글 줄을 알아서 찾습니다]
+     예전에는 '머리글은 3행'으로 못박아 두었는데, 머리글이 1행으로 올라가자
+     머리글을 데이터로 착각했습니다. 이제 '성명'이 적힌 줄을 찾아 씁니다.
+
+   [열 고정은 기본으로 꺼져 있습니다]
+     제목 병합이 없어져서 이제 열 고정이 가능해졌습니다.
+     성명이 항상 보이게 하고 싶으시면 아래 FREEZE_COLS 를 2 나 3 으로 바꾸세요.
 
    [설치]
      Apps Script 에서 서식정비.gs 를 열고 Ctrl+A → Delete → 이 파일 붙여넣기 → Ctrl+S
@@ -53,12 +56,19 @@ var C_WHITE = '#ffffff';
 // 지울 배경색. 여기 적힌 색만 흰색으로 바뀝니다.
 var CLEAR_FILLS = ['#e8f0fe'];
 
-// A열 번호가 1.0 으로 보이는 것을 1 로. 원하지 않으면 false 로 두세요.
+// 'No' 열 번호가 1.0 으로 보이는 것을 1 로. 원하지 않으면 false 로 두세요.
+// (지금 형사사건에는 No 열이 없어 아무 일도 하지 않습니다)
 var FIX_NUMBER_FORMAT = true;
 
+// 왼쪽에 고정할 열 수. 0 이면 열 고정을 하지 않습니다.
+// 2 로 두면 구속여부·성명이 오른쪽으로 스크롤해도 계속 보입니다.
+var FREEZE_COLS = 0;
+
 /* 탭별 머리글 행 / 데이터 시작 행 */
+/* 머리글 줄은 고정하지 않고 fmHeadRow_() 가 탭마다 찾습니다.
+   못 찾으면 여기 적힌 값을 씁니다. */
 var FM_TABS = [
-  { name: '형사사건', headRow: 3, firstRow: 4 },
+  { name: '형사사건', headRow: 1, firstRow: 2 },
   { name: '항소사건', headRow: 2, firstRow: 3 },
   { name: '약식명령', headRow: 2, firstRow: 3 },
   { name: '종결', headRow: 1, firstRow: 2 }
@@ -129,6 +139,11 @@ function fmProcess_(dryRun, ssId) {
 
     var lastRow = sh.getLastRow();
     var lastCol = sh.getLastColumn();
+
+    // 머리글 줄을 찾아 쓴다 (못 찾으면 위에 적어둔 값)
+    var found = fmHeadRow_(sh);
+    if (found) t = { name: t.name, headRow: found, firstRow: found + 1 };
+
     if (lastRow < t.firstRow || lastCol < 1) {
       out.push(''); out.push('[' + t.name + '] 데이터 없음'); return;
     }
@@ -167,6 +182,31 @@ function fmProcess_(dryRun, ssId) {
   return out.join('\n');
 }
 
+/* 머리글 줄을 찾는다. '성명'(또는 '이름')이 적힌 줄을 머리글로 본다. */
+function fmHeadRow_(sh) {
+  var probe = Math.min(5, sh.getLastRow());
+  var lastCol = Math.max(sh.getLastColumn(), 1);
+  if (probe < 1) return 0;
+  var vals = sh.getRange(1, 1, probe, lastCol).getValues();
+  for (var r = 0; r < probe; r++) {
+    for (var c = 0; c < lastCol; c++) {
+      var h = String(vals[r][c] == null ? '' : vals[r][c]).replace(/\s/g, '');
+      if (h.indexOf('성명') === 0 || h.indexOf('이름') === 0) return r + 1;
+    }
+  }
+  return 0;
+}
+
+// 머리글 줄에서 이름으로 열을 찾는다 (공백을 뺀 뒤 정확히 일치)
+function fmFindCol_(sh, headRow, key) {
+  var lastCol = Math.max(sh.getLastColumn(), 1);
+  var row = sh.getRange(headRow, 1, 1, lastCol).getValues()[0];
+  for (var c = 0; c < row.length; c++) {
+    if (String(row[c] == null ? '' : row[c]).replace(/\s/g, '') === key) return c + 1;
+  }
+  return 0;
+}
+
 function fmStyle_(sh, t, lastRow, lastCol, bg) {
   var n = lastRow - t.firstRow + 1;
 
@@ -196,6 +236,10 @@ function fmStyle_(sh, t, lastRow, lastCol, bg) {
   // ④ 행 고정 · 필터 · 눈금선
   //    열 고정은 하지 않는다 (제목 병합을 풀어야 해서)
   try { sh.setFrozenRows(t.headRow); } catch (err) { Logger.log('[' + t.name + '] 행 고정 건너뜀 — ' + err); }
+  if (FREEZE_COLS > 0) {
+    try { sh.setFrozenColumns(Math.min(FREEZE_COLS, lastCol)); }
+    catch (err) { Logger.log('[' + t.name + '] 열 고정 건너뜀 — ' + err); }
+  }
   try { sh.setHiddenGridlines(true); } catch (err) { /* 구버전 대비 */ }
   try {
     var f = sh.getFilter();
@@ -203,8 +247,12 @@ function fmStyle_(sh, t, lastRow, lastCol, bg) {
     sh.getRange(t.headRow, 1, lastRow - t.headRow + 1, lastCol).createFilter();
   } catch (err) { Logger.log('[' + t.name + '] 필터 건너뜀 — ' + err); }
 
-  // ⑤ A열 번호를 1.0 이 아니라 1 로 (표시 형식만, 값과 정렬은 그대로)
-  if (FIX_NUMBER_FORMAT) sh.getRange(t.firstRow, 1, n, 1).setNumberFormat('0');
+  // ⑤ 번호 열이 1.0 이 아니라 1 로 보이게 (표시 형식만, 값과 정렬은 그대로)
+  //    'No' 머리글이 있을 때만. 없으면 아무것도 하지 않는다.
+  if (FIX_NUMBER_FORMAT) {
+    var noCol = fmFindCol_(sh, t.headRow, 'No');
+    if (noCol) sh.getRange(t.firstRow, noCol, n, 1).setNumberFormat('0');
+  }
 }
 
 /* ── 값 무변경 확인 ── */

@@ -79,6 +79,36 @@ var CL_COL_POLICE = 8, CL_COL_PROS_OFFICE = 13, CL_COL_CASENO = 15, CL_COL_COURT
    ① 종결 탭을 형사사건과 같은 구조로
    ══════════════════════════════════════════════════════════════ */
 
+/* ── 안전장치 ────────────────────────────────────────────────
+   이 스크립트는 형사사건 머리글이 3행이고 A열이 No 인 배치를 전제로
+   만들어졌습니다. 그 뒤 머리글이 1행으로 올라가고 No 열이 없어졌으므로
+   지금 그대로 돌리면 엉뚱한 칸을 건드립니다.
+   구조를 다시 맞추기 전까지는 실행을 막습니다. */
+function clGuard_() {
+  var sh = SpreadsheetApp.openById(CL_SHEET_ID).getSheetByName(CL_MAIN);
+  if (!sh) return '[' + CL_MAIN + '] 탭을 찾지 못했습니다.';
+
+  var probe = Math.min(5, sh.getLastRow());
+  var lastCol = Math.max(sh.getLastColumn(), 1);
+  var head = 0;
+  if (probe > 0) {
+    var vals = sh.getRange(1, 1, probe, lastCol).getValues();
+    for (var r = 0; r < probe && !head; r++) {
+      for (var c = 0; c < lastCol; c++) {
+        var h = String(vals[r][c] == null ? '' : vals[r][c]).replace(/\s/g, '');
+        if (h.indexOf('성명') === 0 || h.indexOf('이름') === 0) { head = r + 1; break; }
+      }
+    }
+  }
+  if (head !== CL_MAIN_HEAD) {
+    return '지금은 실행할 수 없습니다.\n\n'
+      + '이 스크립트는 형사사건 머리글이 ' + CL_MAIN_HEAD + '행인 배치를 전제로 만들어졌는데,\n'
+      + '지금은 ' + head + '행입니다. 그대로 돌리면 엉뚱한 칸을 건드립니다.\n\n'
+      + '종결 이동 기능이 필요하시면 말씀해 주세요. 지금 구조에 맞게 다시 만들어 드리겠습니다.';
+  }
+  return '';
+}
+
 function previewAlignClosed() { clShow_(clAlign_(true)); }
 
 function runAlignClosed() {
@@ -87,6 +117,7 @@ function runAlignClosed() {
 }
 
 function clAlign_(dryRun) {
+  var stop = clGuard_(); if (stop) return stop;
   var ss = SpreadsheetApp.openById(CL_SHEET_ID);
   var main = ss.getSheetByName(CL_MAIN);
   var done = ss.getSheetByName(CL_DONE);
@@ -246,6 +277,7 @@ function runCloseButtons() {
 }
 
 function clButtons_(dryRun) {
+  var stop = clGuard_(); if (stop) return stop;
   var ss = SpreadsheetApp.openById(CL_SHEET_ID);
   var main = ss.getSheetByName(CL_MAIN);
   var done = ss.getSheetByName(CL_DONE);
@@ -294,6 +326,7 @@ function clPutBoxes_(sh, headRow, first, last, col, title) {
    ══════════════════════════════════════════════════════════════ */
 
 function setupCloseButtons() {
+  var stop = clGuard_(); if (stop) { clShow_(stop); return; }
   var ss = SpreadsheetApp.openById(CL_SHEET_ID);
   removeCloseButtons();
   ScriptApp.newTrigger('onCloseEdit').forSpreadsheet(ss).onEdit().create();

@@ -54,8 +54,12 @@
 
 var PT_SHEET_ID = '1YCf77KxxotM4RnxePAhO16C7xbwEiHq4SuF5DN5vWto';
 var PT_TAB = '형사사건';
-var PT_HEADER_ROW = 3;
-var PT_FIRST_ROW = 4;
+
+/* 머리글 줄과 데이터 시작 줄은 고정하지 않고 그때그때 찾습니다.
+   예전에는 '머리글은 3행'으로 못박아 두었는데, 머리글이 1행으로 올라가자
+   머리글을 데이터로 착각했습니다. 이제 '성명'이 적힌 줄을 찾아 씁니다. */
+var PT_HEADER_ROW = 0;   // ptSetRows_() 가 채웁니다
+var PT_FIRST_ROW = 0;
 
 var PT_HEAD_ROLE = '지위';
 var PT_HEAD_STAGE = '단계';
@@ -103,6 +107,7 @@ function ptMove_(dryRun) {
   var ss = SpreadsheetApp.openById(PT_SHEET_ID);
   var sh = ss.getSheetByName(PT_TAB);
   if (!sh) return '[' + PT_TAB + '] 탭을 찾지 못했습니다.';
+  if (!ptSetRows_(sh)) return '머리글 줄을 찾지 못했습니다 (성명 열이 있는지 확인해 주세요).';
 
   var c = ptCols_(sh);
   if (!c.bench || !c.officer) {
@@ -179,6 +184,7 @@ function ptParty_(dryRun) {
   var ss = SpreadsheetApp.openById(PT_SHEET_ID);
   var sh = ss.getSheetByName(PT_TAB);
   if (!sh) return '[' + PT_TAB + '] 탭을 찾지 못했습니다.';
+  if (!ptSetRows_(sh)) return '머리글 줄을 찾지 못했습니다 (성명 열이 있는지 확인해 주세요).';
 
   var c = ptCols_(sh);
   if (!c.name) return '성명 열을 찾지 못했습니다. ' + PT_HEADER_ROW + '행 머리글을 확인해 주세요.';
@@ -373,6 +379,7 @@ function onStageEdit(e) {
   if (!e || !e.range) return;
   var sh = e.range.getSheet();
   if (sh.getName() !== PT_TAB) return;
+  if (!ptSetRows_(sh)) return;
 
   var top = e.range.getRow();
   var bottom = top + e.range.getNumRows() - 1;
@@ -394,6 +401,7 @@ function refreshStages() {
   var ss = SpreadsheetApp.openById(PT_SHEET_ID);
   var sh = ss.getSheetByName(PT_TAB);
   if (!sh) { ptShow_('[' + PT_TAB + '] 탭을 찾지 못했습니다.'); return; }
+  if (!ptSetRows_(sh)) { ptShow_('머리글 줄을 찾지 못했습니다.'); return; }
   var c = ptCols_(sh);
   var last = ptLastRow_(sh, c.name);
   var r = ptRecalc_(sh, PT_FIRST_ROW, last);
@@ -402,6 +410,7 @@ function refreshStages() {
 
 // from~to 행의 단계와 지위를 다시 계산. 바뀐 칸만 씁니다.
 function ptRecalc_(sh, from, to) {
+  if (!PT_HEADER_ROW && !ptSetRows_(sh)) return { stage: 0, role: 0 };
   var c = ptCols_(sh);
   if (!c.name || !c.role || !c.stage) return { stage: 0, role: 0 };
   if (to < from) return { stage: 0, role: 0 };
@@ -485,6 +494,27 @@ function ptAny_() {
 /* 머리글 이름으로 열을 찾는다.
    순서가 중요하다. '관할경찰서'·'관할검찰청' 을 '관할' 보다 먼저 걸러야
    그 둘이 진짜 '관할' 로 오인식되지 않는다. */
+/* 머리글 줄을 찾아 PT_HEADER_ROW / PT_FIRST_ROW 를 채운다.
+   '성명'(또는 '이름')이 적힌 줄을 머리글로 본다. 위에서 다섯 줄만 살펴본다.
+   머리글이 1행이든 3행이든 알아서 맞추므로, 행을 올리거나 내려도 깨지지 않는다. */
+function ptSetRows_(sh) {
+  var probe = Math.min(5, sh.getLastRow());
+  var lastCol = Math.max(sh.getLastColumn(), 1);
+  if (probe < 1) return false;
+  var vals = sh.getRange(1, 1, probe, lastCol).getValues();
+  for (var r = 0; r < probe; r++) {
+    for (var c = 0; c < lastCol; c++) {
+      var h = String(vals[r][c] == null ? '' : vals[r][c]).replace(/\s/g, '');
+      if (h.indexOf('성명') === 0 || h.indexOf('이름') === 0) {
+        PT_HEADER_ROW = r + 1;
+        PT_FIRST_ROW = r + 2;
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 function ptCols_(sh) {
   var lastCol = sh.getLastColumn();
   var row = sh.getRange(PT_HEADER_ROW, 1, 1, lastCol).getValues()[0];

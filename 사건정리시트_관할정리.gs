@@ -30,7 +30,7 @@ var TARGET_SHEET_ID = '1YCf77KxxotM4RnxePAhO16C7xbwEiHq4SuF5DN5vWto';
    종결 탭은 대상에서 뺐습니다. 열 배치가 바뀌면서 재판부 열이 아예 없어져
    관할정리가 할 일이 없고, 옛 열 번호를 그대로 두면 엉뚱한 칸을 건드립니다. */
 var CLEAN_TARGETS = [
-  { sheet: '형사사건', headRow: 3, firstRow: 4 }
+  { sheet: '형사사건' }   // 머리글 줄은 clnHeadRow_() 가 찾습니다
 ];
 
 /* 전화 국번 → 법원.
@@ -85,6 +85,10 @@ function process_(dryRun) {
   CLEAN_TARGETS.forEach(function (t) {
     var sh = ss.getSheetByName(t.sheet);
     if (!sh) { lines.push('[' + t.sheet + '] 탭을 찾지 못했습니다 — 건너뜁니다'); return; }
+
+    var headRow = clnHeadRow_(sh);
+    if (!headRow) { lines.push('[' + t.sheet + '] 머리글 줄을 찾지 못해 건너뜁니다'); return; }
+    t = { sheet: t.sheet, headRow: headRow, firstRow: headRow + 1 };
 
     var cols = resolveCleanCols_(sh, t);
     if (!cols.bench || !cols.court || !cols.caseNo) {
@@ -245,6 +249,22 @@ function guessCourt_(caseNo, bench) {
 // 머리글이 있으면 이름으로 찾고(열이 밀려도 안전), 없으면 적어둔 번호를 쓴다.
 //   '관할' 과 '관할경찰서', '사건번호' 와 '경찰사건번호' 가 헷갈리지 않도록
 //   공백을 뺀 머리글이 정확히 일치할 때만 잡는다.
+/* 머리글 줄을 찾는다. '성명'(또는 '이름')이 적힌 줄을 머리글로 본다.
+   머리글이 1행이든 3행이든 알아서 맞추므로 행을 올리거나 내려도 깨지지 않는다. */
+function clnHeadRow_(sh) {
+  var probe = Math.min(5, sh.getLastRow());
+  var lastCol = Math.max(sh.getLastColumn(), 1);
+  if (probe < 1) return 0;
+  var vals = sh.getRange(1, 1, probe, lastCol).getValues();
+  for (var r = 0; r < probe; r++) {
+    for (var c = 0; c < lastCol; c++) {
+      var h = String(vals[r][c] == null ? '' : vals[r][c]).replace(/\s/g, '');
+      if (h.indexOf('성명') === 0 || h.indexOf('이름') === 0) return r + 1;
+    }
+  }
+  return 0;
+}
+
 function resolveCleanCols_(sh, t) {
   var lastCol = sh.getLastColumn();
   var row = sh.getRange(t.headRow, 1, 1, lastCol).getValues()[0];
