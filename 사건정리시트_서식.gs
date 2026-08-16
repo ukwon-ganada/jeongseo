@@ -244,6 +244,10 @@ function fmStyle_(sh, t, lastRow, lastCol, bg) {
     catch (err) { Logger.log('[' + t.name + '] 열 고정 건너뜀 — ' + err); }
   }
   try { sh.setHiddenGridlines(true); } catch (err) { /* 구버전 대비 */ }
+  /* 주의 — 여기서 거는 필터는 모든 칸에 정렬 단추를 답니다.
+     항소사건 탭은 항소이유마감일·기일 두 칸으로만 정렬하기로 해서
+     항소정리.gs 가 필터를 걷어냅니다. runFormat 을 돌리시면 다시 생기니,
+     그때는 runAppeal 을 한 번 더 실행해 주세요. */
   try {
     var f = sh.getFilter();
     if (f) f.remove();
