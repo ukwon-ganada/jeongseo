@@ -222,7 +222,10 @@ function fmStyle_(sh, t, lastRow, lastCol, bg) {
   }
   if (changed) sh.getRange(1, 1, lastRow, lastCol).setBackgrounds(bg);
 
-  // ② 격자 제거 → 가로 구분선만
+  /* ② 격자 제거 → 가로 구분선만
+     주의 — 여기서 격자를 통째로 지우므로 세로선.gs 가 그은 세로선도 함께
+     사라집니다. runFormat 을 돌리신 뒤에는 runGridLines 를 한 번 더
+     실행해 주세요. */
   var all = sh.getRange(1, 1, lastRow, lastCol);
   all.setBorder(false, false, false, false, false, false);
   sh.getRange(t.firstRow, 1, n, lastCol)
