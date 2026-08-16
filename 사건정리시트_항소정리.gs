@@ -677,6 +677,8 @@ function apLog_(ss, msg) {
 
 function apShow_(text) {
   Logger.log(text);
+  // 시트에 붙은 프로젝트면 스크롤되는 창으로 보여준다 (alert 는 1200자에서 잘린다)
+  if (typeof uiShow_ === 'function') { uiShow_(text); return; }
   try {
     var t = text.length > 1200 ? text.substring(0, 1200) + '\n\n... 전체 내용은 아래 [실행 로그]에서' : text;
     SpreadsheetApp.getUi().alert(t);
