@@ -52,6 +52,14 @@ function onOpen() {
       .addSeparator()
       .addItem('※ 머리글 단추로도 정렬됩니다', 'uiSortHint'))
 
+    .addSubMenu(ui.createMenu('기일 가져오기')
+      .addItem('① 접속 확인', 'checkHearingSetup')
+      .addItem('② 미리보기', 'previewHearings')
+      .addItem('③ 실행', 'runHearings')
+      .addSeparator()
+      .addItem('매일 아침 자동  켜기', 'setupHearingDaily')
+      .addItem('매일 아침 자동  끄기', 'removeHearingDaily'))
+
     .addSubMenu(ui.createMenu('항소 탭')
       .addItem('재편하기  — 미리보기', 'previewAppeal')
       .addItem('재편하기  실행', 'runAppeal'))
@@ -161,6 +169,11 @@ function uiHelp() {
     + '                     한 번만 하시면 됩니다.\n\n'
     + '[정렬]\n'
     + '  보통은 머리글 단추로 하세요. 두 단계 정렬만 이 메뉴를 씁니다.\n\n'
+    + '[기일 가져오기]\n'
+    + '  로웨어 사건정보(슈파베이스)에서 기일을 받아 형사·항소 탭에 채웁니다.\n'
+    + '  사건번호로 맞춥니다. 로웨어에 기일이 없는 사건은 건드리지 않습니다.\n'
+    + '  덮어쓴 값은 수정로그에 「기존 → 새 값」 으로 남습니다.\n'
+    + '  처음 쓰실 때는 ① 접속 확인 부터. 안 되면 거기서 이유를 알려줍니다.\n\n'
     + '[항소 탭]\n'
     + '  열을 성명·구속여부·사건번호… 순으로 재편하고 항소장·항소이유서\n'
     + '  체크칸을 만듭니다. 이미 하셨으면 다시 안 하셔도 됩니다.\n\n'
