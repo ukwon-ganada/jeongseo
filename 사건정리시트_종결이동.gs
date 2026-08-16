@@ -5,7 +5,12 @@
      종결 탭 맨 오른쪽 [복원] 을 체크하면 형사사건으로 되돌아옵니다.
 
        형사사건   … 항소여부 │ 종결 ☑  ──▶  종결 탭 맨 아래로 (종결일 자동 기록)
-       종결       … 비고     │ 복원 ☑  ──▶  형사사건 맨 아래로
+       종결       … 원래자리 │ 복원 ☑  ──▶  형사사건의 있던 자리로
+
+     복원은 맨 아래가 아니라 원래 있던 자리로 돌아갑니다. 종결로 보낼 때
+     바로 윗줄 사람 이름을 '원래자리' 칸에 적어 두었다가, 복원할 때 그 사람을
+     찾아 바로 아래에 끼워 넣습니다. 행 번호를 적어 두면 그 사이에 다른 행이
+     드나들 때 자리가 밀리기 때문입니다. 그 사람마저 종결됐다면 맨 아래로 갑니다.
 
      구글시트는 셀 안에 누를 수 있는 버튼을 만들 수 없습니다.
      체크박스가 가장 가까운 방법이고, 클릭 한 번이라는 점은 같습니다.
@@ -15,7 +20,7 @@
      있고, 지위·단계·수사기록·재판부 같은 15개 항목이 옮기다 없어지지 않습니다.
 
        형사사건   A~V (지금 22열)          + 종결 ☐
-       종결       A~V (형사사건과 동일)    + 종결일 · 결과 · 비고 · 복원 ☐
+       종결       A~V (형사사건과 동일)    + 종결일 · 결과 · 비고 · 원래자리 · 복원 ☐
 
    [머리글 줄과 열 수를 알아서 맞춥니다]
      '성명'이 적힌 줄을 머리글로 보고, 형사사건 머리글 개수를 세어 씁니다.
@@ -53,8 +58,12 @@ var CL_SHEET_ID = '1YCf77KxxotM4RnxePAhO16C7xbwEiHq4SuF5DN5vWto';
 var CL_MAIN = '형사사건';
 var CL_DONE = '종결';
 
-// 종결 탭에만 있는 뒤쪽 열 (형사사건 열 다음에 붙습니다)
-var CL_EXTRA = ['종결일', '결과', '비고'];
+/* 종결 탭에만 있는 뒤쪽 열 (형사사건 열 다음에 붙습니다)
+   원래자리 — 복원할 때 맨 아래가 아니라 있던 자리로 되돌리기 위한 표시입니다.
+   행 번호는 다른 행이 드나들면 밀리므로, 바로 윗줄 사람 이름을 적어 둡니다. */
+var CL_EXTRA = ['종결일', '결과', '비고', '원래자리'];
+var CL_HEAD_WHERE = '원래자리';
+var CL_TOP_MARK = '맨 위';
 var CL_HEAD_CLOSE = '종결';
 var CL_HEAD_RESTORE = '복원';
 var CL_BTN_WIDTH = 60;
@@ -73,9 +82,34 @@ var CL_ROLES = ['피고인', '피의자', '고소인', '피해자', '피고소�
 
 function previewAlignClosed() { clShow_(clAlign_(true)); }
 
-function runAlignClosed() {
-  var backup = clBackup_('종결탭재편');
-  clShow_('백업 먼저 만들었습니다:\n' + backup + '\n\n' + clAlign_(false));
+function runAlignClosed() { clRun_('종결탭재편', clAlign_); }
+
+/* 백업 → 본 작업 → 결과 보고를 한 자리에서 한다.
+
+   예전에는 clBackup_ 가 실패하면 (드라이브 용량, 권한 등) 함수가 그대로 죽어서
+   실행 로그에 아무 말도 남지 않았다. 무엇 때문에 멈췄는지 보이게 한다.
+   본 작업에서 난 오류도 삼키지 않고 그대로 적는다. */
+function clRun_(what, work) {
+  var head;
+  try {
+    head = '백업 먼저 만들었습니다:\n' + clBackup_(what);
+  } catch (err) {
+    clShow_('백업을 만들지 못해 아무것도 바꾸지 않았습니다.\n\n'
+      + '이유: ' + (err && err.message ? err.message : err) + '\n\n'
+      + '드라이브 용량이 찼거나 권한이 없을 때 이렇게 됩니다.\n'
+      + '오래된 [백업] 사건정리 … 파일을 지우고 다시 실행해 주세요.');
+    return;
+  }
+  var body;
+  try {
+    body = work(false);
+  } catch (err) {
+    clShow_(head + '\n\n작업 중 오류가 나서 멈췄습니다.\n\n'
+      + '이유: ' + (err && err.message ? err.message : err) + '\n'
+      + (err && err.stack ? '\n' + err.stack : ''));
+    return;
+  }
+  clShow_(head + '\n\n' + body);
 }
 
 function clAlign_(dryRun) {
@@ -329,10 +363,7 @@ var CL_PLAIN_BG = ['#ffffff', '#f2f2f2', ''];
 
 function previewDoneFormat() { clShow_(clFormat_(true)); }
 
-function runDoneFormat() {
-  var backup = clBackup_('종결탭양식');
-  clShow_('백업 먼저 만들었습니다:\n' + backup + '\n\n' + clFormat_(false));
-}
+function runDoneFormat() { clRun_('종결탭양식', clFormat_); }
 
 function clFormat_(dryRun) {
   var ss = SpreadsheetApp.openById(CL_SHEET_ID);
@@ -345,7 +376,7 @@ function clFormat_(dryRun) {
 
   var shared = clSharedCols_(main, mHead);
   if (!shared) return '형사사건 머리글이 비어 있습니다.';
-  var total = shared + CL_EXTRA.length;      // … 종결일 · 결과 · 비고
+  var total = shared + CL_EXTRA.length;      // … 종결일 · 결과 · 비고 · 원래자리
   var restore = total + 1;                   // 복원 체크박스 자리
   var mainHead = main.getRange(mHead, 1, 1, shared).getValues()[0];
 
@@ -426,9 +457,11 @@ function clFormat_(dryRun) {
   /* 종결 전용 뒤쪽 열은 성격이 맞는 형사사건 열에서 서식을 가져온다.
      항소여부(체크박스) 칸은 Arial 이라, 글로 적는 종결일·결과·비고에는
      같은 글로 적는 칸인 체크할것 을 본으로 삼아야 글꼴이 어긋나지 않는다. */
-  var cText = clFind_(mainHead, '체크할것') || shared;     // 종결일 · 결과 · 비고
-  var cBox = clFind_(mainHead, '항소여부') || shared;      // 복원 체크박스
-  var extras = [cText, cText, cText, cBox];                // 종결일 결과 비고 복원
+  var cText = clFind_(mainHead, '체크할것') || shared;     // 글로 적는 칸
+  var cBox = clFind_(mainHead, '항소여부') || shared;      // 체크박스 칸
+  var extras = [];                                         // 종결일 … 원래자리 + 복원
+  for (var t = 0; t < CL_EXTRA.length; t++) extras.push(cText);
+  extras.push(cBox);
 
   // ② 머리글 서식
   main.getRange(mHead, 1, 1, shared).copyTo(
@@ -452,12 +485,13 @@ function clFormat_(dryRun) {
   // ④ 열 너비 — 공유 열은 형사사건 그대로, 종결 전용 열은 짝이 되는 열에서
   for (var w = 1; w <= shared; w++) done.setColumnWidth(w, main.getColumnWidth(w));
   var wDate = clFind_(mainHead, '기일');
-  var extraW = [
-    wDate ? main.getColumnWidth(wDate) : 120,    // 종결일
-    main.getColumnWidth(cText),                  // 결과
-    main.getColumnWidth(cText),                  // 비고
-    CL_BTN_WIDTH                                 // 복원
-  ];
+  var extraW = [];
+  CL_EXTRA.forEach(function (h) {
+    if (h === '종결일') extraW.push(wDate ? main.getColumnWidth(wDate) : 120);
+    else if (h === CL_HEAD_WHERE) extraW.push(90);          // 원래자리 — 표시용이라 좁게
+    else extraW.push(main.getColumnWidth(cText));           // 결과 · 비고
+  });
+  extraW.push(CL_BTN_WIDTH);                                // 복원
   for (var e = 0; e < extraW.length; e++) done.setColumnWidth(shared + 1 + e, extraW[e]);
 
   // ⑤ 행 높이
@@ -644,10 +678,7 @@ function verifyDoneFormat() {
 
 function previewCloseButtons() { clShow_(clButtons_(true)); }
 
-function runCloseButtons() {
-  var backup = clBackup_('체크박스깔기');
-  clShow_('백업 먼저 만들었습니다:\n' + backup + '\n\n' + clButtons_(false));
-}
+function runCloseButtons() { clRun_('체크박스깔기', clButtons_); }
 
 function clButtons_(dryRun) {
   var ss = SpreadsheetApp.openById(CL_SHEET_ID);
@@ -762,12 +793,33 @@ function onCloseEdit(e) {
 
     // 아래 행부터 지운다 (위부터 지우면 행 번호가 밀린다)
     for (var j = checked.length - 1; j >= 0; j--) {
+      if (!clClaim_(name, checked[j])) continue;      // 같은 체크를 두 번 처리하지 않는다
       if (toClose) clToDone_(ss, main, done, mHead, dHead, shared, checked[j]);
       else clToMain_(ss, main, done, mHead, dHead, shared, checked[j]);
     }
     SpreadsheetApp.flush();
   } finally {
     lock.releaseLock();
+  }
+}
+
+/* 같은 체크를 한 번만 처리하도록 표를 끊는다.
+
+   수정로그를 보면 체크 한 번에 트리거가 두 번 돌고 있다 (한쪽은 계정 이름이,
+   다른 쪽은 '(로그인 정보 없음)' 이 찍힌다). 계정이 다른 트리거가 두 개
+   걸려 있으면 removeCloseButtons 로도 남의 것은 지울 수 없다.
+   그래서 스크립트 쪽에서 막는다 — 먼저 표를 끊은 실행만 옮긴다.
+
+   CacheService 는 스크립트 전체가 함께 쓰므로 계정이 달라도 통한다. */
+function clClaim_(sheetName, row) {
+  try {
+    var cache = CacheService.getScriptCache();
+    var key = 'cl:' + sheetName + ':' + row;
+    if (cache.get(key)) return false;               // 이미 다른 실행이 가져갔다
+    cache.put(key, '1', 90);                        // 90초 동안 잠근다
+    return true;
+  } catch (err) {
+    return true;                                    // 캐시를 못 써도 일은 계속한다
   }
 }
 
@@ -782,11 +834,21 @@ function clToDone_(ss, main, done, mHead, dHead, shared, row) {
     return;
   }
 
+  /* 있던 자리를 적어 둔다 — 복원할 때 맨 아래가 아니라 여기로 돌아온다.
+     행 번호는 다른 행이 드나들면 밀리므로 바로 윗줄 사람 이름을 쓴다. */
+  var where = CL_TOP_MARK;
+  if (row > mHead + 1) {
+    var above = String(main.getRange(row - 1, nameCol).getValue() || '').replace(/\s+/g, ' ').trim();
+    if (above) where = above;
+  }
+
   var at = clLastRow_(done, dHead) + 1;
   if (at <= dHead) at = dHead + 1;
   clCopyFormat_(done, dHead, at, shared + CL_EXTRA.length + 1);
   done.getRange(at, 1, 1, shared).setValues([data]);
   done.getRange(at, shared + 1).setValue(new Date()).setNumberFormat('yyyy-mm-dd');
+  var whereCol = shared + 1 + CL_EXTRA.indexOf(CL_HEAD_WHERE);
+  done.getRange(at, whereCol).setValue(where);
   done.getRange(at, shared + CL_EXTRA.length + 1).insertCheckboxes().setValue(false);
 
   main.deleteRow(row);
@@ -807,10 +869,12 @@ function clToMain_(ss, main, done, mHead, dHead, shared, row) {
   }
 
   // 결과·비고는 형사사건에 자리가 없으므로 체크할것 아래에 이어 붙인다
+  // (원래자리는 자리를 찾는 데만 쓰는 표시라 옮기지 않는다)
   var todoCol = clFind_(mainHead, '체크할것');
   if (todoCol) {
     var extra = [];
     for (var k = 1; k < CL_EXTRA.length; k++) {              // 종결일은 뺀다
+      if (CL_EXTRA[k] === CL_HEAD_WHERE) continue;
       var v = String(full[shared + k] == null ? '' : full[shared + k]).trim();
       if (v) extra.push(CL_EXTRA[k] + ': ' + v);
     }
@@ -820,14 +884,42 @@ function clToMain_(ss, main, done, mHead, dHead, shared, row) {
     }
   }
 
-  var at = clLastRow_(main, mHead) + 1;
-  if (at <= mHead) at = mHead + 1;
+  /* 있던 자리로 되돌린다. 적어 둔 윗줄 사람을 찾아 그 바로 아래에 끼워 넣는다.
+     그 사람이 안 보이면(이름이 바뀌었거나 그 사람도 종결됐다면) 맨 아래로 간다. */
+  var where = String(full[shared + CL_EXTRA.indexOf(CL_HEAD_WHERE)] || '').trim();
+  var bottom = clLastRow_(main, mHead) + 1;
+  if (bottom <= mHead) bottom = mHead + 1;
+
+  var at = bottom, back = false;
+  if (where === CL_TOP_MARK) {
+    at = mHead + 1; back = true;
+  } else if (where) {
+    var found = clRowByName_(main, mHead, nameCol, where);
+    if (found) { at = found + 1; back = true; }
+  }
+  if (back && at < bottom) main.insertRowBefore(at);
+  else { at = bottom; back = false; }
+
   clCopyFormat_(main, mHead, at, shared + 1);
   main.getRange(at, 1, 1, shared).setValues([data]);
   main.getRange(at, shared + 1).insertCheckboxes().setValue(false);
 
   done.deleteRow(row);
-  clLog_(ss, '종결 복원 — ' + String(data[nameCol - 1]).replace(/\n/g, ' ').trim());
+  clLog_(ss, '종결 복원 — ' + String(data[nameCol - 1]).replace(/\n/g, ' ').trim()
+    + (back ? ' (' + at + '행, 있던 자리)' : ' (맨 아래 — 있던 자리를 못 찾았습니다)'));
+}
+
+/* 성명 열에서 이름으로 행을 찾는다 (줄바꿈·공백 무시, 같은 이름이면 첫 줄) */
+function clRowByName_(sh, head, nameCol, name) {
+  var last = sh.getLastRow();
+  if (last <= head) return 0;
+  var key = clNorm_(name);
+  if (!key) return 0;
+  var v = sh.getRange(head + 1, nameCol, last - head, 1).getValues();
+  for (var i = 0; i < v.length; i++) {
+    if (clNorm_(v[i][0]) === key) return head + 1 + i;
+  }
+  return 0;
 }
 
 /* ══════════════════════════════════════════════════════════════
