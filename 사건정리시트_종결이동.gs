@@ -482,6 +482,14 @@ function clFormat_(dryRun) {
     }
   }
 
+  /* ③-2 종결일은 날짜로 보이게 되돌린다.
+     바로 위에서 체크할것 칸의 서식을 복사해 오는데, 거기에는 표시 형식도
+     딸려 온다. 그러면 날짜가 46250.47 같은 숫자로 보인다. */
+  var dateCol = shared + 1 + CL_EXTRA.indexOf('종결일');
+  if (n && CL_EXTRA.indexOf('종결일') >= 0) {
+    done.getRange(dHead + 1, dateCol, n, 1).setNumberFormat('yyyy-mm-dd');
+  }
+
   // ④ 열 너비 — 공유 열은 형사사건 그대로, 종결 전용 열은 짝이 되는 열에서
   for (var w = 1; w <= shared; w++) done.setColumnWidth(w, main.getColumnWidth(w));
   var wDate = clFind_(mainHead, '기일');
