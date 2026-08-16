@@ -111,13 +111,17 @@ var VL_NO_FILTER = ['수정로그'];
 // 정렬 명령이 다룰 탭
 var VL_SORT_TAB = '형사사건';
 
-/* 기일 표기를 맞출 탭과 그 모양.
+/* 기일 표기를 맞출 탭.
    기본 정렬은 글자순이라 '2026. 9. 10.' 이 '2026-08-20' 보다 앞으로 옵니다.
-   아래 모양으로 맞춰 두면 단추 한 번으로 정확히 날짜순이 됩니다. */
+   두 탭 모두 'YYYY-MM-DD 종류' 한 모양으로 맞춥니다. */
 var VL_DATE_FIX = [
-  { tab: '형사사건', head: '기일', form: 'YYYY-MM-DD' },
-  { tab: '항소사건', head: '기일', form: 'YY.MM.DD' }
+  { tab: '형사사건', head: '기일' },
+  { tab: '항소사건', head: '기일' }
 ];
+
+/* 칸에서 뺀 법정·시각을 메모로 남길지.
+   마우스를 올리면 원래 값이 뜹니다. 손으로 적어 두신 것을 지키기 위한 것입니다. */
+var VL_DATE_NOTE = true;
 
 /* ══════════════════════════════════════════════════════════════
    실행
@@ -275,20 +279,26 @@ function previewFixDates() { vlShow_(vlFixDates_(true)); }
 
 function runFixDates() { vlRun_('기일표기맞추기', function () { return vlFixDates_(false); }); }
 
-/* 기일 칸 몇 개만 표기가 달라 기본 정렬이 어긋난다.
+/* 기일 칸의 표기가 다섯 가지로 섞여 있어 기본 정렬이 어긋난다.
+   두 탭 모두 「날짜 + 종류」 한 모양으로 맞춘다.
 
-     2026. 9. 10. 10:30 공판기일   →   2026-09-10 10:30 공판기일
-     26.8.13. 무죄                 →   2026-08-13 무죄
+     2026-08-13 공판기일(제324호 법정 16:00)  →  2026-08-13 공판기일
+     2026-08-13 00:00:00                    →  2026-08-13
+     2026-09-10 10:30 공판기일               →  2026-09-10 공판기일
+     26.08.25 13:50 선고                     →  2026-08-25 선고기일
+     26.08.05                               →  2026-08-05
+     추정상태 기일체크하기                     →  그대로 (날짜가 없으면 안 건드림)
 
-   날짜 부분만 그 탭에서 쓰는 모양으로 바꾸고 뒤에 붙은 글은 그대로 둔다.
-   날짜가 없는 줄('추정상태 기일체크하기')은 건드리지 않는다. */
+   칸에서 뺀 법정·시각은 버리지 않고 메모에 넣는다.
+   '무죄' 처럼 알아보지 못한 글은 지우지 않고 그대로 뒤에 남긴다. */
 function vlFixDates_(dryRun) {
   var ss = SpreadsheetApp.openById(VL_SHEET_ID);
   var out = [];
   out.push(dryRun ? '=== 미리보기 (시트는 바뀌지 않았습니다) ===' : '=== 기일 표기 맞추기 완료 ===');
-  out.push('날짜 부분만 바꾸고 뒤에 붙은 글은 그대로 둡니다.');
+  out.push('두 탭 모두  YYYY-MM-DD 종류  한 모양으로 맞춥니다.');
+  if (VL_DATE_NOTE) out.push('칸에서 뺀 법정·시각은 메모에 남습니다 (마우스를 올리면 뜹니다).');
 
-  var total = 0;
+  var total = 0, painted = [];
   VL_DATE_FIX.forEach(function (spec) {
     var sh = ss.getSheetByName(spec.tab);
     if (!sh) { out.push(''); out.push('[' + spec.tab + '] 탭 없음'); return; }
@@ -306,52 +316,77 @@ function vlFixDates_(dryRun) {
     }
     if (!col) { out.push(''); out.push('[' + spec.tab + '] ' + spec.head + ' 열 없음'); return; }
 
-    var vals = sh.getRange(head + 1, col, n, 1).getValues();
-    var next = [], hits = [];
+    var range = sh.getRange(head + 1, col, n, 1);
+    var vals = range.getValues();
+    var notes = range.getNotes();
+    var next = [], nextNote = [], hits = [];
+
     for (var i = 0; i < n; i++) {
       var v = vals[i][0];
-      var fixed = vlReformat_(v, spec.form);
-      if (fixed === null) { next.push([v]); continue; }
-      next.push([fixed]);
-      hits.push('   ' + (head + 1 + i) + '행  ' + String(v).replace(/\s+/g, ' ').trim().substring(0, 34)
-        + '  →  ' + fixed.substring(0, 34));
+      var fixed = vlReformat_(v);
+      if (fixed === null) { next.push([v]); nextNote.push([notes[i][0]]); continue; }
+
+      next.push([fixed.text]);
+      // 메모가 이미 있으면 덮지 않는다 — 손으로 적어 두셨을 수 있다
+      nextNote.push([notes[i][0] || (VL_DATE_NOTE ? fixed.note : '')]);
+
+      hits.push('   ' + (head + 1 + i) + '행  '
+        + String(v).replace(/\s+/g, ' ').trim().substring(0, 34)
+        + '  →  ' + fixed.text.substring(0, 34));
     }
 
     out.push('');
     out.push('[' + spec.tab + '] ' + spec.head + ' ' + vlL_(col) + '열 — 고칠 것 ' + hits.length + '건');
-    hits.forEach(function (s) { out.push(s); });
+    hits.slice(0, 40).forEach(function (s) { out.push(s); });
+    if (hits.length > 40) out.push('   ... 외 ' + (hits.length - 40) + '건');
     total += hits.length;
-    if (!dryRun && hits.length) sh.getRange(head + 1, col, n, 1).setValues(next);
+
+    if (!dryRun) {
+      if (hits.length) {
+        range.setValues(next);
+        if (VL_DATE_NOTE) range.setNotes(nextNote);
+      }
+      // 글자색은 고칠 것이 없어도 매번 새로 건다 (없던 것을 채워 준다)
+      if (typeof hrPaint_ === 'function') { hrPaint_(sh, head, col, n); painted.push(spec.tab); }
+    }
   });
 
   out.push('');
+  if (!dryRun && painted.length) {
+    out.push('글자색도 입혔습니다 — 공판기일 파랑 · 선고기일 빨강 (' + painted.join(' · ') + ').');
+  } else if (!dryRun && typeof hrPaint_ !== 'function') {
+    out.push('※ 글자색은 기일가져오기 파일이 있어야 입혀집니다.');
+  } else if (dryRun) {
+    out.push('실행하면 공판기일 파랑 · 선고기일 빨강 글자색도 함께 입힙니다.');
+  }
+
   if (!total) {
-    out.push('고칠 것이 없습니다. 이미 표기가 맞습니다.');
+    out.push('');
+    out.push('고칠 표기는 없습니다. 이미 모양이 맞습니다.');
     return out.join('\n');
   }
   if (dryRun) {
-    out.push('실제로 고치려면 runFixDates 를 실행하세요.');
+    out.push('');
+    out.push('모두 ' + total + '건을 고칩니다. 실제로 하려면 「기일 표기 맞추기 실행」 을 누르세요.');
     return out.join('\n');
   }
+  out.push('');
   out.push('모두 ' + total + '건을 맞췄습니다. 이제 기일 머리글 단추로 정렬하면 날짜순이 됩니다.');
   vlLog_(ss, '기일 표기 맞추기 ' + total + '건');
   return out.join('\n');
 }
 
-/* 표기가 이미 맞으면 null, 고쳐야 하면 고친 글을 돌려준다. */
-function vlReformat_(v, form) {
-  if (v instanceof Date) return null;
+/* 이미 모양이 맞으면 null, 고쳐야 하면 { text, note } 를 돌려준다.
+
+   날짜로 시작하지 않는 줄은 사람이 적어 둔 메모일 수 있으므로 건드리지 않는다. */
+function vlReformat_(v) {
+  if (v instanceof Date) return null;                  // 진짜 날짜값은 그대로 둔다
   var t = String(v == null ? '' : v).replace(/\s+/g, ' ').trim();
   if (!t) return null;
 
-  var want = (form === 'YY.MM.DD')
-    ? /^\d{2}\.\d{2}\.\d{2}(?!\d)/
-    : /^\d{4}-\d{2}-\d{2}(?!\d)/;
-  if (want.test(t)) return null;                       // 이미 맞다
-
-  var m = t.match(/^(\d{4})\s*-\s*(\d{1,2})\s*-\s*(\d{1,2})\.?/);
-  if (!m) m = t.match(/^(\d{2,4})\s*\.\s*(\d{1,2})\s*\.\s*(\d{1,2})\.?/);
-  if (!m) return null;                                 // 날짜로 시작하지 않으면 그대로
+  // ① 앞머리의 날짜를 읽는다  2026-08-13 · 2026. 9. 10. · 26.08.25
+  var m = t.match(/^(\d{2,4})\s*[-.]\s*(\d{1,2})\s*[-.]\s*(\d{1,2})\.?/);
+  if (!m) return null;
 
   var y = parseInt(m[1], 10);
   if (y < 100) y += 2000;
@@ -359,12 +394,34 @@ function vlReformat_(v, form) {
   if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
 
   var p2 = function (x) { return (x < 10 ? '0' : '') + x; };
-  var head = (form === 'YY.MM.DD')
-    ? String(y).slice(2) + '.' + p2(mo) + '.' + p2(d)
-    : y + '-' + p2(mo) + '-' + p2(d);
+  var day = y + '-' + p2(mo) + '-' + p2(d);
 
+  // ② 뒤에 붙은 글에서 법정·시각을 걷어낸다
   var rest = t.substring(m[0].length).trim();
-  return rest ? head + ' ' + rest : head;
+  var kind = vlKind_(rest);
+
+  var text = kind ? day + ' ' + kind : day;
+  if (text === t) return null;                         // 이미 맞다
+
+  return { text: text, note: t };                      // 메모에는 원래 값을 통째로
+}
+
+/* '공판기일(제324호 법정 16:00)' → '공판기일'
+   '00:00:00'                   → ''
+   '13:50 선고'                  → '선고기일'
+   '무죄'                        → '무죄'   (모르는 글은 지우지 않는다) */
+function vlKind_(rest) {
+  var s = String(rest == null ? '' : rest);
+  s = s.replace(/\([^)]*\)/g, ' ');                    // (제324호 법정 16:00)
+  s = s.replace(/\d{1,2}:\d{2}(:\d{2})?/g, ' ');       // 16:00 · 00:00:00
+  s = s.replace(/\S*법정\S*/g, ' ');                    // 괄호 없이 적힌 법정
+  s = s.replace(/제?\s*\d+\s*호실?/g, ' ');              // 제316호 · 413호
+  s = s.replace(/[()\[\]·,]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!s) return '';
+
+  // '선고' 처럼 짧게 적으신 것은 '선고기일' 로 맞춘다
+  if (/^(공판|선고|심리|변론|조정|심문|공판준비)$/.test(s)) return s + '기일';
+  return s;
 }
 
 /* ══════════════════════════════════════════════════════════════

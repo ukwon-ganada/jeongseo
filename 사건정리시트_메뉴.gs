@@ -57,6 +57,8 @@ function onOpen() {
       .addItem('② 미리보기', 'previewHearings')
       .addItem('③ 실행', 'runHearings')
       .addSeparator()
+      .addItem('기일 글자색 입히기', 'runHearingColors')
+      .addSeparator()
       .addItem('매일 아침 자동  켜기', 'setupHearingDaily')
       .addItem('매일 아침 자동  끄기', 'removeHearingDaily'))
 
@@ -165,8 +167,9 @@ function uiHelp() {
     + '[표 양식]\n'
     + '  격자·글자 맞추기   다섯 탭의 격자·글꼴·행높이를 형사 탭 기준으로 통일하고\n'
     + '                     머리글에 정렬 단추를 답니다.\n'
-    + '  기일 표기 맞추기   기일 몇 칸의 날짜 표기를 맞춰 정렬이 정확해집니다.\n'
-    + '                     한 번만 하시면 됩니다.\n\n'
+    + '  기일 표기 맞추기   기일 칸을 「2026-08-13 공판기일」 한 모양으로 맞춥니다.\n'
+    + '                     법정·시각은 메모로 옮겨 두고, 공판기일 파랑 ·\n'
+    + '                     선고기일 빨강 글자색도 함께 입힙니다.\n\n'
     + '[정렬]\n'
     + '  보통은 머리글 단추로 하세요. 두 단계 정렬만 이 메뉴를 씁니다.\n\n'
     + '[기일 가져오기]\n'
