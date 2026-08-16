@@ -1,45 +1,74 @@
-/* 법무법인 정서 — 사건정리 시트: 옅은 세로 구분선
+/* 법무법인 정서 — 사건정리 시트: 표 양식 통일 (격자·글자·행높이)
    ───────────────────────────────────────────────────────────────
    [무엇을 하나]
-     모든 탭에 옅은 세로선을 긋습니다. 열이 스무 개가 넘어가면 세로선이 없을 때
-     어느 값이 어느 칸의 것인지 눈으로 따라가기 어렵습니다.
+     다섯 탭의 표 생김새를 하나로 맞춥니다.
 
-       지금    가로선만 있음
-       뒤      가로선 + 옅은 세로선  (가로선은 그대로 둡니다)
+       격자      머리글부터 마지막 줄까지 사방·안쪽 전부 옅은 회색
+       머리글    회색 바탕 + 굵게, 아래 선도 격자와 같은 톤
+       글자      맑은 고딕 · 형사사건과 같은 크기
+       행 높이   형사사건과 같게
 
-   [선 하나만 건드립니다]
-     테두리의 왼쪽·오른쪽·칸 사이 세로선만 새로 긋습니다.
-     위·아래·가로선 자리에는 null 을 넘기므로 기존 가로선과 머리글 아래의
-     진한 선은 손대지 않습니다.
+   [예전 방식을 버렸습니다]
+     전에는 세로선만 긋고 '기존 가로선은 null 로 두면 안 건드린다' 고 했는데,
+     실제로는 형사사건의 가로선이 함께 지워졌습니다.
+     이제는 여섯 자리를 모두 true 로 넘겨 격자를 통째로 다시 긋습니다.
+     남길 것이 없으니 어긋날 여지도 없습니다.
 
-     글꼴·글자 크기·정렬·열 너비·행 높이·배경색·값 — 아무것도 바꾸지 않습니다.
+   [머리글 아래 짙은 선을 없앱니다]
+     머리글 아래에만 #9e9e9e 짙은 선이 깔려 그림자처럼 보였습니다.
+     격자와 같은 #d9d9d9 로 낮춥니다. 머리글은 회색 바탕과 굵은 글씨로
+     충분히 구분됩니다.
 
-   [탭마다 알아서 범위를 잡습니다]
-     머리글은 '성명'(또는 '이름')이 적힌 줄, 없으면 1행.
-     세로선은 데이터가 있는 데까지만 긋습니다. 예전 스크립트가 남긴 가로선이
-     데이터보다 한참 아래까지 그어져 있는데, 거기까지 격자를 치면 표가 아니라
-     빈 양식지처럼 보이기 때문입니다.
+   [형사사건을 본으로 삼습니다]
+     글자 크기와 행 높이를 숫자로 박지 않고 형사사건 탭에서 읽어 옵니다.
+     getRowHeight 는 픽셀을 돌려주는데 40.5 는 포인트라 숫자를 박으면
+     단위를 헷갈리기 쉽습니다. 나중에 형사 탭을 바꾸시면 나머지가 따라옵니다.
+
+   [건드리지 않는 것]
+     값 · 정렬 · 열 너비 · 조건부 서식 · 체크박스 · 드롭다운 ·
+     머리글 줄 말고 손으로 칠하신 배경색
+
+     값은 앞뒤로 MD5 지문을 떠서 한 글자도 안 바뀐 것을 확인합니다.
+
+   [수정로그만 행 높이는 그대로]
+     390줄짜리 기계 기록이라 늘리면 스크롤만 길어집니다.
+     같이 맞추고 싶으시면 아래 VL_KEEP_ROW_H 에서 이름만 빼세요.
 
    [설치]
-     Apps Script 에서 [+] → 스크립트를 눌러 새 파일을 만들고
-     이 내용을 붙여넣은 뒤 Ctrl+S
+     Apps Script 왼쪽에서 세로선 파일을 열고 Ctrl+A 로 전체 선택한 뒤
+     이 내용을 붙여넣고 Ctrl+S
+
+     새 파일로 만들지 마세요. previewGridLines 가 두 벌이 되어 어느 쪽이
+     도는지 알 수 없게 됩니다.
 
    [실행]
-     · previewGridLines  → runGridLines    세로선 긋기
-     · removeGridLines                     세로선만 걷어내기
+     · previewGridLines  → runGridLines
+     · removeGridLines                     격자만 걷어내기
 
    [주의]
-     서식.gs 의 runFormat 을 돌리면 세로선이 지워집니다. 그 함수는 격자를
-     통째로 지우고 가로선만 다시 긋기 때문입니다.
-     그때는 runGridLines 를 한 번 더 실행하시면 됩니다.
+     서식.gs 의 runFormat 은 격자를 지우고 가로선만 다시 긋습니다.
+     그 함수를 돌리셨다면 runGridLines 를 한 번 더 실행해 주세요.
    ─────────────────────────────────────────────────────────────── */
 
 var VL_SHEET_ID = '1YCf77KxxotM4RnxePAhO16C7xbwEiHq4SuF5DN5vWto';
 
-// 세로선 색. 지금 가로선과 같은 톤입니다. 더 옅게 하시려면 '#e8eaed'
+// 글자 크기·행 높이를 읽어 올 본보기 탭
+var VL_REF = '형사사건';
+
+// 격자 색 — 가로·세로·머리글 아래 모두 같은 톤. 더 옅게 하려면 '#e8eaed'
 var VL_COLOR = '#d9d9d9';
 
-// 빼고 싶은 탭 이름 (예: ['수정로그'])
+// 머리글 바탕
+var VL_HEAD_BG = '#f2f2f2';
+
+// 글꼴. 본보기 탭에서 읽지 못했을 때만 씁니다
+var VL_FONT = '맑은 고딕';
+var VL_SIZE = 10;
+
+// 행 높이를 건드리지 않을 탭
+var VL_KEEP_ROW_H = ['수정로그'];
+
+// 아예 건너뛸 탭
 var VL_SKIP = [];
 
 /* ══════════════════════════════════════════════════════════════
@@ -48,9 +77,9 @@ var VL_SKIP = [];
 
 function previewGridLines() { vlShow_(vlProcess_(true, true)); }
 
-function runGridLines() { vlRun_('세로선긋기', function () { return vlProcess_(false, true); }); }
+function runGridLines() { vlRun_('표양식통일', function () { return vlProcess_(false, true); }); }
 
-function removeGridLines() { vlRun_('세로선지우기', function () { return vlProcess_(false, false); }); }
+function removeGridLines() { vlRun_('격자제거', function () { return vlProcess_(false, false); }); }
 
 /* 백업 → 본 작업 → 결과 보고.
    백업이 실패하면 (드라이브 용량·권한) 왜 멈췄는지 보이게 한다. */
@@ -77,16 +106,23 @@ function vlRun_(what, work) {
   vlShow_(head + '\n\n' + body);
 }
 
-/* draw 가 true 면 긋고, false 면 지운다. */
+/* draw 가 true 면 양식을 맞추고, false 면 격자만 걷어낸다. */
 function vlProcess_(dryRun, draw) {
   var ss = SpreadsheetApp.openById(VL_SHEET_ID);
   var sheets = ss.getSheets();
 
+  var style = vlRefStyle_(ss);
+
   var out = [];
   out.push(dryRun ? '=== 미리보기 (시트는 바뀌지 않았습니다) ==='
-    : (draw ? '=== 세로 구분선 완료 ===' : '=== 세로 구분선 제거 완료 ==='));
-  out.push(draw ? '색 ' + VL_COLOR + ' · 가로선과 머리글 아래 선은 그대로 둡니다'
-    : '세로선만 지웁니다. 가로선과 머리글 아래 선은 그대로 둡니다');
+    : (draw ? '=== 표 양식 통일 완료 ===' : '=== 격자 제거 완료 ==='));
+  if (draw) {
+    out.push('본보기 [' + VL_REF + '] — 글자 ' + style.font + ' ' + style.size
+      + 'pt · 행 높이 ' + style.bodyH + ' · 머리글 높이 ' + style.headH);
+    out.push('격자 ' + VL_COLOR + ' (머리글 아래 짙은 선도 이 톤으로 낮춥니다)');
+  } else {
+    out.push('격자만 지웁니다. 글자·행높이·값은 그대로입니다.');
+  }
 
   var before = dryRun ? '' : vlSum_(ss);
   var jobs = [], skipped = [], failed = [];
@@ -100,24 +136,42 @@ function vlProcess_(dryRun, draw) {
     var cols = vlLastCol_(sh, head);
     if (last < head || cols < 1) { skipped.push(name + ' (데이터 없음)'); return; }
 
-    jobs.push({ sh: sh, name: name, head: head, last: last, cols: cols });
+    jobs.push({ sh: sh, name: name, head: head, last: last, cols: cols,
+      keepH: VL_KEEP_ROW_H.indexOf(name) >= 0 });
   });
 
   jobs.forEach(function (j) {
     out.push('');
     out.push('[' + j.name + '] ' + j.head + '행~' + j.last + '행 · '
-      + j.cols + '열 (' + vlL_(1) + '~' + vlL_(j.cols) + ')');
+      + j.cols + '열 (' + vlL_(1) + '~' + vlL_(j.cols) + ')'
+      + (draw && j.keepH ? '   ※ 행 높이는 그대로' : ''));
     if (dryRun) return;
 
-    /* 위·아래·가로선 자리에 null → 기존 가로선을 건드리지 않는다.
-       왼쪽·오른쪽·칸 사이 세로선만 새로 긋거나 지운다. */
     try {
-      var range = j.sh.getRange(j.head, 1, j.last - j.head + 1, j.cols);
-      if (draw) {
-        range.setBorder(null, true, null, true, true, null,
-          VL_COLOR, SpreadsheetApp.BorderStyle.SOLID);
-      } else {
-        range.setBorder(null, false, null, false, false, null);
+      var all = j.sh.getRange(j.head, 1, j.last - j.head + 1, j.cols);
+
+      if (!draw) {
+        all.setBorder(false, false, false, false, false, false);
+        return;
+      }
+
+      // ① 격자 — 여섯 자리 모두 true. 남길 것이 없으니 어긋날 여지도 없다
+      all.setBorder(true, true, true, true, true, true,
+        VL_COLOR, SpreadsheetApp.BorderStyle.SOLID);
+
+      // ② 글자 — 크기와 글꼴만. 색·굵기·정렬은 건드리지 않는다
+      all.setFontFamily(style.font).setFontSize(style.size);
+
+      // ③ 머리글 — 바탕과 굵기. 아래 선은 ①에서 이미 같은 톤으로 그어졌다
+      j.sh.getRange(j.head, 1, 1, j.cols)
+        .setBackground(VL_HEAD_BG).setFontWeight('bold');
+
+      // ④ 행 높이
+      if (!j.keepH) {
+        j.sh.setRowHeight(j.head, style.headH);
+        if (j.last > j.head) {
+          j.sh.setRowHeights(j.head + 1, j.last - j.head, style.bodyH);
+        }
       }
     } catch (err) {
       // 한 탭이 실패해도 나머지 탭은 계속한다
@@ -134,7 +188,7 @@ function vlProcess_(dryRun, draw) {
 
   if (dryRun) {
     out.push('');
-    out.push('실제로 그으려면 runGridLines 를 실행하세요.');
+    out.push('실제로 맞추려면 runGridLines 를 실행하세요.');
     return out.join('\n');
   }
 
@@ -145,7 +199,7 @@ function vlProcess_(dryRun, draw) {
     : '!! 값이 바뀌었습니다 — 백업으로 되돌려 주세요 !!');
   if (failed.length) out.push('실패한 탭 ' + failed.length + '개 — ' + failed.join(' / '));
 
-  vlLog_(ss, (draw ? '모든 탭에 세로 구분선' : '세로 구분선 제거')
+  vlLog_(ss, (draw ? '다섯 탭 표 양식 통일' : '격자 제거')
     + ' (' + (jobs.length - failed.length) + '개 탭)');
   return out.join('\n');
 }
@@ -153,6 +207,50 @@ function vlProcess_(dryRun, draw) {
 /* ══════════════════════════════════════════════════════════════
    도구
    ══════════════════════════════════════════════════════════════ */
+
+/* 본보기 탭에서 글자 크기와 행 높이를 읽어 온다.
+   숫자를 박아 두면 픽셀·포인트를 헷갈리기 쉬워서 실제 값을 읽는다.
+
+   한 칸만 보면 안 된다. 형사사건 2행은 Arial 인데 탭 전체로는 맑은 고딕이
+   1197칸 대 137칸으로 훨씬 많다. 한 칸만 읽으면 Arial 이 다섯 탭에 퍼진다.
+   그래서 여러 줄을 훑어 제일 많은 값을 쓴다. */
+function vlRefStyle_(ss) {
+  var s = { font: VL_FONT, size: VL_SIZE, bodyH: 54, headH: 54 };
+  var ref = ss.getSheetByName(VL_REF);
+  if (!ref) return s;
+  try {
+    var head = vlHeadRow_(ref);
+    var last = vlLastRow_(ref, head);
+    var cols = vlLastCol_(ref, head);
+    var n = Math.min(30, last - head);
+    if (n < 1 || cols < 1) return s;
+
+    var rg = ref.getRange(head + 1, 1, n, cols);
+    s.font = vlTop_(rg.getFontFamilies()) || VL_FONT;
+    s.size = vlTop_(rg.getFontSizes()) || VL_SIZE;
+
+    s.headH = ref.getRowHeight(head);
+    var hs = [];
+    for (var r = head + 1; r <= head + n; r++) hs.push([ref.getRowHeight(r)]);
+    s.bodyH = vlTop_(hs) || 54;
+  } catch (err) { /* 못 읽으면 위 기본값 */ }
+  return s;
+}
+
+/* 표에서 제일 많이 나오는 값 */
+function vlTop_(grid) {
+  var count = {}, best = null, most = 0;
+  for (var r = 0; r < grid.length; r++) {
+    for (var c = 0; c < grid[r].length; c++) {
+      var v = grid[r][c];
+      if (v === '' || v == null) continue;
+      var k = String(v);
+      count[k] = (count[k] || 0) + 1;
+      if (count[k] > most) { most = count[k]; best = v; }
+    }
+  }
+  return best;
+}
 
 // 머리글 줄 — '성명' 또는 '이름'이 적힌 줄. 못 찾으면 1행 (수정로그처럼)
 function vlHeadRow_(sh) {
@@ -220,10 +318,10 @@ function vlSum_(ss) {
     if (rows < 1 || cols < 1) { parts.push(sh.getName() + ':'); return; }
     var v = sh.getRange(1, 1, rows, cols).getValues();
     parts.push(sh.getName() + ':' + v.map(function (row) {
-      return row.map(function (x) { return x == null ? '' : String(x); }).join('');
-    }).join(''));
+      return row.map(function (x) { return x == null ? '' : String(x); }).join('');
+    }).join(''));
   });
-  return Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, parts.join(''))
+  return Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, parts.join(''))
     .map(function (b) { return (b < 0 ? b + 256 : b).toString(16); }).join('');
 }
 
@@ -244,7 +342,7 @@ function vlLog_(ss, msg) {
     if (typeof append_ === 'function') {
       var who = '(로그인 정보 없음)';
       try { who = Session.getActiveUser().getEmail() || who; } catch (e) { }
-      append_(ss, who, '-', '-', '', msg, '세로선');
+      append_(ss, who, '-', '-', '', msg, '표양식');
     }
   } catch (err) { /* 수정로그 스크립트가 없으면 넘어감 */ }
 }
