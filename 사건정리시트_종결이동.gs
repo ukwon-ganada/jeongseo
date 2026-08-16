@@ -382,6 +382,7 @@ function clToDone_(ss, main, done, mHead, dHead, shared, row) {
 
   var at = clLastRow_(done, dHead) + 1;
   if (at <= dHead) at = dHead + 1;
+  clCopyFormat_(done, dHead, at, shared + CL_EXTRA.length + 1);
   done.getRange(at, 1, 1, shared).setValues([data]);
   done.getRange(at, shared + 1).setValue(new Date()).setNumberFormat('yyyy-mm-dd');
   done.getRange(at, shared + CL_EXTRA.length + 1).insertCheckboxes().setValue(false);
@@ -419,6 +420,7 @@ function clToMain_(ss, main, done, mHead, dHead, shared, row) {
 
   var at = clLastRow_(main, mHead) + 1;
   if (at <= mHead) at = mHead + 1;
+  clCopyFormat_(main, mHead, at, shared + 1);
   main.getRange(at, 1, 1, shared).setValues([data]);
   main.getRange(at, shared + 1).insertCheckboxes().setValue(false);
 
@@ -429,6 +431,19 @@ function clToMain_(ss, main, done, mHead, dHead, shared, row) {
 /* ══════════════════════════════════════════════════════════════
    도구
    ══════════════════════════════════════════════════════════════ */
+
+/* 새로 추가되는 행이 위 행들과 같은 모양이 되도록 서식만 복사한다.
+   setValues 는 값만 쓰기 때문에, 그냥 두면 새 행 혼자 민짜로 보인다.
+   값은 건드리지 않는다 (PASTE_FORMAT). */
+function clCopyFormat_(sh, head, at, cols) {
+  var src = head + 1;                 // 첫 데이터 행을 본으로 삼는다
+  if (src >= at || src > sh.getLastRow()) src = at - 1;
+  if (src <= head || src >= at) return;
+  try {
+    sh.getRange(src, 1, 1, cols).copyTo(
+      sh.getRange(at, 1, 1, cols), SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
+  } catch (err) { /* 서식 복사는 실패해도 값 이동은 계속한다 */ }
+}
 
 // 머리글 줄을 찾는다 ('성명' 또는 '이름'이 적힌 줄)
 function clHeadRow_(sh) {
