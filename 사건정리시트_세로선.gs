@@ -41,21 +41,24 @@
      새 파일로 만들지 마세요. previewGridLines 가 두 벌이 되어 어느 쪽이
      도는지 알 수 없게 됩니다.
 
-   [정렬은 기일로만]
+   [정렬은 기일과 단계로만]
      구글시트는 필터를 걸면 모든 칸에 정렬 단추가 생기고 일부만 뺄 수 없습니다.
-     그래서 필터를 아예 걷어내고, 형사 탭은 아래 명령으로만 정렬합니다.
+     그래서 필터를 아예 걷어내고, 형사 탭은 아래 두 명령으로만 정렬합니다.
 
-       sortCriminalByHearing   형사사건 기일 빠른 순
+       sortCriminalByHearing   기일 빠른 순
+       sortCriminalByStage     단계 순 (①경찰 → ②검찰 → ③재판),
+                               같은 단계 안에서는 기일 빠른 순
 
-     글자 그대로 세우지 않고 날짜를 읽어서 세웁니다. 기일에 '2026-09-04' 와
+     기일은 글자 그대로 세우지 않고 날짜를 읽어서 세웁니다. '2026-09-04' 와
      '2026. 9. 10.' 과 '26.8.13.' 세 가지 모양이 섞여 있어, 글자순으로 하면
-     9월이 8월 앞으로 오기 때문입니다. 날짜가 없는 줄은 맨 뒤로 갑니다.
+     9월이 8월 앞으로 오기 때문입니다. 빈 칸은 맨 뒤로 갑니다.
 
      항소 탭은 항소정리.gs 의 sortByHearing · sortByDeadline 을 쓰세요.
 
    [실행]
      · previewGridLines  → runGridLines
-     · sortCriminalByHearing               형사 탭 기일 순 정렬
+     · sortCriminalByHearing               형사 탭 기일 순
+     · sortCriminalByStage                 형사 탭 단계 순 (→ 기일 순)
      · removeGridLines                     격자만 걷어내기
 
    [주의]
@@ -89,9 +92,8 @@ var VL_SKIP = [];
    그래서 필터를 아예 없애고, 정렬은 아래 명령으로만 합니다. */
 var VL_DROP_FILTER = true;
 
-// 정렬할 탭과 그 기준 칸
+// 정렬할 탭
 var VL_SORT_TAB = '형사사건';
-var VL_SORT_HEAD = '기일';
 
 /* ══════════════════════════════════════════════════════════════
    실행
@@ -242,19 +244,31 @@ function vlProcess_(dryRun, draw) {
    정렬 — 형사사건 기일 순
    ══════════════════════════════════════════════════════════════ */
 
-function sortCriminalByHearing() { vlShow_(vlSort_(VL_SORT_TAB, VL_SORT_HEAD)); }
+/* 기일 빠른 순. 같은 날이면 시각 순 */
+function sortCriminalByHearing() {
+  vlShow_(vlSort_(VL_SORT_TAB, [{ head: '기일', kind: 'date' }]));
+}
 
-/* 글자 그대로 줄 세우지 않고 날짜를 읽어서 줄 세운다.
-   형사사건 기일에는 세 가지 모양이 섞여 있다.
+/* 단계 순 (①경찰 → ②검찰 → ③재판). 같은 단계 안에서는 기일 빠른 순.
+   단계만으로 세우면 같은 단계끼리 순서가 없어 눈에 안 들어옵니다. */
+function sortCriminalByStage() {
+  vlShow_(vlSort_(VL_SORT_TAB, [{ head: '단계', kind: 'text' }, { head: '기일', kind: 'date' }]));
+}
+
+/* 열쇠 여러 개로 줄을 세운다. 앞의 열쇠가 먼저, 같으면 다음 열쇠.
+   끝까지 같으면 원래 순서를 지킨다.
+
+   글자 그대로 세우지 않고 날짜를 읽는다. 형사사건 기일에는 세 가지 모양이 섞여
+   있어서 글자순으로 하면 '2026. 9. 10.' 이 '2026-08-20' 보다 앞으로 온다.
 
      2026-09-04 16:00                       하이픈
      2026-08-20 공판기일(412호법정 11:30)     하이픈 + 뒤에 시각
      2026. 9. 10. 10:30 공판기일             점 + 빈칸
      26.8.13. 무죄                          두 자리 연도
 
-   글자순으로 세우면 '2026. 9. 10.' 이 '2026-08-20' 보다 앞으로 온다.
-   날짜가 없는 줄('추정상태 기일체크하기' 등)은 맨 뒤로 보낸다. */
-function vlSort_(tabName, headName) {
+   단계는 ①②③ 로 시작해 글자순이 곧 단계 순이다.
+   빈 칸은 어느 열쇠든 맨 뒤로 보낸다. */
+function vlSort_(tabName, keys) {
   var ss = SpreadsheetApp.openById(VL_SHEET_ID);
   var sh = ss.getSheetByName(tabName);
   if (!sh) return '[' + tabName + '] 탭을 찾지 못했습니다.';
@@ -266,24 +280,49 @@ function vlSort_(tabName, headName) {
   if (n < 2) return '줄일 것이 없습니다.';
 
   var headRow = sh.getRange(head, 1, 1, cols).getValues()[0];
-  var col = 0;
-  for (var c = 0; c < headRow.length; c++) {
-    if (vlNorm_(headRow[c]).indexOf(vlNorm_(headName)) === 0) { col = c + 1; break; }
+  for (var k = 0; k < keys.length; k++) {
+    keys[k].col = 0;
+    for (var c = 0; c < headRow.length; c++) {
+      if (vlNorm_(headRow[c]).indexOf(vlNorm_(keys[k].head)) === 0) { keys[k].col = c + 1; break; }
+    }
+    if (!keys[k].col) return '[' + keys[k].head + '] 열을 찾지 못했습니다.';
   }
-  if (!col) return '[' + headName + '] 열을 찾지 못했습니다.';
 
   var rows = sh.getRange(head + 1, 1, n, cols).getValues();
-  var keyed = rows.map(function (r, i) { return { r: r, i: i, k: vlDateKey_(r[col - 1]) }; });
-  keyed.sort(function (a, b) { return (a.k - b.k) || (a.i - b.i); });   // 같으면 원래 순서
+  var keyed = rows.map(function (r, i) {
+    return {
+      r: r, i: i,
+      k: keys.map(function (key) {
+        return (key.kind === 'date') ? vlDateKey_(r[key.col - 1]) : vlTextKey_(r[key.col - 1]);
+      })
+    };
+  });
+  keyed.sort(function (a, b) {
+    for (var j = 0; j < a.k.length; j++) {
+      var x = a.k[j], y = b.k[j];
+      if (x === y) continue;
+      if (x === Infinity) return 1;                  // 빈 칸은 언제나 뒤로
+      if (y === Infinity) return -1;
+      return (x < y) ? -1 : 1;
+    }
+    return a.i - b.i;                                 // 끝까지 같으면 원래 순서
+  });
 
   sh.getRange(head + 1, 1, n, cols).setValues(keyed.map(function (x) { return x.r; }));
 
-  var dated = keyed.filter(function (x) { return x.k !== Infinity; }).length;
+  var label = keys.map(function (key) { return key.head; }).join(' → ');
+  var filled = keyed.filter(function (x) { return x.k[0] !== Infinity; }).length;
   var moved = keyed.filter(function (x, i) { return x.i !== i; }).length;
-  vlLog_(ss, '[' + tabName + '] ' + headName + ' 순으로 정렬 (' + dated + '건)');
-  return '=== [' + tabName + '] ' + headName + ' 순으로 줄 세웠습니다 ===\n'
-    + n + '건 중 날짜가 있는 ' + dated + '건을 빠른 날짜부터, '
-    + (n - dated) + '건은 맨 뒤로.\n자리가 바뀐 줄 ' + moved + '건.';
+  vlLog_(ss, '[' + tabName + '] ' + label + ' 순으로 정렬 (' + filled + '건)');
+  return '=== [' + tabName + '] ' + label + ' 순으로 줄 세웠습니다 ===\n'
+    + n + '건 중 ' + keys[0].head + ' 가 적힌 ' + filled + '건이 앞으로, '
+    + (n - filled) + '건은 맨 뒤로.\n자리가 바뀐 줄 ' + moved + '건.';
+}
+
+/* 글자 열쇠. 빈 칸은 맨 뒤(Infinity). */
+function vlTextKey_(v) {
+  var t = String(v == null ? '' : v).replace(/\s+/g, ' ').trim();
+  return t ? t : Infinity;
 }
 
 /* 정렬용 열쇠. 날짜가 없으면 맨 뒤(Infinity). */
