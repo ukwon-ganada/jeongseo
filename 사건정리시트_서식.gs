@@ -64,6 +64,12 @@ var FIX_NUMBER_FORMAT = true;
 // 2 로 두면 구속여부·성명이 오른쪽으로 스크롤해도 계속 보입니다.
 var FREEZE_COLS = 0;
 
+/* 머리글에 필터 단추를 달지. 필터를 걸면 모든 칸에 정렬 단추가 생기고
+   일부만 뺄 수 없어서, 기일로만 정렬하기로 하고 꺼 두었습니다.
+   정렬은 세로선.gs 의 sortCriminalByHearing (형사) ·
+   항소정리.gs 의 sortByHearing · sortByDeadline (항소) 로 합니다. */
+var MAKE_FILTER = false;
+
 /* 탭별 머리글 행 / 데이터 시작 행 */
 /* 머리글 줄은 고정하지 않고 fmHeadRow_() 가 탭마다 찾습니다.
    못 찾으면 여기 적힌 값을 씁니다. */
@@ -244,14 +250,20 @@ function fmStyle_(sh, t, lastRow, lastCol, bg) {
     catch (err) { Logger.log('[' + t.name + '] 열 고정 건너뜀 — ' + err); }
   }
   try { sh.setHiddenGridlines(true); } catch (err) { /* 구버전 대비 */ }
-  /* 주의 — 여기서 거는 필터는 모든 칸에 정렬 단추를 답니다.
-     항소사건 탭은 항소이유마감일·기일 두 칸으로만 정렬하기로 해서
-     항소정리.gs 가 필터를 걷어냅니다. runFormat 을 돌리시면 다시 생기니,
-     그때는 runAppeal 을 한 번 더 실행해 주세요. */
+  /* 필터는 걸지 않습니다 (MAKE_FILTER = false).
+     필터를 걸면 모든 칸에 정렬 단추가 생기고 일부만 뺄 수 없습니다.
+     기일로만 정렬하기로 해서, 정렬은 이 명령들로 합니다.
+
+       형사사건   세로선.gs 의 sortCriminalByHearing
+       항소사건   항소정리.gs 의 sortByHearing · sortByDeadline
+
+     예전처럼 모든 칸에 정렬 단추를 달고 싶으시면 MAKE_FILTER 를 true 로. */
   try {
     var f = sh.getFilter();
     if (f) f.remove();
-    sh.getRange(t.headRow, 1, lastRow - t.headRow + 1, lastCol).createFilter();
+    if (MAKE_FILTER) {
+      sh.getRange(t.headRow, 1, lastRow - t.headRow + 1, lastCol).createFilter();
+    }
   } catch (err) { Logger.log('[' + t.name + '] 필터 건너뜀 — ' + err); }
 
   // ⑤ 번호 열이 1.0 이 아니라 1 로 보이게 (표시 형식만, 값과 정렬은 그대로)

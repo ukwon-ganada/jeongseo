@@ -41,8 +41,21 @@
      새 파일로 만들지 마세요. previewGridLines 가 두 벌이 되어 어느 쪽이
      도는지 알 수 없게 됩니다.
 
+   [정렬은 기일로만]
+     구글시트는 필터를 걸면 모든 칸에 정렬 단추가 생기고 일부만 뺄 수 없습니다.
+     그래서 필터를 아예 걷어내고, 형사 탭은 아래 명령으로만 정렬합니다.
+
+       sortCriminalByHearing   형사사건 기일 빠른 순
+
+     글자 그대로 세우지 않고 날짜를 읽어서 세웁니다. 기일에 '2026-09-04' 와
+     '2026. 9. 10.' 과 '26.8.13.' 세 가지 모양이 섞여 있어, 글자순으로 하면
+     9월이 8월 앞으로 오기 때문입니다. 날짜가 없는 줄은 맨 뒤로 갑니다.
+
+     항소 탭은 항소정리.gs 의 sortByHearing · sortByDeadline 을 쓰세요.
+
    [실행]
      · previewGridLines  → runGridLines
+     · sortCriminalByHearing               형사 탭 기일 순 정렬
      · removeGridLines                     격자만 걷어내기
 
    [주의]
@@ -70,6 +83,15 @@ var VL_KEEP_ROW_H = ['수정로그'];
 
 // 아예 건너뛸 탭
 var VL_SKIP = [];
+
+/* 필터 단추를 걷어낼지.
+   구글시트는 필터를 걸면 모든 칸에 정렬 단추가 생기고 일부만 뺄 수 없습니다.
+   그래서 필터를 아예 없애고, 정렬은 아래 명령으로만 합니다. */
+var VL_DROP_FILTER = true;
+
+// 정렬할 탭과 그 기준 칸
+var VL_SORT_TAB = '형사사건';
+var VL_SORT_HEAD = '기일';
 
 /* ══════════════════════════════════════════════════════════════
    실행
@@ -173,6 +195,12 @@ function vlProcess_(dryRun, draw) {
           j.sh.setRowHeights(j.head + 1, j.last - j.head, style.bodyH);
         }
       }
+
+      // ⑤ 필터 단추 — 모든 칸에 생겨 버리므로 걷어낸다
+      if (VL_DROP_FILTER) {
+        var f = j.sh.getFilter();
+        if (f) { f.remove(); j.dropped = true; }
+      }
     } catch (err) {
       // 한 탭이 실패해도 나머지 탭은 계속한다
       failed.push(j.name + ' — ' + (err && err.message ? err.message : err));
@@ -194,6 +222,12 @@ function vlProcess_(dryRun, draw) {
 
   var after = vlSum_(ss);
   out.push('');
+  var drop = jobs.filter(function (j) { return j.dropped; });
+  if (drop.length) {
+    out.push('필터 단추를 걷어낸 탭 ' + drop.length + '개 — '
+      + drop.map(function (j) { return j.name; }).join(' · '));
+    out.push('정렬은 sortCriminalByHearing (형사사건 기일 순) 으로 하세요.');
+  }
   out.push(before === after
     ? '값 대조 — 한 글자도 바뀌지 않았습니다'
     : '!! 값이 바뀌었습니다 — 백업으로 되돌려 주세요 !!');
@@ -202,6 +236,78 @@ function vlProcess_(dryRun, draw) {
   vlLog_(ss, (draw ? '다섯 탭 표 양식 통일' : '격자 제거')
     + ' (' + (jobs.length - failed.length) + '개 탭)');
   return out.join('\n');
+}
+
+/* ══════════════════════════════════════════════════════════════
+   정렬 — 형사사건 기일 순
+   ══════════════════════════════════════════════════════════════ */
+
+function sortCriminalByHearing() { vlShow_(vlSort_(VL_SORT_TAB, VL_SORT_HEAD)); }
+
+/* 글자 그대로 줄 세우지 않고 날짜를 읽어서 줄 세운다.
+   형사사건 기일에는 세 가지 모양이 섞여 있다.
+
+     2026-09-04 16:00                       하이픈
+     2026-08-20 공판기일(412호법정 11:30)     하이픈 + 뒤에 시각
+     2026. 9. 10. 10:30 공판기일             점 + 빈칸
+     26.8.13. 무죄                          두 자리 연도
+
+   글자순으로 세우면 '2026. 9. 10.' 이 '2026-08-20' 보다 앞으로 온다.
+   날짜가 없는 줄('추정상태 기일체크하기' 등)은 맨 뒤로 보낸다. */
+function vlSort_(tabName, headName) {
+  var ss = SpreadsheetApp.openById(VL_SHEET_ID);
+  var sh = ss.getSheetByName(tabName);
+  if (!sh) return '[' + tabName + '] 탭을 찾지 못했습니다.';
+
+  var head = vlHeadRow_(sh);
+  var cols = vlLastCol_(sh, head);
+  var last = vlLastRow_(sh, head);
+  var n = last - head;
+  if (n < 2) return '줄일 것이 없습니다.';
+
+  var headRow = sh.getRange(head, 1, 1, cols).getValues()[0];
+  var col = 0;
+  for (var c = 0; c < headRow.length; c++) {
+    if (vlNorm_(headRow[c]).indexOf(vlNorm_(headName)) === 0) { col = c + 1; break; }
+  }
+  if (!col) return '[' + headName + '] 열을 찾지 못했습니다.';
+
+  var rows = sh.getRange(head + 1, 1, n, cols).getValues();
+  var keyed = rows.map(function (r, i) { return { r: r, i: i, k: vlDateKey_(r[col - 1]) }; });
+  keyed.sort(function (a, b) { return (a.k - b.k) || (a.i - b.i); });   // 같으면 원래 순서
+
+  sh.getRange(head + 1, 1, n, cols).setValues(keyed.map(function (x) { return x.r; }));
+
+  var dated = keyed.filter(function (x) { return x.k !== Infinity; }).length;
+  var moved = keyed.filter(function (x, i) { return x.i !== i; }).length;
+  vlLog_(ss, '[' + tabName + '] ' + headName + ' 순으로 정렬 (' + dated + '건)');
+  return '=== [' + tabName + '] ' + headName + ' 순으로 줄 세웠습니다 ===\n'
+    + n + '건 중 날짜가 있는 ' + dated + '건을 빠른 날짜부터, '
+    + (n - dated) + '건은 맨 뒤로.\n자리가 바뀐 줄 ' + moved + '건.';
+}
+
+/* 정렬용 열쇠. 날짜가 없으면 맨 뒤(Infinity). */
+function vlDateKey_(v) {
+  if (v instanceof Date) return v.getTime();
+  var t = String(v == null ? '' : v).replace(/\s+/g, ' ').trim();
+  if (!t) return Infinity;
+
+  var y, mo, d;
+  var m = t.match(/(\d{4})\s*-\s*(\d{1,2})\s*-\s*(\d{1,2})/);      // 2026-09-04
+  if (!m) m = t.match(/(\d{2,4})\s*\.\s*(\d{1,2})\s*\.\s*(\d{1,2})/); // 2026. 9. 10. / 26.8.13.
+  if (!m) return Infinity;
+
+  y = parseInt(m[1], 10);
+  if (y < 100) y += 2000;
+  mo = parseInt(m[2], 10);
+  d = parseInt(m[3], 10);
+  if (mo < 1 || mo > 12 || d < 1 || d > 31) return Infinity;
+
+  // 날짜 뒤에 붙은 시각만 본다 (날짜 앞의 숫자를 시각으로 잘못 읽지 않도록)
+  var rest = t.substring(m.index + m[0].length);
+  var hm = rest.match(/(\d{1,2})\s*:\s*(\d{2})/);
+  return new Date(y, mo - 1, d,
+    hm ? parseInt(hm[1], 10) : 0, hm ? parseInt(hm[2], 10) : 0).getTime();
 }
 
 /* ══════════════════════════════════════════════════════════════
