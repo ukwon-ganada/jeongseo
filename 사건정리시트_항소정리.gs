@@ -446,13 +446,26 @@ function apTodoColors_(sh, first, n) {
    정렬 — 항소이유마감일 · 기일 두 칸으로만
    ══════════════════════════════════════════════════════════════ */
 
-function sortByDeadline() { apShow_(apSort_('항소이유마감일')); }
+function sortByDeadline() { apRun_('마감일정렬', function () { return apSort_('항소이유마감일'); }); }
 
-function sortByHearing() { apShow_(apSort_('기일')); }
+function sortByHearing() { apRun_('기일정렬', function () { return apSort_('기일'); }); }
 
-/* 글자 그대로 줄 세우지 않고 날짜를 읽어서 줄 세운다.
-   기일은 '26.10.01 10:20공판' 처럼 적혀 있는데, 24행 '26. 9. 11. 15:00' 처럼
-   빈칸이 섞인 줄이 있어 글자순으로 세우면 9월이 8월 앞으로 온다.
+/* 줄을 세운다.
+
+   [예전에 사고가 났던 자리다 — 반드시 Range.sort 를 써야 한다]
+     처음에는 값을 읽어 새 순서로 setValues 로 다시 썼다. setValues 는 값만 쓴다.
+     칸에 붙어 있던 배경색·메모·데이터 확인은 제자리에 남아, 값이 이사 간 뒤
+     엉뚱한 사건에 붙었다. 형사 탭에서 실제로 이 사고가 났다.
+
+     Range.sort 는 구글시트가 줄을 통째로 옮기므로 색·메모·체크박스가 값과
+     함께 따라간다. 다시는 setValues 로 정렬하지 말 것.
+
+   [그런데 Range.sort 는 칸 값 기준으로만 세운다]
+     기일은 '26.10.01 10:20공판' 처럼 적혀 있는데 '26. 9. 11. 15:00' 처럼 빈칸이
+     섞인 줄이 있어 글자순으로 세우면 9월이 8월 앞으로 온다.
+     그래서 오른쪽 끝에 임시 열을 빌려 계산한 열쇠를 채우고, 그 열로 세운 뒤
+     임시 열을 되돌린다.
+
    비었거나 '기일 미지정' 인 줄은 맨 뒤로 보낸다. */
 function apSort_(headName) {
   var ss = SpreadsheetApp.openById(AP_SHEET_ID);
@@ -471,19 +484,52 @@ function apSort_(headName) {
   var n = last - head;
   if (n < 2) return '줄일 것이 없습니다.';
 
-  var rows = sh.getRange(head + 1, 1, n, cols).getValues();
-  var keyed = rows.map(function (r, i) {
-    return { r: r, i: i, k: apDateKey_(r[col - 1]) };
-  });
-  keyed.sort(function (a, b) { return (a.k - b.k) || (a.i - b.i); });   // 같으면 원래 순서
+  var before = sh.getRange(head + 1, 1, n, cols).getValues();
+  var first0 = apNorm_(before[0][nameCol - 1]), last0 = apNorm_(before[n - 1][nameCol - 1]);
 
-  sh.getRange(head + 1, 1, n, cols).setValues(keyed.map(function (x) { return x.r; }));
+  var keyRows = [], dated = 0;
+  for (var i = 0; i < n; i++) {
+    var p = apDatePart_(before[i][col - 1]);
+    if (p.charAt(0) !== '힣') dated++;
+    keyRows.push([p]);
+  }
 
-  var moved = keyed.filter(function (x, i) { return x.i !== i; }).length;
-  var dated = keyed.filter(function (x) { return x.k !== Infinity; }).length;
+  // 오른쪽 끝에 임시 열을 하나 빌린다
+  var tmp = cols + 1;
+  if (sh.getMaxColumns() < tmp) sh.insertColumnsAfter(sh.getMaxColumns(), tmp - sh.getMaxColumns());
+  var tmpRange = sh.getRange(head + 1, tmp, n, 1);
+  var tmpBack = tmpRange.getValues();
+  tmpRange.setValues(keyRows);
+
+  try {
+    // 여기가 핵심 — 구글시트가 줄을 통째로 옮긴다 (색·메모가 함께 간다)
+    sh.getRange(head + 1, 1, n, tmp).sort({ column: tmp, ascending: true });
+  } finally {
+    sh.getRange(head + 1, tmp, n, 1).setValues(tmpBack);
+  }
+
+  var after = sh.getRange(head + 1, 1, n, cols).getValues();
+  var moved = 0;
+  for (var m = 0; m < n; m++) {
+    if (apNorm_(after[m][nameCol - 1]) !== apNorm_(before[m][nameCol - 1])) moved++;
+  }
+
+  apLog_(ss, '[' + AP_TAB + '] ' + headName + ' 순으로 정렬 — 정렬 전 첫 줄 '
+    + first0 + ' · 마지막 줄 ' + last0);
   return '=== [' + headName + '] 순으로 줄 세웠습니다 ===\n'
     + n + '건 중 날짜가 있는 ' + dated + '건을 빠른 날짜부터, '
-    + (n - dated) + '건은 맨 뒤로.\n자리가 바뀐 줄 ' + moved + '건.';
+    + (n - dated) + '건은 맨 뒤로.\n자리가 바뀐 줄 ' + moved + '건.\n'
+    + '줄을 통째로 옮겼으므로 칸 색과 메모가 값과 함께 따라갔습니다.\n\n'
+    + '정렬 전 첫 줄은 ' + first0 + ', 마지막 줄은 ' + last0 + ' 이었습니다.';
+}
+
+/* 정렬 열쇠 — 날짜를 자릿수 고정 숫자 글자로. 날짜가 없으면 '힣' 로 맨 뒤. */
+function apDatePart_(v) {
+  var k = apDateKey_(v);
+  if (k === Infinity) return '힣';
+  var s = String(Math.round(k / 60000));
+  while (s.length < 12) s = '0' + s;
+  return s;
 }
 
 /* 정렬용 열쇠. 날짜가 없으면 맨 뒤(Infinity). */

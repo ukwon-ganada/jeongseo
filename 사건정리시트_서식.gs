@@ -64,11 +64,9 @@ var FIX_NUMBER_FORMAT = true;
 // 2 로 두면 구속여부·성명이 오른쪽으로 스크롤해도 계속 보입니다.
 var FREEZE_COLS = 0;
 
-/* 머리글에 필터 단추를 달지. 필터를 걸면 모든 칸에 정렬 단추가 생기고
-   일부만 뺄 수 없어서, 기일로만 정렬하기로 하고 꺼 두었습니다.
-   정렬은 세로선.gs 의 sortCriminalByHearing (형사) ·
-   항소정리.gs 의 sortByHearing · sortByDeadline (항소) 로 합니다. */
-var MAKE_FILTER = false;
+/* 머리글에 필터 단추를 달지. 단추를 누르면 그 칸 기준으로 바로 정렬됩니다.
+   구글시트는 일부 칸에만 달 수 없어 모든 칸에 생깁니다. */
+var MAKE_FILTER = true;
 
 /* 탭별 머리글 행 / 데이터 시작 행 */
 /* 머리글 줄은 고정하지 않고 fmHeadRow_() 가 탭마다 찾습니다.
@@ -250,14 +248,11 @@ function fmStyle_(sh, t, lastRow, lastCol, bg) {
     catch (err) { Logger.log('[' + t.name + '] 열 고정 건너뜀 — ' + err); }
   }
   try { sh.setHiddenGridlines(true); } catch (err) { /* 구버전 대비 */ }
-  /* 필터는 걸지 않습니다 (MAKE_FILTER = false).
-     필터를 걸면 모든 칸에 정렬 단추가 생기고 일부만 뺄 수 없습니다.
-     기일로만 정렬하기로 해서, 정렬은 이 명령들로 합니다.
+  /* 머리글 필터 단추. 이걸 눌러 바로 정렬하시면 됩니다.
+     구글시트 기본 정렬은 줄을 통째로 옮기므로 칸 색과 메모가 값과 함께 갑니다.
 
-       형사사건   세로선.gs 의 sortCriminalByHearing
-       항소사건   항소정리.gs 의 sortByHearing · sortByDeadline
-
-     예전처럼 모든 칸에 정렬 단추를 달고 싶으시면 MAKE_FILTER 를 true 로. */
+     기일은 표기가 섞여 있으면 글자순이 날짜순과 어긋납니다.
+     세로선.gs 의 runFixDates 를 한 번 돌려 표기를 맞춰 두세요. */
   try {
     var f = sh.getFilter();
     if (f) f.remove();
