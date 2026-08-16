@@ -24,10 +24,22 @@
    [설치]
      Apps Script 에서 종결이동.gs 내용을 통째로 바꿔 붙여넣고 Ctrl+S
 
+   [양식도 형사사건과 똑같이 맞춥니다]
+     글꼴·글자크기·정렬·격자·열 너비·행 높이·틀 고정·단계 칸 색까지 옮겨 옵니다.
+     형사사건 탭은 원본으로 읽기만 하고 쓰기 호출이 하나도 없습니다.
+     종결 탭도 값은 한 글자도 바뀌지 않습니다 (서식·너비·높이만 바뀝니다).
+
+     열 구성이 아직 다르면 열 너비가 엉뚱한 칸에 붙으므로,
+     구조를 맞추기 전에는 양식 맞추기가 스스로 멈춰 섭니다.
+     runAlignClosed 가 끝나면 양식 맞추기까지 저절로 이어집니다.
+
    [실행 순서]  반드시 이 순서로
-     1) previewAlignClosed  → runAlignClosed    종결 탭을 형사사건 구조에 맞춤
-     2) previewCloseButtons → runCloseButtons   양쪽에 체크박스 깔기
-     3) setupCloseButtons                       체크하면 옮겨지도록 켜기
+     1) previewAlignClosed  → runAlignClosed    구조 재편 + 양식 맞추기
+     2) verifyDoneFormat                        남은 차이가 없는지 확인
+     3) previewCloseButtons → runCloseButtons   양쪽에 체크박스 깔기
+     4) setupCloseButtons                       체크하면 옮겨지도록 켜기
+
+     나중에 양식만 다시 맞추고 싶으면  previewDoneFormat → runDoneFormat
 
    [중요]
      스크립트가 지운 행은 Ctrl+Z 로 되돌릴 수 없습니다.
@@ -101,12 +113,22 @@ function clAlign_(dryRun) {
   // 어느 열을 어디로 보낼지 정한다
   var plan = clPlan_(dHeadRow, mainHead, shared, srcCols);
 
-  var rows = [], roleCnt = {}, stageCnt = {}, lost = [], routed = [], kept = 0;
+  var rows = [], roleCnt = {}, stageCnt = {}, lost = [], routed = [], kept = 0, already = 0;
 
   for (var i = 0; i < n; i++) {
     if (!clBag_(old[i]).length) continue;
     var row = [];
     for (var c = 0; c < total; c++) row.push('');
+
+    /* 체크박스로 이미 넘어온 행은 벌써 형사사건 배치다.
+       종결일 칸에 날짜가 찍혀 있는 것이 그 표시다.
+       이런 행을 옛 배치로 다시 풀어 헤치면 이름이 사라진다. 그대로 둔다. */
+    if (srcCols > shared && old[i][shared] instanceof Date) {
+      for (var k = 0; k < total && k < srcCols; k++) row[k] = old[i][k];
+      already++;
+      rows.push(row);
+      continue;
+    }
 
     for (var s = 0; s < srcCols; s++) {
       var v = old[i][s];
@@ -161,6 +183,18 @@ function clAlign_(dryRun) {
 
   out.push('');
   out.push('[' + CL_DONE + '] ' + rows.length + '건을 새 배치로 옮깁니다');
+  if (already) {
+    out.push('   그 중 ' + already + '건은 체크박스로 이미 넘어온 행이라 그대로 둡니다');
+  }
+
+  // 같은 사람이 두 번 들어와 있지 않은지 (체크를 두 번 누르면 이렇게 됩니다)
+  var dup = clDupes_(rows, mainHead);
+  if (dup.length) {
+    out.push('');
+    out.push('■ 같은 사건이 두 줄 이상 있습니다 — 손으로 지워 주셔야 합니다');
+    dup.forEach(function (s) { out.push('   ' + s); });
+  }
+
   if (routed.length) {
     out.push('');
     out.push('■ 내용을 보고 자리를 정한 값 ' + routed.length + '건 (밀려 있던 행들)');
@@ -215,6 +249,10 @@ function clAlign_(dryRun) {
   out.push('');
   out.push('머리글을 형사사건과 똑같이 맞추고 ' + rows.length + '건을 다시 배치했습니다.');
   clLog_(ss, '종결 탭을 형사사건과 같은 구조로 재편 (' + rows.length + '건)');
+
+  // 구조를 맞췄으면 양식도 이어서 맞춘다 (둘이 따로 놀지 않게)
+  out.push('');
+  out.push(clFormat_(false));
   return out.join('\n');
 }
 
@@ -228,6 +266,8 @@ function clPlan_(dHeadRow, mainHead, shared, srcCols) {
   for (var c = 0; c < srcCols; c++) {
     var h = clNorm_(dHeadRow[c]);
     if (!h) { plan.push({ mode: 'route' }); continue; }          // 머리글 없는 열
+    // 옛 자리에 남은 종결·복원 체크박스 열은 옮길 값이 아니다
+    if (h === CL_HEAD_CLOSE || h === CL_HEAD_RESTORE) { plan.push(null); continue; }
     if (CL_ROUTE_HEADS.indexOf(h) >= 0) { plan.push({ mode: 'route' }); continue; }
 
     var ex = CL_EXTRA.indexOf(h);
@@ -239,6 +279,23 @@ function clPlan_(dHeadRow, mainHead, shared, srcCols) {
   return plan;
 }
 
+/* 같은 사람·같은 사건번호가 두 줄 이상인지 찾는다 */
+function clDupes_(rows, mainHead) {
+  var nameCol = clFind_(mainHead, '성명') || clFind_(mainHead, '이름');
+  var caseCol = clFind_(mainHead, '사건번호');
+  if (!nameCol) return [];
+  var seen = {}, dup = [];
+  rows.forEach(function (r, i) {
+    var nm = clNorm_(r[nameCol - 1]);
+    if (!nm) return;
+    var key = nm + '|' + (caseCol ? clNorm_(r[caseCol - 1]) : '');
+    if (seen[key] === undefined) { seen[key] = i + 1; return; }
+    dup.push(nm + (caseCol && clNorm_(r[caseCol - 1]) ? ' (' + clNorm_(r[caseCol - 1]) + ')' : '')
+      + ' — ' + seen[key] + '번째 · ' + (i + 1) + '번째 줄');
+  });
+  return dup;
+}
+
 /* 값의 생김새로 갈 자리를 정한다 */
 function clRoute_(v, shared, mainHead) {
   var s = String(v).replace(/\n/g, ' ').trim();
@@ -248,6 +305,337 @@ function clRoute_(v, shared, mainHead) {
   if (/(법원|지원|고법)/.test(s)) return clFind_(mainHead, '관할');
   if (/\d{4}\s*[가-힣]{1,3}\s*\d/.test(s) || /^\d{4}-\d+$/.test(s)) return clFind_(mainHead, '사건번호');
   return clFind_(mainHead, '체크할것');                           // 메모성 값
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ①-2 종결 탭 양식을 형사사건과 똑같이
+
+   형사사건 탭은 원본으로 읽기만 합니다. 쓰기 호출이 하나도 없습니다.
+   종결 탭도 값은 한 글자도 바뀌지 않습니다 (서식·너비·높이만).
+   ══════════════════════════════════════════════════════════════ */
+
+// 체크박스가 들어갈 머리글 (형사사건과 공유하는 열)
+var CL_BOXES = ['선임계', '공소장', '증거기록', '항소여부'];
+
+// 단계 칸 색 — 지위단계.gs 와 같은 규칙을 종결에도 건다
+var CL_STAGES = [
+  { label: '①경찰', bg: '#eceff1', fg: '#37474f' },
+  { label: '②검찰', bg: '#e1f0fa', fg: '#0b4f6c' },
+  { label: '③재판', bg: '#fce8e6', fg: '#b3261e' }
+];
+
+// 손으로 칠한 칸으로 보지 않을 배경색 (기본 바탕과 머리글 회색)
+var CL_PLAIN_BG = ['#ffffff', '#f2f2f2', ''];
+
+function previewDoneFormat() { clShow_(clFormat_(true)); }
+
+function runDoneFormat() {
+  var backup = clBackup_('종결탭양식');
+  clShow_('백업 먼저 만들었습니다:\n' + backup + '\n\n' + clFormat_(false));
+}
+
+function clFormat_(dryRun) {
+  var ss = SpreadsheetApp.openById(CL_SHEET_ID);
+  var main = ss.getSheetByName(CL_MAIN);
+  var done = ss.getSheetByName(CL_DONE);
+  if (!main || !done) return '형사사건 또는 종결 탭을 찾지 못했습니다.';
+
+  var mHead = clHeadRow_(main), dHead = clHeadRow_(done);
+  if (!mHead || !dHead) return '머리글 줄을 찾지 못했습니다.';
+
+  var shared = clSharedCols_(main, mHead);
+  if (!shared) return '형사사건 머리글이 비어 있습니다.';
+  var total = shared + CL_EXTRA.length;      // … 종결일 · 결과 · 비고
+  var restore = total + 1;                   // 복원 체크박스 자리
+  var mainHead = main.getRange(mHead, 1, 1, shared).getValues()[0];
+
+  /* 안전 자물쇠 — 열 구성이 다른 채로 너비를 옮기면 엉뚱한 칸에 붙는다.
+     (형사 E 사건명 너비가 종결 E 사건명이 아니라 단계 칸에 붙는 식) */
+  if (!clAligned_(main, mHead, done, dHead, shared)) {
+    var dRow = done.getRange(dHead, 1, 1, Math.max(done.getLastColumn(), shared)).getValues()[0];
+    var where = '';
+    for (var c = 0; c < shared; c++) {
+      if (clNorm_(dRow[c]) !== clNorm_(mainHead[c])) {
+        where = '   ' + clL_(c + 1) + '열   형사사건 「' + clNorm_(mainHead[c]) + '」'
+          + '  ↔  종결 「' + clNorm_(dRow[c]) + '」\n';
+        break;
+      }
+    }
+    return '종결 탭 열 구성이 아직 형사사건과 다릅니다.\n' + where + '\n'
+      + '이 상태에서 양식만 맞추면 열 너비가 엉뚱한 칸에 붙습니다.\n'
+      + '먼저 previewAlignClosed → runAlignClosed 를 실행해 주세요.\n'
+      + '(runAlignClosed 가 끝나면 양식 맞추기까지 저절로 이어집니다.)';
+  }
+
+  var dLast = clLastRow_(done, dHead);
+  var n = Math.max(0, dLast - dHead);
+  var maxRow = done.getMaxRows(), maxCol = done.getMaxColumns();
+
+  var headH = main.getRowHeight(mHead);
+  var bodyH = main.getRowHeight(mHead + 1);
+
+  var out = [];
+  out.push(dryRun ? '=== 미리보기 (시트는 바뀌지 않았습니다) ===' : '=== 종결 탭 양식 맞추기 완료 ===');
+  out.push('[' + CL_DONE + '] 머리글 ' + dHead + '행 · 본문 ' + n + '건 · ' + restore + '열');
+  out.push('');
+  out.push('■ 형사사건에서 그대로 가져오는 것');
+  out.push('   글꼴·글자크기·정렬·격자   머리글 ' + mHead + '행 / 본문 ' + (mHead + 1) + '행 서식 복사');
+  out.push('   열 너비   1~' + shared + '열은 형사사건 그대로, 뒤쪽 4열은 짝이 되는 열에서');
+  out.push('   행 높이   머리글 ' + headH + ' · 본문 ' + bodyH);
+  out.push('   틀 고정   ' + main.getFrozenRows() + '행');
+  out.push('   단계 칸 색   ①경찰 · ②검찰 · ③재판 조건부 서식');
+
+  var diff = clDiff_(main, mHead, done, dHead, shared, n, headH, bodyH);
+  out.push('');
+  out.push('■ 지금 다른 점');
+  if (!diff.length) out.push('   없음 — 이미 형사사건과 같습니다');
+  diff.forEach(function (s) { out.push('   ' + s); });
+
+  var merges = done.getRange(1, 1, maxRow, maxCol).getMergedRanges().length;
+  if (merges) out.push('   옛 병합 ' + merges + '개 → 풉니다');
+
+  // 미리보기 중에는 시트를 넓히지 않으므로 있는 열까지만 훑는다
+  var marks = clMarks_(done, dHead, n, Math.min(restore, maxCol));
+  if (marks.length) {
+    out.push('');
+    out.push('■ 손으로 칠하신 칸 ' + marks.length + '개 — 지우지 않고 그대로 되돌려 놓습니다');
+    marks.slice(0, 12).forEach(function (m) { out.push('   ' + m.a1 + '   ' + m.bg); });
+    if (marks.length > 12) out.push('   ... 외 ' + (marks.length - 12) + '개');
+    out.push('   ※ 재편으로 값이 옮겨 간 자리라면 표시 뜻이 어긋날 수 있습니다. 확인해 주세요.');
+  }
+
+  if (dryRun) {
+    out.push('');
+    out.push('실제로 맞추려면 runDoneFormat 을 실행하세요.');
+    return out.join('\n');
+  }
+
+  /* ── 실제 변경 ── */
+
+  var before = clSum_(done, restore);
+
+  // ⓪ 복원 칸까지 자리가 있어야 아래 서식 복사가 범위를 벗어나지 않는다
+  if (done.getMaxColumns() < restore) {
+    done.insertColumnsAfter(done.getMaxColumns(), restore - done.getMaxColumns());
+    maxCol = done.getMaxColumns();
+  }
+
+  // ① 옛 병합 — 새 배치와 어긋나므로 푼다
+  if (merges) done.getRange(1, 1, maxRow, maxCol).breakApart();
+
+  /* 종결 전용 뒤쪽 열은 성격이 맞는 형사사건 열에서 서식을 가져온다.
+     항소여부(체크박스) 칸은 Arial 이라, 글로 적는 종결일·결과·비고에는
+     같은 글로 적는 칸인 체크할것 을 본으로 삼아야 글꼴이 어긋나지 않는다. */
+  var cText = clFind_(mainHead, '체크할것') || shared;     // 종결일 · 결과 · 비고
+  var cBox = clFind_(mainHead, '항소여부') || shared;      // 복원 체크박스
+  var extras = [cText, cText, cText, cBox];                // 종결일 결과 비고 복원
+
+  // ② 머리글 서식
+  main.getRange(mHead, 1, 1, shared).copyTo(
+    done.getRange(dHead, 1, 1, shared), SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
+  for (var x = 0; x < extras.length; x++) {
+    main.getRange(mHead, extras[x]).copyTo(
+      done.getRange(dHead, shared + 1 + x), SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
+  }
+
+  // ③ 본문 서식 — 형사사건 첫 데이터 행 하나를 본문 전체에 되풀이해 붙인다
+  if (n) {
+    main.getRange(mHead + 1, 1, 1, shared).copyTo(
+      done.getRange(dHead + 1, 1, n, shared), SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
+    for (var y = 0; y < extras.length; y++) {
+      main.getRange(mHead + 1, extras[y]).copyTo(
+        done.getRange(dHead + 1, shared + 1 + y, n, 1),
+        SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
+    }
+  }
+
+  // ④ 열 너비 — 공유 열은 형사사건 그대로, 종결 전용 열은 짝이 되는 열에서
+  for (var w = 1; w <= shared; w++) done.setColumnWidth(w, main.getColumnWidth(w));
+  var wDate = clFind_(mainHead, '기일');
+  var extraW = [
+    wDate ? main.getColumnWidth(wDate) : 120,    // 종결일
+    main.getColumnWidth(cText),                  // 결과
+    main.getColumnWidth(cText),                  // 비고
+    CL_BTN_WIDTH                                 // 복원
+  ];
+  for (var e = 0; e < extraW.length; e++) done.setColumnWidth(shared + 1 + e, extraW[e]);
+
+  // ⑤ 행 높이
+  done.setRowHeight(dHead, headH);
+  if (maxRow > dHead) done.setRowHeights(dHead + 1, maxRow - dHead, bodyH);
+
+  // ⑥ 틀 고정
+  done.setFrozenRows(main.getFrozenRows());
+
+  // ⑦ 데이터 확인 — 옛 자리에 남은 체크박스를 걷어내고 머리글 이름대로 다시 깐다
+  if (n) {
+    done.getRange(dHead + 1, 1, n, done.getMaxColumns()).clearDataValidations();
+    CL_BOXES.forEach(function (h) {
+      var col = clFind_(mainHead, h);
+      if (col) done.getRange(dHead + 1, col, n, 1).insertCheckboxes();
+    });
+    if (done.getMaxColumns() >= restore
+      && clNorm_(done.getRange(dHead, restore).getValue()) === CL_HEAD_RESTORE) {
+      done.getRange(dHead + 1, restore, n, 1).insertCheckboxes();
+    }
+    ['지위', '단계'].forEach(function (h) {
+      var col = clFind_(mainHead, h);
+      if (!col) return;
+      var dv = main.getRange(mHead + 1, col).getDataValidation();
+      if (dv) done.getRange(dHead + 1, col, n, 1).setDataValidation(dv);
+    });
+  }
+
+  // ⑧ 단계 칸 색 — 채우기가 아니라 조건부 서식이라 서식 복사에 딸려오지 않는다
+  var stageCol = clFind_(mainHead, '단계');
+  if (stageCol && n) {
+    done.getRange(dHead + 1, stageCol, n, 1).setBackground(null);
+    clStageColors_(done, stageCol, dHead + 1, n);
+  }
+
+  // ⑨ 손으로 칠하신 칸 되돌려 놓기
+  marks.forEach(function (m) { done.getRange(m.a1).setBackground(m.bg); });
+
+  // ⑩ 값 대조
+  var after = clSum_(done, restore);
+  out.push('');
+  out.push(before === after
+    ? '값 대조 — 한 글자도 바뀌지 않았습니다'
+    : '!! 값이 바뀌었습니다 — 백업으로 되돌려 주세요 !!');
+
+  out.push('양식을 형사사건과 똑같이 맞췄습니다.');
+  clLog_(ss, '종결 탭 양식을 형사사건과 동일하게 맞춤 (' + n + '건)');
+  return out.join('\n');
+}
+
+/* 두 탭의 양식을 재어 다른 점만 추린다 */
+function clDiff_(main, mHead, done, dHead, shared, n, headH, bodyH) {
+  var d = [];
+  var probe = Math.min(n, 20);
+
+  function uniq(arr) {
+    var seen = [];
+    arr.forEach(function (v) { if (seen.indexOf(v) < 0) seen.push(v); });
+    return seen;
+  }
+
+  var mBody = probe ? main.getRange(mHead + 1, 1, 1, shared) : null;
+  var dBody = probe ? done.getRange(dHead + 1, 1, probe, shared) : null;
+
+  if (mBody && dBody) {
+    var mSize = uniq(mBody.getFontSizes()[0]);
+    var dSize = uniq([].concat.apply([], dBody.getFontSizes()));
+    if (dSize.join(',') !== mSize.join(',')) {
+      d.push('글자 크기   형사사건 ' + mSize.join('·') + 'pt  ↔  종결 ' + dSize.join('·') + 'pt');
+    }
+    var mFam = uniq(mBody.getFontFamilies()[0]);
+    var dFam = uniq([].concat.apply([], dBody.getFontFamilies()));
+    if (dFam.join(',') !== mFam.join(',')) {
+      d.push('글꼴   형사사건 ' + mFam.join('·') + '  ↔  종결 ' + dFam.join('·'));
+    }
+    var mV = uniq(mBody.getVerticalAlignments()[0]);
+    var dV = uniq([].concat.apply([], dBody.getVerticalAlignments()));
+    if (dV.join(',') !== mV.join(',')) {
+      d.push('세로 정렬   형사사건 ' + mV.join('·') + '  ↔  종결 ' + dV.join('·'));
+    }
+    var mH = uniq(mBody.getHorizontalAlignments()[0]);
+    var dH = uniq([].concat.apply([], dBody.getHorizontalAlignments()));
+    if (dH.join(',') !== mH.join(',')) {
+      d.push('가로 정렬   형사사건 ' + mH.join('·') + '  ↔  종결 ' + dH.join('·'));
+    }
+  }
+
+  var heights = [];
+  for (var r = dHead + 1; r <= dHead + probe; r++) {
+    var h = done.getRowHeight(r);
+    if (heights.indexOf(h) < 0) heights.push(h);
+  }
+  if (heights.length && (heights.length > 1 || heights[0] !== bodyH)) {
+    d.push('행 높이   형사사건 ' + bodyH + ' 로 일정  ↔  종결 ' + heights.join('·'));
+  }
+  if (done.getRowHeight(dHead) !== headH) {
+    d.push('머리글 행 높이   형사사건 ' + headH + '  ↔  종결 ' + done.getRowHeight(dHead));
+  }
+
+  var wrong = [];
+  for (var w = 1; w <= shared; w++) {
+    if (done.getColumnWidth(w) !== main.getColumnWidth(w)) wrong.push(clL_(w));
+  }
+  if (wrong.length) {
+    d.push('열 너비   ' + wrong.length + '개 열이 다름 (' + wrong.slice(0, 10).join(' ')
+      + (wrong.length > 10 ? ' …' : '') + ')');
+  }
+  if (done.getFrozenRows() !== main.getFrozenRows()) {
+    d.push('틀 고정   형사사건 ' + main.getFrozenRows() + '행  ↔  종결 ' + done.getFrozenRows() + '행');
+  }
+  return d;
+}
+
+/* 손으로 칠하신 칸을 찾아 둔다 (기본 바탕·머리글 회색은 뺀다) */
+function clMarks_(sh, head, n, cols) {
+  var found = [];
+  if (!n) return found;
+  var rg = sh.getRange(head + 1, 1, n, cols);
+  var bg = rg.getBackgrounds();
+  for (var r = 0; r < bg.length; r++) {
+    for (var c = 0; c < bg[r].length; c++) {
+      var v = String(bg[r][c] || '').toLowerCase();
+      if (CL_PLAIN_BG.indexOf(v) >= 0) continue;
+      found.push({ a1: clL_(c + 1) + (head + 1 + r), bg: bg[r][c] });
+    }
+  }
+  return found;
+}
+
+/* 단계 칸 색 — 이 열을 겨냥한 기존 규칙만 걷어내고 새로 건다 */
+function clStageColors_(sh, col, first, n) {
+  var range = sh.getRange(first, col, n, 1);
+  var keep = sh.getConditionalFormatRules().filter(function (rule) {
+    var rs = rule.getRanges();
+    for (var i = 0; i < rs.length; i++) {
+      if (rs[i].getColumn() === col && rs[i].getNumColumns() === 1) return false;
+    }
+    return true;
+  });
+  CL_STAGES.forEach(function (s) {
+    keep.push(SpreadsheetApp.newConditionalFormatRule()
+      .whenTextEqualTo(s.label)
+      .setBackground(s.bg).setFontColor(s.fg).setBold(true)
+      .setRanges([range]).build());
+  });
+  sh.setConditionalFormatRules(keep);
+}
+
+/* 값이 그대로인지 대조하는 지문 */
+function clSum_(sh, cols) {
+  var last = sh.getLastRow();
+  if (last < 1) return '';
+  var v = sh.getRange(1, 1, last, Math.min(cols, sh.getMaxColumns())).getValues();
+  var flat = v.map(function (row) {
+    return row.map(function (x) { return x == null ? '' : String(x); }).join('');
+  }).join('');
+  return Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, flat)
+    .map(function (b) { return (b < 0 ? b + 256 : b).toString(16); }).join('');
+}
+
+/* 양식이 정말 같아졌는지 다시 재어 본다 */
+function verifyDoneFormat() {
+  var ss = SpreadsheetApp.openById(CL_SHEET_ID);
+  var main = ss.getSheetByName(CL_MAIN), done = ss.getSheetByName(CL_DONE);
+  if (!main || !done) return clShow_('형사사건 또는 종결 탭을 찾지 못했습니다.');
+
+  var mHead = clHeadRow_(main), dHead = clHeadRow_(done);
+  var shared = clSharedCols_(main, mHead);
+  var n = Math.max(0, clLastRow_(done, dHead) - dHead);
+  var diff = clDiff_(main, mHead, done, dHead, shared, n,
+    main.getRowHeight(mHead), main.getRowHeight(mHead + 1));
+
+  var out = ['=== 종결 ↔ 형사사건 양식 대조 ==='];
+  out.push('공유 열 ' + shared + '개 · 종결 본문 ' + n + '건');
+  out.push('');
+  if (!diff.length) out.push('남은 차이 없음 — 두 탭 양식이 같습니다.');
+  else diff.forEach(function (s) { out.push('   ' + s); });
+  clShow_(out.join('\n'));
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -346,6 +734,20 @@ function onCloseEdit(e) {
   var watchCol = toClose ? shared + 1 : shared + CL_EXTRA.length + 1;
   if (e.range.getColumn() > watchCol || e.range.getLastColumn() < watchCol) return;
 
+  /* 종결 탭이 아직 형사사건과 같은 구조가 아니면 옮기지 않는다.
+     구조가 다른 채로 옮기면 이름이 'No' 칸에, 사건명이 '선임계' 칸에 들어가
+     종결 탭이 엉망이 된다. 체크만 해제하고 무엇을 해야 하는지 남긴다. */
+  if (!clAligned_(main, mHead, done, dHead, shared)) {
+    e.range.setValue(false);
+    clLog_(ss, '종결 이동 안 함 — 종결 탭 구조가 형사사건과 다릅니다. runAlignClosed 를 먼저 실행하세요.');
+    try {
+      SpreadsheetApp.openById(CL_SHEET_ID).toast(
+        '종결 탭 구조가 형사사건과 아직 다릅니다.\nrunAlignClosed 를 먼저 실행해 주세요.',
+        '옮기지 않았습니다', 12);
+    } catch (err) { }
+    return;
+  }
+
   var top = Math.max(e.range.getRow(), head + 1);
   var bottom = e.range.getRow() + e.range.getNumRows() - 1;
   if (bottom <= head) return;
@@ -432,17 +834,26 @@ function clToMain_(ss, main, done, mHead, dHead, shared, row) {
    도구
    ══════════════════════════════════════════════════════════════ */
 
-/* 새로 추가되는 행이 위 행들과 같은 모양이 되도록 서식만 복사한다.
-   setValues 는 값만 쓰기 때문에, 그냥 두면 새 행 혼자 민짜로 보인다.
-   값은 건드리지 않는다 (PASTE_FORMAT). */
+/* 새로 옮겨 온 행이 위 행들과 똑같아 보이도록 서식과 데이터 확인을 함께 복사한다.
+
+   서식(PASTE_FORMAT)만 복사하면 체크박스가 따라오지 않는다. 체크박스는 서식이
+   아니라 데이터 확인이기 때문이다. 그러면 선임계·공소장·증거기록 칸이 네모가
+   아니라 글자 FALSE / TRUE 로 보인다. 지위·단계 드롭다운도 마찬가지다.
+   그래서 PASTE_DATA_VALIDATION 을 한 번 더 붙인다.
+
+   값은 건드리지 않는다. */
 function clCopyFormat_(sh, head, at, cols) {
   var src = head + 1;                 // 첫 데이터 행을 본으로 삼는다
   if (src >= at || src > sh.getLastRow()) src = at - 1;
   if (src <= head || src >= at) return;
+  cols = Math.min(cols, sh.getMaxColumns());
+  var from = sh.getRange(src, 1, 1, cols), to = sh.getRange(at, 1, 1, cols);
   try {
-    sh.getRange(src, 1, 1, cols).copyTo(
-      sh.getRange(at, 1, 1, cols), SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
+    from.copyTo(to, SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
   } catch (err) { /* 서식 복사는 실패해도 값 이동은 계속한다 */ }
+  try {
+    from.copyTo(to, SpreadsheetApp.CopyPasteType.PASTE_DATA_VALIDATION, false);
+  } catch (err) { /* 체크박스 복사도 마찬가지 */ }
 }
 
 // 머리글 줄을 찾는다 ('성명' 또는 '이름'이 적힌 줄)
@@ -460,6 +871,19 @@ function clHeadRow_(sh) {
   return 0;
 }
 
+/* 종결 탭이 형사사건과 같은 열 구성인지.
+   여기서 아니라고 하면 행을 옮기지도, 양식을 맞추지도 않는다. */
+function clAligned_(main, mHead, done, dHead, shared) {
+  var mainHead = main.getRange(mHead, 1, 1, shared).getValues()[0];
+  var width = Math.max(done.getLastColumn(), shared);
+  if (done.getMaxColumns() < shared) return false;
+  var dRow = done.getRange(dHead, 1, 1, Math.min(width, done.getMaxColumns())).getValues()[0];
+  for (var c = 0; c < shared; c++) {
+    if (clNorm_(dRow[c]) !== clNorm_(mainHead[c])) return false;
+  }
+  return true;
+}
+
 // 형사사건에서 머리글이 붙어 있는 마지막 열 = 두 탭이 공유할 열 수
 function clSharedCols_(main, head) {
   var lastCol = Math.max(main.getLastColumn(), 1);
@@ -474,10 +898,17 @@ function clSharedCols_(main, head) {
   return n;
 }
 
-// 머리글 목록에서 이름으로 열 번호를 찾는다 (공백 제거 후 앞부분 일치)
+/* 머리글 목록에서 이름으로 열 번호를 찾는다.
+   딱 맞는 이름을 먼저 찾고, 없을 때만 앞부분 일치로 넘어간다.
+   앞부분 일치만 쓰면 '관할' 을 찾을 때 '관할경찰서' 가 먼저 걸려
+   법원 이름이 경찰서 칸으로 들어간다. */
 function clFind_(headRow, key) {
-  for (var c = 0; c < headRow.length; c++) {
-    var h = clNorm_(headRow[c]);
+  var c, h;
+  for (c = 0; c < headRow.length; c++) {
+    if (clNorm_(headRow[c]) === key) return c + 1;                 // 정확히 같은 이름
+  }
+  for (c = 0; c < headRow.length; c++) {
+    h = clNorm_(headRow[c]);
     if (h && (h.indexOf(key) === 0 || key.indexOf(h) === 0)) return c + 1;
   }
   return 0;
@@ -504,9 +935,12 @@ function clStage_(caseNo, court, bench) {
 }
 
 // 값 대조용 — 비어있지 않은 값만 문자열로 모은다
+/* 값 대조용 자루. 체크 안 된 체크박스(false)는 담긴 정보가 없으므로 뺀다.
+   빈 칸과 똑같이 봐야 '값이 사라졌다' 는 헛경보가 뜨지 않는다. */
 function clBag_(arr) {
   var bag = [];
   for (var i = 0; i < arr.length; i++) {
+    if (arr[i] === false) continue;
     var v = String(arr[i] == null ? '' : arr[i]).replace(/\s+/g, ' ').trim();
     if (v) bag.push(v);
   }
