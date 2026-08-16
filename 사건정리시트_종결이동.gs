@@ -1,113 +1,63 @@
-/* 법무법인 정서 — 사건정리 시트: 종결 처리 / 되돌리기
+/* 법무법인 정서 — 사건정리 시트: 종결 처리 / 복원
    ───────────────────────────────────────────────────────────────
    [무엇을 하나]
-     형사사건 맨 오른쪽 [종결] 칸을 체크하면 그 행이 종결 탭으로 넘어갑니다.
-     종결 탭 맨 오른쪽 [복원] 칸을 체크하면 형사사건으로 되돌아옵니다.
+     형사사건 맨 오른쪽 [종결] 을 체크하면 그 행이 종결 탭으로 넘어갑니다.
+     종결 탭 맨 오른쪽 [복원] 을 체크하면 형사사건으로 되돌아옵니다.
 
-       형사사건   … 항소여부 │ 종결 ☑  ──▶  종결 탭 맨 아래로
+       형사사건   … 항소여부 │ 종결 ☑  ──▶  종결 탭 맨 아래로 (종결일 자동 기록)
        종결       … 비고     │ 복원 ☑  ──▶  형사사건 맨 아래로
 
      구글시트는 셀 안에 누를 수 있는 버튼을 만들 수 없습니다.
      체크박스가 가장 가까운 방법이고, 클릭 한 번이라는 점은 같습니다.
 
    [정보가 사라지지 않게 합니다]
-     종결 탭 열 구성을 형사사건과 똑같이 맞춥니다.
-     그래야 행을 그대로 복사할 수 있고, 지위·단계·수사기록·재판부 같은
-     항목이 옮기는 과정에서 없어지지 않습니다.
+     종결 탭 머리글을 형사사건과 똑같이 맞춥니다. 그래야 행을 그대로 복사할 수
+     있고, 지위·단계·수사기록·재판부 같은 15개 항목이 옮기다 없어지지 않습니다.
 
-       형사사건   A~W                     + X 종결 ☐
-       종결       A~W (형사사건과 동일)    + X 종결일 · Y 결과 · Z 비고 · AA 복원 ☐
+       형사사건   A~V (지금 22열)          + 종결 ☐
+       종결       A~V (형사사건과 동일)    + 종결일 · 결과 · 비고 · 복원 ☐
+
+   [머리글 줄과 열 수를 알아서 맞춥니다]
+     '성명'이 적힌 줄을 머리글로 보고, 형사사건 머리글 개수를 세어 씁니다.
+     행을 올리거나 열을 옮기셔도 다시 깨지지 않습니다.
 
    [설치]
-     Apps Script 왼쪽 [파일] 옆 + → [스크립트] → 이름을 종결이동 으로 하고
-     이 파일 전체를 붙여넣기 → 저장(Ctrl+S)
+     Apps Script 에서 종결이동.gs 내용을 통째로 바꿔 붙여넣고 Ctrl+S
 
    [실행 순서]  반드시 이 순서로
-     1) previewAlignClosed  → runAlignClosed    종결 탭 구조를 형사사건에 맞춤
+     1) previewAlignClosed  → runAlignClosed    종결 탭을 형사사건 구조에 맞춤
      2) previewCloseButtons → runCloseButtons   양쪽에 체크박스 깔기
      3) setupCloseButtons                       체크하면 옮겨지도록 켜기
 
    [중요]
      스크립트가 지운 행은 Ctrl+Z 로 되돌릴 수 없습니다.
      그래서 종결 탭에 복원 체크박스를 두는 것입니다.
-     실수로 체크하셨다면 종결 탭 맨 아래에서 그 행을 찾아 복원을 체크하세요.
+     실수로 체크하셨다면 종결 탭 맨 아래에서 그 행을 찾아 [복원] 을 체크하세요.
 
    [끄기]  removeCloseButtons
    ─────────────────────────────────────────────────────────────── */
 
 var CL_SHEET_ID = '1YCf77KxxotM4RnxePAhO16C7xbwEiHq4SuF5DN5vWto';
-
 var CL_MAIN = '형사사건';
-var CL_MAIN_HEAD = 3;
-var CL_MAIN_FIRST = 4;
-
 var CL_DONE = '종결';
-var CL_DONE_HEAD = 1;
-var CL_DONE_FIRST = 2;
 
-var CL_SHARED_COLS = 23;   // A~W — 두 탭이 공유하는 열 수
-
-// 종결 탭에만 있는 뒤쪽 열 (공유 열 다음부터)
-var CL_DONE_EXTRA = ['종결일', '결과', '비고'];
+// 종결 탭에만 있는 뒤쪽 열 (형사사건 열 다음에 붙습니다)
+var CL_EXTRA = ['종결일', '결과', '비고'];
 var CL_HEAD_CLOSE = '종결';
 var CL_HEAD_RESTORE = '복원';
 var CL_BTN_WIDTH = 60;
 
-/* 종결 탭 재편 — 지금 열 → 새 자리.
-   자리가 분명한 것만 여기 적습니다. */
-var CL_FIXED = [
-  [2, 2],   // 구속여부 → 구속여부
-  [3, 3],   // 성 명    → 성 명
-  [4, 6],   // 사건명   → 사건명
-  [5, 7],   // 선임계   → 선임계
-  [10, 20], // 기일     → 기일
-  [11, 25], // 결과     → 결과      (A~W 23열 + 종결일 24 + 결과 25 + 비고 26)
-  [12, 26], // 비고     → 비고
-  [16, 18], // (머리글 없는 체크박스) → 공소장
-  [17, 19], // (머리글 없는 체크박스) → 증거기록
-  [20, 22]  // (수임일 메모)          → 체크할것
-];
+/* 값의 내용을 보고 자리를 정할 머리글.
+   예전 배치로 붙여넣은 행들이 한 칸씩 밀려 있어, 열 위치대로 옮기면
+   법원이 사건번호 칸에 들어갑니다. 그래서 이 열들은 값을 보고 보냅니다. */
+var CL_ROUTE_HEADS = ['사건번호', '관할'];
 
-/* F·G·H 세 열은 행마다 들어있는 것이 다릅니다.
-   예전 배치로 붙여넣은 행들이 한 칸씩 밀려 있어, 열 위치로 옮기면
-   법원이 사건번호 칸에 들어가 버립니다. 그래서 값의 내용을 보고 자리를 정합니다.
-     울산경찰청 → 관할경찰서   /   2026노720 → 사건번호   /   인천지방법원 → 관할 */
-var CL_ROUTE_FROM = [6, 7, 8];
-var CL_COL_POLICE = 8, CL_COL_PROS_OFFICE = 13, CL_COL_CASENO = 15, CL_COL_COURT = 16;
+var CL_ROLES = ['피고인', '피의자', '고소인', '피해자', '피고소인', '피고발인',
+  '고발인', '신청인', '참고인', '증인', '행위자', '보호소년'];
 
 /* ══════════════════════════════════════════════════════════════
    ① 종결 탭을 형사사건과 같은 구조로
    ══════════════════════════════════════════════════════════════ */
-
-/* ── 안전장치 ────────────────────────────────────────────────
-   이 스크립트는 형사사건 머리글이 3행이고 A열이 No 인 배치를 전제로
-   만들어졌습니다. 그 뒤 머리글이 1행으로 올라가고 No 열이 없어졌으므로
-   지금 그대로 돌리면 엉뚱한 칸을 건드립니다.
-   구조를 다시 맞추기 전까지는 실행을 막습니다. */
-function clGuard_() {
-  var sh = SpreadsheetApp.openById(CL_SHEET_ID).getSheetByName(CL_MAIN);
-  if (!sh) return '[' + CL_MAIN + '] 탭을 찾지 못했습니다.';
-
-  var probe = Math.min(5, sh.getLastRow());
-  var lastCol = Math.max(sh.getLastColumn(), 1);
-  var head = 0;
-  if (probe > 0) {
-    var vals = sh.getRange(1, 1, probe, lastCol).getValues();
-    for (var r = 0; r < probe && !head; r++) {
-      for (var c = 0; c < lastCol; c++) {
-        var h = String(vals[r][c] == null ? '' : vals[r][c]).replace(/\s/g, '');
-        if (h.indexOf('성명') === 0 || h.indexOf('이름') === 0) { head = r + 1; break; }
-      }
-    }
-  }
-  if (head !== CL_MAIN_HEAD) {
-    return '지금은 실행할 수 없습니다.\n\n'
-      + '이 스크립트는 형사사건 머리글이 ' + CL_MAIN_HEAD + '행인 배치를 전제로 만들어졌는데,\n'
-      + '지금은 ' + head + '행입니다. 그대로 돌리면 엉뚱한 칸을 건드립니다.\n\n'
-      + '종결 이동 기능이 필요하시면 말씀해 주세요. 지금 구조에 맞게 다시 만들어 드리겠습니다.';
-  }
-  return '';
-}
 
 function previewAlignClosed() { clShow_(clAlign_(true)); }
 
@@ -117,112 +67,116 @@ function runAlignClosed() {
 }
 
 function clAlign_(dryRun) {
-  var stop = clGuard_(); if (stop) return stop;
   var ss = SpreadsheetApp.openById(CL_SHEET_ID);
   var main = ss.getSheetByName(CL_MAIN);
   var done = ss.getSheetByName(CL_DONE);
   if (!main || !done) return '형사사건 또는 종결 탭을 찾지 못했습니다.';
 
+  var mHead = clHeadRow_(main), dHead = clHeadRow_(done);
+  if (!mHead || !dHead) return '머리글 줄을 찾지 못했습니다 (성명 열이 있는지 확인해 주세요).';
+
+  var shared = clSharedCols_(main, mHead);
+  if (!shared) return '형사사건 머리글이 비어 있습니다.';
+  var total = shared + CL_EXTRA.length;
+
+  var mainHead = main.getRange(mHead, 1, 1, shared).getValues()[0];
   var out = [];
   out.push(dryRun ? '=== 미리보기 (시트는 바뀌지 않았습니다) ===' : '=== 종결 탭 재편 완료 ===');
+  out.push('형사사건 머리글 ' + mHead + '행 · ' + shared + '열  →  종결에 그대로 옮겨 씁니다');
 
-  // 이미 재편됐는지 — 종결 1행 D칸이 '지위' 면 끝난 것
-  var d4 = String(done.getRange(CL_DONE_HEAD, 4).getValue() || '').replace(/\s/g, '');
-  if (d4.indexOf('지위') === 0) {
+  // 이미 맞춰졌는지 — 종결 머리글이 형사사건과 같으면 끝난 것
+  var dHeadRow = done.getRange(dHead, 1, 1, Math.max(done.getLastColumn(), shared)).getValues()[0];
+  if (clNorm_(dHeadRow[0]) === clNorm_(mainHead[0]) && clNorm_(dHeadRow[2]) === clNorm_(mainHead[2])) {
+    out.push('');
     out.push('이미 형사사건과 같은 구조입니다. 할 일이 없습니다.');
     return out.join('\n');
   }
 
   var last = done.getLastRow();
-  var n = last - CL_DONE_FIRST + 1;
-  if (n < 1) { out.push('종결 탭에 데이터가 없습니다.'); return out.join('\n'); }
+  if (last <= dHead) { out.push('종결 탭에 데이터가 없습니다.'); return out.join('\n'); }
+  var n = last - dHead;
+  var srcCols = Math.max(done.getLastColumn(), 1);
+  var old = done.getRange(dHead + 1, 1, n, srcCols).getValues();
 
-  var old = done.getRange(CL_DONE_FIRST, 1, n, Math.max(done.getLastColumn(), 12)).getValues();
-  var totalCols = CL_SHARED_COLS + CL_DONE_EXTRA.length;   // A~Z (26열)
+  // 어느 열을 어디로 보낼지 정한다
+  var plan = clPlan_(dHeadRow, mainHead, shared, srcCols);
 
-  var rows = [], roleCnt = {}, stageCnt = {}, kept = 0, lost = [], routed = [];
+  var rows = [], roleCnt = {}, stageCnt = {}, lost = [], routed = [], kept = 0;
 
   for (var i = 0; i < n; i++) {
-    var blank = true;
-    for (var k = 0; k < old[i].length; k++) {
-      if (String(old[i][k] == null ? '' : old[i][k]).trim()) { blank = false; break; }
-    }
-    if (blank) continue;
-
+    if (!clBag_(old[i]).length) continue;
     var row = [];
-    for (var c = 0; c < totalCols; c++) row.push('');
+    for (var c = 0; c < total; c++) row.push('');
 
-    CL_FIXED.forEach(function (m) {
-      var v = old[i][m[0] - 1];
-      if (v != null && String(v) !== '') row[m[1] - 1] = v;
-    });
+    for (var s = 0; s < srcCols; s++) {
+      var v = old[i][s];
+      if (v == null || String(v).trim() === '') continue;
+      var how = plan[s];
+      if (!how) continue;                                   // 갈 곳 없는 열 (No 등)
 
-    // F·G·H 는 내용을 보고 자리를 정한다
-    CL_ROUTE_FROM.forEach(function (src) {
-      var v = old[i][src - 1];
-      if (v == null || String(v).trim() === '') return;
-      var dst = clRoute_(v);
-      // 그 자리가 이미 차 있으면 사건번호(없으면 관할)로 보낸다
-      if (String(row[dst - 1] || '').trim()) {
-        dst = String(row[CL_COL_CASENO - 1] || '').trim() ? CL_COL_COURT : CL_COL_CASENO;
+      var dst = (how.mode === 'route') ? clRoute_(v, shared, mainHead) : how.dst;
+      if (!dst) continue;
+      if (String(row[dst - 1]).trim()) {                    // 이미 차 있으면 다른 자리로
+        var alt = clFind_(mainHead, '사건번호');
+        dst = (dst === alt) ? clFind_(mainHead, '관할') : alt;
+        if (!dst || String(row[dst - 1]).trim()) continue;
       }
       row[dst - 1] = v;
-      routed.push((CL_DONE_FIRST + i) + '행  ' + clL_(src) + '「'
-        + String(v).replace(/\n/g, ' ').substring(0, 20) + '」 → ' + clRouteName_(dst));
-    });
-
-    // 성명에서 지위 떼어내기 (형사사건과 같은 규칙)
-    var flat = String(row[2] == null ? '' : row[2]).replace(/\s+/g, ' ').trim();
-    var mm = flat.match(/^(.*?)\s*\(([^()]*)\)\s*$/);
-    if (mm && clKnownRole_(mm[2].trim())) {
-      row[2] = mm[1].trim();
-      row[3] = clAliasRole_(mm[2].trim());
-      roleCnt[row[3]] = (roleCnt[row[3]] || 0) + 1;
-    } else {
-      row[2] = flat;
-      kept++;
+      if (how.mode === 'route') {
+        routed.push((dHead + 1 + i) + '행  ' + clL_(s + 1) + '「'
+          + String(v).replace(/\n/g, ' ').substring(0, 18) + '」 → ' + clNorm_(mainHead[dst - 1]));
+      }
     }
 
-    // 단계 계산 — 사건번호(15) · 관할(16) · 재판부(17)
-    var stage = clStage_(String(row[14] || ''), String(row[15] || ''), String(row[16] || ''));
-    row[4] = stage;
-    if (stage) stageCnt[stage] = (stageCnt[stage] || 0) + 1;
+    // 성명에서 지위 떼어내고 단계 계산
+    var nameCol = clFind_(mainHead, '성명') || clFind_(mainHead, '이름');
+    var roleCol = clFind_(mainHead, '지위');
+    var stageCol = clFind_(mainHead, '단계');
+    var flat = String(row[nameCol - 1] || '').replace(/\s+/g, ' ').trim();
+    var mm = flat.match(/^(.*?)\s*\(([^()]*)\)\s*$/);
+    if (mm && CL_ROLES.indexOf(clAlias_(mm[2].trim())) >= 0) {
+      row[nameCol - 1] = mm[1].trim();
+      if (roleCol) {
+        row[roleCol - 1] = clAlias_(mm[2].trim());
+        roleCnt[row[roleCol - 1]] = (roleCnt[row[roleCol - 1]] || 0) + 1;
+      }
+    } else {
+      row[nameCol - 1] = flat;
+      kept++;
+    }
+    if (stageCol) {
+      var st = clStage_(row[clFind_(mainHead, '사건번호') - 1],
+        row[clFind_(mainHead, '관할') - 1], row[clFind_(mainHead, '재판부') - 1]);
+      row[stageCol - 1] = st;
+      if (st) stageCnt[st] = (stageCnt[st] || 0) + 1;
+    }
 
     // 값이 하나라도 사라지지 않았는지 대조
-    var beforeSet = clBag_(old[i]);
-    var afterSet = clBag_(row);
-    beforeSet.forEach(function (v) {
-      if (afterSet.indexOf(v) < 0 && v !== flat) lost.push((CL_DONE_FIRST + i) + '행 「' + v.substring(0, 30) + '」');
+    var after = clBag_(row);
+    clBag_(old[i]).forEach(function (v) {
+      if (after.indexOf(v) < 0 && v !== flat) lost.push((dHead + 1 + i) + '행 「' + v.substring(0, 30) + '」');
     });
-
     rows.push(row);
   }
 
-  out.push('[' + CL_DONE + '] ' + rows.length + '건을 형사사건과 같은 배치로 옮깁니다');
   out.push('');
-  out.push('■ 옮기는 자리');
-  out.push('   사건명 D→F · 선임계 E→G · 기일 J→T · 결과 K→Y · 비고 L→Z');
-  out.push('   머리글 없던 체크박스 P·Q → 공소장·증거기록 · 수임일 T → 체크할것');
-  out.push('   (구속여부·성명은 제자리)');
+  out.push('[' + CL_DONE + '] ' + rows.length + '건을 새 배치로 옮깁니다');
   if (routed.length) {
     out.push('');
-    out.push('■ 내용을 보고 자리를 정한 값 ' + routed.length + '건');
-    out.push('   (예전 배치로 붙여넣어 한 칸씩 밀려 있던 행들입니다)');
-    routed.forEach(function (s) { out.push('   ' + s); });
+    out.push('■ 내용을 보고 자리를 정한 값 ' + routed.length + '건 (밀려 있던 행들)');
+    routed.slice(0, 15).forEach(function (s) { out.push('   ' + s); });
+    if (routed.length > 15) out.push('   ... 외 ' + (routed.length - 15) + '건');
   }
   out.push('');
   out.push('■ 성명에서 떼어낸 지위');
   Object.keys(roleCnt).sort(function (a, b) { return roleCnt[b] - roleCnt[a]; })
     .forEach(function (k) { out.push('   ' + k + '  ' + roleCnt[k] + '건'); });
   if (kept) out.push('   지위 표기가 없어 이름만 둔 행  ' + kept + '건');
-  out.push('');
-  out.push('■ 계산된 단계');
-  ['①경찰', '②검찰', '③재판'].forEach(function (s) {
-    if (stageCnt[s]) out.push('   ' + s + '  ' + stageCnt[s] + '건');
-  });
-  var noStage = rows.length - (stageCnt['①경찰'] || 0) - (stageCnt['②검찰'] || 0) - (stageCnt['③재판'] || 0);
-  if (noStage) out.push('   미정  ' + noStage + '건');
-
+  if (Object.keys(stageCnt).length) {
+    out.push('');
+    out.push('■ 계산된 단계');
+    Object.keys(stageCnt).sort().forEach(function (k) { out.push('   ' + k + '  ' + stageCnt[k] + '건'); });
+  }
   out.push('');
   out.push(lost.length ? '!! 사라지는 값 ' + lost.length + '건 !!' : '값 대조 — 사라지는 값 없음');
   lost.slice(0, 15).forEach(function (s) { out.push('   ' + s); });
@@ -240,29 +194,60 @@ function clAlign_(dryRun) {
 
   /* ── 실제 변경 ── */
 
-  if (done.getMaxColumns() < totalCols + 1) {
-    done.insertColumnsAfter(done.getMaxColumns(), totalCols + 1 - done.getMaxColumns());
+  if (done.getMaxColumns() < total + 1) {
+    done.insertColumnsAfter(done.getMaxColumns(), total + 1 - done.getMaxColumns());
   }
+  // 옛 병합이 남아 있으면 새 배치와 어긋나므로 푼다
+  done.getRange(1, 1, done.getMaxRows(), done.getMaxColumns()).breakApart();
 
-  // 머리글 — 형사사건 것을 그대로 가져오고 뒤에 종결 전용 열을 붙인다
-  var head = main.getRange(CL_MAIN_HEAD, 1, 1, CL_SHARED_COLS).getValues()[0];
-  var headRow = head.slice();
-  CL_DONE_EXTRA.forEach(function (h) { headRow.push(h); });
-  done.getRange(CL_DONE_HEAD, 1, 1, totalCols).setValues([headRow]);
+  var headRow = mainHead.slice();
+  CL_EXTRA.forEach(function (h) { headRow.push(h); });
+  done.getRange(dHead, 1, 1, total).setValues([headRow]);
 
-  // 본문 — 옛 값을 지우고 새 배치로 다시 쓴다
-  done.getRange(CL_DONE_FIRST, 1, n, done.getMaxColumns()).clearContent();
+  done.getRange(dHead + 1, 1, n, done.getMaxColumns()).clearContent();
   if (rows.length) {
-    done.getRange(CL_DONE_FIRST, 1, rows.length, totalCols).setValues(rows);
-    // 공소장·증거기록은 형사사건과 같이 체크박스로
-    done.getRange(CL_DONE_FIRST, 18, rows.length, 2).insertCheckboxes()
-      .setHorizontalAlignment('center').setVerticalAlignment('middle');
+    done.getRange(dHead + 1, 1, rows.length, total).setValues(rows);
+    var qc = clFind_(mainHead, '공소장'), rc = clFind_(mainHead, '증거기록');
+    if (qc) done.getRange(dHead + 1, qc, rows.length, 1).insertCheckboxes();
+    if (rc) done.getRange(dHead + 1, rc, rows.length, 1).insertCheckboxes();
   }
 
   out.push('');
   out.push('머리글을 형사사건과 똑같이 맞추고 ' + rows.length + '건을 다시 배치했습니다.');
   clLog_(ss, '종결 탭을 형사사건과 같은 구조로 재편 (' + rows.length + '건)');
   return out.join('\n');
+}
+
+/* 종결의 각 열을 어디로 보낼지 정한다.
+   · 머리글이 있고 형사사건에 같은 이름이 있으면 → 그 자리
+   · 머리글이 사건번호·관할이면 → 값을 보고 정함 (밀린 행 때문)
+   · 결과·비고 → 종결 전용 자리
+   · 머리글이 없으면 → 값의 생김새로 정함 */
+function clPlan_(dHeadRow, mainHead, shared, srcCols) {
+  var plan = [];
+  for (var c = 0; c < srcCols; c++) {
+    var h = clNorm_(dHeadRow[c]);
+    if (!h) { plan.push({ mode: 'route' }); continue; }          // 머리글 없는 열
+    if (CL_ROUTE_HEADS.indexOf(h) >= 0) { plan.push({ mode: 'route' }); continue; }
+
+    var ex = CL_EXTRA.indexOf(h);
+    if (ex >= 0) { plan.push({ mode: 'fixed', dst: shared + 1 + ex }); continue; }
+
+    var dst = clFind_(mainHead, h);
+    plan.push(dst ? { mode: 'fixed', dst: dst } : null);          // 못 찾으면 버림 (No 등)
+  }
+  return plan;
+}
+
+/* 값의 생김새로 갈 자리를 정한다 */
+function clRoute_(v, shared, mainHead) {
+  var s = String(v).replace(/\n/g, ' ').trim();
+  if (typeof v === 'boolean') return 0;                          // 체크박스는 따로 처리
+  if (/경찰/.test(s)) return clFind_(mainHead, '관할경찰서');
+  if (/(검찰청|지검|지청)/.test(s)) return clFind_(mainHead, '관할검찰청');
+  if (/(법원|지원|고법)/.test(s)) return clFind_(mainHead, '관할');
+  if (/\d{4}\s*[가-힣]{1,3}\s*\d/.test(s) || /^\d{4}-\d+$/.test(s)) return clFind_(mainHead, '사건번호');
+  return clFind_(mainHead, '체크할것');                           // 메모성 값
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -277,23 +262,26 @@ function runCloseButtons() {
 }
 
 function clButtons_(dryRun) {
-  var stop = clGuard_(); if (stop) return stop;
   var ss = SpreadsheetApp.openById(CL_SHEET_ID);
   var main = ss.getSheetByName(CL_MAIN);
   var done = ss.getSheetByName(CL_DONE);
   if (!main || !done) return '형사사건 또는 종결 탭을 찾지 못했습니다.';
 
-  var mainCol = CL_SHARED_COLS + 1;                          // X
-  var doneCol = CL_SHARED_COLS + CL_DONE_EXTRA.length + 1;   // AA
-  var mainLast = clLastRow_(main, CL_MAIN_FIRST);
-  var doneLast = clLastRow_(done, CL_DONE_FIRST);
+  var mHead = clHeadRow_(main), dHead = clHeadRow_(done);
+  if (!mHead || !dHead) return '머리글 줄을 찾지 못했습니다.';
+  var shared = clSharedCols_(main, mHead);
+
+  var mainCol = shared + 1;
+  var doneCol = shared + CL_EXTRA.length + 1;
+  var mLast = clLastRow_(main, mHead);
+  var dLast = clLastRow_(done, dHead);
 
   var out = [];
   out.push(dryRun ? '=== 미리보기 (시트는 바뀌지 않았습니다) ===' : '=== 체크박스 설치 완료 ===');
-  out.push('[' + CL_MAIN + '] ' + clL_(mainCol) + '열에 「' + CL_HEAD_CLOSE + '」 체크박스 — '
-    + CL_MAIN_FIRST + '~' + mainLast + '행 (' + Math.max(0, mainLast - CL_MAIN_FIRST + 1) + '건)');
-  out.push('[' + CL_DONE + '] ' + clL_(doneCol) + '열에 「' + CL_HEAD_RESTORE + '」 체크박스 — '
-    + CL_DONE_FIRST + '~' + doneLast + '행 (' + Math.max(0, doneLast - CL_DONE_FIRST + 1) + '건)');
+  out.push('[' + CL_MAIN + '] ' + clL_(mainCol) + '열에 「' + CL_HEAD_CLOSE + '」 — '
+    + (mHead + 1) + '~' + mLast + '행 (' + Math.max(0, mLast - mHead) + '건)');
+  out.push('[' + CL_DONE + '] ' + clL_(doneCol) + '열에 「' + CL_HEAD_RESTORE + '」 — '
+    + (dHead + 1) + '~' + dLast + '행 (' + Math.max(0, dLast - dHead) + '건)');
 
   if (dryRun) {
     out.push('');
@@ -301,8 +289,8 @@ function clButtons_(dryRun) {
     return out.join('\n');
   }
 
-  clPutBoxes_(main, CL_MAIN_HEAD, CL_MAIN_FIRST, mainLast, mainCol, CL_HEAD_CLOSE);
-  clPutBoxes_(done, CL_DONE_HEAD, CL_DONE_FIRST, doneLast, doneCol, CL_HEAD_RESTORE);
+  clPutBoxes_(main, mHead, mLast, mainCol, CL_HEAD_CLOSE);
+  clPutBoxes_(done, dHead, dLast, doneCol, CL_HEAD_RESTORE);
 
   out.push('');
   out.push('이제 setupCloseButtons 를 실행하면 체크할 때 실제로 옮겨집니다.');
@@ -310,13 +298,12 @@ function clButtons_(dryRun) {
   return out.join('\n');
 }
 
-function clPutBoxes_(sh, headRow, first, last, col, title) {
+function clPutBoxes_(sh, head, last, col, title) {
   if (sh.getMaxColumns() < col) sh.insertColumnsAfter(sh.getMaxColumns(), col - sh.getMaxColumns());
-  sh.getRange(headRow, col).setValue(title);
-  if (last >= first) {
-    var r = sh.getRange(first, col, last - first + 1, 1);
+  sh.getRange(head, col).setValue(title);
+  if (last > head) {
+    var r = sh.getRange(head + 1, col, last - head, 1);
     r.insertCheckboxes();
-    r.setHorizontalAlignment('center').setVerticalAlignment('middle');
   }
   sh.setColumnWidth(col, CL_BTN_WIDTH);
 }
@@ -326,14 +313,13 @@ function clPutBoxes_(sh, headRow, first, last, col, title) {
    ══════════════════════════════════════════════════════════════ */
 
 function setupCloseButtons() {
-  var stop = clGuard_(); if (stop) { clShow_(stop); return; }
   var ss = SpreadsheetApp.openById(CL_SHEET_ID);
   removeCloseButtons();
   ScriptApp.newTrigger('onCloseEdit').forSpreadsheet(ss).onEdit().create();
-  clShow_('켰습니다.\n\n형사사건 맨 오른쪽 [종결] 을 체크하면 종결 탭으로 넘어가고,\n'
-    + '종결 탭 맨 오른쪽 [복원] 을 체크하면 형사사건으로 돌아옵니다.\n\n'
+  clShow_('켰습니다.\n\n형사사건 맨 오른쪽 [' + CL_HEAD_CLOSE + '] 을 체크하면 종결 탭으로 넘어가고,\n'
+    + '종결 탭 맨 오른쪽 [' + CL_HEAD_RESTORE + '] 을 체크하면 형사사건으로 돌아옵니다.\n\n'
     + '스크립트가 지운 행은 Ctrl+Z 로 못 되돌립니다.\n'
-    + '실수로 체크하셨다면 종결 탭 맨 아래에서 그 행을 찾아 [복원] 을 체크하세요.');
+    + '실수로 체크하셨다면 종결 탭 맨 아래에서 그 행을 찾아 [' + CL_HEAD_RESTORE + '] 을 체크하세요.');
 }
 
 function removeCloseButtons() {
@@ -346,32 +332,36 @@ function onCloseEdit(e) {
   if (!e || !e.range) return;
   var sh = e.range.getSheet();
   var name = sh.getName();
-
-  var toClose = (name === CL_MAIN);
-  var toRestore = (name === CL_DONE);
+  var toClose = (name === CL_MAIN), toRestore = (name === CL_DONE);
   if (!toClose && !toRestore) return;
 
-  var watchCol = toClose ? CL_SHARED_COLS + 1 : CL_SHARED_COLS + CL_DONE_EXTRA.length + 1;
+  var ss = SpreadsheetApp.openById(CL_SHEET_ID);
+  var main = ss.getSheetByName(CL_MAIN), done = ss.getSheetByName(CL_DONE);
+  if (!main || !done) return;
+  var mHead = clHeadRow_(main), dHead = clHeadRow_(done);
+  if (!mHead || !dHead) return;
+  var shared = clSharedCols_(main, mHead);
+
+  var head = toClose ? mHead : dHead;
+  var watchCol = toClose ? shared + 1 : shared + CL_EXTRA.length + 1;
   if (e.range.getColumn() > watchCol || e.range.getLastColumn() < watchCol) return;
 
-  var first = toClose ? CL_MAIN_FIRST : CL_DONE_FIRST;
-  var top = Math.max(e.range.getRow(), first);
+  var top = Math.max(e.range.getRow(), head + 1);
   var bottom = e.range.getRow() + e.range.getNumRows() - 1;
-  if (bottom < first) return;
+  if (bottom <= head) return;
 
   var lock = LockService.getDocumentLock();
   try { lock.waitLock(20000); } catch (err) { return; }
   try {
-    // 체크된 행을 모은 뒤, 아래에서부터 지운다 (위부터 지우면 행 번호가 밀린다)
     var checked = [];
     var vals = sh.getRange(top, watchCol, bottom - top + 1, 1).getValues();
     for (var i = 0; i < vals.length; i++) if (vals[i][0] === true) checked.push(top + i);
     if (!checked.length) return;
 
-    var ss = SpreadsheetApp.openById(CL_SHEET_ID);
+    // 아래 행부터 지운다 (위부터 지우면 행 번호가 밀린다)
     for (var j = checked.length - 1; j >= 0; j--) {
-      if (toClose) clMoveToDone_(ss, checked[j]);
-      else clMoveToMain_(ss, checked[j]);
+      if (toClose) clToDone_(ss, main, done, mHead, dHead, shared, checked[j]);
+      else clToMain_(ss, main, done, mHead, dHead, shared, checked[j]);
     }
     SpreadsheetApp.flush();
   } finally {
@@ -380,101 +370,115 @@ function onCloseEdit(e) {
 }
 
 // 형사사건 → 종결
-function clMoveToDone_(ss, row) {
-  var main = ss.getSheetByName(CL_MAIN);
-  var done = ss.getSheetByName(CL_DONE);
-  var data = main.getRange(row, 1, 1, CL_SHARED_COLS).getValues()[0];
+function clToDone_(ss, main, done, mHead, dHead, shared, row) {
+  var data = main.getRange(row, 1, 1, shared).getValues()[0];
+  var mainHead = main.getRange(mHead, 1, 1, shared).getValues()[0];
+  var nameCol = clFind_(mainHead, '성명') || clFind_(mainHead, '이름');
 
-  if (!String(data[2] == null ? '' : data[2]).trim()) {   // 성명이 비면 빈 행
-    main.getRange(row, CL_SHARED_COLS + 1).setValue(false);
+  if (!String(data[nameCol - 1] == null ? '' : data[nameCol - 1]).trim()) {
+    main.getRange(row, shared + 1).setValue(false);      // 빈 행이면 체크만 해제
     return;
   }
 
-  var at = clLastRow_(done, CL_DONE_FIRST) + 1;
-  if (at < CL_DONE_FIRST) at = CL_DONE_FIRST;
-  done.getRange(at, 1, 1, CL_SHARED_COLS).setValues([data]);
-  done.getRange(at, CL_SHARED_COLS + 1)
-    .setValue(new Date()).setNumberFormat('yyyy-mm-dd');           // 종결일
-
-  var restoreCol = CL_SHARED_COLS + CL_DONE_EXTRA.length + 1;
-  done.getRange(at, restoreCol).insertCheckboxes().setValue(false)
-    .setHorizontalAlignment('center').setVerticalAlignment('middle');
+  var at = clLastRow_(done, dHead) + 1;
+  if (at <= dHead) at = dHead + 1;
+  done.getRange(at, 1, 1, shared).setValues([data]);
+  done.getRange(at, shared + 1).setValue(new Date()).setNumberFormat('yyyy-mm-dd');
+  done.getRange(at, shared + CL_EXTRA.length + 1).insertCheckboxes().setValue(false);
 
   main.deleteRow(row);
-  clLog_(ss, '종결 처리 — ' + String(data[2]).replace(/\n/g, ' ').trim()
-    + ' (' + String(data[14] || '사건번호 없음').replace(/\n/g, ' ').trim() + ')');
+  clLog_(ss, '종결 처리 — ' + String(data[nameCol - 1]).replace(/\n/g, ' ').trim());
 }
 
 // 종결 → 형사사건 (복원)
-function clMoveToMain_(ss, row) {
-  var main = ss.getSheetByName(CL_MAIN);
-  var done = ss.getSheetByName(CL_DONE);
-  var width = CL_SHARED_COLS + CL_DONE_EXTRA.length;
+function clToMain_(ss, main, done, mHead, dHead, shared, row) {
+  var width = shared + CL_EXTRA.length;
   var full = done.getRange(row, 1, 1, width).getValues()[0];
-  var data = full.slice(0, CL_SHARED_COLS);
+  var data = full.slice(0, shared);
+  var mainHead = main.getRange(mHead, 1, 1, shared).getValues()[0];
+  var nameCol = clFind_(mainHead, '성명') || clFind_(mainHead, '이름');
 
-  if (!String(data[2] == null ? '' : data[2]).trim()) {
+  if (!String(data[nameCol - 1] == null ? '' : data[nameCol - 1]).trim()) {
     done.getRange(row, width + 1).setValue(false);
     return;
   }
 
   // 결과·비고는 형사사건에 자리가 없으므로 체크할것 아래에 이어 붙인다
-  var extra = [];
-  for (var k = 1; k < CL_DONE_EXTRA.length; k++) {          // 종결일은 뺀다
-    var v = String(full[CL_SHARED_COLS + k] == null ? '' : full[CL_SHARED_COLS + k]).trim();
-    if (v) extra.push(CL_DONE_EXTRA[k] + ': ' + v);
-  }
-  if (extra.length) {
-    var prev = String(data[21] == null ? '' : data[21]).trim();   // V 체크할것
-    data[21] = prev ? prev + '\n' + extra.join('\n') : extra.join('\n');
+  var todoCol = clFind_(mainHead, '체크할것');
+  if (todoCol) {
+    var extra = [];
+    for (var k = 1; k < CL_EXTRA.length; k++) {              // 종결일은 뺀다
+      var v = String(full[shared + k] == null ? '' : full[shared + k]).trim();
+      if (v) extra.push(CL_EXTRA[k] + ': ' + v);
+    }
+    if (extra.length) {
+      var prev = String(data[todoCol - 1] == null ? '' : data[todoCol - 1]).trim();
+      data[todoCol - 1] = prev ? prev + '\n' + extra.join('\n') : extra.join('\n');
+    }
   }
 
-  var at = clLastRow_(main, CL_MAIN_FIRST) + 1;
-  if (at < CL_MAIN_FIRST) at = CL_MAIN_FIRST;
-  main.getRange(at, 1, 1, CL_SHARED_COLS).setValues([data]);
-  main.getRange(at, CL_SHARED_COLS + 1).insertCheckboxes().setValue(false)
-    .setHorizontalAlignment('center').setVerticalAlignment('middle');
+  var at = clLastRow_(main, mHead) + 1;
+  if (at <= mHead) at = mHead + 1;
+  main.getRange(at, 1, 1, shared).setValues([data]);
+  main.getRange(at, shared + 1).insertCheckboxes().setValue(false);
 
   done.deleteRow(row);
-  clLog_(ss, '종결 복원 — ' + String(data[2]).replace(/\n/g, ' ').trim()
-    + ' (' + String(data[14] || '사건번호 없음').replace(/\n/g, ' ').trim() + ')');
+  clLog_(ss, '종결 복원 — ' + String(data[nameCol - 1]).replace(/\n/g, ' ').trim());
 }
 
 /* ══════════════════════════════════════════════════════════════
    도구
    ══════════════════════════════════════════════════════════════ */
 
-var CL_ROLES = ['피고인', '피의자', '고소인', '피해자', '피고소인', '피고발인',
-  '고발인', '신청인', '참고인', '증인', '행위자', '보호소년'];
-
-function clKnownRole_(v) {
-  return CL_ROLES.indexOf(clAliasRole_(v)) >= 0;
+// 머리글 줄을 찾는다 ('성명' 또는 '이름'이 적힌 줄)
+function clHeadRow_(sh) {
+  var probe = Math.min(5, sh.getLastRow());
+  var lastCol = Math.max(sh.getLastColumn(), 1);
+  if (probe < 1) return 0;
+  var vals = sh.getRange(1, 1, probe, lastCol).getValues();
+  for (var r = 0; r < probe; r++) {
+    for (var c = 0; c < lastCol; c++) {
+      var h = clNorm_(vals[r][c]);
+      if (h.indexOf('성명') === 0 || h.indexOf('이름') === 0) return r + 1;
+    }
+  }
+  return 0;
 }
 
-// 값의 내용을 보고 갈 자리를 정한다
-function clRoute_(v) {
-  var s = String(v).replace(/\n/g, ' ').trim();
-  if (/경찰/.test(s)) return CL_COL_POLICE;
-  if (/(검찰청|지검|지청)/.test(s)) return CL_COL_PROS_OFFICE;
-  if (/(법원|지원|고법)/.test(s)) return CL_COL_COURT;
-  return CL_COL_CASENO;   // 임시번호(2025-3976)도 사건번호로 본다
+// 형사사건에서 머리글이 붙어 있는 마지막 열 = 두 탭이 공유할 열 수
+function clSharedCols_(main, head) {
+  var lastCol = Math.max(main.getLastColumn(), 1);
+  var row = main.getRange(head, 1, 1, lastCol).getValues()[0];
+  var n = 0;
+  for (var c = 0; c < row.length; c++) {
+    var h = clNorm_(row[c]);
+    if (!h) continue;
+    if (h === CL_HEAD_CLOSE || h === CL_HEAD_RESTORE) break;   // 체크박스 열은 뺀다
+    n = c + 1;
+  }
+  return n;
 }
 
-function clRouteName_(col) {
-  if (col === CL_COL_POLICE) return '관할경찰서';
-  if (col === CL_COL_PROS_OFFICE) return '관할검찰청';
-  if (col === CL_COL_COURT) return '관할';
-  return '사건번호';
+// 머리글 목록에서 이름으로 열 번호를 찾는다 (공백 제거 후 앞부분 일치)
+function clFind_(headRow, key) {
+  for (var c = 0; c < headRow.length; c++) {
+    var h = clNorm_(headRow[c]);
+    if (h && (h.indexOf(key) === 0 || key.indexOf(h) === 0)) return c + 1;
+  }
+  return 0;
 }
-function clAliasRole_(v) {
-  return (v === '피고인2') ? '피고인' : v;
+
+function clNorm_(v) {
+  return String(v == null ? '' : v).replace(/\s/g, '');
 }
+
+function clAlias_(v) { return (v === '피고인2') ? '피고인' : v; }
 
 // 형사사건과 같은 단계 판정 규칙
 function clStage_(caseNo, court, bench) {
-  caseNo = String(caseNo).replace(/\n/g, ' ');
-  court = String(court).replace(/\n/g, ' ');
-  bench = String(bench).replace(/\n/g, ' ');
+  caseNo = String(caseNo == null ? '' : caseNo).replace(/\n/g, ' ');
+  court = String(court == null ? '' : court).replace(/\n/g, ' ');
+  bench = String(bench == null ? '' : bench).replace(/\n/g, ' ');
 
   if (/\d{4}\s*(고합|고단|고정|고약|노|도|초재|재고단|전고단|동버|푸|서|모)\s*\d/.test(caseNo)
     || (court && /(법원|지원|고법)/.test(court) && !/(검찰청|지검|지청)/.test(court))
@@ -484,7 +488,7 @@ function clStage_(caseNo, court, bench) {
   return '';
 }
 
-// 값 대조용 — 비어있지 않은 값들만 문자열로 모은다
+// 값 대조용 — 비어있지 않은 값만 문자열로 모은다
 function clBag_(arr) {
   var bag = [];
   for (var i = 0; i < arr.length; i++) {
@@ -494,17 +498,23 @@ function clBag_(arr) {
   return bag;
 }
 
-function clLastRow_(sh, first) {
+// 성명이 채워진 마지막 줄
+function clLastRow_(sh, head) {
+  var lastCol = Math.max(sh.getLastColumn(), 1);
+  var headRow = sh.getRange(head, 1, 1, lastCol).getValues()[0];
+  var nameCol = clFind_(headRow, '성명') || clFind_(headRow, '이름');
+  if (!nameCol) return head;
   var last = sh.getLastRow();
-  if (last < first) return first - 1;
-  var v = sh.getRange(first, 3, last - first + 1, 1).getValues();   // C 성명 기준
+  if (last <= head) return head;
+  var v = sh.getRange(head + 1, nameCol, last - head, 1).getValues();
   for (var i = v.length - 1; i >= 0; i--) {
-    if (String(v[i][0] == null ? '' : v[i][0]).trim()) return first + i;
+    if (String(v[i][0] == null ? '' : v[i][0]).trim()) return head + 1 + i;
   }
-  return first - 1;
+  return head;
 }
 
 function clL_(c) {
+  if (!c) return '-';
   var s = '';
   while (c > 0) { var m = (c - 1) % 26; s = String.fromCharCode(65 + m) + s; c = (c - m - 1) / 26; }
   return s;
