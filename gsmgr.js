@@ -431,6 +431,10 @@
         'font:inherit;font-size:12px;font-weight:700;padding:4px 10px;border-radius:8px;cursor:pointer;pointer-events:auto;}',
       '#' + SHELL_ID + ' .gm-toast .gm-toast-retry:hover{background:rgba(255,255,255,.28);}',
       /* 앱바 버튼 */
+      '#' + SHELL_ID + ' .gm-sync{border:1px solid rgba(22,38,63,.2);background:#fff;color:#5b6b86;font-weight:600;',
+        'font-size:12.5px;height:38px;padding:0 13px;border-radius:999px;cursor:pointer;font-family:inherit;}',
+      '#' + SHELL_ID + ' .gm-sync:hover{background:rgba(22,38,63,.05);color:#2b3f63;}',
+      '#' + SHELL_ID + ' .gm-sync[disabled]{opacity:.55;cursor:default;}',
       '#' + SHELL_ID + ' .gm-add{border:none;background:linear-gradient(155deg,#22344f,#16263f);color:#fff;font-weight:600;',
         'font-size:13.5px;height:38px;padding:0 16px;border-radius:999px;cursor:pointer;font-family:inherit;}',
       '#' + SHELL_ID + ' .gm-add:hover{background:linear-gradient(155deg,#2a3e5c,#1b2e4b);}',
@@ -520,6 +524,7 @@
           '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m5 0V4a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v2"/></svg>' +
           '<span id="gsmgr-trash-n">0</span>' +
         '</button>' +
+        '<button class="gm-sync" id="gsmgr-sync" onclick="gsmgrSyncNow()" title="로웨 창고(cases)에서 기일을 다시 가져옵니다">기일 동기화</button>' +
         '<button class="gm-add" onclick="gsmgrOpenAdd()">＋ 사건 추가</button>' +
       '</div>' +
       '<div class="gm-cockpit" id="gsmgr-cockpit"></div>' +
@@ -606,9 +611,10 @@
      (단, 로웨어에 다음 기일이 비어 있으면 지난 기일을 지우지 않도록 그냥 둔다)
      다음 기일이 '공판'이고 저장된 선고기일이 그보다 앞이면 그 선고기일도 함께 지운다
      (선고 연기·변론재개 → 옛 선고기일이 남아 기일 갱신이 화면에 안 보이던 문제). */
-  function syncFromLoware() {
+  function syncFromLoware(report) {
     var sb = (typeof getSB === 'function') ? getSB() : null;
-    if (!sb || !state.cases.length) return;
+    if (!sb) { if (report) gsmgrToast('연결이 없어 동기화하지 못했습니다', 'err', 3200); return; }
+    if (!state.cases.length) { if (report) gsmgrToast('동기화할 사건이 없습니다', 'info', 2400); return; }
     // 조회 키는 저장된 원문과 공백 제거본을 모두 보낸다 —
     // 사건번호를 '2026 고단 1234'처럼 띄어 입력한 사건이 l_code 매칭에서 통째로 빠지던 문제.
     var codes = [], seen = {};
@@ -617,16 +623,24 @@
       if (!raw) return;
       [raw, normCode(raw)].forEach(function (v) { if (v && !seen[v]) { seen[v] = 1; codes.push(v); } });
     });
-    if (!codes.length) return;
+    if (!codes.length) { if (report) gsmgrToast('사건번호가 입력된 사건이 없습니다', 'info', 2800); return; }
     sb.from('cases').select('l_code,next_date,next_contents').in('l_code', codes).then(function (res) {
-      if (!res || res.error || !res.data) return;
+      if (!res || res.error || !res.data) {
+        if (report) gsmgrToast('창고 조회 실패 — ' + ((res && res.error && res.error.message) || '응답 없음'), 'err', 6000);
+        return;
+      }
       var map = {};
       res.data.forEach(function (r) { map[normCode(r.l_code)] = r; });
-      var changed = [];
+      var changed = [], miss = [], noDate = [], matched = 0, total = 0;
       state.cases.forEach(function (c) {
+        if (c.deleted) return;
         if (c.hearingType === '선정취소') return;         // 선정취소로 종결된 건 → 기일 자동 갱신 안 함
+        if (!c.caseNumber) return;
+        total++;
         var r = map[normCode(c.caseNumber)];
-        if (!r || !r.next_date) return;                 // 로웨어에 다음 기일 없음 → 유지
+        if (!r) { miss.push(c.caseNumber); return; }     // 창고(cases)에 그 사건번호가 아예 없음
+        matched++;
+        if (!r.next_date) { noDate.push(c.caseNumber); return; } // 창고에 다음 기일 없음 → 유지
         var nd = String(r.next_date).slice(0, 10);
         var isCancel = /선정\s*취소/.test(r.next_contents || '');
         var isSgo = /선고/.test(r.next_contents || '');
@@ -651,7 +665,26 @@
         render();
         changed.forEach(function (u) { commitPatch(u.id, u.patch, 0, null, true); }); // 조용히 · 낙관적 잠금 · 변경 필드만
       }
-    }, function () {});
+      if (report) gsmgrToast(syncReport(total, matched, changed.length, miss, noDate),
+                             changed.length ? 'ok' : 'info', 7000);
+    }, function (e) {
+      if (report) gsmgrToast('창고 조회 실패 — ' + ((e && e.message) || '네트워크 오류'), 'err', 6000);
+    });
+  }
+
+  /* 동기화 결과 한 줄 요약 — 기일이 안 맞을 때 어느 단계가 막혔는지 바로 보이게 한다.
+     · '창고에 없음'  → 사건번호가 로웨 창고(cases)와 다르거나 그 사건이 창고에 적재되지 않음
+     · '다음 기일 없음' → 창고 쪽 next_date 가 비어 있음(로웨 적재 문제 — 앱에서 고칠 수 없음)
+     · 갱신 0건 + 매칭 정상 → 이미 창고와 같은 기일(= 창고가 오래된 값) */
+  function syncReport(total, matched, changedN, miss, noDate) {
+    var msg = '사건 ' + total + '건 · 창고 매칭 ' + matched + '건 · 기일 갱신 ' + changedN + '건';
+    if (miss.length) {
+      msg += ' · 창고에 없음 ' + miss.length + '건(' + miss.slice(0, 2).join(', ') + (miss.length > 2 ? ' 외' : '') + ')';
+    }
+    if (noDate.length) {
+      msg += ' · 창고에 다음 기일 없음 ' + noDate.length + '건(' + noDate.slice(0, 2).join(', ') + (noDate.length > 2 ? ' 외' : '') + ')';
+    }
+    return msg;
   }
 
   /* ── 편집 보호 · 실시간 리로드 스케줄 ──
@@ -1498,6 +1531,16 @@
     if (!state.loaded) render(); // 로딩 표시
     load(syncFromLoware);        // 로드 후 로웨어 기일 자동 반영
     subscribe();
+  };
+
+  // 앱바 '기일 동기화' — 최신 사건 목록을 다시 읽고 창고 기일을 맞춘 뒤 결과를 알려준다
+  window.gsmgrSyncNow = function () {
+    var btn = document.getElementById('gsmgr-sync');
+    if (btn) btn.disabled = true;
+    var reenable = function () { var b = document.getElementById('gsmgr-sync'); if (b) b.disabled = false; };
+    setTimeout(reenable, 8000);   // 편집 중이라 load가 미뤄지는 등 콜백이 안 와도 버튼은 살려둔다
+    gsmgrToast('기일 확인 중…', 'info', 8000);
+    load(function () { syncFromLoware(true); reenable(); });
   };
 
   window.closeGsmgr = function () {
