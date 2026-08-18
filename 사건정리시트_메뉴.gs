@@ -29,8 +29,47 @@
        로 열리는 프로젝트여야 합니다. 따로 만든 독립 프로젝트면 안 됩니다.
    ─────────────────────────────────────────────────────────────── */
 
+/* ══════════════════════════════════════════════════════════════
+   트리거가 켜져 있는지 — 메뉴 이름에 보여 주려고
+   ══════════════════════════════════════════════════════════════ */
+
+/* 「켜기」 를 눌러야 도는 것들이 있는데, 안 눌렀는지 시트 어디서도
+   알 수 없었습니다. 종결 체크가 안 넘어가던 일이 그래서 생겼습니다.
+   메뉴 이름에 ● / ○ 를 붙여 눈에 보이게 합니다.
+
+   한계 둘:
+     · 지금 로그인한 사람의 트리거만 보입니다. 남이 건 것은 안 보입니다
+     · 메뉴는 시트를 열 때 그려집니다. 켠 뒤 새로고침해야 바뀝니다  */
+
+var MN_TRIGS = null;          // null = 아직 안 봄 · false = 볼 수 없었음
+
+/* 핸들러 이름 → 걸린 개수.
+   onOpen 은 단순 트리거라 권한이 좁습니다(AuthMode.LIMITED).
+   거기서 getProjectTriggers() 가 막힐 수 있어 반드시 감쌉니다.
+   막히면 false 를 내고, 메뉴는 예전과 똑같은 이름을 씁니다 — 나빠지지 않습니다. */
+function mnLoadTrigs_() {
+  try {
+    var m = {};
+    ScriptApp.getProjectTriggers().forEach(function (t) {
+      var h = t.getHandlerFunction();
+      m[h] = (m[h] || 0) + 1;
+    });
+    return m;
+  } catch (err) {
+    return false;
+  }
+}
+
+function mnLabel_(base, handler) {
+  if (MN_TRIGS === null) MN_TRIGS = mnLoadTrigs_();          // 한 번만 받아 쓴다
+  if (MN_TRIGS === false) return base + '  켜기';
+  return base + (MN_TRIGS[handler] ? '  \u25cf 켜져 있음 — 다시 걸기'
+                                   : '  \u25cb 꺼져 있음 — 켜기');
+}
+
 /* 시트를 열 때 저절로 돕니다 */
 function onOpen() {
+  MN_TRIGS = null;
   var ui = SpreadsheetApp.getUi();
 
   ui.createMenu('사건정리')
@@ -59,7 +98,7 @@ function onOpen() {
       .addSeparator()
       .addItem('기일 글자색 입히기', 'runHearingColors')
       .addSeparator()
-      .addItem('매일 아침 자동  켜기', 'setupHearingDaily')
+      .addItem(mnLabel_('매일 아침 자동', 'hearingDaily'), 'setupHearingDaily')
       .addItem('매일 아침 자동  끄기', 'removeHearingDaily'))
 
     .addSubMenu(ui.createMenu('항소 탭')
@@ -77,7 +116,7 @@ function onOpen() {
       .addItem('체크박스 깔기  — 미리보기', 'previewCloseButtons')
       .addItem('체크박스 깔기  실행', 'runCloseButtons')
       .addSeparator()
-      .addItem('체크하면 옮기기  켜기', 'setupCloseButtons')
+      .addItem(mnLabel_('체크하면 옮기기', 'onCloseEdit'), 'setupCloseButtons')
       .addItem('체크하면 옮기기  끄기', 'removeCloseButtons'))
 
     .addSubMenu(ui.createMenu('체크박스')
@@ -92,7 +131,7 @@ function onOpen() {
       .addItem('지위·단계 만들기  실행', 'runParty')
       .addSeparator()
       .addItem('단계 다시 계산', 'refreshStages')
-      .addItem('자동 갱신  켜기', 'setupStageAutoUpdate')
+      .addItem(mnLabel_('자동 갱신', 'onStageEdit'), 'setupStageAutoUpdate')
       .addItem('자동 갱신  끄기', 'removeStageAutoUpdate'))
 
     .addSubMenu(ui.createMenu('관할·재판부 정리')
@@ -107,9 +146,10 @@ function onOpen() {
       .addItem('백업으로 되돌리기  — 미리보기', 'previewRestore')
       .addItem('백업으로 되돌리기  실행', 'runRestore')
       .addSeparator()
-      .addItem('수정기록·자동백업  켜기', 'setup')
+      .addItem(mnLabel_('수정기록·자동백업', 'logEdit'), 'setup')
       .addItem('수정기록·자동백업  끄기', 'uninstall'))
 
+    .addItem('지금 무엇이 켜져 있나 보기', 'uiTriggers')
     .addItem('도움말 — 무엇이 무엇인지', 'uiHelp')
     .addToUi();
 }
@@ -162,6 +202,54 @@ function uiSortHint() {
     + '   표 양식 → 기일 표기 맞추기 를 한 번만 실행하시면 됩니다.');
 }
 
+/* 눌러서 부르는 것이라 온전한 권한으로 돕니다.
+   메뉴 이름의 ● / ○ 가 안 뜰 때는 이쪽으로 보세요. */
+function uiTriggers() {
+  var list = [
+    ['기일 가져오기', '매일 아침 자동',     'hearingDaily'],
+    ['종결 처리',     '체크하면 옮기기',    'onCloseEdit'],
+    ['지위·단계',     '자동 갱신',          'onStageEdit'],
+    ['백업',          '수정기록 (수정로그)', 'logEdit'],
+    ['백업',          '탭 추가·삭제 기록',   'logChange'],
+    ['백업',          '매일 21시 자동백업',  'dailyBackup']
+  ];
+
+  var m = mnLoadTrigs_();
+  if (m === false) {
+    uiShow_('트리거 목록을 볼 권한이 없습니다.\n\n'
+      + '확장 프로그램 → Apps Script → 왼쪽 시계 모양(트리거) 에서\n'
+      + '직접 보실 수 있습니다.');
+    return;
+  }
+
+  var out = ['=== 지금 켜져 있는 것 ===', ''];
+  var off = [];
+  list.forEach(function (r) {
+    var n = m[r[2]] || 0;
+    out.push((n ? '  \u25cf ' : '  \u25cb ') + r[0] + '   ' + r[1]
+      + (n > 1 ? '   (' + n + '개 겹쳐 있음)' : ''));
+    if (!n) off.push(r[0] + ' — ' + r[1]);
+  });
+
+  if (off.length) {
+    out.push('');
+    out.push('■ 꺼져 있는 것 — 그 메뉴에서 「켜기」 를 누르세요');
+    off.forEach(function (t) { out.push('   ' + t); });
+  }
+
+  out.push('');
+  out.push('=== 알아 두실 것 ===');
+  out.push('  · 여기 보이는 것은 지금 로그인하신 계정이 건 트리거뿐입니다.');
+  out.push('    다른 분이 건 것은 안 보입니다. 그래서 \u25cb 로 떠도 남이 건 것이');
+  out.push('    돌고 있을 수 있습니다.');
+  out.push('  · 「겹쳐 있음」 이 뜨면 같은 일이 두 번 돕니다. 「끄기」 를 눌러도');
+  out.push('    내 것만 지워지니, 남은 것은 그 계정으로 지워야 합니다.');
+  out.push('  · 메뉴 이름의 \u25cf \u25cb 는 시트를 열 때 정해집니다.');
+  out.push('    켜기·끄기 를 누른 뒤에는 새로고침해야 바뀝니다.');
+
+  uiShow_(out.join('\n'));
+}
+
 function uiHelp() {
   uiShow_('=== 사건정리 메뉴 ===\n\n'
     + '[표 양식]\n'
@@ -183,7 +271,8 @@ function uiHelp() {
     + '[종결 처리]\n'
     + '  형사 탭 맨 오른쪽 [종결] 을 체크하면 종결 탭으로 넘어가고,\n'
     + '  종결 탭 [복원] 을 체크하면 있던 자리로 돌아옵니다.\n'
-    + '  「체크하면 옮기기 켜기」 를 한 번 해두셔야 동작합니다.\n\n'
+    + '  「체크하면 옮기기 켜기」 를 한 번 해두셔야 동작합니다.\n'
+    + '  켜져 있는지는 그 메뉴 이름의 \u25cf / \u25cb 로 보실 수 있습니다.\n\n'
     + '[체크박스]  선임계·공소장·증거기록을 네모 체크로 바꿉니다.\n'
     + '[지위·단계]  성명에서 지위를 떼고 경찰·검찰·재판 단계를 계산합니다.\n'
     + '[관할·재판부 정리]  재판부 칸의 전화번호를 메모로 옮기고 관할을 채웁니다.\n\n'
@@ -193,5 +282,7 @@ function uiHelp() {
     + '=== 공통 ===\n'
     + '  · 「미리보기」 는 시트를 절대 바꾸지 않습니다. 먼저 보시고 실행하세요.\n'
     + '  · 「실행」 은 시작 전에 백업을 자동으로 뜹니다.\n'
-    + '  · 시트를 직접 되돌리려면  파일 → 버전 기록  이 가장 정확합니다.');
+    + '  · 시트를 직접 되돌리려면  파일 → 버전 기록  이 가장 정확합니다.\n'
+    + '  · 「켜기」 가 필요한 것들은 메뉴 이름에 \u25cf 켜져 있음 / \u25cb 꺼져 있음\n'
+    + '    으로 나옵니다. 「지금 무엇이 켜져 있나 보기」 로 한눈에 보실 수도 있습니다.');
 }
