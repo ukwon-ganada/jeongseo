@@ -124,7 +124,11 @@ function onOpen() {
       .addItem('선임계  실행', 'runRetainer')
       .addSeparator()
       .addItem('공소장·증거기록  — 미리보기', 'previewCheckbox')
-      .addItem('공소장·증거기록  실행', 'runCheckbox'))
+      .addItem('공소장·증거기록  실행', 'runCheckbox')
+      .addSeparator()
+      .addItem(mnLabel_('선임계 날짜 자동', 'onRetainerEdit'), 'setupRetainerDate')
+      .addItem('선임계 날짜 자동  끄기', 'removeRetainerDate')
+      .addItem('선임계 날짜 지금 보기', 'showRetainerDates'))
 
     .addSubMenu(ui.createMenu('지위·단계')
       .addItem('지위·단계 만들기  — 미리보기', 'previewParty')
@@ -209,6 +213,7 @@ function uiTriggers() {
     ['기일 가져오기', '매일 아침 자동',     'hearingDaily'],
     ['종결 처리',     '체크하면 옮기기',    'onCloseEdit'],
     ['지위·단계',     '자동 갱신',          'onStageEdit'],
+    ['체크박스',      '선임계 날짜 자동',    'onRetainerEdit'],
     ['백업',          '수정기록 (수정로그)', 'logEdit'],
     ['백업',          '탭 추가·삭제 기록',   'logChange'],
     ['백업',          '매일 21시 자동백업',  'dailyBackup']
@@ -273,7 +278,11 @@ function uiHelp() {
     + '  종결 탭 [복원] 을 체크하면 있던 자리로 돌아옵니다.\n'
     + '  「체크하면 옮기기 켜기」 를 한 번 해두셔야 동작합니다.\n'
     + '  켜져 있는지는 그 메뉴 이름의 \u25cf / \u25cb 로 보실 수 있습니다.\n\n'
-    + '[체크박스]  선임계·공소장·증거기록을 네모 체크로 바꿉니다.\n'
+    + '[체크박스]\n'
+    + '  선임계·공소장·증거기록을 네모 체크로 바꿉니다.\n'
+    + '  「선임계 날짜 자동」 을 켜두면 선임계를 체크할 때 그 칸 메모에\n'
+    + '  제출일이 저절로 들어갑니다 (마우스를 올리면 보입니다).\n'
+    + '  체크를 풀면 그 줄만 지워지고, 손으로 고친 날짜는 덮지 않습니다.\n\n'
     + '[지위·단계]  성명에서 지위를 떼고 경찰·검찰·재판 단계를 계산합니다.\n'
     + '[관할·재판부 정리]  재판부 칸의 전화번호를 메모로 옮기고 관할을 채웁니다.\n\n'
     + '[백업]\n'
