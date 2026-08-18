@@ -755,28 +755,48 @@ function removeCloseButtons() {
   });
 }
 
+/* 어디까지 갔는지 찍는다. Apps Script 「실행」 목록에서 그 줄을 펼치면 보인다.
+
+   왜 필요한가: onCloseEdit 은 조건에 안 맞으면 아무 말 없이 되돌아간다.
+   그래서 '돌긴 돌았는데 아무 일도 안 났다' 가 되면 어디서 멈췄는지 알 길이 없다.
+   계정 이름도 함께 찍는다 — 트리거가 여러 계정에 걸려 있을 수 있기 때문이다. */
+function clTrace_(msg) {
+  var who = '(로그인 정보 없음)';
+  try { who = Session.getActiveUser().getEmail() || who; } catch (e) { }
+  try { console.log('[종결] ' + who + '  ' + msg); } catch (e) { Logger.log(msg); }
+}
+
 function onCloseEdit(e) {
-  if (!e || !e.range) return;
+  if (!e || !e.range) { clTrace_('멈춤 — 편집 정보가 없음'); return; }
   var sh = e.range.getSheet();
   var name = sh.getName();
   var toClose = (name === CL_MAIN), toRestore = (name === CL_DONE);
-  if (!toClose && !toRestore) return;
+
+  clTrace_('시작 — 탭「' + name + '」 ' + e.range.getA1Notation()
+    + '  값 ' + JSON.stringify(e.value) + ' (이전 ' + JSON.stringify(e.oldValue) + ')');
+
+  if (!toClose && !toRestore) { clTrace_('멈춤 — 형사사건도 종결도 아닌 탭'); return; }
 
   var ss = SpreadsheetApp.openById(CL_SHEET_ID);
   var main = ss.getSheetByName(CL_MAIN), done = ss.getSheetByName(CL_DONE);
-  if (!main || !done) return;
+  if (!main || !done) { clTrace_('멈춤 — 탭을 못 찾음'); return; }
   var mHead = clHeadRow_(main), dHead = clHeadRow_(done);
-  if (!mHead || !dHead) return;
+  if (!mHead || !dHead) { clTrace_('멈춤 — 머리글 줄을 못 찾음'); return; }
   var shared = clSharedCols_(main, mHead);
 
   var head = toClose ? mHead : dHead;
   var watchCol = toClose ? shared + 1 : shared + CL_EXTRA.length + 1;
-  if (e.range.getColumn() > watchCol || e.range.getLastColumn() < watchCol) return;
+  if (e.range.getColumn() > watchCol || e.range.getLastColumn() < watchCol) {
+    clTrace_('멈춤 — 고친 칸이 체크 열이 아님 (고친 열 ' + e.range.getColumn()
+      + '~' + e.range.getLastColumn() + ' · 체크 열 ' + watchCol + ')');
+    return;
+  }
 
   /* 종결 탭이 아직 형사사건과 같은 구조가 아니면 옮기지 않는다.
      구조가 다른 채로 옮기면 이름이 'No' 칸에, 사건명이 '선임계' 칸에 들어가
      종결 탭이 엉망이 된다. 체크만 해제하고 무엇을 해야 하는지 남긴다. */
   if (!clAligned_(main, mHead, done, dHead, shared)) {
+    clTrace_('멈춤 — 종결 탭 구조가 다름');
     e.range.setValue(false);
     clLog_(ss, '종결 이동 안 함 — 종결 탭 구조가 형사사건과 다릅니다. runAlignClosed 를 먼저 실행하세요.');
     try {
@@ -789,21 +809,34 @@ function onCloseEdit(e) {
 
   var top = Math.max(e.range.getRow(), head + 1);
   var bottom = e.range.getRow() + e.range.getNumRows() - 1;
-  if (bottom <= head) return;
+  if (bottom <= head) { clTrace_('멈춤 — 머리글 줄 위쪽'); return; }
 
   var lock = LockService.getDocumentLock();
-  try { lock.waitLock(20000); } catch (err) { return; }
+  try { lock.waitLock(20000); } catch (err) {
+    clTrace_('멈춤 — 20초 기다려도 문서 잠금을 못 얻음');
+    return;
+  }
   try {
     var checked = [];
     var vals = sh.getRange(top, watchCol, bottom - top + 1, 1).getValues();
     for (var i = 0; i < vals.length; i++) if (vals[i][0] === true) checked.push(top + i);
-    if (!checked.length) return;
+    if (!checked.length) {
+      clTrace_('멈춤 — ' + top + '~' + bottom + '행에 체크된 것이 없음 (읽은 값 '
+        + JSON.stringify(vals.map(function (v) { return v[0]; }).slice(0, 5)) + ')');
+      return;
+    }
+    clTrace_('체크된 줄 ' + checked.join(', ') + '행');
 
     // 아래 행부터 지운다 (위부터 지우면 행 번호가 밀린다)
     for (var j = checked.length - 1; j >= 0; j--) {
-      if (!clClaim_(name, checked[j])) continue;      // 같은 체크를 두 번 처리하지 않는다
+      if (!clClaim_(name, checked[j])) {
+        clTrace_('건너뜀 — ' + checked[j] + '행은 다른 실행이 이미 가져갔음 (90초 잠금)');
+        continue;
+      }
+      clTrace_('옮기는 중 — ' + checked[j] + '행');
       if (toClose) clToDone_(ss, main, done, mHead, dHead, shared, checked[j]);
       else clToMain_(ss, main, done, mHead, dHead, shared, checked[j]);
+      clTrace_('옮김 끝 — ' + checked[j] + '행');
     }
     SpreadsheetApp.flush();
   } finally {
