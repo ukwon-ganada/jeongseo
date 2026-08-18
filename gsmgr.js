@@ -8,7 +8,9 @@
      depositDate, depositAmount, appeal, appealStamped } }
    패널(파생, 저장 안 함):
      · 기준일 = 선고일(verdictDate, 없으면 hearingType='선고'의 hearingDate) 우선, 없으면 (최근)기일
-     · 종결 = 강제종결(수동)이거나 선정취소이거나 '선고기일'이 지남  · 진행 = 그 외(공판만 지남·미래 기일·기일 없음)
+     · 진행 패널의 '기일' = 남은 기일 중 가장 이른 것(둘 다 지났으면 최근에 지난 것)
+     · 종결 = 강제종결(수동)이거나 선정취소이거나 '선고기일'이 지남(단 그 뒤에 새 기일이 잡혔으면 진행 유지)
+     · 진행 = 그 외(공판만 지남·미래 기일·기일 없음)
      · 보수 = 종결 && claimed(보수청구 체크) — 필터뷰(종결에도 남음)
    진입점: window.goCaseManager() / window.closeGsmgr()
    ─────────────────────────────────────────────────────────────── */
@@ -60,8 +62,14 @@
   function verdictOf(c) { return c.verdictDate || (c.hearingType === '선고' ? c.hearingDate : ''); }
   // 사건의 기준 날짜 = 선고일 우선, 없으면 (최근)기일
   function caseDate(c) { return verdictOf(c) || c.hearingDate || ''; }
+  // 변론재개 등으로 '선고기일보다 뒤'의 기일이 잡히면 그 선고기일은 무효 → 아직 진행 중
+  function reopened(c) {
+    var v = ymd(verdictOf(c)), h = ymd(c.hearingDate);
+    return !!(v && h && h > v);
+  }
   // 종결 = 강제종결(수동)이거나 선정취소이거나 '선고기일'이 지났을 때. 공판기일만 지난 경우는 진행 유지.
-  function isClosed(c) { return c.forceClosed || c.hearingType === '선정취소' || reached(verdictOf(c)); }
+  //        (선고 뒤에 새 기일이 잡힌 사건은 종결로 보내지 않는다 — 기일이 갱신돼도 목록에서 사라지던 문제)
+  function isClosed(c) { return c.forceClosed || c.hearingType === '선정취소' || (reached(verdictOf(c)) && !reopened(c)); }
   // 검색어 매칭: 피고인·사건명·연락처는 부분일치, 사건번호는 공백 무시 부분일치
   function matchesQuery(c) {
     var q = (state.query || '').trim();
@@ -111,8 +119,18 @@
     });
     return arr;
   }
-  // 진행 패널의 '기일' = 선고기일 예정 있으면 그것, 없으면 최근 공판기일
-  function activeDate(c) { return verdictOf(c) || c.hearingDate || ''; }
+  // 진행 패널의 '기일' = 앞으로 남은 기일 중 가장 이른 것(둘 다 지났으면 가장 최근에 지난 기일).
+  // 예전엔 선고기일을 무조건 우선해서, 선고가 취소·연기되고 새 공판기일이 잡혀도 옛 선고기일만 보였다.
+  function activeDate(c) {
+    var v = verdictOf(c), h = c.hearingDate || '';
+    var vy = ymd(v), hy = ymd(h), t = ymdToday();
+    var vNext = !!vy && vy >= t, hNext = !!hy && hy >= t;
+    if (vNext && hNext) return (vy <= hy) ? v : h;   // 둘 다 예정 → 이른 쪽
+    if (vNext) return v;
+    if (hNext) return h;
+    if (vy && hy) return (vy >= hy) ? v : h;         // 둘 다 지남 → 최근 쪽
+    return v || h || '';
+  }
   // 보수 단계: 미청구(none) → 청구(claimed) → 지급(paid, 입금일 있음)
   function feeStage(c) { return ymd(c.depositDate) ? 'paid' : (c.claimed ? 'claimed' : 'none'); }
   // 어떤 날짜로부터 오늘까지 지난 일수(양수=지남) — 미청구 경고 D+n
@@ -585,11 +603,20 @@
   /* ── 로웨어(cases) 기일 자동 반영 ──
      화면 열 때, 저장된 사건번호로 cases 를 다시 조회해 next_date(공판기일)/next_contents(종류)를
      기준으로 기일을 최신화한다. 로웨어 값이 가장 정확하므로 국선 화면의 기존 기일을 덮어쓴다.
-     (단, 로웨어에 다음 기일이 비어 있으면 지난 기일을 지우지 않도록 그냥 둔다) */
+     (단, 로웨어에 다음 기일이 비어 있으면 지난 기일을 지우지 않도록 그냥 둔다)
+     다음 기일이 '공판'이고 저장된 선고기일이 그보다 앞이면 그 선고기일도 함께 지운다
+     (선고 연기·변론재개 → 옛 선고기일이 남아 기일 갱신이 화면에 안 보이던 문제). */
   function syncFromLoware() {
     var sb = (typeof getSB === 'function') ? getSB() : null;
     if (!sb || !state.cases.length) return;
-    var codes = state.cases.map(function (c) { return c.caseNumber; }).filter(Boolean);
+    // 조회 키는 저장된 원문과 공백 제거본을 모두 보낸다 —
+    // 사건번호를 '2026 고단 1234'처럼 띄어 입력한 사건이 l_code 매칭에서 통째로 빠지던 문제.
+    var codes = [], seen = {};
+    state.cases.forEach(function (c) {
+      var raw = String(c.caseNumber == null ? '' : c.caseNumber).trim();
+      if (!raw) return;
+      [raw, normCode(raw)].forEach(function (v) { if (v && !seen[v]) { seen[v] = 1; codes.push(v); } });
+    });
     if (!codes.length) return;
     sb.from('cases').select('l_code,next_date,next_contents').in('l_code', codes).then(function (res) {
       if (!res || res.error || !res.data) return;
@@ -604,16 +631,20 @@
         var isCancel = /선정\s*취소/.test(r.next_contents || '');
         var isSgo = /선고/.test(r.next_contents || '');
         var ht = isCancel ? '선정취소' : (isSgo ? '선고' : '공판');
+        // 다음 기일이 '공판'인데 저장된 선고기일이 그보다 앞(또는 같은 날) → 그 선고기일은 취소·변경된 값
+        var staleVerdict = (ht === '공판') && !!c.verdictDate && ymd(c.verdictDate) <= ymd(nd);
         var sameDate = ymd(c.hearingDate) === ymd(nd);
         var sameType = c.hearingType === ht;
-        var sameVerdict = !isSgo || ymd(c.verdictDate) === ymd(nd);
+        var sameVerdict = isSgo ? (ymd(c.verdictDate) === ymd(nd)) : !staleVerdict;
         if (sameDate && sameType && sameVerdict) return; // 변경 없음
         // 바뀐 필드만 patch로 저장(commitPatch) — 예전엔 로컬 _raw 전체를 통째 upsert 해서
         // 다른 기기가 그 사이 고친 메모·보수·항소 등을 낙관적 잠금 없이 덮어썼음(유실).
         var patch = { hearingType: ht, hearingDate: nd };
         c.hearingType = ht; c.hearingDate = nd;                       // 낙관적 즉시 표시
         if (c._raw) { c._raw.hearingType = ht; c._raw.hearingDate = nd; }
-        if (isSgo && nd) { patch.verdictDate = nd; c.verdictDate = nd; if (c._raw) c._raw.verdictDate = nd; } // 공판일 땐 기존 선고기일 유지
+        if (isSgo && nd) { patch.verdictDate = nd; c.verdictDate = nd; if (c._raw) c._raw.verdictDate = nd; }
+        // 지난 선고기일이 남아 있으면 지운다 — 안 지우면 '기일'칸이 옛 선고기일만 보여주고 사건이 종결로 빠졌음
+        else if (staleVerdict) { patch.verdictDate = ''; c.verdictDate = ''; if (c._raw) c._raw.verdictDate = ''; }
         changed.push({ id: c.id, patch: patch });
       });
       if (changed.length) {
@@ -823,13 +854,13 @@
     return '<span class="gm-name" data-tip="' + esc(c.contact) + '">' + (c.defendant ? hlEsc(c.defendant) : '—') + '</span>';
   }
   function hearingTag(c) {
-    var v = verdictOf(c);
-    if (v && !reached(v)) { // 선고기일이 예정(미래)된 진행 사건
-      return '<span class="gm-tag tag-sgo">선고</span>' + fmtDate(v);
-    }
-    var t = c.hearingType || '공판';
+    var d = activeDate(c), v = verdictOf(c);
+    var t;
+    if (c.hearingType === '선정취소') t = '선정취소';
+    else if (v && ymd(v) === ymd(d)) t = '선고';     // 표시 중인 날짜가 선고기일일 때만 '선고'
+    else t = c.hearingType || '공판';
     var cls = t === '선고' ? 'tag-sgo' : (t === '선정취소' ? 'tag-cancel' : 'tag-gongpan');
-    return '<span class="gm-tag ' + cls + '">' + esc(t) + '</span>' + fmtDate(c.hearingDate);
+    return '<span class="gm-tag ' + cls + '">' + esc(t) + '</span>' + fmtDate(d);
   }
 
   function trow(tab, c) {
@@ -1477,6 +1508,17 @@
     setPillBadge(computeAttention(state.cases)); // 홈 복귀 → 배지 갱신
     if (window._swMaybeReload) setTimeout(window._swMaybeReload, 0); // 홈 복귀 → 대기 중 새 버전 교체
   };
+
+  /* 화면을 열어둔 채 다른 앱·탭에 다녀오면 로웨어 기일을 다시 맞춘다
+     (열 때 1회만 동기화해서, 하루 종일 켜 둔 기기에는 바뀐 기일이 안 들어오던 문제) */
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) return;
+      var el = document.getElementById(SHELL_ID);
+      if (!el || !el.classList.contains('active')) return;
+      load(syncFromLoware);
+    });
+  }
 
   /* 첫 홈 진입(로그인 직후) 배지 표시 — 세션 준비될 때까지 몇 번 시도 */
   if (typeof window !== 'undefined' && typeof document !== 'undefined') {
