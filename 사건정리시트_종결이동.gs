@@ -885,6 +885,7 @@ function clToDone_(ss, main, done, mHead, dHead, shared, row) {
 
   var at = clLastRow_(done, dHead) + 1;
   if (at <= dHead) at = dHead + 1;
+  clEnsureSize_(done, at, shared + CL_EXTRA.length + 1);
   clCopyFormat_(done, dHead, at, shared + CL_EXTRA.length + 1);
   done.getRange(at, 1, 1, shared).setValues([data]);
   done.getRange(at, shared + 1).setValue(new Date()).setNumberFormat('yyyy-mm-dd');
@@ -941,6 +942,7 @@ function clToMain_(ss, main, done, mHead, dHead, shared, row) {
   if (back && at < bottom) main.insertRowBefore(at);
   else { at = bottom; back = false; }
 
+  clEnsureSize_(main, at, shared + 1);
   clCopyFormat_(main, mHead, at, shared + 1);
   main.getRange(at, 1, 1, shared).setValues([data]);
   main.getRange(at, shared + 1).insertCheckboxes().setValue(false);
@@ -966,6 +968,20 @@ function clRowByName_(sh, head, nameCol, name) {
 /* ══════════════════════════════════════════════════════════════
    도구
    ══════════════════════════════════════════════════════════════ */
+
+/* 쓰려는 칸이 시트 격자 밖이면 넓힌다.
+
+   구글 시트는 격자 크기가 정해져 있어서, 마지막 행 아래에 빈 행이 없으면
+   그 자리에 쓸 수 없다. 「목표 범위 좌표가 시트 크기를 벗어납니다」 가 그 뜻이다.
+
+   종결 탭이 38행까지 꽉 찬 채로 39행에 쓰려다 이 오류가 났고, 그동안
+   종결 체크가 아무 말 없이 안 넘어갔다. 빈 행을 정리해 지우고 나면 이 일이
+   난다 — 예전에는 빈 행이 남아 있어 우연히 되던 것이다. */
+function clEnsureSize_(sh, row, col) {
+  var r = sh.getMaxRows(), c = sh.getMaxColumns();
+  if (row > r) sh.insertRowsAfter(r, row - r);
+  if (col > c) sh.insertColumnsAfter(c, col - c);
+}
 
 /* 새로 옮겨 온 행이 위 행들과 똑같아 보이도록 서식과 데이터 확인을 함께 복사한다.
 
