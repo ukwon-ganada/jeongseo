@@ -24,6 +24,11 @@
   var state = { cases: [], tab: 'active', loaded: false, error: '', pendingReload: false, pendingCb: null, query: '', feeFilter: 'all' };
   var channel = null;
   var reloadTimer = null;
+  /* 로웨어 대조 결과(파생, 저장 안 함) — normCode(사건번호) → true 는 '로웨어에 그 번호가 없음'.
+     사건번호를 한 글자라도 잘못 넣으면 조회에서 통째로 빠져 기일이 영영 갱신되지 않는데,
+     예전엔 그게 아무 흔적 없이 조용히 지나가 오타 하나가 계속 방치됐다. */
+  var lowareMiss = {};
+  var lowareChecked = false;   // 조회에 한 번이라도 성공하기 전에는 배지를 띄우지 않는다
 
   /* ── 유틸 ── */
   function esc(v) {
@@ -292,6 +297,10 @@
         'cursor:default;position:relative;border-bottom:1px dotted rgba(22,38,63,.28);}',
       '#' + SHELL_ID + ' .gm-code{font-family:\'IBM Plex Mono\',monospace;color:#37507a;font-size:12px;',
         'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
+      /* 로웨어에서 못 찾은 사건번호 — 기일이 자동 갱신되지 않는다는 경고 */
+      '#' + SHELL_ID + ' .gm-miss{font-family:\'Noto Sans KR\',sans-serif;font-size:10.5px;font-weight:700;',
+        'margin-left:6px;padding:1px 6px;border-radius:9px;vertical-align:1px;white-space:nowrap;',
+        'background:#fdecea;color:#a3302b;border:1px solid rgba(163,48,43,.28);cursor:help;}',
       /* 금액 = 우측정렬 탭ular 숫자(회계장부 느낌) */
       '#' + SHELL_ID + ' .gm-num,#' + SHELL_ID + ' .gm-fee-table th:nth-child(5),#' + SHELL_ID + ' .gm-fee-table td:nth-child(5),',
         '#' + SHELL_ID + ' .gm-fee-table th:nth-child(7),#' + SHELL_ID + ' .gm-fee-table td:nth-child(7){text-align:right;}',
@@ -640,6 +649,13 @@
       if (!res || res.error || !res.data) return;
       var map = {};
       res.data.forEach(function (r) { map[normCode(r.l_code)] = r; });
+      // 조회에 성공했으니 이제 '로웨어에 아예 없는 사건번호'를 가려낼 수 있다(대개 오타).
+      lowareMiss = {}; lowareChecked = true;
+      state.cases.forEach(function (c) {
+        if (c.deleted) return;
+        var k = normCode(c.caseNumber);
+        if (k && !map[k]) lowareMiss[k] = true;
+      });
       var changed = [];
       state.cases.forEach(function (c) {
         if (c.hearingType === '선정취소') return;         // 선정취소로 종결된 건 → 기일 자동 갱신 안 함
@@ -876,6 +892,18 @@
   function nameCell(c) {
     return '<span class="gm-name" data-tip="' + esc(c.contact) + '">' + (c.defendant ? hlEsc(c.defendant) : '—') + '</span>';
   }
+  /* 진행 패널의 사건번호 칸 — 로웨어에서 못 찾은 번호에는 배지를 붙인다.
+     이 사건은 기일 자동 갱신이 아예 일어나지 않으므로, 번호를 고쳐야 한다는 뜻.
+     (종결·보수·휴지통 패널에는 붙이지 않는다 — 끝난 사건은 로웨어 목록에서 정상적으로 빠진다) */
+  function codeCell(c) {
+    var html = hlEsc(c.caseNumber);
+    if (lowareChecked && c.caseNumber && lowareMiss[normCode(c.caseNumber)]) {
+      html += '<span class="gm-miss" title="로웨어에서 이 사건번호를 찾지 못했습니다.' +
+              ' 번호가 정확한지 확인해 주세요 — 맞을 때까지 기일이 자동으로 갱신되지 않습니다.">미매칭</span>';
+    }
+    return html;
+  }
+
   function hearingTag(c) {
     var d = activeDate(c), v = verdictOf(c);
     var t;
@@ -892,7 +920,7 @@
       var ucls = (lv === 'urgent' || lv === 'soon') ? ' u-' + lv : '';
       return '<tr data-id="' + esc(c.id) + '" class="gm-row' + ucls + '">' +
         '<td>' + nameCell(c) + '</td>' +
-        '<td class="gm-code">' + hlEsc(c.caseNumber) + '</td>' +
+        '<td class="gm-code">' + codeCell(c) + '</td>' +
         '<td class="gm-clip" title="' + esc(c.caseName) + '">' + hlEsc(c.caseName) + '</td>' +
         '<td>' + hearingTag(c) + dueBadge(c) + '</td>' +
         '<td class="gm-memocell"><div class="gm-memo-edit" contenteditable="true" data-id="' + esc(c.id) + '" data-field="todo" data-ph="메모 입력…">' + esc(c.todo) + '</div></td>' +
@@ -1372,6 +1400,7 @@
         state.cases.push(normalize({ id: data.id, data: data }));
         render();
         closeAdd();
+        syncFromLoware();   // 새로 넣은 사건번호도 바로 대조 — 오타면 '미매칭' 배지가 즉시 붙는다
       }, function () { if (btn) { btn.disabled = false; btn.textContent = '저장'; } alert('저장 중 오류가 발생했습니다.'); });
   };
 
@@ -1434,16 +1463,20 @@
   window.gsmgrEditSave = function () {
     var c = editState; if (!c) return;
     var g = function (id) { var e = document.getElementById(id); return e ? e.value : ''; };
+    var prevCode = c.caseNumber || '';
     // 편집 대상 6개만 patch — 나머지(메모·항소·보수·feeForm 등)는 서버 최신본에서 병합 보존
     var patch = {
       defendant: g('gd-defendant').trim(), caseNumber: g('gd-caseNumber').trim(), caseName: g('gd-caseName').trim(),
       hearingType: (addForm && addForm.hearingType) || c.hearingType || '공판',
       hearingDate: g('gd-hearingDate'), verdictDate: g('gd-verdictDate'), contact: g('gd-contact').trim()
     };
+    var codeChanged = normCode(prevCode) !== normCode(patch.caseNumber);
     Object.keys(patch).forEach(function (k) { c[k] = patch[k]; if (c._raw) c._raw[k] = patch[k]; }); // 낙관적
     closeDrawer();
     render();
-    commitPatch(c.id, patch); // 동시수정 안전 저장(토스트·재시도 포함)
+    // 사건번호를 고쳤으면 저장 뒤 바로 로웨어와 다시 맞춘다 —
+    // 고친 번호가 맞으면 기일이 그 자리에서 들어오고, 여전히 틀리면 '미매칭' 배지가 다시 붙는다.
+    commitPatch(c.id, patch, 0, codeChanged ? syncFromLoware : null); // 동시수정 안전 저장(토스트·재시도 포함)
   };
 
   // 강제 종결: 선고·선정취소가 아니어도 수동으로 종결 처리(휴지통/복원과 동일한 즉시-저장, 되돌리기 가능)
