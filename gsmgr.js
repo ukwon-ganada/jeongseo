@@ -21,7 +21,7 @@
   var STYLE_ID = 'gsmgr-style';
   var TABLE_ID = 'gsmgr-tbl';
 
-  var state = { cases: [], tab: 'active', loaded: false, error: '', pendingReload: false, query: '', feeFilter: 'all' };
+  var state = { cases: [], tab: 'active', loaded: false, error: '', pendingReload: false, pendingCb: null, query: '', feeFilter: 'all' };
   var channel = null;
   var reloadTimer = null;
 
@@ -560,6 +560,9 @@
       // 배지만 최신 데이터로 갱신(홈 화면 요소라 편집과 무관). 편집 끝나면 flushPendingReload가 다시 로드.
       if (isEditing()) {
         state.pendingReload = true;
+        // 미뤄진 로드가 이어받도록 콜백(로웨어 기일 동기화)도 함께 보관한다 —
+        // 예전엔 여기서 콜백을 버려서, 편집 중에 화면이 돌아오면 그 회차 기일 동기화가 통째로 사라졌다.
+        if (typeof cb === 'function') state.pendingCb = cb;
         setPillBadge(computeAttention((res.data || []).map(normalize)));
         return;
       }
@@ -600,6 +603,21 @@
     }, function () {});
   };
 
+  /* 로웨어 cases 의 next_date/next_contents 는 '가장 최근 진행기록 1건'의 지정일·내용이다.
+     그 진행기록은 기일만이 아니라 송달·서면·접수·문자·명령·변경일 수도 있고, 그럴 때
+     next_date 는 기일이 아니라 그 송달일·서면접수일이다(형사 171건 중 93건이 이 경우).
+     그런 날짜로 기일을 덮어쓰면 화면의 기일이 지난 송달일로 바뀌고, 그 뒤 송달·서면이
+     쌓일 때마다 다시 덮어써서 기일이 영영 앞으로 나아가지 않는다 — '기일이 갱신되지
+     않는다'던 증상의 실제 원인. (게다가 그 기록의 내용에 '선고'가 남아 있으면 지난
+     선고기일로 읽혀 사건이 종결 패널로 사라지기까지 했다.)
+     last_process 는 항상 'YYYY-MM-DD [종류]내용' 꼴이라(전 906행 검증) 종류로 기일만 고른다.
+     last_process 가 비어 있는 예전 행은 내용에 '기일'이 있는지로 보수적으로 판정한다. */
+  function isHearingRow(r) {
+    var lp = String(r.last_process == null ? '' : r.last_process);
+    if (lp) return /\[\s*기일\s*\]/.test(lp);
+    return /기일/.test(String(r.next_contents == null ? '' : r.next_contents));
+  }
+
   /* ── 로웨어(cases) 기일 자동 반영 ──
      화면 열 때, 저장된 사건번호로 cases 를 다시 조회해 next_date(공판기일)/next_contents(종류)를
      기준으로 기일을 최신화한다. 로웨어 값이 가장 정확하므로 국선 화면의 기존 기일을 덮어쓴다.
@@ -618,7 +636,7 @@
       [raw, normCode(raw)].forEach(function (v) { if (v && !seen[v]) { seen[v] = 1; codes.push(v); } });
     });
     if (!codes.length) return;
-    sb.from('cases').select('l_code,next_date,next_contents').in('l_code', codes).then(function (res) {
+    sb.from('cases').select('l_code,next_date,next_contents,last_process').in('l_code', codes).then(function (res) {
       if (!res || res.error || !res.data) return;
       var map = {};
       res.data.forEach(function (r) { map[normCode(r.l_code)] = r; });
@@ -627,6 +645,7 @@
         if (c.hearingType === '선정취소') return;         // 선정취소로 종결된 건 → 기일 자동 갱신 안 함
         var r = map[normCode(c.caseNumber)];
         if (!r || !r.next_date) return;                 // 로웨어에 다음 기일 없음 → 유지
+        if (!isHearingRow(r)) return;                   // 최근 진행이 기일이 아님(송달·서면 등) → 기존 기일 유지
         var nd = String(r.next_date).slice(0, 10);
         var isCancel = /선정\s*취소/.test(r.next_contents || '');
         var isSgo = /선고/.test(r.next_contents || '');
@@ -675,7 +694,11 @@
     reloadTimer = setTimeout(function () { load(); }, 180); // 이벤트 몰림 코얼레싱
   }
   function flushPendingReload() {
-    if (state.pendingReload && !isEditing()) { state.pendingReload = false; load(); }
+    if (state.pendingReload && !isEditing()) {
+      state.pendingReload = false;
+      var cb = state.pendingCb; state.pendingCb = null;
+      load(cb);
+    }
   }
 
   /* ── 실시간 구독 ── */
