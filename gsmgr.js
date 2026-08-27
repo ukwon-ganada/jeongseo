@@ -456,6 +456,16 @@
       '#gsmgr-paste .gp-ta{width:100%;box-sizing:border-box;height:240px;resize:vertical;font:inherit;font-size:13px;',
         'line-height:1.6;border:1.5px solid rgba(22,38,63,.2);border-radius:12px;padding:12px 14px;color:#16263f;outline:none;}',
       '#gsmgr-paste .gp-ta:focus{border-color:#16263f;box-shadow:0 0 0 3px rgba(22,38,63,.12);}',
+      '#gsmgr-paste .gp-or{margin:12px 0 8px;font-size:12.5px;color:#5b6b86;}',
+      '#gsmgr-paste .gp-or b{color:#16263f;}',
+      '#gsmgr-paste .gp-drop{display:flex;align-items:center;justify-content:center;height:74px;cursor:pointer;',
+        'border:1.5px dashed rgba(22,38,63,.28);border-radius:12px;color:#5b6b86;font-size:13px;font-weight:600;',
+        'background:#f8fafd;transition:background .12s,border-color .12s;}',
+      '#gsmgr-paste .gp-drop:hover,#gsmgr-paste .gp-drop.over{background:#eef3fa;border-color:#16263f;color:#16263f;}',
+      '#gsmgr-paste .gp-warn{margin:10px 0 12px;padding:10px 13px;border-radius:11px;background:#fdf1dd;color:#7a5618;',
+        'font-size:12.5px;line-height:1.55;font-weight:600;}',
+      '#gsmgr-paste .gp-okline{margin:10px 0 12px;padding:9px 13px;border-radius:11px;background:#e9f3ec;color:#2c5c40;',
+        'font-size:12.5px;font-weight:600;}',
       '#gsmgr-paste .gp-list{border:1px solid rgba(22,38,63,.12);border-radius:12px;overflow:hidden;max-height:46vh;overflow-y:auto;}',
       '#gsmgr-paste .gp-row{display:grid;grid-template-columns:24px 108px 1fr 128px 92px;align-items:center;gap:8px;',
         'padding:9px 12px;border-bottom:1px solid rgba(22,38,63,.07);font-size:13px;cursor:pointer;}',
@@ -957,6 +967,86 @@
     return out;
   }
 
+  /* 잔액 연쇄 검증 — 거래마다 잔액이 유일하므로 '직전 잔액 + 입금액 = 현재 잔액'이
+     이어져야 한다. 끊기면 (가) 중간 문자를 빠뜨렸거나 (나) 금액을 잘못 읽은 것.
+     사진 판독(OCR)의 오독을 잡아내는 안전장치이자, 붙여넣기 누락 경고이기도 하다.
+     단 입금 사이에 출금이 섞이면 정상적으로도 끊기므로 경고까지만 하고 막지는 않는다. */
+  function checkBalanceChain(items) {
+    var withBal = items.filter(function (i) { return i.balance != null; })
+                       .sort(function (a, b) { return a.balance - b.balance; });
+    if (withBal.length < 2) return { ok: true, breaks: 0, checked: withBal.length };
+    var breaks = 0;
+    for (var i = 1; i < withBal.length; i++) {
+      if (withBal[i - 1].balance + withBal[i].amount !== withBal[i].balance) breaks++;
+    }
+    return { ok: breaks === 0, breaks: breaks, checked: withBal.length };
+  }
+
+  /* ── 스크린샷 판독 ──
+     사진을 그대로 올리면 sms-ocr 함수(Supabase Edge Function)가 읽어 준다.
+     보내기 전에 폭 1600px·JPEG로 줄인다 — 글자는 그대로 읽히면서 전송량만 크게 준다. */
+  var MAX_SHOTS = 12;
+  function shrinkImage(file, cb) {
+    var url = URL.createObjectURL(file);
+    var img = new Image();
+    img.onload = function () {
+      try {
+        var maxW = 1600;
+        var scale = Math.min(1, maxW / img.naturalWidth);
+        var w = Math.round(img.naturalWidth * scale), h = Math.round(img.naturalHeight * scale);
+        var cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+        cv.getContext('2d').drawImage(img, 0, 0, w, h);
+        var durl = cv.toDataURL('image/jpeg', 0.85);
+        URL.revokeObjectURL(url);
+        cb({ media_type: 'image/jpeg', data: durl.slice(durl.indexOf(',') + 1) });
+      } catch (e) { URL.revokeObjectURL(url); cb(null); }
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); cb(null); };
+    img.src = url;
+  }
+  function shrinkAll(files, cb) {
+    var out = [], n = 0;
+    if (!files.length) { cb(out); return; }
+    files.forEach(function (f, i) {
+      shrinkImage(f, function (im) {
+        if (im) out[i] = im;
+        if (++n === files.length) cb(out.filter(Boolean));
+      });
+    });
+  }
+  function ocrShots(images, cb) {
+    var base = (window.SUPABASE_URL || 'https://nyjyemjsperpakrrgzcc.supabase.co');
+    var key = (window.SUPABASE_KEY || 'sb_publishable_QKl9MIt2_MflYnpN41VRvg_cNIAbYhU');
+    fetch(base + '/functions/v1/sms-ocr', {
+      method: 'POST', headers: { 'content-type': 'application/json', 'apikey': key },
+      body: JSON.stringify({ images: images })
+    }).then(function (r) {
+      if (r.status === 404) { cb({ ok: false, reason: 'not_deployed' }); return; }
+      return r.json().then(function (d) { cb(d || { ok: false, reason: 'empty' }); });
+    }, function () { cb({ ok: false, reason: 'network' }); });
+  }
+  // 판독 결과(MM/DD) → 붙여넣기 파서와 같은 모양({code, amount, date:YYYY-MM-DD, balance})으로
+  function shotItemsToEntries(items) {
+    var cur = ymdToday(), curY = +cur.slice(0, 4), curM = +cur.slice(4, 6);
+    return items.map(function (it) {
+      var md = String(it.date || '').split('/');
+      var mm = +md[0], dd = +md[1];
+      var y = (mm > curM) ? curY - 1 : curY;
+      return { code: normCode(it.code), amount: it.amount, balance: (it.balance == null ? null : it.balance),
+               date: y + '-' + ('0' + mm).slice(-2) + '-' + ('0' + dd).slice(-2) };
+    });
+  }
+  // 문자(텍스트)와 사진에서 나온 건을 합치고 잔액으로 중복 제거
+  function mergeEntries(a, b) {
+    var out = [], seen = {};
+    a.concat(b).forEach(function (it) {
+      var k = (it.balance != null) ? ('b' + it.balance) : ('x' + it.date + it.amount + it.code);
+      if (seen[k]) return;
+      seen[k] = 1; out.push(it);
+    });
+    return out;
+  }
+
   // 파싱 결과 → 사건별 적용 계획 [{code, id, name, date, amount, parts, status}]
   function planDeposits(items) {
     var byCode = {}, order = [];
@@ -1006,10 +1096,71 @@
       '<div class="ga-h">입금 문자 붙여넣기</div>' +
       '<div class="ga-sub">은행 입금 문자를 그대로 붙여넣으세요. 적요의 사건번호로 사건을 찾아 입금일·입금액을 채웁니다.</div>' +
       '<textarea id="gp-text" class="gp-ta" placeholder="[Web발신]&#10;하나,08/27 13:58&#10;748******40207&#10;입금531,850원&#10;2026고단1012&#10;잔액9,536,103원"></textarea>' +
+      '<div class="gp-or">또는 문자 <b>스크린샷</b>을 그대로 올리세요 — 사진에서 읽어 냅니다(한 번에 ' + MAX_SHOTS + '장까지).</div>' +
+      '<label class="gp-drop" id="gp-drop">' +
+        '<input type="file" id="gp-file" accept="image/*" multiple hidden>' +
+        '<span id="gp-droptxt">사진 선택 · 또는 여기로 끌어다 놓기</span>' +
+      '</label>' +
       '<div class="ga-btns">' +
         '<button class="ga-cancel" onclick="closePaste()">닫기</button>' +
-        '<button class="ga-save" onclick="gsmgrPasteAnalyze()">확인하기</button>' +
+        '<button class="ga-save" id="gp-go" onclick="gsmgrPasteAnalyze()">확인하기</button>' +
       '</div>';
+    var inp = document.getElementById('gp-file'), drop = document.getElementById('gp-drop');
+    if (inp) inp.addEventListener('change', function () { takeShots(inp.files); });
+    if (drop) {
+      ['dragenter', 'dragover'].forEach(function (ev) {
+        drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('over'); });
+      });
+      ['dragleave', 'drop'].forEach(function (ev) {
+        drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); });
+      });
+      drop.addEventListener('drop', function (e) {
+        if (e.dataTransfer && e.dataTransfer.files) takeShots(e.dataTransfer.files);
+      });
+    }
+  }
+  // 사진 선택·드롭 → 축소 → 판독 → 미리보기
+  function takeShots(fileList) {
+    var files = Array.prototype.slice.call(fileList || []).filter(function (f) { return /^image\//.test(f.type); });
+    if (!files.length) { gsmgrToast('이미지 파일만 올릴 수 있습니다', 'err', 2800); return; }
+    if (files.length > MAX_SHOTS) {
+      gsmgrToast('한 번에 ' + MAX_SHOTS + '장까지 — 나눠서 올리면 합쳐집니다', 'info', 3400);
+      files = files.slice(0, MAX_SHOTS);
+    }
+    var txt = document.getElementById('gp-droptxt');
+    var go = document.getElementById('gp-go');
+    if (txt) txt.textContent = '사진 ' + files.length + '장 읽는 중…';
+    if (go) go.disabled = true;
+    shrinkAll(files, function (images) {
+      if (!images.length) { if (txt) txt.textContent = '사진을 읽지 못했습니다 — 다시 선택해 주세요'; if (go) go.disabled = false; return; }
+      ocrShots(images, function (res) {
+        if (go) go.disabled = false;
+        if (!res || !res.ok) {
+          if (txt) txt.textContent = '사진 선택 · 또는 여기로 끌어다 놓기';
+          gsmgrToast(ocrErrText(res), 'err', 6000);
+          return;
+        }
+        var shots = shotItemsToEntries(res.items || []);
+        var ta = document.getElementById('gp-text');
+        var typed = parseDepositSms(ta ? ta.value : '');
+        var all = mergeEntries(typed, shots);
+        if (!all.length) {
+          if (txt) txt.textContent = '사진 선택 · 또는 여기로 끌어다 놓기';
+          gsmgrToast('사진에서 입금 문자를 찾지 못했습니다', 'err', 4200);
+          return;
+        }
+        pastePlan = planDeposits(all);
+        renderPastePreview(all.length, checkBalanceChain(all), shots.length);
+      });
+    });
+  }
+  function ocrErrText(res) {
+    var r = res && res.reason;
+    if (r === 'not_deployed') return '사진 판독 기능이 아직 서버에 설치되지 않았습니다 — 문자 텍스트를 붙여넣어 주세요';
+    if (r === 'no_api_key') return '서버에 API 키가 설정되지 않았습니다';
+    if (r === 'too_large') return '사진 용량이 너무 큽니다 — 나눠서 올려 주세요';
+    if (r === 'network') return '네트워크 오류 — 잠시 후 다시 시도해 주세요';
+    return '사진을 읽지 못했습니다' + (r ? ' (' + r + ')' : '');
   }
   window.gsmgrPasteAnalyze = function () {
     var ta = document.getElementById('gp-text');
@@ -1019,9 +1170,9 @@
       return;
     }
     pastePlan = planDeposits(items);
-    renderPastePreview(items.length);
+    renderPastePreview(items.length, checkBalanceChain(items), 0);
   };
-  function renderPastePreview(nMsg) {
+  function renderPastePreview(nMsg, chain, nShot) {
     var box = document.getElementById('gp-box'); if (!box) return;
     var badge = { ok: '', active: '<span class="gp-tag warn">진행 중</span>',
                   exists: '<span class="gp-tag warn">이미 입력됨</span>', nocase: '<span class="gp-tag err">사건 없음</span>' };
@@ -1039,10 +1190,19 @@
       '</label>';
     }).join('');
     var miss = pastePlan.filter(function (r) { return r.status === 'nocase'; }).length;
+    var warn = '';
+    if (chain && !chain.ok) {
+      warn = '<div class="gp-warn">⚠ 잔액이 이어지지 않는 곳이 ' + chain.breaks + '군데 있습니다. ' +
+             '중간에 빠진 문자가 있거나' + (nShot ? ' 사진에서 금액을 잘못 읽었을' : ' 일부를 빠뜨렸을') +
+             ' 수 있습니다(입금 사이에 출금이 있었다면 정상입니다). 금액을 확인하고 저장해 주세요.</div>';
+    } else if (chain && chain.checked >= 2) {
+      warn = '<div class="gp-okline">✓ 잔액 ' + chain.checked + '건이 빠짐없이 이어집니다 — 누락된 문자 없음</div>';
+    }
     box.innerHTML =
       '<div class="ga-h">확인 후 저장</div>' +
-      '<div class="ga-sub">문자 ' + nMsg + '건 · 사건 ' + pastePlan.length + '건' +
+      '<div class="ga-sub">' + (nShot ? '사진에서 읽은 ' : '문자 ') + nMsg + '건 · 사건 ' + pastePlan.length + '건' +
         (miss ? ' · <b>목록에 없는 사건 ' + miss + '건</b>' : '') + '</div>' +
+      warn +
       '<div class="gp-list">' + rows + '</div>' +
       '<div class="ga-btns">' +
         '<button class="ga-cancel" onclick="renderPasteBack()">‹ 다시</button>' +
@@ -1766,6 +1926,7 @@
   /* node 검증/하네스용 (브라우저에선 무시) */
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = { _state: state, normalize: normalize, panelCases: panelCases, render: render, reached: reached,
-      parseDepositSms: parseDepositSms, planDeposits: planDeposits };
+      parseDepositSms: parseDepositSms, planDeposits: planDeposits, checkBalanceChain: checkBalanceChain,
+      shotItemsToEntries: shotItemsToEntries, mergeEntries: mergeEntries };
   }
 })();
