@@ -431,6 +431,13 @@
         'font:inherit;font-size:12px;font-weight:700;padding:4px 10px;border-radius:8px;cursor:pointer;pointer-events:auto;}',
       '#' + SHELL_ID + ' .gm-toast .gm-toast-retry:hover{background:rgba(255,255,255,.28);}',
       /* 앱바 버튼 */
+      '#' + SHELL_ID + ' .gm-fee-paste{border:1px dashed rgba(22,38,63,.3);background:#fff;color:#41537a;',
+        'font-weight:600;font-size:12.5px;height:32px;padding:0 12px;border-radius:999px;cursor:pointer;font-family:inherit;margin-left:4px;}',
+      '#' + SHELL_ID + ' .gm-fee-paste:hover{background:rgba(22,38,63,.05);color:#16263f;}',
+      '#' + SHELL_ID + ' .gm-sync{border:1px solid rgba(22,38,63,.2);background:#fff;color:#5b6b86;font-weight:600;',
+        'font-size:12.5px;height:38px;padding:0 13px;border-radius:999px;cursor:pointer;font-family:inherit;}',
+      '#' + SHELL_ID + ' .gm-sync:hover{background:rgba(22,38,63,.05);color:#2b3f63;}',
+      '#' + SHELL_ID + ' .gm-sync[disabled]{opacity:.55;cursor:default;}',
       '#' + SHELL_ID + ' .gm-add{border:none;background:linear-gradient(155deg,#22344f,#16263f);color:#fff;font-weight:600;',
         'font-size:13.5px;height:38px;padding:0 16px;border-radius:999px;cursor:pointer;font-family:inherit;}',
       '#' + SHELL_ID + ' .gm-add:hover{background:linear-gradient(155deg,#2a3e5c,#1b2e4b);}',
@@ -438,6 +445,36 @@
         'font-size:12.5px;height:38px;padding:0 12px;border-radius:999px;cursor:pointer;font-family:inherit;}',
       '#' + SHELL_ID + ' .gm-legacy:hover{background:#eef2f9;}',
       /* 추가 모달 */
+      /* 입금 문자 붙여넣기 모달 — 추가 모달과 같은 모양, 목록만 넓게 */
+      '#gsmgr-paste{display:none;position:fixed;inset:0;z-index:1300;background:rgba(12,19,34,.5);',
+        'backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);align-items:center;justify-content:center;padding:20px;}',
+      '#gsmgr-paste.on{display:flex;}',
+      '#gsmgr-paste .ga-box{width:100%;max-width:620px;max-height:88vh;overflow:auto;background:#fff;',
+        'border-radius:18px;padding:22px;box-shadow:0 30px 80px rgba(10,20,40,.35);}',
+      '#gsmgr-paste .ga-h{font-family:\'Noto Serif KR\',serif;font-size:19px;font-weight:600;color:#16263f;margin-bottom:4px;}',
+      '#gsmgr-paste .ga-sub{font-size:12.5px;color:#5b6b86;margin-bottom:14px;}',
+      '#gsmgr-paste .gp-ta{width:100%;box-sizing:border-box;height:240px;resize:vertical;font:inherit;font-size:13px;',
+        'line-height:1.6;border:1.5px solid rgba(22,38,63,.2);border-radius:12px;padding:12px 14px;color:#16263f;outline:none;}',
+      '#gsmgr-paste .gp-ta:focus{border-color:#16263f;box-shadow:0 0 0 3px rgba(22,38,63,.12);}',
+      '#gsmgr-paste .gp-list{border:1px solid rgba(22,38,63,.12);border-radius:12px;overflow:hidden;max-height:46vh;overflow-y:auto;}',
+      '#gsmgr-paste .gp-row{display:grid;grid-template-columns:24px 108px 1fr 128px 92px;align-items:center;gap:8px;',
+        'padding:9px 12px;border-bottom:1px solid rgba(22,38,63,.07);font-size:13px;cursor:pointer;}',
+      '#gsmgr-paste .gp-row:last-child{border-bottom:none;}',
+      '#gsmgr-paste .gp-row:hover{background:#f4f7fb;}',
+      '#gsmgr-paste .gp-row.off{opacity:.55;cursor:default;}',
+      '#gsmgr-paste .gp-code{font-variant-numeric:tabular-nums;color:#41537a;font-weight:600;}',
+      '#gsmgr-paste .gp-nm{font-weight:600;color:#16263f;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
+      '#gsmgr-paste .gp-amt{text-align:right;font-variant-numeric:tabular-nums;font-weight:700;color:#16263f;}',
+      '#gsmgr-paste .gp-amt .gp-sub{display:block;font-size:11px;font-weight:500;color:#8a97ab;}',
+      '#gsmgr-paste .gp-dt{text-align:right;font-size:12px;color:#5b6b86;font-variant-numeric:tabular-nums;}',
+      '#gsmgr-paste .gp-tag{display:inline-block;margin-left:6px;font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:999px;}',
+      '#gsmgr-paste .gp-tag.warn{background:#fdf1dd;color:#8a6320;}',
+      '#gsmgr-paste .gp-tag.err{background:#fae3dc;color:#8f3d26;}',
+      '#gsmgr-paste .ga-btns{display:flex;gap:8px;margin-top:18px;}',
+      '#gsmgr-paste .ga-cancel{flex:0 0 auto;padding:0 18px;height:46px;border:1px solid rgba(22,38,63,.18);',
+        'background:#fff;color:#41537a;font-weight:600;border-radius:12px;cursor:pointer;font-family:inherit;font-size:14px;}',
+      '#gsmgr-paste .ga-save{flex:1;height:46px;border:none;background:linear-gradient(155deg,#22344f,#16263f);',
+        'color:#fff;font-weight:700;border-radius:12px;cursor:pointer;font-family:inherit;font-size:14.5px;}',
       '#gsmgr-add{display:none;position:fixed;inset:0;z-index:1300;background:rgba(12,19,34,.5);',
         'align-items:center;justify-content:center;padding:20px;font-family:var(--font,sans-serif);}',
       '#gsmgr-add.on{display:flex;}',
@@ -520,6 +557,7 @@
           '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m5 0V4a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v2"/></svg>' +
           '<span id="gsmgr-trash-n">0</span>' +
         '</button>' +
+        '<button class="gm-sync" id="gsmgr-sync" onclick="gsmgrSyncNow()" title="로웨 창고(cases)에서 기일을 다시 가져옵니다">기일 동기화</button>' +
         '<button class="gm-add" onclick="gsmgrOpenAdd()">＋ 사건 추가</button>' +
       '</div>' +
       '<div class="gm-cockpit" id="gsmgr-cockpit"></div>' +
@@ -606,9 +644,10 @@
      (단, 로웨어에 다음 기일이 비어 있으면 지난 기일을 지우지 않도록 그냥 둔다)
      다음 기일이 '공판'이고 저장된 선고기일이 그보다 앞이면 그 선고기일도 함께 지운다
      (선고 연기·변론재개 → 옛 선고기일이 남아 기일 갱신이 화면에 안 보이던 문제). */
-  function syncFromLoware() {
+  function syncFromLoware(report) {
     var sb = (typeof getSB === 'function') ? getSB() : null;
-    if (!sb || !state.cases.length) return;
+    if (!sb) { if (report) gsmgrToast('연결이 없어 동기화하지 못했습니다', 'err', 3200); return; }
+    if (!state.cases.length) { if (report) gsmgrToast('동기화할 사건이 없습니다', 'info', 2400); return; }
     // 조회 키는 저장된 원문과 공백 제거본을 모두 보낸다 —
     // 사건번호를 '2026 고단 1234'처럼 띄어 입력한 사건이 l_code 매칭에서 통째로 빠지던 문제.
     var codes = [], seen = {};
@@ -617,16 +656,24 @@
       if (!raw) return;
       [raw, normCode(raw)].forEach(function (v) { if (v && !seen[v]) { seen[v] = 1; codes.push(v); } });
     });
-    if (!codes.length) return;
+    if (!codes.length) { if (report) gsmgrToast('사건번호가 입력된 사건이 없습니다', 'info', 2800); return; }
     sb.from('cases').select('l_code,next_date,next_contents').in('l_code', codes).then(function (res) {
-      if (!res || res.error || !res.data) return;
+      if (!res || res.error || !res.data) {
+        if (report) gsmgrToast('창고 조회 실패 — ' + ((res && res.error && res.error.message) || '응답 없음'), 'err', 6000);
+        return;
+      }
       var map = {};
       res.data.forEach(function (r) { map[normCode(r.l_code)] = r; });
-      var changed = [];
+      var changed = [], miss = [], noDate = [], matched = 0, total = 0;
       state.cases.forEach(function (c) {
+        if (c.deleted) return;
         if (c.hearingType === '선정취소') return;         // 선정취소로 종결된 건 → 기일 자동 갱신 안 함
+        if (!c.caseNumber) return;
+        total++;
         var r = map[normCode(c.caseNumber)];
-        if (!r || !r.next_date) return;                 // 로웨어에 다음 기일 없음 → 유지
+        if (!r) { miss.push(c.caseNumber); return; }     // 창고(cases)에 그 사건번호가 아예 없음
+        matched++;
+        if (!r.next_date) { noDate.push(c.caseNumber); return; } // 창고에 다음 기일 없음 → 유지
         var nd = String(r.next_date).slice(0, 10);
         var isCancel = /선정\s*취소/.test(r.next_contents || '');
         var isSgo = /선고/.test(r.next_contents || '');
@@ -651,7 +698,26 @@
         render();
         changed.forEach(function (u) { commitPatch(u.id, u.patch, 0, null, true); }); // 조용히 · 낙관적 잠금 · 변경 필드만
       }
-    }, function () {});
+      if (report) gsmgrToast(syncReport(total, matched, changed.length, miss, noDate),
+                             changed.length ? 'ok' : 'info', 7000);
+    }, function (e) {
+      if (report) gsmgrToast('창고 조회 실패 — ' + ((e && e.message) || '네트워크 오류'), 'err', 6000);
+    });
+  }
+
+  /* 동기화 결과 한 줄 요약 — 기일이 안 맞을 때 어느 단계가 막혔는지 바로 보이게 한다.
+     · '창고에 없음'  → 사건번호가 로웨 창고(cases)와 다르거나 그 사건이 창고에 적재되지 않음
+     · '다음 기일 없음' → 창고 쪽 next_date 가 비어 있음(로웨 적재 문제 — 앱에서 고칠 수 없음)
+     · 갱신 0건 + 매칭 정상 → 이미 창고와 같은 기일(= 창고가 오래된 값) */
+  function syncReport(total, matched, changedN, miss, noDate) {
+    var msg = '사건 ' + total + '건 · 창고 매칭 ' + matched + '건 · 기일 갱신 ' + changedN + '건';
+    if (miss.length) {
+      msg += ' · 창고에 없음 ' + miss.length + '건(' + miss.slice(0, 2).join(', ') + (miss.length > 2 ? ' 외' : '') + ')';
+    }
+    if (noDate.length) {
+      msg += ' · 창고에 다음 기일 없음 ' + noDate.length + '건(' + noDate.slice(0, 2).join(', ') + (noDate.length > 2 ? ' 외' : '') + ')';
+    }
+    return msg;
   }
 
   /* ── 편집 보호 · 실시간 리로드 스케줄 ──
@@ -667,6 +733,8 @@
     if (add && add.classList.contains('on')) return true;   // 추가 모달 열림
     var dr = document.getElementById('gsmgr-drawer');
     if (dr && dr.classList.contains('on')) return true;     // 편집 드로어 열림
+    var pa = document.getElementById('gsmgr-paste');
+    if (pa && pa.classList.contains('on')) return true;     // 입금 문자 붙여넣기 열림
     return false;
   }
   function scheduleReload() {
@@ -837,6 +905,7 @@
       '<div class="gm-fee-chips">' +
         '<button class="gm-fee-chip' + (state.feeFilter === 'all' ? ' on' : '') + '" onclick="gsmgrFeeFilter(\'all\')">전체 ' + all.length + '</button>' +
         '<button class="gm-fee-chip warn' + (state.feeFilter === 'unclaimed' ? ' on' : '') + '" onclick="gsmgrFeeFilter(\'unclaimed\')">미청구 ' + unclaimed + '</button>' +
+        '<button class="gm-fee-paste" onclick="gsmgrOpenPaste()" title="은행 입금 문자를 붙여넣어 입금일·입금액 일괄 입력">＋ 입금 문자 붙여넣기</button>' +
       '</div>' +
       (unclaimed ? '<span class="gm-fee-warn">⚠ 선고 후 미청구 ' + unclaimed + '건 — 청구 기한을 확인하세요.</span>' : '') +
     '</div>';
@@ -849,6 +918,161 @@
     body.innerHTML = head + '<div class="gm-card"><table class="gm-fee-table">' + colgroup('fee') + thead('fee') +
       '<tbody>' + rows.map(function (c) { return trow('fee', c); }).join('') + '</tbody></table></div>';
   }
+
+  /* ── 입금 문자 붙여넣기(보수 탭) ─────────────────────────────────────────
+     은행 입금 문자를 그대로 붙여넣으면 적요의 사건번호로 사건을 찾아
+     입금일·입금액을 채운다. 국선보수는 한 사건에 기본보수·증액·여비가
+     여러 건으로 나뉘어 들어오므로 사건번호별로 합산한다.
+     같은 문자를 두 번 붙여넣어도 '잔액'이 거래마다 유일하므로 중복 합산되지 않는다. */
+  function won(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+
+  // 문자 덩어리 → [{code, amount, date, balance}]  (인식 못 한 줄은 그냥 버린다)
+  function parseDepositSms(text, today) {
+    var t = String(text || '').replace(/\r/g, '');
+    var cur = today || ymdToday();
+    var curY = +cur.slice(0, 4), curM = +cur.slice(4, 6);
+    // 문자 1건 = '입금…원' 기준으로 자른다(앞뒤 몇 줄에 날짜·사건번호·잔액이 붙어 있음)
+    var out = [], seen = {};
+    var re = /입금\s*([\d,]+)\s*원/g, m;
+    while ((m = re.exec(t))) {
+      var amount = +m[1].replace(/,/g, '');
+      if (!amount) continue;
+      var head = t.slice(Math.max(0, m.index - 90), m.index);   // 앞: 은행·날짜
+      var tail = t.slice(m.index, m.index + 140);                 // 뒤: 사건번호·잔액
+      var code = tail.match(/(20\d{2})\s*(고단|고정|고합|노|초기|재고단|재고정)\s*(\d+)/);
+      if (!code) continue;                                        // 사건번호 없는 입금은 국선보수가 아님
+      var bal = tail.match(/잔액\s*([\d,]+)\s*원/);
+      var md = head.match(/(\d{1,2})\/(\d{1,2})\s+\d{1,2}:\d{2}/);
+      var date = cur.slice(0, 4) + '-' + cur.slice(4, 6) + '-' + cur.slice(6, 8);
+      if (md) {
+        var mm = +md[1], dd = +md[2];
+        var y = (mm > curM) ? curY - 1 : curY;                    // 12월 문자를 1월에 붙여넣는 경우
+        date = y + '-' + ('0' + mm).slice(-2) + '-' + ('0' + dd).slice(-2);
+      }
+      var key = bal ? ('b' + bal[1].replace(/,/g, '')) : ('x' + date + amount + code[0]);
+      if (seen[key]) continue;                                    // 화면 겹쳐 찍힌 문자 중복 제거
+      seen[key] = 1;
+      out.push({ code: normCode(code[0]), amount: amount, date: date, balance: bal ? +bal[1].replace(/,/g, '') : null });
+    }
+    return out;
+  }
+
+  // 파싱 결과 → 사건별 적용 계획 [{code, id, name, date, amount, parts, status}]
+  function planDeposits(items) {
+    var byCode = {}, order = [];
+    items.forEach(function (it) {
+      if (!byCode[it.code]) { byCode[it.code] = { code: it.code, amount: 0, parts: [], date: it.date }; order.push(it.code); }
+      var g = byCode[it.code];
+      g.amount += it.amount; g.parts.push(it.amount);
+      if (ymd(it.date) > ymd(g.date)) g.date = it.date;           // 여러 날짜면 마지막 입금일
+    });
+    return order.map(function (code) {
+      var g = byCode[code];
+      var c = null;
+      state.cases.forEach(function (x) { if (!x.deleted && normCode(x.caseNumber) === code) c = x; });
+      var status = !c ? 'nocase' : (ymd(c.depositDate) ? 'exists' : (isClosed(c) ? 'ok' : 'active'));
+      return { code: code, id: c ? c.id : '', name: c ? c.defendant : '', date: g.date,
+               amount: g.amount, parts: g.parts, status: status,
+               prev: c ? (c.depositDate || '') : '' };
+    });
+  }
+
+  var pastePlan = null;
+
+  function injectPasteModal() {
+    if (document.getElementById('gsmgr-paste')) return;
+    var el = document.createElement('div');
+    el.id = 'gsmgr-paste';
+    el.addEventListener('click', function (e) { if (e.target === el) closePaste(); });
+    el.innerHTML = '<div class="ga-box" id="gp-box"></div>';
+    document.body.appendChild(el);
+  }
+  window.closePaste = function () {
+    var m = document.getElementById('gsmgr-paste');
+    if (m) m.classList.remove('on');
+    pastePlan = null;
+    setTimeout(flushPendingReload, 80);
+  };
+  window.gsmgrOpenPaste = function () {
+    injectPasteModal();
+    pastePlan = null;
+    document.getElementById('gsmgr-paste').classList.add('on');
+    renderPasteInput();
+    setTimeout(function () { var i = document.getElementById('gp-text'); if (i) i.focus(); }, 60);
+  };
+  function renderPasteInput() {
+    var box = document.getElementById('gp-box'); if (!box) return;
+    box.innerHTML =
+      '<div class="ga-h">입금 문자 붙여넣기</div>' +
+      '<div class="ga-sub">은행 입금 문자를 그대로 붙여넣으세요. 적요의 사건번호로 사건을 찾아 입금일·입금액을 채웁니다.</div>' +
+      '<textarea id="gp-text" class="gp-ta" placeholder="[Web발신]&#10;하나,08/27 13:58&#10;748******40207&#10;입금531,850원&#10;2026고단1012&#10;잔액9,536,103원"></textarea>' +
+      '<div class="ga-btns">' +
+        '<button class="ga-cancel" onclick="closePaste()">닫기</button>' +
+        '<button class="ga-save" onclick="gsmgrPasteAnalyze()">확인하기</button>' +
+      '</div>';
+  }
+  window.gsmgrPasteAnalyze = function () {
+    var ta = document.getElementById('gp-text');
+    var items = parseDepositSms(ta ? ta.value : '');
+    if (!items.length) {
+      gsmgrToast('입금 문자를 인식하지 못했습니다 — 사건번호가 적힌 문자인지 확인해 주세요', 'err', 4200);
+      return;
+    }
+    pastePlan = planDeposits(items);
+    renderPastePreview(items.length);
+  };
+  function renderPastePreview(nMsg) {
+    var box = document.getElementById('gp-box'); if (!box) return;
+    var badge = { ok: '', active: '<span class="gp-tag warn">진행 중</span>',
+                  exists: '<span class="gp-tag warn">이미 입력됨</span>', nocase: '<span class="gp-tag err">사건 없음</span>' };
+    var rows = pastePlan.map(function (r, i) {
+      var dis = (r.status === 'nocase') ? ' disabled' : '';
+      var chk = (r.status === 'ok') ? ' checked' : '';       // 기존 입금일이 있거나 사건이 없으면 기본 해제
+      return '<label class="gp-row' + (dis ? ' off' : '') + '">' +
+        '<input type="checkbox" data-i="' + i + '"' + chk + dis + '>' +
+        '<span class="gp-code">' + esc(r.code) + '</span>' +
+        '<span class="gp-nm">' + esc(r.name || '—') + badge[r.status] + '</span>' +
+        '<span class="gp-amt">' + won(r.amount) + '원' +
+          (r.parts.length > 1 ? '<span class="gp-sub">' + r.parts.map(won).join(' + ') + '</span>' : '') +
+        '</span>' +
+        '<span class="gp-dt">' + fmtDate(r.date) + '</span>' +
+      '</label>';
+    }).join('');
+    var miss = pastePlan.filter(function (r) { return r.status === 'nocase'; }).length;
+    box.innerHTML =
+      '<div class="ga-h">확인 후 저장</div>' +
+      '<div class="ga-sub">문자 ' + nMsg + '건 · 사건 ' + pastePlan.length + '건' +
+        (miss ? ' · <b>목록에 없는 사건 ' + miss + '건</b>' : '') + '</div>' +
+      '<div class="gp-list">' + rows + '</div>' +
+      '<div class="ga-btns">' +
+        '<button class="ga-cancel" onclick="renderPasteBack()">‹ 다시</button>' +
+        '<button class="ga-save" onclick="gsmgrPasteApply()">선택 항목 저장</button>' +
+      '</div>';
+  }
+  window.renderPasteBack = function () { renderPasteInput(); };
+
+  window.gsmgrPasteApply = function () {
+    if (!pastePlan) return;
+    var box = document.getElementById('gp-box');
+    var picks = [];
+    if (box) {
+      Array.prototype.forEach.call(box.querySelectorAll('input[type=checkbox]'), function (cb) {
+        if (cb.checked && !cb.disabled) picks.push(pastePlan[+cb.getAttribute('data-i')]);
+      });
+    }
+    if (!picks.length) { gsmgrToast('저장할 항목을 선택해 주세요', 'info', 2600); return; }
+    closePaste();
+    gsmgrToast('저장 중… ' + picks.length + '건', 'info', 0);
+    var done = 0;
+    picks.forEach(function (r) {
+      // 입금이 확인된 사건은 '청구'도 된 상태로 본다(미청구인데 지급됨은 모순)
+      var patch = { depositDate: r.date, depositAmount: won(r.amount), claimed: true };
+      commitPatch(r.id, patch, 0, function () {
+        done++;
+        if (done === picks.length) { gsmgrToast(picks.length + '건 저장됨', 'ok', 2600); render(); }
+      }, true);
+    });
+  };
 
   function nameCell(c) {
     return '<span class="gm-name" data-tip="' + esc(c.contact) + '">' + (c.defendant ? hlEsc(c.defendant) : '—') + '</span>';
@@ -1500,6 +1724,16 @@
     subscribe();
   };
 
+  // 앱바 '기일 동기화' — 최신 사건 목록을 다시 읽고 창고 기일을 맞춘 뒤 결과를 알려준다
+  window.gsmgrSyncNow = function () {
+    var btn = document.getElementById('gsmgr-sync');
+    if (btn) btn.disabled = true;
+    var reenable = function () { var b = document.getElementById('gsmgr-sync'); if (b) b.disabled = false; };
+    setTimeout(reenable, 8000);   // 편집 중이라 load가 미뤄지는 등 콜백이 안 와도 버튼은 살려둔다
+    gsmgrToast('기일 확인 중…', 'info', 8000);
+    load(function () { syncFromLoware(true); reenable(); });
+  };
+
   window.closeGsmgr = function () {
     var el = document.getElementById(SHELL_ID);
     if (el) el.classList.remove('active');
@@ -1531,6 +1765,7 @@
 
   /* node 검증/하네스용 (브라우저에선 무시) */
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { _state: state, normalize: normalize, panelCases: panelCases, render: render, reached: reached };
+    module.exports = { _state: state, normalize: normalize, panelCases: panelCases, render: render, reached: reached,
+      parseDepositSms: parseDepositSms, planDeposits: planDeposits };
   }
 })();
