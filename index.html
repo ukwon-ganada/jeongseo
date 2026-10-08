@@ -1595,6 +1595,10 @@ function collectFormData(){
   if((!fd.signature||fd.signature==='')&&currentRecord&&currentRecord.form_data&&currentRecord.form_data.signature){
     fd.signature=currentRecord.form_data.signature;
   }
+  // 계약 대장에서 지정한 담당자는 편집 화면에 없으므로 기존 값 보존
+  if(currentRecord&&currentRecord.form_data&&Array.isArray(currentRecord.form_data.managers)){
+    fd.managers=currentRecord.form_data.managers.slice();
+  }
   return fd;
 }
 function gv(id){var e=document.getElementById(id);return e?!!e.checked:false;}
@@ -1720,7 +1724,7 @@ async function saveToCloud(explicit){
     if(currentEditId){
       // 기존 레코드의 상대방 서명·서명상태를 먼저 읽어서 보존 (덮어쓰기 방지)
       try{
-        var existing=await client.from('contracts').select('counterparty_signature,sign_status,sign_token,sign_expires_at').eq('id',currentEditId).limit(1);
+        var existing=await client.from('contracts').select('counterparty_signature,sign_status,sign_token,sign_expires_at,managers:form_data->managers').eq('id',currentEditId).limit(1);
         if(existing&&existing.data&&existing.data[0]){
           var ex=existing.data[0];
           // ── 서명 완료된 계약서: 사건번호·사건명·관할만 수정 허용 (그 외 내용은 잠금) ──
@@ -1731,6 +1735,8 @@ async function saveToCloud(explicit){
           if(ex.sign_status)payload.sign_status=ex.sign_status;
           if(ex.sign_token)payload.sign_token=ex.sign_token;
           if(ex.sign_expires_at)payload.sign_expires_at=ex.sign_expires_at;
+          // 담당자: 다른 PC에서 바꿨을 수도 있으니 DB의 최신값으로 보존
+          if(Array.isArray(ex.managers))payload.form_data.managers=ex.managers;
         }
       }catch(exErr){/* 조회 실패해도 저장은 진행 */}
       var ur=await client.from('contracts').update(payload).eq('id',currentEditId);
