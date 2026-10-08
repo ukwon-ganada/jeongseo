@@ -51,7 +51,10 @@
     '.creg-mgrin input{width:100%;height:36px;border:1px solid var(--border,#e7e9ee);border-radius:10px;padding:0 12px 0 32px;font-size:13.5px;font-family:var(--font);background:#fff;outline:none;transition:border-color .14s;box-sizing:border-box;}',
     '.creg-mgrin input:focus{border-color:var(--hero,#3a6df0);}',
     '.creg-mgrbtn{flex:none;height:36px;padding:0 14px;border:0;border-radius:10px;background:var(--black,#15181d);color:#fff;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;-webkit-appearance:none;appearance:none;}',
-    '.creg-mgrbtn:hover{opacity:.88;}'
+    '.creg-mgrbtn:hover{opacity:.88;}',
+    /* 모바일 계약 목록 카드의 담당자 태그 */
+    '.lc-mgrs{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;}',
+    '.lc-mgr{font-size:12px;font-weight:600;line-height:1;padding:4px 8px;border-radius:999px;background:#eef3fe;color:#2f5fb0;white-space:nowrap;}'
   ].join('');
   function injectStyle() {
     if (document.getElementById(MGR_STYLE_ID)) return;
@@ -320,8 +323,16 @@
   function findRec(id) { var l = records(); for (var i = 0; i < l.length; i++) { if (l[i].id === id) return l[i]; } return null; }
   function drawerRow(label, val) { return '<div class="creg-drow"><div class="creg-dlabel">' + label + '</div><div class="creg-dval">' + (val || '<span class="creg-dash">—</span>') + '</div></div>'; }
 
+  injectStyle(); // 모바일 목록도 담당자 태그를 쓰므로 로드 즉시 주입
+
   window.ContractReg = {
     render: render,
+    /* 모바일 카드용: 담당자 태그 HTML(없으면 빈 문자열) */
+    mgrTagsMobile: function (it) {
+      var l = managersOf(it);
+      return l.length ? '<div class="lc-mgrs">' + l.map(function (n) { return '<span class="lc-mgr">#' + esc(n) + '</span>'; }).join('') + '</div>' : '';
+    },
+    managersOf: managersOf,
     search: function (v) { _q = (v || '').trim(); renderRows(); },
     type: function (t) {
       _type = t || '';
