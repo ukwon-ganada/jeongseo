@@ -21,9 +21,14 @@
   var STYLE_ID = 'gsmgr-style';
   var TABLE_ID = 'gsmgr-tbl';
 
-  var state = { cases: [], tab: 'active', loaded: false, error: '', pendingReload: false, query: '', feeFilter: 'all' };
+  var state = { cases: [], tab: 'active', loaded: false, error: '', pendingReload: false, pendingCb: null, query: '', feeFilter: 'all' };
   var channel = null;
   var reloadTimer = null;
+  /* 로웨어 대조 결과(파생, 저장 안 함) — normCode(사건번호) → true 는 '로웨어에 그 번호가 없음'.
+     사건번호를 한 글자라도 잘못 넣으면 조회에서 통째로 빠져 기일이 영영 갱신되지 않는데,
+     예전엔 그게 아무 흔적 없이 조용히 지나가 오타 하나가 계속 방치됐다. */
+  var lowareMiss = {};
+  var lowareChecked = false;   // 조회에 한 번이라도 성공하기 전에는 배지를 띄우지 않는다
 
   /* ── 유틸 ── */
   function esc(v) {
@@ -292,6 +297,10 @@
         'cursor:default;position:relative;border-bottom:1px dotted rgba(22,38,63,.28);}',
       '#' + SHELL_ID + ' .gm-code{font-family:\'IBM Plex Mono\',monospace;color:#37507a;font-size:12px;',
         'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
+      /* 로웨어에서 못 찾은 사건번호 — 기일이 자동 갱신되지 않는다는 경고 */
+      '#' + SHELL_ID + ' .gm-miss{font-family:\'Noto Sans KR\',sans-serif;font-size:10.5px;font-weight:700;',
+        'margin-left:6px;padding:1px 6px;border-radius:9px;vertical-align:1px;white-space:nowrap;',
+        'background:#fdecea;color:#a3302b;border:1px solid rgba(163,48,43,.28);cursor:help;}',
       /* 금액 = 우측정렬 탭ular 숫자(회계장부 느낌) */
       '#' + SHELL_ID + ' .gm-num,#' + SHELL_ID + ' .gm-fee-table th:nth-child(5),#' + SHELL_ID + ' .gm-fee-table td:nth-child(5),',
         '#' + SHELL_ID + ' .gm-fee-table th:nth-child(7),#' + SHELL_ID + ' .gm-fee-table td:nth-child(7){text-align:right;}',
@@ -608,6 +617,9 @@
       // 배지만 최신 데이터로 갱신(홈 화면 요소라 편집과 무관). 편집 끝나면 flushPendingReload가 다시 로드.
       if (isEditing()) {
         state.pendingReload = true;
+        // 미뤄진 로드가 이어받도록 콜백(로웨어 기일 동기화)도 함께 보관한다 —
+        // 예전엔 여기서 콜백을 버려서, 편집 중에 화면이 돌아오면 그 회차 기일 동기화가 통째로 사라졌다.
+        if (typeof cb === 'function') state.pendingCb = cb;
         setPillBadge(computeAttention((res.data || []).map(normalize)));
         return;
       }
@@ -648,6 +660,21 @@
     }, function () {});
   };
 
+  /* 로웨어 cases 의 next_date/next_contents 는 '가장 최근 진행기록 1건'의 지정일·내용이다.
+     그 진행기록은 기일만이 아니라 송달·서면·접수·문자·명령·변경일 수도 있고, 그럴 때
+     next_date 는 기일이 아니라 그 송달일·서면접수일이다(형사 171건 중 93건이 이 경우).
+     그런 날짜로 기일을 덮어쓰면 화면의 기일이 지난 송달일로 바뀌고, 그 뒤 송달·서면이
+     쌓일 때마다 다시 덮어써서 기일이 영영 앞으로 나아가지 않는다 — '기일이 갱신되지
+     않는다'던 증상의 실제 원인. (게다가 그 기록의 내용에 '선고'가 남아 있으면 지난
+     선고기일로 읽혀 사건이 종결 패널로 사라지기까지 했다.)
+     last_process 는 항상 'YYYY-MM-DD [종류]내용' 꼴이라(전 906행 검증) 종류로 기일만 고른다.
+     last_process 가 비어 있는 예전 행은 내용에 '기일'이 있는지로 보수적으로 판정한다. */
+  function isHearingRow(r) {
+    var lp = String(r.last_process == null ? '' : r.last_process);
+    if (lp) return /\[\s*기일\s*\]/.test(lp);
+    return /기일/.test(String(r.next_contents == null ? '' : r.next_contents));
+  }
+
   /* ── 로웨어(cases) 기일 자동 반영 ──
      화면 열 때, 저장된 사건번호로 cases 를 다시 조회해 next_date(공판기일)/next_contents(종류)를
      기준으로 기일을 최신화한다. 로웨어 값이 가장 정확하므로 국선 화면의 기존 기일을 덮어쓴다.
@@ -667,23 +694,28 @@
       [raw, normCode(raw)].forEach(function (v) { if (v && !seen[v]) { seen[v] = 1; codes.push(v); } });
     });
     if (!codes.length) { if (report) gsmgrToast('사건번호가 입력된 사건이 없습니다', 'info', 2800); return; }
-    sb.from('cases').select('l_code,next_date,next_contents').in('l_code', codes).then(function (res) {
+    sb.from('cases').select('l_code,next_date,next_contents,last_process').in('l_code', codes).then(function (res) {
       if (!res || res.error || !res.data) {
         if (report) gsmgrToast('창고 조회 실패 — ' + ((res && res.error && res.error.message) || '응답 없음'), 'err', 6000);
         return;
       }
       var map = {};
       res.data.forEach(function (r) { map[normCode(r.l_code)] = r; });
-      var changed = [], miss = [], noDate = [], matched = 0, total = 0;
+      // 조회에 성공했으니 이제 '창고에 아예 없는 사건번호'를 화면에 표시할 수 있다(대개 오타).
+      lowareChecked = true; lowareMiss = {};
+      var changed = [], miss = [], noDate = [], notHearing = [], matched = 0, total = 0;
       state.cases.forEach(function (c) {
         if (c.deleted) return;
         if (c.hearingType === '선정취소') return;         // 선정취소로 종결된 건 → 기일 자동 갱신 안 함
         if (!c.caseNumber) return;
         total++;
         var r = map[normCode(c.caseNumber)];
-        if (!r) { miss.push(c.caseNumber); return; }     // 창고(cases)에 그 사건번호가 아예 없음
+        // 창고(cases)에 그 사건번호가 아예 없음 — 기일이 영영 갱신되지 않으므로 행에도 배지로 남긴다
+        if (!r) { miss.push(c.caseNumber); lowareMiss[normCode(c.caseNumber)] = true; return; }
         matched++;
         if (!r.next_date) { noDate.push(c.caseNumber); return; } // 창고에 다음 기일 없음 → 유지
+        // 최근 진행이 기일이 아님(송달·서면 등) → 그 날짜는 기일이 아니므로 기존 기일을 그대로 둔다
+        if (!isHearingRow(r)) { notHearing.push(c.caseNumber); return; }
         var nd = String(r.next_date).slice(0, 10);
         var isCancel = /선정\s*취소/.test(r.next_contents || '');
         var isSgo = /선고/.test(r.next_contents || '');
@@ -708,7 +740,7 @@
         render();
         changed.forEach(function (u) { commitPatch(u.id, u.patch, 0, null, true); }); // 조용히 · 낙관적 잠금 · 변경 필드만
       }
-      if (report) gsmgrToast(syncReport(total, matched, changed.length, miss, noDate),
+      if (report) gsmgrToast(syncReport(total, matched, changed.length, miss, noDate, notHearing),
                              changed.length ? 'ok' : 'info', 7000);
     }, function (e) {
       if (report) gsmgrToast('창고 조회 실패 — ' + ((e && e.message) || '네트워크 오류'), 'err', 6000);
@@ -718,14 +750,18 @@
   /* 동기화 결과 한 줄 요약 — 기일이 안 맞을 때 어느 단계가 막혔는지 바로 보이게 한다.
      · '창고에 없음'  → 사건번호가 로웨 창고(cases)와 다르거나 그 사건이 창고에 적재되지 않음
      · '다음 기일 없음' → 창고 쪽 next_date 가 비어 있음(로웨 적재 문제 — 앱에서 고칠 수 없음)
+     · '최근 진행이 기일 아님' → 창고의 next_date 가 송달·서면 등의 날짜라 기일로 쓸 수 없음(정상)
      · 갱신 0건 + 매칭 정상 → 이미 창고와 같은 기일(= 창고가 오래된 값) */
-  function syncReport(total, matched, changedN, miss, noDate) {
+  function syncReport(total, matched, changedN, miss, noDate, notHearing) {
     var msg = '사건 ' + total + '건 · 창고 매칭 ' + matched + '건 · 기일 갱신 ' + changedN + '건';
     if (miss.length) {
       msg += ' · 창고에 없음 ' + miss.length + '건(' + miss.slice(0, 2).join(', ') + (miss.length > 2 ? ' 외' : '') + ')';
     }
     if (noDate.length) {
       msg += ' · 창고에 다음 기일 없음 ' + noDate.length + '건(' + noDate.slice(0, 2).join(', ') + (noDate.length > 2 ? ' 외' : '') + ')';
+    }
+    if (notHearing && notHearing.length) {
+      msg += ' · 최근 진행이 기일 아님 ' + notHearing.length + '건';
     }
     return msg;
   }
@@ -753,7 +789,11 @@
     reloadTimer = setTimeout(function () { load(); }, 180); // 이벤트 몰림 코얼레싱
   }
   function flushPendingReload() {
-    if (state.pendingReload && !isEditing()) { state.pendingReload = false; load(); }
+    if (state.pendingReload && !isEditing()) {
+      state.pendingReload = false;
+      var cb = state.pendingCb; state.pendingCb = null;
+      load(cb);
+    }
   }
 
   /* ── 실시간 구독 ── */
@@ -1237,6 +1277,18 @@
   function nameCell(c) {
     return '<span class="gm-name" data-tip="' + esc(c.contact) + '">' + (c.defendant ? hlEsc(c.defendant) : '—') + '</span>';
   }
+  /* 진행 패널의 사건번호 칸 — 로웨어에서 못 찾은 번호에는 배지를 붙인다.
+     이 사건은 기일 자동 갱신이 아예 일어나지 않으므로, 번호를 고쳐야 한다는 뜻.
+     (종결·보수·휴지통 패널에는 붙이지 않는다 — 끝난 사건은 로웨어 목록에서 정상적으로 빠진다) */
+  function codeCell(c) {
+    var html = hlEsc(c.caseNumber);
+    if (lowareChecked && c.caseNumber && lowareMiss[normCode(c.caseNumber)]) {
+      html += '<span class="gm-miss" title="로웨어에서 이 사건번호를 찾지 못했습니다.' +
+              ' 번호가 정확한지 확인해 주세요 — 맞을 때까지 기일이 자동으로 갱신되지 않습니다.">미매칭</span>';
+    }
+    return html;
+  }
+
   function hearingTag(c) {
     var d = activeDate(c), v = verdictOf(c);
     var t;
@@ -1253,7 +1305,7 @@
       var ucls = (lv === 'urgent' || lv === 'soon') ? ' u-' + lv : '';
       return '<tr data-id="' + esc(c.id) + '" class="gm-row' + ucls + '">' +
         '<td>' + nameCell(c) + '</td>' +
-        '<td class="gm-code">' + hlEsc(c.caseNumber) + '</td>' +
+        '<td class="gm-code">' + codeCell(c) + '</td>' +
         '<td class="gm-clip" title="' + esc(c.caseName) + '">' + hlEsc(c.caseName) + '</td>' +
         '<td>' + hearingTag(c) + dueBadge(c) + '</td>' +
         '<td class="gm-memocell"><div class="gm-memo-edit" contenteditable="true" data-id="' + esc(c.id) + '" data-field="todo" data-ph="메모 입력…">' + esc(c.todo) + '</div></td>' +
@@ -1733,6 +1785,7 @@
         state.cases.push(normalize({ id: data.id, data: data }));
         render();
         closeAdd();
+        syncFromLoware();   // 새로 넣은 사건번호도 바로 대조 — 오타면 '미매칭' 배지가 즉시 붙는다
       }, function () { if (btn) { btn.disabled = false; btn.textContent = '저장'; } alert('저장 중 오류가 발생했습니다.'); });
   };
 
@@ -1795,16 +1848,20 @@
   window.gsmgrEditSave = function () {
     var c = editState; if (!c) return;
     var g = function (id) { var e = document.getElementById(id); return e ? e.value : ''; };
+    var prevCode = c.caseNumber || '';
     // 편집 대상 6개만 patch — 나머지(메모·항소·보수·feeForm 등)는 서버 최신본에서 병합 보존
     var patch = {
       defendant: g('gd-defendant').trim(), caseNumber: g('gd-caseNumber').trim(), caseName: g('gd-caseName').trim(),
       hearingType: (addForm && addForm.hearingType) || c.hearingType || '공판',
       hearingDate: g('gd-hearingDate'), verdictDate: g('gd-verdictDate'), contact: g('gd-contact').trim()
     };
+    var codeChanged = normCode(prevCode) !== normCode(patch.caseNumber);
     Object.keys(patch).forEach(function (k) { c[k] = patch[k]; if (c._raw) c._raw[k] = patch[k]; }); // 낙관적
     closeDrawer();
     render();
-    commitPatch(c.id, patch); // 동시수정 안전 저장(토스트·재시도 포함)
+    // 사건번호를 고쳤으면 저장 뒤 바로 로웨어와 다시 맞춘다 —
+    // 고친 번호가 맞으면 기일이 그 자리에서 들어오고, 여전히 틀리면 '미매칭' 배지가 다시 붙는다.
+    commitPatch(c.id, patch, 0, codeChanged ? syncFromLoware : null); // 동시수정 안전 저장(토스트·재시도 포함)
   };
 
   // 강제 종결: 선고·선정취소가 아니어도 수동으로 종결 처리(휴지통/복원과 동일한 즉시-저장, 되돌리기 가능)
