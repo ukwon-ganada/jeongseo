@@ -54,6 +54,7 @@
       + '.au-err{font-size:12px;color:#c0392b;margin:4px 0 2px;min-height:16px;}'
       + '.au-btn{width:100%;height:52px;margin-top:6px;background:#1a1a1a;color:#fff;border:none;'
       + 'border-radius:14px;font-size:15px;font-weight:600;font-family:inherit;cursor:pointer;}'
+      + '.au-btn{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}'
       + '.au-btn:disabled{opacity:.55;cursor:default;}'
       + '.au-remember{display:flex;align-items:center;justify-content:center;gap:7px;'
       + 'font-size:13px;color:#666;margin:6px 0 2px;cursor:pointer;user-select:none;}'
@@ -96,7 +97,10 @@
     var el = document.createElement('div');
     el.id = OVERLAY_ID;
     el.innerHTML =
-      '<form class="au-box" id="au-form" autocomplete="on" action="#">'
+      // novalidate: 브라우저 자체 형식검사를 끈다. 아이폰 사파리는 이메일 칸 값이 형식에
+      // 안 맞으면(자동채움된 아이디·보이지 않는 문자 등) 안내도 없이 제출을 막아 "아무 반응 없음"이 됐다.
+      // 검사는 doLogin()에서 직접 하고, 문제가 있으면 빨간 문구로 알려준다.
+      '<form class="au-box" id="au-form" autocomplete="on" action="#" novalidate>'
       + '<div class="au-brand">법무법인 정서</div>'
       + '<div class="au-sub">직원 로그인</div>'
       + '<input type="email" name="email" class="au-input" id="au-email" placeholder="이메일" '
@@ -154,22 +158,41 @@
   }
 
   /* ── 로그인 실행 ── */
+  var _busy = false;
   function doLogin() {
-    var email = (document.getElementById('au-email') || {}).value || '';
+    if (_busy) return;                    // 버튼 연타·Enter 중복 방지
+    var emEl = document.getElementById('au-email');
+    var email = (emEl || {}).value || '';
     var pw = (document.getElementById('au-pw') || {}).value || '';
-    email = email.trim();
+    // 자동채움이 끼워넣는 공백·보이지 않는 문자(제로폭 등) 제거
+    email = email.replace(/[\s​-‍⁠﻿]/g, '');
+    if (emEl && emEl.value !== email) emEl.value = email;
     if (!email || !pw) { setErr('이메일과 비밀번호를 입력해 주세요.'); return; }
+    if (email.indexOf('@') < 1) { setErr('이메일 주소 형식으로 입력해 주세요. (예: name@jeongseo.com)'); return; }
+    try { if (document.activeElement) document.activeElement.blur(); } catch (e) {}  // 아이폰 키보드 닫기
     var btn = document.getElementById('au-btn');
+    _busy = true;
     if (btn) { btn.disabled = true; btn.textContent = '로그인 중…'; }
     setErr('');
+    function done() {
+      _busy = false; clearTimeout(watchdog);
+      if (btn) { btn.disabled = false; btn.textContent = '로그인'; }
+    }
+    // 응답이 15초 넘게 없으면(통신 끊김 등) 멈춘 채로 두지 않고 다시 누를 수 있게
+    var watchdog = setTimeout(function () {
+      if (!_busy) return;
+      done();
+      setErr('응답이 늦습니다. 인터넷 연결을 확인한 뒤 다시 눌러 주세요.');
+    }, 15000);
     getClient(function (sb) {
       if (!sb) {
+        done();
         setErr('연결 준비 중입니다. 잠시 후 다시 시도해 주세요.');
-        if (btn) { btn.disabled = false; btn.textContent = '로그인'; }
         return;
       }
       sb.auth.signInWithPassword({ email: email, password: pw }).then(function (res) {
-        if (btn) { btn.disabled = false; btn.textContent = '로그인'; }
+        if (!_busy) return;               // 이미 시간초과 처리됨
+        done();
         if (res && res.error) {
           setErr('이메일 또는 비밀번호가 올바르지 않습니다.');
           var p = document.getElementById('au-pw'); if (p) p.value = '';
@@ -186,7 +209,7 @@
         var p2 = document.getElementById('au-pw'); if (p2) p2.value = '';
         hideOverlay();
       }, function () {
-        if (btn) { btn.disabled = false; btn.textContent = '로그인'; }
+        done();
         setErr('로그인 중 오류가 발생했습니다. 다시 시도해 주세요.');
       });
     });
