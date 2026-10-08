@@ -3,7 +3,9 @@
    PC(≥768px) 전용. 저장된 계약서를 '대장형 데이터 테이블'로 관리한다.
    · 데이터 출처: window.listCache (index.html 이 Supabase 'contracts'에서 로드)
        각 레코드.form_data 에 scope(업무범위)·fee/success(계약조건)가 들어 있음
-   · 표 컬럼: 의뢰인(+서명상태) · 사건 · 업무범위 · 계약조건(착수금+성공배지) · 작성일
+   · 표 컬럼: 의뢰인(+서명상태) · 사건 · 업무범위 · 계약조건(착수금+성공배지) · 담당자 · 작성일
+   · 담당자: form_data.managers(이름 배열)에 저장 → DB 구조 변경 없이 모든 PC에 공유.
+       명단 = 기본 5명 + 계약에 이미 지정된 이름(누군가 추가한 담당자도 자동 포함)
    · 상단 KPI(총 계약·서명완료/대기·이번 달 신규), 유형 필터, 정렬
    · 행 클릭 → 우측 요약 드로어(업무범위·계약조건·서명이력) + '계약서 열기'
    · 전역 연동: openContractDetail(id) / deleteContract(id) / loadContractList() / goHome()
@@ -20,7 +22,9 @@
   function fmtDate(iso) { var d = new Date(iso); if (isNaN(d)) return '—'; return d.getFullYear() + '.' + pad(d.getMonth() + 1) + '.' + pad(d.getDate()); }
   function fmtDateTime(iso) { var d = new Date(iso); if (isNaN(d)) return '기록 없음'; return d.getFullYear() + '.' + pad(d.getMonth() + 1) + '.' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()); }
 
-  var _q = '', _type = '', _sort = 'new', _built = false;
+  var _q = '', _type = '', _sort = 'new', _mgr = '', _built = false;
+  var DEFAULT_MANAGERS = ['서고은', '김희진', '김미영', '송영범', '임정빈'];
+  var _extraManagers = []; // 이번 세션에서 새로 추가했지만 아직 어느 계약에도 지정 안 된 이름
 
   function records() { return (window.listCache || []).slice(); }
 
@@ -71,16 +75,46 @@
     if (it.sent_at) return { k: 'sent', t: '발송' };
     return { k: 'draft', t: '작성' };
   }
+  /* ── 담당자 ── */
+  function managersOf(it) {
+    var m = it && it.form_data && it.form_data.managers;
+    return Array.isArray(m) ? m.filter(Boolean) : [];
+  }
+  function allManagers() {
+    var seen = {}, out = [];
+    function add(n) { n = String(n || '').trim(); if (n && !seen[n]) { seen[n] = 1; out.push(n); } }
+    DEFAULT_MANAGERS.forEach(add);
+    records().forEach(function (it) { managersOf(it).forEach(add); });
+    _extraManagers.forEach(add);
+    return out;
+  }
+  function mgrTags(list) {
+    return list.length
+      ? '<div class="creg-mgrs">' + list.map(function (n) { return '<span class="creg-mgr">#' + esc(n) + '</span>'; }).join('') + '</div>'
+      : '<span class="creg-dash">미지정</span>';
+  }
+  /* 담당자 필터 드롭다운 옵션 갱신(새 이름이 생기면 반영) */
+  function renderMgrFilter() {
+    var sel = $('creg-mgrsel'); if (!sel) return;
+    var names = allManagers();
+    if (_mgr && _mgr !== '__none' && names.indexOf(_mgr) < 0) _mgr = '';
+    sel.innerHTML = '<option value="">전체 담당자</option><option value="__none">미지정</option>' +
+      names.map(function (n) { return '<option value="' + esc(n) + '">' + esc(n) + '</option>'; }).join('');
+    sel.value = _mgr;
+  }
+
   function statusChip(it) { var s = statusOf(it); return '<span class="creg-st creg-st-' + s.k + '"><span class="creg-st-dot"></span>' + s.t + '</span>'; }
 
   /* 필터·정렬 적용된 목록 */
   function view() {
     var items = records();
     if (_type) items = items.filter(function (it) { return (it.doc_type || '형사') === _type; });
+    if (_mgr === '__none') items = items.filter(function (it) { return managersOf(it).length === 0; });
+    else if (_mgr) items = items.filter(function (it) { return managersOf(it).indexOf(_mgr) > -1; });
     if (_q) {
       var q = _q.toLowerCase();
       items = items.filter(function (it) {
-        return ((it.client_name || '') + (it.case_num || '') + (it.case_name || '')).toLowerCase().indexOf(q) > -1;
+        return ((it.client_name || '') + (it.case_num || '') + (it.case_name || '') + managersOf(it).join(' ')).toLowerCase().indexOf(q) > -1;
       });
     }
     if (_sort === 'name') items.sort(function (a, b) { return (a.client_name || '').localeCompare(b.client_name || '', 'ko'); });
@@ -103,20 +137,21 @@
         '<div class="creg-kpi" id="creg-kpi"></div>' +
         '<div class="creg-toolbar">' +
           '<div class="creg-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>' +
-            '<input id="creg-search" type="text" placeholder="의뢰인·사건번호·사건명 검색" oninput="ContractReg.search(this.value)" autocomplete="off"></div>' +
+            '<input id="creg-search" type="text" placeholder="의뢰인·사건번호·사건명·담당자 검색" oninput="ContractReg.search(this.value)" autocomplete="off"></div>' +
           '<div class="creg-types" id="creg-types">' +
             '<button class="creg-tchip on" data-t="" onclick="ContractReg.type(\'\')">전체</button>' +
             '<button class="creg-tchip" data-t="형사" onclick="ContractReg.type(\'형사\')">형사</button>' +
             '<button class="creg-tchip" data-t="민사" onclick="ContractReg.type(\'민사\')">민사</button>' +
             '<button class="creg-tchip" data-t="가사" onclick="ContractReg.type(\'가사\')">가사</button>' +
           '</div>' +
+          '<select class="creg-sort creg-mgrsel" id="creg-mgrsel" onchange="ContractReg.mgr(this.value)" aria-label="담당자 필터"></select>' +
           '<select class="creg-sort" id="creg-sort" onchange="ContractReg.sort(this.value)">' +
             '<option value="new">최신순</option><option value="name">의뢰인순</option><option value="fee">착수금순</option>' +
           '</select>' +
         '</div>' +
         '<div class="creg-tablewrap">' +
           '<table class="creg-table">' +
-            '<thead><tr><th style="width:20%">의뢰인</th><th style="width:24%">사건</th><th style="width:24%">업무범위</th><th style="width:20%">계약조건</th><th style="width:12%">작성일</th></tr></thead>' +
+            '<thead><tr><th style="width:17%">의뢰인</th><th style="width:21%">사건</th><th style="width:20%">업무범위</th><th style="width:17%">계약조건</th><th style="width:15%">담당자</th><th style="width:10%">작성일</th></tr></thead>' +
             '<tbody id="creg-tbody"></tbody>' +
           '</table>' +
           '<div class="creg-empty" id="creg-empty" style="display:none;"></div>' +
@@ -161,6 +196,7 @@
       '<td><div class="creg-case">' + esc(it.case_num || '') + (it.case_name ? ' · ' + esc(it.case_name) : (it.case_num ? '' : '<span class="creg-dash">사건정보 없음</span>')) + '</div>' + docBadge(it.doc_type) + '</td>' +
       '<td>' + scopeHtml + '</td>' +
       '<td><div class="creg-fee">' + feeCell(fd) + '</div></td>' +
+      '<td>' + mgrTags(managersOf(it)) + '</td>' +
       '<td class="creg-date">' + fmtDate(it.created_at) + '</td>' +
     '</tr>';
   }
@@ -174,7 +210,7 @@
     if (empty) {
       var has = items.length > 0;
       empty.style.display = has ? 'none' : 'block';
-      if (!has) empty.textContent = (_q || _type) ? '조건에 맞는 계약이 없습니다.' : '저장된 계약서가 없습니다. 계약서를 작성·저장하면 여기 표시됩니다.';
+      if (!has) empty.textContent = (_q || _type || _mgr) ? '조건에 맞는 계약이 없습니다.' : '저장된 계약서가 없습니다. 계약서를 작성·저장하면 여기 표시됩니다.';
     }
   }
 
@@ -183,7 +219,62 @@
     // 컨트롤 상태 반영
     var s = $('creg-search'); if (s && s.value !== _q) s.value = _q;
     renderKPI();
+    renderMgrFilter();
     renderRows();
+    // 드로어가 열려 있으면(목록 새로고침 등) 담당자 영역도 최신으로
+    if (_openId && $('creg-drawer') && $('creg-drawer').classList.contains('open')) renderMgrEditor();
+  }
+
+  /* ── 드로어 안 담당자 지정 영역 ── */
+  var _openId = null, _saving = false;
+  function renderMgrEditor() {
+    var box = $('creg-mgredit'); if (!box) return;
+    var it = findRec(_openId); if (!it) return;
+    var mine = managersOf(it);
+    box.innerHTML =
+      '<div class="creg-mgrpick">' +
+        allManagers().map(function (n) {
+          var on = mine.indexOf(n) > -1;
+          return '<button type="button" class="creg-mgrchip' + (on ? ' on' : '') + '" aria-pressed="' + on + '" data-n="' + esc(n) + '" onclick="ContractReg.toggleMgr(this.getAttribute(\'data-n\'))">#' + esc(n) + '</button>';
+        }).join('') +
+      '</div>' +
+      '<div class="creg-mgradd">' +
+        '<input id="creg-mgrinput" type="text" maxlength="20" placeholder="새 담당자 이름" autocomplete="off" onkeydown="if(event.key===\'Enter\'){event.preventDefault();ContractReg.addMgr();}">' +
+        '<button type="button" class="fs-btn ghost creg-btn" onclick="ContractReg.addMgr()">+ 추가</button>' +
+      '</div>' +
+      '<div class="creg-mgrhint">이름을 누르면 지정/해제되고 바로 저장됩니다.</div>';
+  }
+  /* 담당자 목록을 Supabase에 저장 (form_data.managers만 갱신, 나머지 내용은 DB의 최신값 유지) */
+  async function saveManagers(id, list) {
+    var client = (typeof window.getSB === 'function') ? window.getSB() : null;
+    if (!client) throw new Error('연결을 확인해 주세요');
+    var r = await client.from('contracts').select('form_data').eq('id', id).limit(1);
+    if (r.error) throw r.error;
+    if (!r.data || !r.data[0]) throw new Error('계약을 찾을 수 없습니다');
+    var fd = r.data[0].form_data || {};
+    fd.managers = list;
+    var u = await client.from('contracts').update({ form_data: fd }).eq('id', id);
+    if (u.error) throw u.error;
+    return fd;
+  }
+  function toast(m) { if (typeof window.showToast === 'function') window.showToast(m); }
+  async function setManagers(list) {
+    if (_saving) return;
+    var it = findRec(_openId); if (!it) return;
+    var prev = managersOf(it);
+    _saving = true;
+    if (!it.form_data) it.form_data = {};
+    it.form_data.managers = list; // 화면 먼저 반영
+    renderMgrEditor(); renderMgrFilter(); renderRows();
+    try {
+      var fd = await saveManagers(it.id, list);
+      it.form_data = fd;
+    } catch (e) {
+      it.form_data.managers = prev; // 실패하면 되돌리기
+      toast('담당자 저장 실패: ' + ((e && e.message) || '다시 시도해 주세요'));
+    }
+    _saving = false;
+    renderMgrEditor(); renderMgrFilter(); renderRows();
   }
 
   /* ── 요약 드로어 ── */
@@ -200,8 +291,27 @@
       renderRows();
     },
     sort: function (s) { _sort = s || 'new'; renderRows(); },
+    mgr: function (m) { _mgr = m || ''; renderRows(); },
+    toggleMgr: function (n) {
+      var it = findRec(_openId); if (!it || !n) return;
+      var list = managersOf(it).slice(), i = list.indexOf(n);
+      if (i > -1) list.splice(i, 1); else list.push(n);
+      setManagers(list);
+    },
+    addMgr: function () {
+      var inp = $('creg-mgrinput'); if (!inp) return;
+      var n = inp.value.replace(/^#+/, '').replace(/\s+/g, ' ').trim();
+      if (!n) { inp.focus(); return; }
+      var it = findRec(_openId); if (!it) return;
+      if (allManagers().indexOf(n) < 0) _extraManagers.push(n);
+      var list = managersOf(it).slice();
+      if (list.indexOf(n) < 0) list.push(n);
+      inp.value = '';
+      setManagers(list);
+    },
     open: function (id) {
       var it = findRec(id); if (!it) return;
+      _openId = id;
       var fd = it.form_data || {};
       var st = statusOf(it);
       var chips = scopeItems(fd);
@@ -227,6 +337,7 @@
         '</div>' +
         '<div class="creg-dtags">' + docBadge(it.doc_type) + '<span class="creg-st creg-st-' + st.k + '"><span class="creg-st-dot"></span>' + st.t + '</span></div>' +
         '<div class="creg-dbody">' +
+          '<div class="creg-dsec">담당자</div><div id="creg-mgredit"></div>' +
           '<div class="creg-dsec">사건 정보</div>' +
           drawerRow('사건번호', esc(it.case_num || '')) +
           drawerRow('사건명', esc(it.case_name || '')) +
@@ -242,6 +353,7 @@
           '<button class="fs-btn ghost creg-btn" onclick="ContractReg.closeDrawer()">닫기</button>' +
           '<button class="fs-btn primary creg-btn" onclick="ContractReg.openDoc(\'' + esc(it.id) + '\')">계약서 열기</button>' +
         '</div>';
+      renderMgrEditor();
       $('creg-scrim').classList.add('show');
       $('creg-drawer').classList.add('open');
     },
