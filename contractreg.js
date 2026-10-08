@@ -26,6 +26,39 @@
   var DEFAULT_MANAGERS = ['서고은', '김희진', '김미영', '송영범', '임정빈'];
   var _extraManagers = []; // 이번 세션에서 새로 추가했지만 아직 어느 계약에도 지정 안 된 이름
 
+  /* 담당자 UI 스타일 — JS와 함께 배포되도록 주입(예전 styles.css 캐시가 남아도 깨지지 않음) */
+  var MGR_STYLE_ID = 'creg-mgr-style';
+  var MGR_CSS = [
+    '.creg-mgrsel{margin-left:auto;min-width:118px;}',
+    '.creg-mgrsel + .creg-sort{margin-left:8px;}',
+    /* 표 셀 태그 */
+    '.creg-mgrs{display:flex;flex-wrap:wrap;gap:4px;}',
+    '.creg-mgr{font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;background:#eef3fe;color:#2f5fb0;white-space:nowrap;}',
+    /* 드로어 편집 카드 */
+    '.creg-mgrbox{border:1px solid var(--border,#e7e9ee);border-radius:12px;background:var(--gray-50,#fafbfc);padding:12px;}',
+    '.creg-mgrpick{display:flex;flex-wrap:wrap;gap:6px;}',
+    '.creg-mgrchip{display:inline-flex;align-items:center;gap:0;height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--border,#e7e9ee);background:#fff;color:var(--gray-700,#555);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;transition:background .14s,border-color .14s,color .14s;-webkit-appearance:none;appearance:none;line-height:1;}',
+    '.creg-mgrchip:hover{border-color:#c9d5f3;background:#f7f9ff;}',
+    '.creg-mgrchip .creg-mgrhash{color:var(--gray-400,#9096a1);font-weight:500;margin-right:1px;}',
+    '.creg-mgrchip svg{width:13px;height:13px;display:none;margin-right:5px;}',
+    '.creg-mgrchip.on{background:#eef3fe;border-color:#9fb6ec;color:#2f5fb0;}',
+    '.creg-mgrchip.on .creg-mgrhash{color:#7d9be0;}',
+    '.creg-mgrchip.on svg{display:block;}',
+    '.creg-mgrchip:disabled{opacity:.55;cursor:default;}',
+    '.creg-mgradd{display:flex;gap:6px;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border,#e7e9ee);}',
+    '.creg-mgrin{position:relative;flex:1;min-width:0;}',
+    '.creg-mgrin svg{position:absolute;left:11px;top:50%;width:14px;height:14px;transform:translateY(-50%);color:var(--gray-400,#9096a1);pointer-events:none;}',
+    '.creg-mgrin input{width:100%;height:36px;border:1px solid var(--border,#e7e9ee);border-radius:10px;padding:0 12px 0 32px;font-size:13.5px;font-family:var(--font);background:#fff;outline:none;transition:border-color .14s;box-sizing:border-box;}',
+    '.creg-mgrin input:focus{border-color:var(--hero,#3a6df0);}',
+    '.creg-mgrbtn{flex:none;height:36px;padding:0 14px;border:0;border-radius:10px;background:var(--black,#15181d);color:#fff;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;-webkit-appearance:none;appearance:none;}',
+    '.creg-mgrbtn:hover{opacity:.88;}'
+  ].join('');
+  function injectStyle() {
+    if (document.getElementById(MGR_STYLE_ID)) return;
+    var st = document.createElement('style'); st.id = MGR_STYLE_ID; st.textContent = MGR_CSS;
+    document.head.appendChild(st);
+  }
+
   function records() { return (window.listCache || []).slice(); }
 
   /* form_data.scope → 사람이 읽는 항목 배열 */
@@ -126,6 +159,7 @@
   /* ── 셸(1회 주입) ── */
   function ensureUI() {
     var host = $('listPC'); if (!host) return false;
+    injectStyle();
     if (_built && $('creg-tbody')) return true;
     host.innerHTML =
       '<div class="creg">' +
@@ -231,18 +265,23 @@
     var box = $('creg-mgredit'); if (!box) return;
     var it = findRec(_openId); if (!it) return;
     var mine = managersOf(it);
+    var check = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><polyline points="20 6 9 17 4 12"/></svg>';
     box.innerHTML =
-      '<div class="creg-mgrpick">' +
-        allManagers().map(function (n) {
-          var on = mine.indexOf(n) > -1;
-          return '<button type="button" class="creg-mgrchip' + (on ? ' on' : '') + '" aria-pressed="' + on + '" data-n="' + esc(n) + '" onclick="ContractReg.toggleMgr(this.getAttribute(\'data-n\'))">#' + esc(n) + '</button>';
-        }).join('') +
-      '</div>' +
-      '<div class="creg-mgradd">' +
-        '<input id="creg-mgrinput" type="text" maxlength="20" placeholder="새 담당자 이름" autocomplete="off" onkeydown="if(event.key===\'Enter\'){event.preventDefault();ContractReg.addMgr();}">' +
-        '<button type="button" class="fs-btn ghost creg-btn" onclick="ContractReg.addMgr()">+ 추가</button>' +
-      '</div>' +
-      '<div class="creg-mgrhint">이름을 누르면 지정/해제되고 바로 저장됩니다.</div>';
+      '<div class="creg-mgrbox">' +
+        '<div class="creg-mgrpick">' +
+          allManagers().map(function (n) {
+            var on = mine.indexOf(n) > -1;
+            return '<button type="button" class="creg-mgrchip' + (on ? ' on' : '') + '" aria-pressed="' + on + '"' + (_saving ? ' disabled' : '') +
+              ' data-n="' + esc(n) + '" onclick="ContractReg.toggleMgr(this.getAttribute(\'data-n\'))">' +
+              check + '<span class="creg-mgrhash">#</span>' + esc(n) + '</button>';
+          }).join('') +
+        '</div>' +
+        '<div class="creg-mgradd">' +
+          '<div class="creg-mgrin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>' +
+            '<input id="creg-mgrinput" type="text" maxlength="20" placeholder="새 담당자 이름" autocomplete="off" onkeydown="if(event.key===\'Enter\'&&!event.isComposing){event.preventDefault();ContractReg.addMgr();}"></div>' +
+          '<button type="button" class="creg-mgrbtn" onclick="ContractReg.addMgr()">추가</button>' +
+        '</div>' +
+      '</div>';
   }
   /* 담당자 목록을 Supabase에 저장 (form_data.managers만 갱신, 나머지 내용은 DB의 최신값 유지) */
   async function saveManagers(id, list) {
