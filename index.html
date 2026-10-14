@@ -1247,7 +1247,8 @@
       <div class="fs-chip" data-role="피고인">피고인</div>
       <div class="fs-chip" data-role="고소인">고소인</div>
       <div class="fs-chip" data-role="피해자">피해자</div>
-    </div></div>
+      <div class="fs-chip" data-role="참고인">참고인</div>
+    </div><div class="att-add-row"><input type="text" class="att-add-input" id="sj-role-new" placeholder="추가할 지위 (예: 진정인)" onkeydown="if(event.key==='Enter'){event.preventDefault();addSjRole('sj-role');}"><button type="button" class="att-add-btn" onclick="addSjRole('sj-role')">＋ 추가</button></div></div>
 
     <div class="fs-section">사건 정보</div>
     <div class="fs-field"><label class="fs-label">사건번호</label><input type="text" class="fs-input" id="sj-casenum" placeholder="2026-2988"></div>
@@ -3876,8 +3877,7 @@ function closeSeonimForm(){document.getElementById('seonimForm').classList.remov
 
 function goSeonim(type){
   closeSeonimType();
-  var roleChips=document.getElementById('sj-role').querySelectorAll('.fs-chip');
-  roleChips.forEach(function(c,i){c.classList.toggle('on',i===0);});
+  renderSjRoleChips('sj-role', SJ_ROLES_FORM[0]);
   document.getElementById('sj-casenum').value='';
   document.getElementById('sj-casename').value='';
   document.getElementById('sj-agency').value='';
@@ -3894,7 +3894,7 @@ function goSeonim(type){
 function editSeonim(){
   if(seonimMode==='민가사'){editMingasa();return;}
   var s=seonimState;
-  document.getElementById('sj-role').querySelectorAll('.fs-chip').forEach(function(c){c.classList.toggle('on', c.dataset.role===s.role);});
+  renderSjRoleChips('sj-role', s.role);
   document.getElementById('sj-casenum').value=s.casenum||'';
   document.getElementById('sj-casename').value=s.casename||'';
   document.getElementById('sj-agency').value=s.agency||'';
@@ -3908,6 +3908,7 @@ function editSeonim(){
 
 /* 칩 토글 */
 document.getElementById('sj-role').addEventListener('click',function(e){
+  if(e.target.closest('.att-chip-del'))return;
   var c=e.target.closest('.fs-chip'); if(!c)return;
   this.querySelectorAll('.fs-chip').forEach(function(x){x.classList.remove('on');});
   c.classList.add('on');
@@ -3945,7 +3946,35 @@ function applySeonimForm(){
 
 /* 양식 렌더 */
 /* ══════ 선임계 양식 칸 클릭 수정 (형사·민가사 공용) ══════ */
-var SJ_ROLES_FORM=['피의자','피고인','고소인','피해자'];
+var SJ_ROLES_FORM=['피의자','피고인','고소인','피해자','참고인'];
+/* ── 의뢰인 지위 칩: 기본 목록 + 직접 추가(✕로 삭제) (형사 폼·수정창 공용) ── */
+function sjRoleChipHTML(r,on,removable,inModal){
+  var del=removable?'<span class="att-chip-del" onclick="removeSjRole(event,this)">✕</span>':'';
+  return '<div class="fs-chip'+(on?' on':'')+'" data-role="'+escapeHtml(r)+'"'+(inModal?' onclick="sjmPickRole(this)"':'')+'>'+escapeHtml(r)+del+'</div>';
+}
+function renderSjRoleChips(boxId,selected){
+  var box=document.getElementById(boxId); if(!box)return;
+  var inModal=(boxId==='sjm-role'), sel=selected||SJ_ROLES_FORM[0];
+  var html=SJ_ROLES_FORM.map(function(r){return sjRoleChipHTML(r,r===sel,false,inModal);}).join('');
+  if(SJ_ROLES_FORM.indexOf(sel)<0) html+=sjRoleChipHTML(sel,true,true,inModal);
+  box.innerHTML=html;
+  var inp=document.getElementById(boxId+'-new'); if(inp)inp.value='';
+}
+function addSjRole(boxId){
+  var inp=document.getElementById(boxId+'-new'); var r=(inp.value||'').trim();
+  if(!r){alert('추가할 지위를 입력해 주세요.');inp.focus();return;}
+  var box=document.getElementById(boxId); var dup=null;
+  box.querySelectorAll('.fs-chip').forEach(function(c){if(c.dataset.role===r)dup=c;});
+  box.querySelectorAll('.fs-chip').forEach(function(c){c.classList.remove('on');});
+  if(dup){dup.classList.add('on');}
+  else box.insertAdjacentHTML('beforeend', sjRoleChipHTML(r,true,true,boxId==='sjm-role'));
+  inp.value=''; inp.focus();
+}
+function removeSjRole(e,el){
+  e.stopPropagation(); var chip=el.closest('.fs-chip'), box=chip.parentNode, wasOn=chip.classList.contains('on');
+  box.removeChild(chip);
+  if(wasOn){var first=box.querySelector('.fs-chip'); if(first)first.classList.add('on');}
+}
 var sjEditCtx=null;
 function sjState(){return seonimMode==='민가사'?mingasaState:seonimState;}
 function sjRerender(){if(seonimMode==='민가사')renderMingasa();else renderSeonim();}
@@ -3973,8 +4002,8 @@ function openSjEdit(type){
   } else if(type==='role'){
     title='역할'; var roles;
     if(mg){var _rd=mgDef(s); roles=[_rd.front,_rd.back];}
-    else roles=SJ_ROLES_FORM;
-    html='<div class="fs-chips" id="sjm-role">'+roles.map(function(r){return '<div class="fs-chip'+(r===s.role?' on':'')+'" data-role="'+escapeHtml(r)+'" onclick="sjmPickRole(this)">'+escapeHtml(r)+'</div>';}).join('')+'</div>';
+    if(mg) html='<div class="fs-chips" id="sjm-role">'+roles.map(function(r){return '<div class="fs-chip'+(r===s.role?' on':'')+'" data-role="'+escapeHtml(r)+'" onclick="sjmPickRole(this)">'+escapeHtml(r)+'</div>';}).join('')+'</div>';
+    else html='<div class="fs-chips" id="sjm-role"></div><div class="att-add-row"><input type="text" class="att-add-input" id="sjm-role-new" placeholder="추가할 지위 (예: 진정인)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addSjRole(\'sjm-role\');}"><button type="button" class="att-add-btn" onclick="addSjRole(\'sjm-role\')">＋ 추가</button></div>';
   } else if(type==='att'){
     title='담당변호사';
     html='<div class="fs-chips att-chips" id="sjm-att"></div>';
@@ -3993,6 +4022,7 @@ function openSjEdit(type){
   }
   document.getElementById('sjModalTitle').textContent=title;
   document.getElementById('sjModalBody').innerHTML=html;
+  if(type==='role'&&!mg) renderSjRoleChips('sjm-role', s.role);
   if(type==='att'){
     renderAttChips('sjm', s.attorneys);
     var ab=document.getElementById('sjm-att');
