@@ -131,7 +131,7 @@
 
         <!-- 하늘 위에 겹치는 오버레이 -->
         <div class="hp-overlay">
-          <!-- 우상단: 세줄(햄버거) 메뉴 → 국선·결재·직원관리 -->
+          <!-- 우상단: 세줄(햄버거) 메뉴 → 국선·직원관리 -->
           <div class="hp-menu-wrap">
             <button class="hp-hamburger" onclick="toggleSettingsMenu(event)" aria-label="메뉴" aria-haspopup="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
@@ -139,7 +139,6 @@
             </button>
             <div class="hp-settings-menu" id="settingsMenu" role="menu">
               <div class="hsm-item" role="menuitem" onclick="closeSettingsMenu();goCaseManager();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>국선<span class="hp-badge" id="hp-badge-gukseon" hidden></span></div>
-              <div class="hsm-item" role="menuitem" onclick="closeSettingsMenu();goGyeoljae();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L20 5"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg>결재<span class="hp-badge" id="hp-badge-gyeoljae" hidden></span></div>
               <div class="hsm-item" role="menuitem" onclick="closeSettingsMenu();openLawyerAdmin();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>직원관리</div>
             </div>
           </div>
@@ -170,7 +169,6 @@
       <div class="sw-tabbar">
         <div class="sw-tab sw-tab-on" aria-label="계약서 작성"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg></div>
         <div class="sw-tab" onclick="openContractList()" aria-label="계약서 목록"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div>
-        <div class="sw-tab" onclick="goGyeoljae()" aria-label="결재함"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
         <div class="sw-tab" onclick="homeDevToast()" aria-label="합의서 작성 준비중"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><span class="sw-devdot"></span></div>
         <div class="sw-tab" onclick="openMoreSheet()" aria-label="기타 서류"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></div>
       </div>
@@ -1387,30 +1385,6 @@
   <iframe id="dojangFrame" class="dj-frame" title="자료출력"></iframe>
 </div>
 
-<!-- ═══════════ 결재 요청 (어쏘) ═══════════ -->
-<div id="screen-gyeoljae-req" class="screen">
-  <div class="sj-appbar no-print">
-    <button class="sj-back" onclick="showScreen('screen-home')">‹ 처음으로</button>
-    <div class="sj-title">결재 요청</div>
-  </div>
-  <div class="gj-wrap">
-    <div class="fs-card">
-      <div class="fs-body" id="gj-req-body"></div>
-      <div class="fs-foot" id="gj-req-foot"></div>
-    </div>
-  </div>
-</div>
-
-<!-- ═══════════ 결재함 (서고은) ═══════════ -->
-<div id="screen-gyeoljae" class="screen">
-  <div class="sj-appbar no-print">
-    <button class="sj-back" onclick="showScreen('screen-home')">‹ 처음으로</button>
-    <div class="sj-title">결재함</div>
-    <button class="sj-print-btn" onclick="goGyeoljaeReq()">＋ 요청</button>
-  </div>
-  <div class="gj-wrap" id="gj-inbox"></div>
-</div>
-
 
 <script>
 
@@ -1432,8 +1406,6 @@ function showScreen(id){
   if(id==='screen-home'&&window._swMaybeReload){setTimeout(window._swMaybeReload,0);}
   // 홈 복귀 시 국선 pill 주의 배지 갱신
   if(id==='screen-home'&&window.gsmgrUpdateBadge){setTimeout(window.gsmgrUpdateBadge,0);}
-  // 홈 복귀 시 결재 pill 대기 건수 배지 갱신
-  if(id==='screen-home'&&window.gyeoljaeUpdateBadge){setTimeout(window.gyeoljaeUpdateBadge,0);}
 }
 
 /* ═══ 직원 인증 (Supabase Auth · auth.js) ═══
@@ -1447,8 +1419,6 @@ function promptUnlock(){
   if(window.jsAuth) window.jsAuth.showLogin();
 }
 function goHome(){showScreen('screen-home');}
-function goGyeoljae(){showScreen('screen-gyeoljae');if(window.gyeoljae)gyeoljae.open();}
-function goGyeoljaeReq(){showScreen('screen-gyeoljae-req');if(window.gyeoljae)gyeoljae.openReq();}
 function goContract(type){
   closeTypeSheet();
   currentEditId=null;
@@ -1524,7 +1494,7 @@ function resetContract(){
 }
 
 /* ═══ Supabase 연동 ═══ */
-var APP_VERSION='v137';
+var APP_VERSION='v138';
 var SUPABASE_URL='https://nyjyemjsperpakrrgzcc.supabase.co';
 var SUPABASE_KEY='sb_publishable_QKl9MIt2_MflYnpN41VRvg_cNIAbYhU';
 /* SMS 본인확인(OTP) 스위치. 솔라피·Edge Function·OTP SQL 준비가 끝나면 true 로 바꾸고 재배포.
@@ -4803,7 +4773,6 @@ function toggleAppealGround(key){
 <script src="./hangso.js"></script>
 <script src="./gukseon.js"></script>
 <script src="./gsmgr.js"></script>
-<script src="./geoljae.js"></script>
 <script src="./pankyul.js"></script>
 <script src="./yeongi.js"></script>
 <script src="./chamgo.js"></script>

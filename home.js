@@ -39,7 +39,6 @@ var MENU = {
   contractList:  { kicker: '관리 · 보관', name: '계약서 목록',   desc: '저장된 계약서를 관리해요.',           icon: 'list',    action: 'openContractList()' },
   appeal:        { kicker: '소송 · 불복', name: '항소·상고장',   desc: '판결에 불복해 다시 다퉈요(민가사 AI 취지작성).', icon: 'check',   action: 'goHangso()', ai: true },
   caseManager:   { kicker: '사건 · 관리', name: '사건 관리',     desc: '진행 중인 사건을 한눈에 관리해요.', icon: 'grid',    action: 'goCaseManager()' },
-  gyeoljae:      { kicker: '검토 · 결재', name: '결재함',        desc: '확인할 서면을 마감 순으로 모아봐요.', icon: 'check',   action: 'goGyeoljae()' },
   agreement:     { kicker: '합의 · 조정', name: '합의서 작성',   desc: '합의서 및 처벌불원서를 작성해요.',   icon: 'users',   action: 'goAgreement()', since: '2026-07-23' },
   sasiljo:       { kicker: '조회 · 통신', name: '사실조회신청서', desc: '통신사에 가입자 인적사항을 조회해요(통신사 자동선택).', icon: 'doc', action: 'goSasiljo()', since: '2026-07-24' }
 };
@@ -239,11 +238,11 @@ if (typeof document !== 'undefined') {
 /* ── 홈 우상단 세줄(햄버거) 드롭다운 메뉴 (PC) ── */
 function toggleSettingsMenu(e) { if (e) e.stopPropagation(); var m = document.getElementById('settingsMenu'); if (m) m.classList.toggle('open'); }
 function closeSettingsMenu() { var m = document.getElementById('settingsMenu'); if (m) m.classList.remove('open'); }
-// 국선·결재 알림이 하나라도 있으면 햄버거에 빨간 점 표시(닫힌 메뉴 안의 알림을 알림)
+// 국선 알림이 있으면 햄버거에 빨간 점 표시(닫힌 메뉴 안의 알림을 알림)
 function hpSyncMenuDot() {
   var dot = document.getElementById('hp-ham-dot'); if (!dot) return;
-  var g = document.getElementById('hp-badge-gukseon'), j = document.getElementById('hp-badge-gyeoljae');
-  dot.hidden = !((g && !g.hidden) || (j && !j.hidden));
+  var g = document.getElementById('hp-badge-gukseon');
+  dot.hidden = !(g && !g.hidden);
 }
 if (typeof window !== 'undefined') window.hpSyncMenuDot = hpSyncMenuDot;
 if (typeof document !== 'undefined') {
