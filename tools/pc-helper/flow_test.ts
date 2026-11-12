@@ -1,7 +1,7 @@
 // 모의 시험: 웍스 콜백 → 기록 → 도우미 대기 함수가 주소를 돌려주는지 (실제 Supabase 없이)
 // 실행: deno test --allow-net tools/pc-helper/flow_test.ts
-import { handle as callback, hmacBase64 } from "../../supabase/functions/works-bot-callback/index.ts";
-import { handle as wait } from "../../supabase/functions/pc-helper-wait/index.ts";
+import { handle as callback, hmacBase64 } from "../../supabase/functions/works-bot-callback/handler.ts";
+import { handle as wait } from "../../supabase/functions/pc-helper-wait/handler.ts";
 
 function assert(c: unknown, m: string) { if (!c) throw new Error(m); }
 

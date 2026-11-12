@@ -14,7 +14,7 @@
 1. SQL Editor에서 `supabase/migrations/20261112_pc_helper.sql` 실행
 2. 함수 배포: `works-bot-callback`, `pc-helper-wait` (둘 다 `--no-verify-jwt`), 시크릿 `WORKS_BOT_SECRET`
 3. 개발자 콘솔 Bot → Callback URL = `https://<프로젝트>.supabase.co/functions/v1/works-bot-callback`
-4. `server.json` 의 주소·anon 키를 실제 값으로
+4. `server.json` 에 법인 프로젝트 주소·공개키가 들어 있음(공개 가능한 값)
 5. 직원마다 토큰 발급: `select public.pc_helper_issue('<웍스 userId>', '<이름> PC');`
 
 ## 설치 (직원 PC, 한 번)
