@@ -78,6 +78,10 @@ nav button[aria-current="page"]{color:var(--ours);font-weight:700}
   <button data-v="info">사건 정보</button>
 </nav>
 <script>
+// ── 방 찾기 시험용: SDK가 주소를 바꾸기 전에 처음 들어온 정보를 기록 ──
+var FIRST = {href: location.href, referrer: document.referrer, name: window.name, hist: history.length};
+try{ if(!sessionStorage.getItem('jeongseo.firstHref')) sessionStorage.setItem('jeongseo.firstHref', location.href); FIRST.loginBefore = sessionStorage.getItem('jeongseo.firstHref'); }catch(e){}
+var DIAG = {};
 // ── 설정 ──────────────────────────────────────────────
 var WOFF_ID = 'Nxkob0LER_dfaSzH8s6flw';
 var SDK = 'https://static.worksmobile.net/static/wm/woff/edge/3.7.1/sdk.js';
@@ -211,6 +215,12 @@ var VIEWS = {
   }
 };
 
+function diagHtml(){
+  var d = {처음주소: FIRST.href, 로그인전주소: FIRST.loginBefore, 지금주소: location.href, referrer: FIRST.referrer, windowName: FIRST.name,
+           historyLength: FIRST.hist, userAgent: navigator.userAgent, getContext: DIAG.context, getChannelId: DIAG.channelId,
+           clientType: DIAG.clientType, sdkVersion: DIAG.version, 저장소키: DIAG.storage};
+  return '<details class="diag"><summary>방 찾기 시험 정보 (눌러서 펼친 뒤 전부 복사해 보내 주세요)</summary><pre style="white-space:pre-wrap;user-select:all">'+esc(JSON.stringify(d,null,1))+'</pre></details>';
+}
 function render(){
   $('#switch').hidden = !!ctx.room; // 휴대폰(방을 앎)에서는 숨김
   document.querySelectorAll('nav button').forEach(function(b){ b.setAttribute('aria-current', b.dataset.v===view?'page':'false'); });
@@ -218,7 +228,7 @@ function render(){
   $('#title').textContent = data.caseNo + ' ' + names[view];
   $('#sub').textContent = data.title + ' · ' + data.court;
   $('#main').innerHTML = (VIEWS[view]||VIEWS.timeline)() +
-    '<div class="diag">방: '+esc(ctx.room||'(없음)')+' · 사건번호 값: '+esc(ctx.caseParam||'(없음)')+' · 사용자: '+esc(ctx.user||'(확인 전)')+' · '+esc(ctx.os)+'</div>';
+    '<div class="diag">방: '+esc(ctx.room||'(없음)')+' · 사건번호 값: '+esc(ctx.caseParam||'(없음)')+' · 사용자: '+esc(ctx.user||'(확인 전)')+' · '+esc(ctx.os)+'</div>' + (ctx.room ? '' : diagHtml());
 }
 document.addEventListener('click', function(e){
   var b=e.target.closest('button'); if(!b) return;
@@ -250,6 +260,7 @@ function showPicker(){
     $('#qs').oninput=function(){ draw(this.value.trim()); };
     $('#qs').focus();
     draw('');
+    $('#main').insertAdjacentHTML('beforeend', diagHtml());
   });
 }
 document.addEventListener('click', function(e){
@@ -272,7 +283,12 @@ function start(){
     }
     var p1 = woff.getProfile().then(function(p){ ctx.user = p.displayName || ''; }).catch(function(){});
     var p2 = ctx.inClient && woff.getChannelId ? Promise.resolve(woff.getChannelId()).then(function(c){ ctx.room = c || ''; }).catch(function(){}) : Promise.resolve();
-    return Promise.all([p1,p2]).then(function(){
+    // 방 찾기 시험: PC에서도 방 정보가 오는지 전부 기록
+    try{ DIAG.context = woff.getContext(); }catch(e){ DIAG.context = '오류: '+((e&&e.message)||e); }
+    try{ DIAG.clientType = woff.getClientType ? woff.getClientType() : ''; DIAG.version = woff.getVersion ? woff.getVersion() : ''; }catch(e){}
+    var p3 = woff.getChannelId ? Promise.resolve().then(function(){ return woff.getChannelId(); }).then(function(c){ DIAG.channelId = c; }).catch(function(e){ DIAG.channelId = '오류: '+((e&&e.message)||e); }) : Promise.resolve();
+    try{ DIAG.storage = Object.keys(sessionStorage).concat(Object.keys(localStorage)).join(', '); }catch(e){}
+    return Promise.all([p1,p2,p3]).then(function(){
       if(!ctx.room && !ctx.caseParam) return showPicker();
       return loadCase(ctx.room || ctx.caseParam).then(function(d){ data=d; render(); });
     });
