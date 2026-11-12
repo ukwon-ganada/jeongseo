@@ -64,7 +64,7 @@ nav button[aria-current="page"]{color:var(--ours);font-weight:700}
 </head>
 <body>
 <header>
-  <h1 id="title">사건방</h1>
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h1 id="title">사건방</h1><button class="chip" id="switch" hidden>사건 바꾸기</button></div>
   <div class="sub" id="sub">불러오는 중…</div>
   <div class="chips" id="chips"></div>
 </header>
@@ -85,7 +85,8 @@ var SDK = 'https://static.worksmobile.net/static/wm/woff/edge/3.7.1/sdk.js';
 // ── 견본 자료 (나중에 Supabase에서 받아 옴) ─────────────
 // loadCase(방ID 또는 사건번호) 한 곳만 바꾸면 실제 자료로 바뀌도록 모아 둠
 function loadCase(key){
-  var CUR = '2026고단1234';
+  // 견본: 사건번호로 열면 제목만 그 번호로 바꿔 보여 줌 (내용은 같은 견본)
+  var CUR = /^\d{4}[가-힣]+\d+$/.test(key || '') ? key : '2026고단1234';
   return Promise.resolve({
     caseNo: CUR, title: '사기', court: '○○지방법원 형사3단독', today: '2026-11-12',
     events: [
@@ -211,6 +212,7 @@ var VIEWS = {
 };
 
 function render(){
+  $('#switch').hidden = !!ctx.room; // 휴대폰(방을 앎)에서는 숨김
   document.querySelectorAll('nav button').forEach(function(b){ b.setAttribute('aria-current', b.dataset.v===view?'page':'false'); });
   var names={timeline:'타임라인',deadline:'기한',hearing:'기일',progress:'진행내용',info:'사건 정보'};
   $('#title').textContent = data.caseNo + ' ' + names[view];
@@ -232,6 +234,7 @@ function addRecent(c){ try{ var r=getRecent().filter(function(x){return x!==c;})
 // ── 사건 고르기 (PC 메뉴처럼 방을 모를 때) ─────────────
 function showPicker(){
   return loadMyCases().then(function(list){
+    $('#switch').hidden=true;
     $('#nav').hidden=true; $('#chips').innerHTML='';
     $('#title').textContent='사건 고르기';
     $('#sub').textContent='PC에서는 어느 방에서 열었는지 알 수 없어, 내 사건 중에서 고릅니다.';
@@ -250,6 +253,7 @@ function showPicker(){
   });
 }
 document.addEventListener('click', function(e){
+  if(e.target.id==='switch'){ showPicker(); window.scrollTo(0,0); return; }
   var b=e.target.closest('.pick'); if(!b) return;
   ctx.caseParam=b.dataset.case; $('#nav').hidden=false; addRecent(ctx.caseParam);
   loadCase(ctx.caseParam).then(function(d){ data=d; render(); window.scrollTo(0,0); });
