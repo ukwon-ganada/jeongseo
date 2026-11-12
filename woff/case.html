@@ -225,25 +225,33 @@ document.addEventListener('click', function(e){
   if(b.dataset.file || b.dataset.todo || b.dataset.secret) alert('견본 화면입니다. 실제 파일 열기·수정은 Supabase 연결 뒤에 동작합니다.');
 });
 
+// 최근 고른 사건 5개 (이 PC 브라우저에만 저장)
+function getRecent(){ try{ return JSON.parse(localStorage.getItem('jeongseo.recentCases')||'[]'); }catch(e){ return []; } }
+function addRecent(c){ try{ var r=getRecent().filter(function(x){return x!==c;}); r.unshift(c); localStorage.setItem('jeongseo.recentCases', JSON.stringify(r.slice(0,5))); }catch(e){} }
+
 // ── 사건 고르기 (PC 메뉴처럼 방을 모를 때) ─────────────
 function showPicker(){
   return loadMyCases().then(function(list){
     $('#nav').hidden=true; $('#chips').innerHTML='';
     $('#title').textContent='사건 고르기';
     $('#sub').textContent='PC에서는 어느 방에서 열었는지 알 수 없어, 내 사건 중에서 고릅니다.';
+    var recent=getRecent();
     function draw(qs){
-      $('#list').innerHTML=list.filter(function(x){ return !qs || (x.c+x.t).indexOf(qs)>=0; }).map(function(x){
-        return '<button class="pick" data-case="'+esc(x.c)+'"><span class="t"><span class="case">'+esc(x.c)+'</span>'+esc(x.t)+'</span><span class="s">다음: '+esc(x.next)+'</span></button>';
+      var rows=list.filter(function(x){ return !qs || (x.c+x.t).indexOf(qs)>=0; });
+      if(!qs) rows.sort(function(a,b){ var i=recent.indexOf(a.c), j=recent.indexOf(b.c); return (i<0?99:i)-(j<0?99:j); });
+      $('#list').innerHTML=rows.map(function(x){
+        return '<button class="pick" data-case="'+esc(x.c)+'"><span class="t"><span class="case">'+esc(x.c)+'</span>'+esc(x.t)+'</span><span class="s">'+(recent.indexOf(x.c)>=0&&!qs?'최근 본 사건 · ':'')+'다음: '+esc(x.next)+'</span></button>';
       }).join('') || '<div class="note">맞는 사건이 없습니다.</div>';
     }
-    $('#main').innerHTML='<input class="search" id="qs" placeholder="사건번호나 사건명으로 찾기"><div id="list"></div><div class="note">내가 들어 있는 사건방만 보입니다.</div>';
+    $('#main').innerHTML='<input class="search" id="qs" placeholder="사건번호나 사건명으로 찾기"><div id="list"></div><div class="note">내가 들어 있는 사건방만 보입니다. 최근 고른 사건이 맨 위에 옵니다.</div>';
     $('#qs').oninput=function(){ draw(this.value.trim()); };
+    $('#qs').focus();
     draw('');
   });
 }
 document.addEventListener('click', function(e){
   var b=e.target.closest('.pick'); if(!b) return;
-  ctx.caseParam=b.dataset.case; $('#nav').hidden=false;
+  ctx.caseParam=b.dataset.case; $('#nav').hidden=false; addRecent(ctx.caseParam);
   loadCase(ctx.caseParam).then(function(d){ data=d; render(); window.scrollTo(0,0); });
 });
 
