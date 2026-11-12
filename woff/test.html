@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WOFF 시험 페이지</title>
+<style>
+  body{font-family:-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;margin:0;padding:16px;background:#f6f7f9;color:#1d2330}
+  h1{font-size:18px;margin:0 0 4px}
+  p.sub{margin:0 0 16px;color:#666;font-size:13px}
+  .row{background:#fff;border:1px solid #e3e6eb;border-radius:10px;padding:10px 12px;margin-bottom:8px}
+  .k{font-size:12px;color:#666}
+  .v{font-size:15px;word-break:break-all;margin-top:2px}
+  .ok{color:#137333}.ng{color:#c5221f}
+  button{width:100%;padding:12px;border:0;border-radius:10px;background:#1d4ed8;color:#fff;font-size:15px;margin-top:8px}
+</style>
+</head>
+<body>
+<h1>WOFF 시험 페이지</h1>
+<p class="sub">사건방 메뉴·바로가기로 열었을 때 방 정보가 넘어오는지 확인합니다. 화면을 캡처해서 보내 주세요.</p>
+<div id="out"></div>
+<button id="copy">결과 복사</button>
+<script>
+(function(){
+  var q = new URLSearchParams(location.search);
+  var woffId = q.get('woffId') || '';
+  // WOFF SDK 주소는 개발자 콘솔 WOFF 가이드의 주소와 같아야 합니다. 다르면 ?sdk=주소 로 바꿔 열 수 있습니다.
+  var sdk = q.get('sdk') || 'https://static.worksmobile.net/static/wm/woff/edge/3.6/sdk.js';
+  var rows = [];
+  function add(k, v, good){
+    rows.push(k + ': ' + v);
+    var d = document.createElement('div'); d.className = 'row';
+    d.innerHTML = '<div class="k"></div><div class="v"></div>';
+    d.children[0].textContent = k;
+    d.children[1].textContent = v;
+    if (good === true) d.children[1].className += ' ok';
+    if (good === false) d.children[1].className += ' ng';
+    document.getElementById('out').appendChild(d);
+  }
+  function safe(fn){ try { var r = fn(); return r === undefined ? '(없음)' : (typeof r === 'object' ? JSON.stringify(r) : String(r)); } catch(e){ return '오류: ' + e.message; } }
+
+  add('열린 시각', new Date().toLocaleString('ko-KR'));
+  add('주소 뒤 값(사건번호 등)', location.search || '(없음)');
+  add('브라우저', navigator.userAgent);
+  if (!woffId) { add('woffId', '주소에 ?woffId=… 가 없습니다', false); return; }
+
+  var s = document.createElement('script');
+  s.src = sdk;
+  s.onerror = function(){ add('WOFF SDK 불러오기', '실패 (' + sdk + ')', false); };
+  s.onload = function(){
+    add('WOFF SDK 불러오기', '성공', true);
+    woff.init({ woffId: woffId }).then(function(){
+      add('woff.init', '성공', true);
+      add('웍스 앱 안에서 열림(isInClient)', safe(function(){ return woff.isInClient(); }));
+      add('기기(getOS)', safe(function(){ return woff.getOS(); }));
+      add('언어(getLanguage)', safe(function(){ return woff.getLanguage(); }));
+      add('방 정보(getContext)', safe(function(){ return woff.getContext && woff.getContext(); }));
+      if (woff.getChannelId) {
+        Promise.resolve().then(function(){ return woff.getChannelId(); })
+          .then(function(c){ add('방 ID(getChannelId)', c ? JSON.stringify(c) : '(빈 값)', !!c); })
+          .catch(function(e){ add('방 ID(getChannelId)', '오류: ' + (e && e.message || e), false); });
+      } else {
+        add('방 ID(getChannelId)', '이 기기에서는 함수 없음', false);
+      }
+      if (woff.getProfile) {
+        woff.getProfile().then(function(p){
+          add('내 정보(getProfile)', (p.displayName || '') + ' / ' + (p.userId || ''), true);
+        }).catch(function(e){ add('내 정보(getProfile)', '오류: ' + (e && e.message || e), false); });
+      }
+    }).catch(function(e){ add('woff.init', '실패: ' + (e && (e.code || '') + ' ' + (e.message || e)), false); });
+  };
+  document.head.appendChild(s);
+
+  document.getElementById('copy').onclick = function(){
+    var t = rows.join('\n');
+    (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(
+      function(){ alert('복사했습니다. 채팅에 붙여 넣어 주세요.'); },
+      function(){ prompt('아래 내용을 복사해 주세요', t); });
+  };
+})();
+</script>
+</body>
+</html>
