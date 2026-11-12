@@ -16,7 +16,8 @@ async function mockDb() {
   const db: Record<string, any[]> = {
     works_room_case: [
       { channel_id: "room-A", l_num: "L1", case_no: "2026고단1234", is_primary: false },
-      { channel_id: "room-A", l_num: "L2", case_no: "2026노1821", is_primary: true },
+      { channel_id: "room-A", l_num: "L2", case_no: "2026노1821", is_primary: true, status: "대상" },
+      { channel_id: "room-H", l_num: "L9", case_no: "2026고단9", is_primary: true, status: "보류" },
     ],
     pc_helper_device: [{ id: "d1", works_user_id: "u1", token_hash: await sha(TOKEN), revoked_at: null }],
     pc_open_request: [],
@@ -81,6 +82,11 @@ Deno.test("한 번 클릭 흐름", async () => {
     await callback(new Request("http://x", { method: "POST", body: b2, headers: { "x-works-signature": await hmacBase64(b2, env.botSecret) } }), env);
     const z = await (await wait(new Request("http://x", { headers: { authorization: "Bearer " + TOKEN } }), env)).json();
     assert(z.url.includes("room=room-Z"), "짝 없는 방");
+    // 보류 방이면 사건을 붙이지 않음
+    const b3 = JSON.stringify({ type: "postback", data: "room-case", source: { userId: "u1", channelId: "room-H" } });
+    await callback(new Request("http://x", { method: "POST", body: b3, headers: { "x-works-signature": await hmacBase64(b3, env.botSecret) } }), env);
+    const hz = await (await wait(new Request("http://x", { headers: { authorization: "Bearer " + TOKEN } }), env)).json();
+    assert(hz.url.includes("hold=1") && !hz.url.includes("case="), "보류 방은 사건 안 붙임: " + hz.url);
     console.log("열 주소:", decodeURIComponent(j.url));
   } finally { await srv.shutdown(); }
 });

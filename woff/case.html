@@ -226,7 +226,7 @@ function render(){
   document.querySelectorAll('nav button').forEach(function(b){ b.setAttribute('aria-current', b.dataset.v===view?'page':'false'); });
   var names={timeline:'타임라인',deadline:'기한',hearing:'기일',progress:'진행내용',info:'사건 정보'};
   $('#title').textContent = data.caseNo + ' ' + names[view];
-  $('#sub').textContent = data.title + ' · ' + data.court;
+  $('#sub').textContent = (q.get('closed') ? '[종결] ' : '') + data.title + ' · ' + data.court;
   $('#main').innerHTML = (VIEWS[view]||VIEWS.timeline)() +
     '<div class="diag">방: '+esc(ctx.room||'(없음)')+' · 사건번호 값: '+esc(ctx.caseParam||'(없음)')+' · 사용자: '+esc(ctx.user||'(확인 전)')+' · '+esc(ctx.os)+'</div>' + (ctx.room ? '' : diagHtml());
 }
@@ -289,6 +289,14 @@ function start(){
     var p3 = woff.getChannelId ? Promise.resolve().then(function(){ return woff.getChannelId(); }).then(function(c){ DIAG.channelId = c; }).catch(function(e){ DIAG.channelId = '오류: '+((e&&e.message)||e); }) : Promise.resolve();
     try{ DIAG.storage = Object.keys(sessionStorage).concat(Object.keys(localStorage)).join(', '); }catch(e){}
     return Promise.all([p1,p2,p3]).then(function(){
+      if(q.get('hold')){
+        // 보류 방: 어느 사건인지 확정 못 함 → 사건정보·서면을 띄우지 않는다
+        $('#nav').hidden=true; $('#switch').hidden=true; $('#chips').innerHTML='';
+        $('#title').textContent='사건 미확정';
+        $('#sub').textContent='이 방의 사건이 아직 정해지지 않았습니다.';
+        $('#main').innerHTML='<div class="note">사건이 확정되면 이 메뉴로 바로 열립니다. 관리자가 관리 화면에서 연결합니다.</div>';
+        return;
+      }
       if(!ctx.room && !ctx.caseParam) return showPicker().then(function(){
         // PC 도우미가 짝 없는 방에서 연 경우
         if(q.get('room')) $('#sub').textContent='이 방은 아직 사건과 짝지어지지 않았어요. 아래에서 골라 주세요.';

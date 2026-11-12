@@ -36,9 +36,12 @@ async function sha256Hex(s: string): Promise<string> {
   return [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
 }
 
-export function openUrl(caseNo: string | null, channelId: string): string {
-  const q = new URLSearchParams(caseNo ? { case: caseNo, view: "timeline" } : { room: channelId, view: "timeline" });
-  return WOFF + "?" + q.toString();
+export function openUrl(caseNo: string | null, channelId: string, status?: string | null): string {
+  const p: Record<string, string> = caseNo ? { case: caseNo } : { room: channelId };
+  if (status === "보류") p.hold = "1";        // 사건 화면 대신 "아직 정해지지 않음" 안내만
+  else if (status === "종결" && caseNo) p.closed = "1"; // 화면은 열고 '종결' 표시
+  p.view = "timeline";
+  return WOFF + "?" + new URLSearchParams(p).toString();
 }
 
 export async function handle(req: Request, env: Env): Promise<Response> {
@@ -57,7 +60,7 @@ export async function handle(req: Request, env: Env): Promise<Response> {
   while (Date.now() < until) {
     const since = new Date(Date.now() - FRESH_SEC * 1000).toISOString();
     const r = await rest(env,
-      "pc_open_request?select=id,channel_id,case_no&delivered_at=is.null" +
+      "pc_open_request?select=id,channel_id,case_no,room_status&delivered_at=is.null" +
         "&works_user_id=eq." + encodeURIComponent(dev.works_user_id) +
         "&created_at=gte." + encodeURIComponent(since) + "&order=created_at.desc&limit=1");
     const row = r.ok ? (await r.json())[0] : null;
@@ -69,7 +72,7 @@ export async function handle(req: Request, env: Env): Promise<Response> {
       });
       const got = u.ok ? await u.json() : [];
       if (got.length) {
-        return new Response(JSON.stringify({ url: openUrl(row.case_no, row.channel_id) }), {
+        return new Response(JSON.stringify({ url: openUrl(row.case_no, row.channel_id, row.room_status) }), {
           headers: { "Content-Type": "application/json" },
         });
       }

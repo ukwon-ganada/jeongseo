@@ -20,6 +20,7 @@ create table if not exists public.works_room_case (
   l_num      text not null,
   case_no    text,
   is_primary boolean not null default false,
+  status     text not null default '대상' check (status in ('대상','보류','종결')),  -- 보류 = 어느 사건인지 확정 못 함
   room_title text,
   updated_at timestamptz not null default now(),
   primary key (channel_id, l_num)
@@ -43,6 +44,7 @@ create table if not exists public.pc_open_request (
   channel_id    text not null,
   l_num         text,
   case_no       text,
+  room_status   text,
   created_at    timestamptz not null default now(),
   delivered_at  timestamptz
 );

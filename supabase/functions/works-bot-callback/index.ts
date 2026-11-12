@@ -64,15 +64,18 @@ export async function handle(req: Request, env: Env): Promise<Response> {
 
   if (ev?.type === "postback" && data === POSTBACK_ROOM_CASE && userId && channelId) {
     // 한 방에 사건이 여럿이면 주 사건(상급심)을 연다
-    const m = await rest(env, "works_room_case?select=l_num,case_no&order=is_primary.desc,updated_at.desc&limit=1&channel_id=eq." +
+    const m = await rest(env, "works_room_case?select=l_num,case_no,status&order=is_primary.desc,updated_at.desc&limit=1&channel_id=eq." +
       encodeURIComponent(channelId));
     const rows = m.ok ? await m.json() : (await m.body?.cancel(), []);
-    const caseNo = rows[0]?.case_no ?? null;
-    const lNum = rows[0]?.l_num ?? null;
+    // 보류(어느 사건인지 확정 못 함)면 사건을 붙이지 않는다: 잘못 붙이느니 안 붙인다
+    const st = rows[0]?.status ?? null;
+    const hold = st === "보류";
+    const caseNo = hold ? null : rows[0]?.case_no ?? null;
+    const lNum = hold ? null : rows[0]?.l_num ?? null;
     const ins = await rest(env, "pc_open_request", {
       method: "POST",
       headers: { Prefer: "return=minimal" },
-      body: JSON.stringify({ works_user_id: userId, channel_id: channelId, l_num: lNum, case_no: caseNo }),
+      body: JSON.stringify({ works_user_id: userId, channel_id: channelId, l_num: lNum, case_no: caseNo, room_status: st }),
     });
     if (!ins.ok) console.error("insert failed", ins.status, await ins.text());
     else await ins.body?.cancel();
