@@ -14,7 +14,10 @@ async function sha(s: string) {
 // 아주 작은 PostgREST 흉내 (이 시험에 필요한 모양만)
 async function mockDb() {
   const db: Record<string, any[]> = {
-    works_room_case: [{ channel_id: "room-A", case_no: "2026고단1234" }],
+    works_room_case: [
+      { channel_id: "room-A", l_num: "L1", case_no: "2026고단1234", is_primary: false },
+      { channel_id: "room-A", l_num: "L2", case_no: "2026노1821", is_primary: true },
+    ],
     pc_helper_device: [{ id: "d1", works_user_id: "u1", token_hash: await sha(TOKEN), revoked_at: null }],
     pc_open_request: [],
   };
@@ -32,7 +35,12 @@ async function mockDb() {
   const srv = Deno.serve({ port: 0, onListen() {} }, async (req) => {
     const u = new URL(req.url); const t = u.pathname.split("/").pop()!;
     const rows = db[t].filter((r) => match(r, u.searchParams));
-    if (req.method === "GET") return Response.json(rows.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || "")));
+    if (req.method === "GET") {
+      const ord = u.searchParams.get("order") || "";
+      rows.sort(ord.startsWith("is_primary") ? (a, b) => Number(b.is_primary) - Number(a.is_primary)
+        : (a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+      return Response.json(rows.slice(0, Number(u.searchParams.get("limit") || 99)));
+    }
     const body = await req.json();
     if (req.method === "POST") { db[t].push({ id: ++seq, created_at: new Date().toISOString(), delivered_at: null, ...body }); return new Response(null, { status: 201 }); }
     if (req.method === "PATCH") { rows.forEach((r) => Object.assign(r, body)); return Response.json(rows); }
@@ -59,10 +67,10 @@ Deno.test("한 번 클릭 흐름", async () => {
     const waiting = wait(new Request("http://x", { headers: { authorization: "Bearer " + TOKEN } }), env);
     await new Promise((s) => setTimeout(s, 300));
     r = await callback(new Request("http://x", { method: "POST", body, headers: { "x-works-signature": await hmacBase64(body, env.botSecret) } }), env);
-    assert(r.status === 200 && db.pc_open_request.length === 1, "클릭 기록");
+    assert(r.status === 200 && db.pc_open_request.length === 1 && db.pc_open_request[0].l_num === "L2", "클릭 기록(주 사건)");
     const got = await waiting;
     const j = await got.json();
-    assert(got.status === 200 && decodeURIComponent(j.url).includes("case=2026고단1234"), "사건 주소 받음: " + j.url);
+    assert(got.status === 200 && decodeURIComponent(j.url).includes("case=2026노1821"), "사건 주소 받음: " + j.url);
 
     // 한 번 받은 건 다시 안 옴
     const again = await wait(new Request("http://x", { headers: { authorization: "Bearer " + TOKEN } }), { ...env, waitMs: 400 });

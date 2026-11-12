@@ -13,11 +13,16 @@
 -- ============================================================================
 
 -- 1) 방 ↔ 사건 (방 제목에서 자동으로 채울 예정)
+--    한 방에 원심·항소심이 함께 붙고(상급심이 주 사건), 공동피고인이면 한 사건에 방이 여럿 → (channel_id, l_num) 쌍.
+--    l_num = cases.l_num(로웨어 사건 고유번호). case_no 는 정규화한 형태(2026노1821: 20xx+부호+앞 0 없는 번호).
 create table if not exists public.works_room_case (
-  channel_id text primary key,
+  channel_id text not null,
+  l_num      text not null,
   case_no    text,
+  is_primary boolean not null default false,
   room_title text,
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  primary key (channel_id, l_num)
 );
 
 -- 2) 도우미가 깔린 PC (토큰은 해시만 저장)
@@ -36,6 +41,7 @@ create table if not exists public.pc_open_request (
   id            bigserial primary key,
   works_user_id text not null,
   channel_id    text not null,
+  l_num         text,
   case_no       text,
   created_at    timestamptz not null default now(),
   delivered_at  timestamptz

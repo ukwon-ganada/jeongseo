@@ -63,13 +63,16 @@ export async function handle(req: Request, env: Env): Promise<Response> {
   const channelId = ev?.source?.channelId;
 
   if (ev?.type === "postback" && data === POSTBACK_ROOM_CASE && userId && channelId) {
-    const m = await rest(env, "works_room_case?select=case_no&channel_id=eq." + encodeURIComponent(channelId));
+    // 한 방에 사건이 여럿이면 주 사건(상급심)을 연다
+    const m = await rest(env, "works_room_case?select=l_num,case_no&order=is_primary.desc,updated_at.desc&limit=1&channel_id=eq." +
+      encodeURIComponent(channelId));
     const rows = m.ok ? await m.json() : (await m.body?.cancel(), []);
     const caseNo = rows[0]?.case_no ?? null;
+    const lNum = rows[0]?.l_num ?? null;
     const ins = await rest(env, "pc_open_request", {
       method: "POST",
       headers: { Prefer: "return=minimal" },
-      body: JSON.stringify({ works_user_id: userId, channel_id: channelId, case_no: caseNo }),
+      body: JSON.stringify({ works_user_id: userId, channel_id: channelId, l_num: lNum, case_no: caseNo }),
     });
     if (!ins.ok) console.error("insert failed", ins.status, await ins.text());
     else await ins.body?.cancel();
