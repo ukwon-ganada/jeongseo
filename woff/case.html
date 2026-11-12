@@ -56,6 +56,9 @@ nav button{border:0;background:transparent;padding:11px 2px;font-size:12px;color
 nav button[aria-current="page"]{color:var(--ours);font-weight:700}
 .diag{margin-top:24px;font-size:11px;color:var(--muted);border-top:1px dashed var(--line);padding-top:8px;overflow-wrap:anywhere}
 .login{margin:24px 0;text-align:center}
+.pick{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:transparent;padding:12px 0;font-family:inherit;color:var(--ink)}
+.pick .s{display:block}
+.search{width:100%;font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);margin:10px 0}
 .login button{border:0;border-radius:10px;background:var(--ours);color:#fff;font-size:15px;padding:12px 20px;font-family:inherit}
 </style>
 </head>
@@ -127,6 +130,16 @@ function loadCase(key){
       {h:'재판부',note:'재판 중',rows:[{l:'법원·재판부',v:'○○지방법원 형사3단독',src:'나의사건'},{l:'재판부 전화',v:'02-000-0000',src:'나의사건'}]}
     ]
   });
+}
+
+// 내가 들어 있는 사건방 목록 (견본) — PC처럼 방을 모를 때 고르기용
+function loadMyCases(){
+  return Promise.resolve([
+    {c:'2026고단1234',t:'사기',next:'12.08 공판기일'},
+    {c:'2026고합88',t:'특정경제범죄가중처벌등에관한법률위반(사기)',next:'11.24 공판준비기일'},
+    {c:'2026노3021',t:'상해',next:'11.17 항소심 공판기일'},
+    {c:'2026가단5512',t:'대여금',next:'11.19 변론기일'}
+  ]);
 }
 
 // ── 공통 ──────────────────────────────────────────────
@@ -212,6 +225,28 @@ document.addEventListener('click', function(e){
   if(b.dataset.file || b.dataset.todo || b.dataset.secret) alert('견본 화면입니다. 실제 파일 열기·수정은 Supabase 연결 뒤에 동작합니다.');
 });
 
+// ── 사건 고르기 (PC 메뉴처럼 방을 모를 때) ─────────────
+function showPicker(){
+  return loadMyCases().then(function(list){
+    $('#nav').hidden=true; $('#chips').innerHTML='';
+    $('#title').textContent='사건 고르기';
+    $('#sub').textContent='PC에서는 어느 방에서 열었는지 알 수 없어, 내 사건 중에서 고릅니다.';
+    function draw(qs){
+      $('#list').innerHTML=list.filter(function(x){ return !qs || (x.c+x.t).indexOf(qs)>=0; }).map(function(x){
+        return '<button class="pick" data-case="'+esc(x.c)+'"><span class="t"><span class="case">'+esc(x.c)+'</span>'+esc(x.t)+'</span><span class="s">다음: '+esc(x.next)+'</span></button>';
+      }).join('') || '<div class="note">맞는 사건이 없습니다.</div>';
+    }
+    $('#main').innerHTML='<input class="search" id="qs" placeholder="사건번호나 사건명으로 찾기"><div id="list"></div><div class="note">내가 들어 있는 사건방만 보입니다.</div>';
+    $('#qs').oninput=function(){ draw(this.value.trim()); };
+    draw('');
+  });
+}
+document.addEventListener('click', function(e){
+  var b=e.target.closest('.pick'); if(!b) return;
+  ctx.caseParam=b.dataset.case; $('#nav').hidden=false;
+  loadCase(ctx.caseParam).then(function(d){ data=d; render(); window.scrollTo(0,0); });
+});
+
 // ── WOFF 시작 ─────────────────────────────────────────
 function start(){
   woff.init({woffId: WOFF_ID}).then(function(){
@@ -225,7 +260,10 @@ function start(){
     }
     var p1 = woff.getProfile().then(function(p){ ctx.user = p.displayName || ''; }).catch(function(){});
     var p2 = ctx.inClient && woff.getChannelId ? Promise.resolve(woff.getChannelId()).then(function(c){ ctx.room = c || ''; }).catch(function(){}) : Promise.resolve();
-    return Promise.all([p1,p2]).then(function(){ return loadCase(ctx.room || ctx.caseParam); }).then(function(d){ data=d; render(); });
+    return Promise.all([p1,p2]).then(function(){
+      if(!ctx.room && !ctx.caseParam) return showPicker();
+      return loadCase(ctx.room || ctx.caseParam).then(function(d){ data=d; render(); });
+    });
   }).catch(function(e){
     // 웍스 밖에서 열었을 때도 견본은 보이게
     loadCase('').then(function(d){ data=d; render(); $('#sub').textContent='웍스 연결 실패: '+((e&&e.message)||e)+' (견본만 표시)'; });
