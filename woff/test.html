@@ -23,9 +23,14 @@
 <script>
 (function(){
   var q = new URLSearchParams(location.search);
-  var woffId = q.get('woffId') || '';
+  var woffId = q.get('woffId') || 'Nxkob0LER_dfaSzH8s6flw'; // 정서 시험 WOFF
   // WOFF SDK 주소는 개발자 콘솔 WOFF 가이드의 주소와 같아야 합니다. 다르면 ?sdk=주소 로 바꿔 열 수 있습니다.
-  var sdk = q.get('sdk') || 'https://static.worksmobile.net/static/wm/woff/edge/3.6/sdk.js';
+  var sdks = q.get('sdk') ? [q.get('sdk')] : [
+    'https://static.worksmobile.net/static/wm/woff/edge/3.7.1/sdk.js',
+    'https://static.worksmobile.net/static/wm/woff/edge/3.7/sdk.js',
+    'https://static.worksmobile.net/static/wm/woff/edge/3.6/sdk.js',
+    'https://static.worksmobile.net/static/wm/woff/edge/3.5/sdk.js'
+  ];
   var rows = [];
   function add(k, v, good){
     rows.push(k + ': ' + v);
@@ -44,11 +49,15 @@
   add('브라우저', navigator.userAgent);
   if (!woffId) { add('woffId', '주소에 ?woffId=… 가 없습니다', false); return; }
 
-  var s = document.createElement('script');
-  s.src = sdk;
-  s.onerror = function(){ add('WOFF SDK 불러오기', '실패 (' + sdk + ')', false); };
-  s.onload = function(){
-    add('WOFF SDK 불러오기', '성공', true);
+  function loadSdk(i){
+    if (i >= sdks.length) { add('WOFF SDK 불러오기', '모든 주소 실패', false); return; }
+    var s = document.createElement('script');
+    s.src = sdks[i];
+    s.onerror = function(){ loadSdk(i + 1); };
+    s.onload = function(){ add('WOFF SDK 불러오기', '성공 (' + sdks[i] + ')', true); start(); };
+    document.head.appendChild(s);
+  }
+  function start(){
     woff.init({ woffId: woffId }).then(function(){
       add('woff.init', '성공', true);
       add('웍스 앱 안에서 열림(isInClient)', safe(function(){ return woff.isInClient(); }));
@@ -68,8 +77,8 @@
         }).catch(function(e){ add('내 정보(getProfile)', '오류: ' + (e && e.message || e), false); });
       }
     }).catch(function(e){ add('woff.init', '실패: ' + (e && (e.code || '') + ' ' + (e.message || e)), false); });
-  };
-  document.head.appendChild(s);
+  }
+  loadSdk(0);
 
   document.getElementById('copy').onclick = function(){
     var t = rows.join('\n');
