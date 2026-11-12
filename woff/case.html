@@ -289,7 +289,10 @@ function start(){
     var p3 = woff.getChannelId ? Promise.resolve().then(function(){ return woff.getChannelId(); }).then(function(c){ DIAG.channelId = c; }).catch(function(e){ DIAG.channelId = '오류: '+((e&&e.message)||e); }) : Promise.resolve();
     try{ DIAG.storage = Object.keys(sessionStorage).concat(Object.keys(localStorage)).join(', '); }catch(e){}
     return Promise.all([p1,p2,p3]).then(function(){
-      if(!ctx.room && !ctx.caseParam) return showPicker();
+      if(!ctx.room && !ctx.caseParam) return showPicker().then(function(){
+        // PC 도우미가 짝 없는 방에서 연 경우
+        if(q.get('room')) $('#sub').textContent='이 방은 아직 사건과 짝지어지지 않았어요. 아래에서 골라 주세요.';
+      });
       return loadCase(ctx.room || ctx.caseParam).then(function(d){ data=d; render(); });
     });
   }).catch(function(e){
