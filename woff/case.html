@@ -275,11 +275,13 @@ document.addEventListener('click', function(e){
 function start(){
   woff.init({woffId: WOFF_ID}).then(function(){
     ctx.os = woff.getOS(); ctx.inClient = woff.isInClient();
+    // ?relogin=1: 권한이 바뀌었을 때 새 토큰을 받도록 로그아웃 후 다시 로그인
+    if(q.get('relogin') && woff.isLoggedIn()){ try{ woff.logout(); }catch(e){} }
     if(!woff.isLoggedIn()){
       // PC 브라우저: 처음 한 번 로그인
       $('#sub').textContent='누가 열었는지 확인이 필요합니다.';
       $('#main').innerHTML='<div class="login"><p>웍스 계정으로 한 번 로그인해 주세요.</p><button id="lg">웍스 계정으로 로그인</button></div>';
-      $('#lg').onclick=function(){ woff.login({redirectUri: location.href}); };
+      $('#lg').onclick=function(){ woff.login({redirectUri: location.href.replace(/[?&]relogin=1/,'')}); };
       return;
     }
     var p1 = woff.getProfile().then(function(p){ ctx.user = p.displayName || ''; }).catch(function(){});
