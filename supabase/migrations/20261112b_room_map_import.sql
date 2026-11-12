@@ -57,18 +57,20 @@ begin
   delete from works_room_case where source = 'csv';
 
   -- 주 사건 행 (l_num 이 비었으면 보류: 사건을 붙이지 않음)
+  -- l_num 이 빈 칸이면 bigint 로 바꾸지 않도록 먼저 안전하게 숫자로 바꿔 둠
+  with r as (
+    select *, case when trim(coalesce(l_num, '')) ~ '^\d+$' then trim(l_num)::bigint end as lnum
+    from works_room_map_raw
+  )
   insert into works_room_case (channel_id, l_num, case_no, is_primary, status, room_title, basis, confidence, source, updated_at)
   select distinct on (r.channel_id)
-         r.channel_id,
-         case when r.l_num ~ '^\d+$' then r.l_num::bigint end,
-         norm_case_no(c.l_code),
-         true,
-         case when r.target like '보류%' or coalesce(r.l_num, '') !~ '^\d+$' then '보류'
+         r.channel_id, r.lnum, norm_case_no(c.l_code), true,
+         case when r.target like '보류%' or r.lnum is null then '보류'
               when r.target like '제외%' or r.target like '%종결%' then '종결'
               else '대상' end,
          r.room_title, r.basis, r.confidence, 'csv', now()
-  from works_room_map_raw r
-  left join cases c on r.l_num ~ '^\d+$' and c.l_num = r.l_num::bigint
+  from r
+  left join cases c on c.l_num = r.lnum
   where not exists (select 1 from works_room_case m where m.channel_id = r.channel_id and m.source = 'manual')
   order by r.channel_id, r.imported_at desc;
   get diagnostics n_main = row_count;
