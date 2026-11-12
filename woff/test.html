@@ -45,7 +45,7 @@
   function safe(fn){ try { var r = fn(); return r === undefined ? '(없음)' : (typeof r === 'object' ? JSON.stringify(r) : String(r)); } catch(e){ return '오류: ' + e.message; } }
 
   add('열린 시각', new Date().toLocaleString('ko-KR'));
-  add('주소 뒤 값(사건번호 등)', location.search || '(없음)');
+  add('주소 뒤 값(사건번호 등)', location.search ? decodeURIComponent(location.search) : '(없음)');
   add('브라우저', navigator.userAgent);
   if (!woffId) { add('woffId', '주소에 ?woffId=… 가 없습니다', false); return; }
 
@@ -62,6 +62,15 @@
       add('woff.init', '성공', true);
       add('웍스 앱 안에서 열림(isInClient)', safe(function(){ return woff.isInClient(); }));
       add('기기(getOS)', safe(function(){ return woff.getOS(); }));
+      var loggedIn = safe(function(){ return woff.isLoggedIn(); });
+      add('로그인 상태(isLoggedIn)', loggedIn, loggedIn === 'true');
+      if (loggedIn === 'false') {
+        var b = document.createElement('button');
+        b.textContent = '웍스 계정으로 로그인 (PC 시험)';
+        b.style.background = '#137333';
+        b.onclick = function(){ woff.login({ redirectUri: location.href }); };
+        document.getElementById('out').appendChild(b);
+      }
       add('언어(getLanguage)', safe(function(){ return woff.getLanguage(); }));
       add('방 정보(getContext)', safe(function(){ return woff.getContext && woff.getContext(); }));
       if (woff.getChannelId) {
