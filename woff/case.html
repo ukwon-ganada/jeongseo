@@ -343,7 +343,7 @@ function showLocate(){
 }
 
 // ── PC 도우미 연결 (?setup=pc) ────────────────────────
-var GET_CMD = 'mkdir %TEMP%\\jshelper & cd /d %TEMP%\\jshelper & for %f in (jeongseo-helper.ps1 install.ps1 install.cmd uninstall.ps1 uninstall.cmd server.json) do curl -sSLO https://raw.githubusercontent.com/ukwon-ganada/jeongseo/main/tools/pc-helper/%f & install.cmd';
+var GET_CMD = 'mkdir %TEMP%\\jshelper & cd /d %TEMP%\\jshelper & (for %f in (jeongseo-helper.ps1 install.ps1 install.cmd uninstall.ps1 uninstall.cmd server.json) do @curl -sSLO https://raw.githubusercontent.com/ukwon-ganada/jeongseo/main/tools/pc-helper/%f) & install.cmd';
 function showSetup(){
   $('#nav').hidden=true; $('#switch').hidden=true;
   $('#title').textContent='PC 도우미 연결';
