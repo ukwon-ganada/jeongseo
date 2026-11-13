@@ -196,8 +196,9 @@ export async function caseFiles(env: Env, lNum: string, fetcher: typeof fetch = 
 
 // 최종 제출본 고르기 (석원 결정 2026-11-13: "규칙은 어쨌든 마지막 서면")
 //   로웨어에 "법무법인 정서 … 제출"(우리 서면)이 찍힌 날 D마다,
-//   바로 앞 우리 제출일 다음 날부터 D까지 방에 올라온 문서 파일 중 마지막 하나를 그 줄에 붙인다.
-//   로웨어 제출 기록엔 시각이 없어서 "그날의 마지막"으로 본다. 앞의 초안·수정본은 화면에 내지 않는다.
+//   그 날짜(D)에 방에 올라온 문서 파일 중 마지막 하나만 그 줄에 붙인다 (석원: "그 날짜 최종서면만").
+//   로웨어 제출 기록엔 시각이 없어서 "그날의 마지막"으로 본다. 초안·수정본은 화면에 내지 않는다.
+//   실시간일 필요 없음: 로웨어에 제출이 뜬 뒤 사건 화면을 열 때 계산된다.
 //   직원이 직접 고른 파일(lp_num)이 있으면 그것이 우선.
 const DOC_RE = /\.(pdf|hwp|hwpx|doc|docx)$/i;
 export function attachFinalFiles(events: any[], files: any[]) {
@@ -206,12 +207,10 @@ export function attachFinalFiles(events: any[], files: any[]) {
   const picked = new Map<string, any>();
   for (const f of docs) if (f.lp != null && !picked.has(String(f.lp))) { picked.set(String(f.lp), f); used.add(f.id); }
   const ours = events.filter((e) => e.k === "ours" && e.lp != null).sort((a, b) => a.d.localeCompare(b.d) || a.lp - b.lp);
-  let prevDay = "", winStart = "";
   for (const e of ours) {
-    if (e.d !== prevDay) { winStart = prevDay; prevDay = e.d; } // 같은 날 제출이 여럿이면 같은 창을 씀
     const m = picked.get(String(e.lp));
     if (m) { e.f = { id: m.id, n: m.n, pick: 1 }; continue; }
-    const pool = docs.filter((f) => !used.has(f.id) && f.lp == null && f.d <= e.d && (!winStart || f.d > winStart))
+    const pool = docs.filter((f) => !used.has(f.id) && f.lp == null && f.d === e.d)
       .sort((a, b) => b.at - a.at);
     if (pool[0]) { used.add(pool[0].id); e.f = { id: pool[0].id, n: pool[0].n, pick: 0 }; }
   }
