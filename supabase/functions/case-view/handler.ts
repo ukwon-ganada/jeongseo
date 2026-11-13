@@ -12,6 +12,7 @@
 //    { "action": "case", "case": "<사건번호>" }       → 사건번호로 찾은 사건
 //    { "action": "mycases" }                        → 내가 담당인 진행 사건 (고르기 화면용)
 //    { "action": "save_info", "lNum": 123, "fields": {...} } → 사건 정보 저장(case_info, 수정 기록 case_info_log)
+//    { "action": "locate" }                         → PC: 이 직원 PC 도우미에게 웍스 창 방 제목을 읽게 해서 지금 방을 찾음(최대 8초)
 //    { "action": "helper_token" }                   → 이 직원의 PC 도우미 연결 코드 발급(한 번만 보여 줌, 서버엔 해시만)
 //  사건 정보 칸은 우리가 직접 입력·수정한다. 로웨어와 연동하지 않는다(자동으로 덮어쓰지 않음).
 //    저장된 값이 없을 때만 처음 값으로 로웨어 값을 한 번 보여 준다(PREFILL_FROM_LAWWARE).
@@ -50,7 +51,8 @@ async function rest(env: Env, path: string, init: RequestInit = {}, fetcher: typ
     headers: { apikey: env.sbKey, Authorization: "Bearer " + env.sbKey, "Content-Type": "application/json", ...(init.headers || {}) },
   });
   if (!r.ok) throw new Error("DB " + r.status + " " + (await r.text()).slice(0, 200));
-  return r.status === 201 || r.status === 204 ? null : r.json();
+  const t = r.status === 204 ? "" : await r.text();
+  return t ? JSON.parse(t) : null;
 }
 const enc = (s: string) => encodeURIComponent(s);
 const inList = (xs: string[]) => "(" + xs.map((x) => '"' + x.replace(/"/g, "") + '"').join(",") + ")";
@@ -225,6 +227,30 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
         .map((m: any) => ({ c: m.l_code, d: m.next_date.slice(0, 10), tm: nz(m.next_time), t: nz(m.next_contents) || "기일", p: nz(m.court) }));
       await logView(env, who, "case", room, c, fetcher);
       return json(shapeCase(c, evs || [], { today, linked, myHearings, status, saved }));
+    }
+
+    if (body?.action === "locate") {
+      if (!who.userId) return json({ error: "직원 확인이 안 됐습니다" }, 401);
+      // 도우미가 최근 90초 안에 서버에 들렀어야 켜져 있는 것
+      const alive = new Date(Date.now() - 90_000).toISOString();
+      const devs = await rest(env, `pc_helper_device?select=id&revoked_at=is.null&works_user_id=eq.${enc(who.userId)}&last_seen_at=gte.${enc(alive)}&limit=1`, {}, fetcher);
+      if (!devs?.length) return json({ nohelper: true });
+      const ins = await rest(env, "pc_locate", { method: "POST", headers: { Prefer: "return=representation" },
+        body: JSON.stringify({ works_user_id: who.userId }) }, fetcher);
+      const id = ins?.[0]?.id;
+      if (!id) return json({ error: "요청을 만들지 못했습니다" }, 500);
+      const until = Date.now() + (body.waitMs ?? 8000);
+      while (Date.now() < until) {
+        await new Promise((r) => setTimeout(r, 300));
+        const row = (await rest(env, `pc_locate?select=taken_at,done_at,channel_id,how&id=eq.${id}`, {}, fetcher))?.[0];
+        if (row?.done_at) {
+          await logView(env, who, "locate:" + nz(row.how), nz(row.channel_id), null, fetcher);
+          return json(row.channel_id ? { room: row.channel_id } : { notfound: true, how: row.how });
+        }
+        if (!row?.taken_at && Date.now() > until - 5000) break; // 3초 안에 도우미가 안 받아 가면 꺼진 것(또는 옛 버전)
+      }
+      await logView(env, who, "locate:timeout", "", null, fetcher);
+      return json({ timeout: true });
     }
 
     if (body?.action === "helper_token") {

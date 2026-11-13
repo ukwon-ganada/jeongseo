@@ -331,6 +331,17 @@ function showCase(key){
   });
 }
 
+// ── PC: 지금 보고 있는 웍스 방 찾기 ───────────────────
+function showLocate(){
+  message('사건 정보', '보고 있는 웍스 방을 확인하는 중…', '<div class="empty-st">잠시만 기다려 주세요</div>');
+  return api({action:'locate'}).then(function(j){
+    if(j.room){ ctx.room=j.room; return showCase({room:j.room}); }
+    if(j.nohelper) return showPicker('PC 도우미가 켜져 있지 않아 방을 알 수 없습니다');
+    if(j.timeout) return showPicker('PC 도우미가 응답하지 않습니다 (업데이트가 필요할 수 있어요)');
+    return showPicker('웍스 창에서 방 이름을 읽지 못했습니다 (창을 최소화하지 마세요)');
+  }).catch(function(){ return showPicker(''); });
+}
+
 // ── PC 도우미 연결 (?setup=pc) ────────────────────────
 var GET_CMD = 'mkdir %TEMP%\\jshelper & cd /d %TEMP%\\jshelper & for %f in (jeongseo-helper.ps1 install.ps1 install.cmd uninstall.ps1 uninstall.cmd server.json) do curl -sSLO https://raw.githubusercontent.com/ukwon-ganada/jeongseo/main/tools/pc-helper/%f & install.cmd';
 function showSetup(){
@@ -373,6 +384,8 @@ function start(){
       // 보류 방: 어느 사건인지 확정 못 함 → 사건정보·서면을 띄우지 않는다
       if(q.get('hold')) return showHold();
       if(q.get('setup')==='pc') return showSetup();
+      // PC(바깥 브라우저): 웍스가 방을 알려 주지 않으므로, 이 PC 도우미가 웍스 창의 방 제목을 읽어 찾는다
+      if(!inClient && !ctx.room && !ctx.caseParam && !q.get('room')) return showLocate();
       if(!ctx.room && !ctx.caseParam) return showPicker(q.get('room') ? '이 방과 연결된 사건이 없습니다' : '');
       return showCase(ctx.room ? {room:ctx.room} : {'case':ctx.caseParam});
     });
