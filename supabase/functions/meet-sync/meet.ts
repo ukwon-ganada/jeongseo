@@ -32,16 +32,29 @@ export function clientNames(client: string): string[] {
   return [...new Set(s.split(/[,\s]+/).map((x) => x.trim()).filter((x) => /^[가-힣]{2,4}$/.test(x)))];
 }
 
-export type CaseRow = { l_num: number; client: string; lawyer: string };
-export function matchCase(name: string, owner: string, cases: CaseRow[], index?: Map<string, CaseRow[]>): number | null {
-  const hits = index ? (index.get(name) || []) : cases.filter((c) => clientNames(c.client).includes(name));
+export type CaseRow = { l_num: number; client: string; lawyer: string; extra?: string[]; accept?: string };
+// 사건번호 맞추기용: "26고단 0123" → "2026고단123"
+export function normCaseNo(s: string): string {
+  const t = String(s || "").replace(/\s/g, "");
+  const m = t.match(/^(\d{2}|\d{4})([가-힣]+)0*(\d+)/);
+  return m ? (m[1].length === 2 ? "20" + m[1] : m[1]) + m[2] + m[3] : t;
+}
+const namesOf = (c: CaseRow) => [...new Set([...clientNames(c.client), ...(c.extra || []).filter((x) => /^[가-힣]{2,4}$/.test(x))])];
+// 같은 이름이 여러 사건이면: ① 일정 주인이 담당인 사건 ② 그중 접견일 전에 선임된 사건 중 가장 최근(1심→항소심처럼 같은 사람의 다음 사건)
+export function matchCase(name: string, owner: string, cases: CaseRow[], index?: Map<string, CaseRow[]>, date = ""): number | null {
+  const hits = index ? (index.get(name) || []) : cases.filter((c) => namesOf(c).includes(name));
   if (hits.length === 1) return hits[0].l_num;
-  const mine = hits.filter((c) => owner && c.lawyer.includes(owner));
-  return mine.length === 1 ? mine[0].l_num : null;
+  let pool = hits.filter((c) => owner && c.lawyer.includes(owner));
+  if (pool.length === 1) return pool[0].l_num;
+  if (!pool.length) pool = hits;
+  if (!date) return null;
+  const before = pool.filter((c) => c.accept && c.accept <= date).sort((a, b) => b.accept!.localeCompare(a.accept!));
+  if (before.length === 1 || (before.length > 1 && before[0].accept !== before[1].accept)) return before[0].l_num;
+  return null;
 }
 export function buildIndex(cases: CaseRow[]): Map<string, CaseRow[]> {
   const ix = new Map<string, CaseRow[]>();
-  for (const c of cases) for (const n of clientNames(c.client)) { const a = ix.get(n) || []; a.push(c); ix.set(n, a); }
+  for (const c of cases) for (const n of namesOf(c)) { const a = ix.get(n) || []; a.push(c); ix.set(n, a); }
   return ix;
 }
 
