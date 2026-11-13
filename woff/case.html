@@ -3,337 +3,356 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>사건방</title>
+<title>사건 정보</title>
 <style>
-:root{--bg:#f4f6f8;--surface:#fff;--ink:#18212b;--muted:#5d6977;--line:#dde3e9;--court:#7a8694;--ours:#1f5fbf;--ours-tint:#e6eefb;--due:#c46a0a;--due-tint:#fbf0e2;--warn:#fff6d6;--warn-line:#e3b93c}
-@media (prefers-color-scheme:dark){:root{--bg:#12171d;--surface:#1b222a;--ink:#e6ebf0;--muted:#9aa6b3;--line:#2e3843;--court:#8d99a6;--ours:#6ea3f2;--ours-tint:#1d2c42;--due:#e39a45;--due-tint:#3a2a17;--warn:#3a3216;--warn-line:#b8922a}}
+:root{
+  --bg:#f5f6f8;--surface:#fff;--ink:#222;--ink2:#555;--muted:#8a8f98;--line:#ebedf0;--line2:#f2f3f5;
+  --accent:#00c73c;--accent-ink:#00a83a;--accent-tint:#e8f9ee;
+  --due:#ff6b00;--due-tint:#fff1e6;--danger:#f04452;
+  --radius:12px;--shadow:0 1px 2px rgba(0,0,0,.04),0 4px 16px rgba(0,0,0,.04);
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#141518;--surface:#1e1f23;--ink:#ececee;--ink2:#c2c5cb;--muted:#8b9099;--line:#2c2e33;--line2:#26282c;
+  --accent:#16d158;--accent-ink:#3ddc78;--accent-tint:#173323;--due:#ff8a3d;--due-tint:#3a2614;--shadow:none}}
 *{box-sizing:border-box}[hidden]{display:none!important}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;font-size:15px;line-height:1.55;padding-bottom:calc(64px + env(safe-area-inset-bottom))}
-header{position:sticky;top:0;z-index:2;background:var(--surface);border-bottom:1px solid var(--line);padding:12px 16px 0}
-header h1{font-size:17px;margin:0}
-header .sub{font-size:12px;color:var(--muted)}
-.chips{display:flex;gap:6px;flex-wrap:wrap;padding:10px 0}
-.chip{border:1px solid var(--line);background:transparent;border-radius:999px;padding:3px 11px;font-size:13px;color:var(--ink);font-family:inherit}
-.chip[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
-.banner{background:var(--warn);border-bottom:1px solid var(--warn-line);font-size:12px;padding:6px 16px}
-main{padding:4px 16px 16px}
-main{max-width:720px;margin-left:auto;margin-right:auto}
-header,.banner{padding-left:max(16px,calc((100% - 688px)/2));padding-right:max(16px,calc((100% - 688px)/2))}
-.fr .edit{white-space:nowrap}
-.yr{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--muted);margin:12px 0 4px}
-.ev{position:relative;padding:4px 0 12px 22px;border-left:2px solid var(--line);margin-left:5px}
-.ev::before{content:"";position:absolute;left:-7px;top:9px;width:12px;height:12px;border-radius:50%;background:var(--surface);border:2px solid var(--court)}
-.ev.ours::before{border-color:var(--ours);background:var(--ours)}.ev.due::before{border-color:var(--due)}
-.d{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--muted)}
-.ev.ours .t{color:var(--ours);font-weight:600}.ev.due .t{color:var(--due);font-weight:600}
-.mini{font-size:12px;border:1px solid var(--ours);color:var(--ours);background:transparent;border-radius:6px;padding:1px 8px;margin-left:6px;font-family:inherit}
-.nofile{color:var(--muted);font-size:12px;font-weight:400}
-.row{display:grid;grid-template-columns:auto 1fr;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);align-items:start}
-.row>div{min-width:0}
-.dday{font-family:ui-monospace,Menlo,monospace;font-size:12px;min-width:56px;text-align:center;border-radius:6px;padding:2px 6px;background:var(--due-tint);color:var(--due)}
-.dday.hot{background:var(--due);color:var(--surface)}
-.row.done{opacity:.55}.row.done .dday{background:var(--bg);color:var(--muted)}
-.t{font-weight:600}.s{font-size:12px;color:var(--muted)}
-.pill{font-size:11px;border-radius:999px;padding:0 7px;border:1px solid var(--due);color:var(--due);margin-left:6px;font-weight:500}
-.case{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--ours);margin-right:4px}
-.hd{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:14px;padding-bottom:4px;border-bottom:1px solid var(--line)}
-.hd b{color:var(--ink)}
-.past{opacity:.55}
-.pg{display:grid;grid-template-columns:84px 1fr;gap:8px;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}
-.pg>div{min-width:0}.pg.ours .c{color:var(--ours);font-weight:600}.pg.plan{opacity:.6}
-.src,.note{font-size:12px;color:var(--muted);padding:8px 0}
-.sec{font-weight:700;margin:16px 0 2px;display:flex;justify-content:space-between;align-items:baseline}
-.sec small{font-weight:400;color:var(--muted);font-size:12px}
-.fr{display:grid;grid-template-columns:84px 1fr auto;gap:8px;align-items:start;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}
-.fr>div{min-width:0;overflow-wrap:anywhere}.fr .l{color:var(--muted);font-size:13px}
-.empty{color:var(--due)}
-.badge{display:inline-block;font-size:11px;border-radius:4px;padding:0 5px;margin-top:2px;background:var(--bg);color:var(--muted)}
-.badge.man{background:var(--ours-tint);color:var(--ours)}
-.edit{font-size:13px;border:0;background:transparent;color:var(--ours);font-family:inherit;padding:2px 0}
-.fr input{width:100%;font:inherit;padding:4px 6px;border:1px solid var(--ours);border-radius:6px;background:var(--surface);color:var(--ink)}
-nav{position:fixed;left:0;right:0;bottom:0;max-width:720px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr);background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
-nav button{border:0;background:transparent;padding:11px 2px;font-size:12px;color:var(--muted);font-family:inherit}
-nav button[aria-current="page"]{color:var(--ours);font-weight:700}
-.diag{margin-top:24px;font-size:11px;color:var(--muted);border-top:1px dashed var(--line);padding-top:8px;overflow-wrap:anywhere}
-.login{margin:24px 0;text-align:center}
-.pick{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:transparent;padding:12px 0;font-family:inherit;color:var(--ink)}
-.pick .s{display:block}
-.search{width:100%;font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);margin:10px 0}
-.login button{border:0;border-radius:10px;background:var(--ours);color:#fff;font-size:15px;padding:12px 20px;font-family:inherit}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Pretendard,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;font-size:15px;line-height:1.5;letter-spacing:-.2px;padding-bottom:env(safe-area-inset-bottom)}
+button,input,textarea{font:inherit;color:inherit;letter-spacing:inherit}
+button{cursor:pointer}
+a{color:inherit}
+
+/* 머리 */
+.top{position:sticky;top:0;z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
+.wrap{max-width:880px;margin:0 auto;padding:0 16px}
+.head{display:flex;align-items:flex-start;gap:12px;padding:14px 0 10px}
+.head .txt{flex:1;min-width:0}
+.head h1{font-size:19px;font-weight:700;margin:0;letter-spacing:-.4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.head .sub{font-size:13px;color:var(--muted);margin-top:2px;overflow-wrap:anywhere}
+.tag{display:inline-block;font-size:11px;font-weight:600;border-radius:4px;padding:1px 6px;margin-right:6px;vertical-align:1px;background:var(--line2);color:var(--muted)}
+.btn-ghost{flex:none;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:6px 10px;font-size:13px;color:var(--ink2)}
+.tabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:0 12px}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{flex:none;border:0;background:none;padding:10px 8px 11px;font-size:15px;color:var(--muted);position:relative;font-weight:500}
+.tabs button[aria-current="page"]{color:var(--ink);font-weight:700}
+.tabs button[aria-current="page"]::after{content:"";position:absolute;left:8px;right:8px;bottom:0;height:2px;border-radius:2px;background:var(--ink)}
+
+/* 본문 */
+main{max-width:880px;margin:0 auto;padding:12px 16px 32px}
+.chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:2px 0 12px}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 13px;font-size:13px;color:var(--ink2)}
+.chip[aria-pressed="true"]{border-color:var(--accent);color:var(--accent-ink);background:var(--accent-tint);font-weight:600}
+.card{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:12px}
+.card-h{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 6px;font-size:13px;font-weight:600;color:var(--muted)}
+.empty-st{text-align:center;color:var(--muted);padding:56px 16px;font-size:14px}
+.empty-st b{display:block;color:var(--ink);font-size:16px;margin-bottom:4px}
+
+/* 타임라인 */
+.yr{font-size:13px;font-weight:700;color:var(--muted);padding:14px 16px 2px}
+.ev{display:grid;grid-template-columns:52px 18px 1fr;gap:0 8px;padding:0 16px}
+.ev .d{font-size:13px;color:var(--muted);padding:12px 0;text-align:right;font-variant-numeric:tabular-nums}
+.ev .d small{display:block;font-size:11px}
+.ev .rail{position:relative}
+.ev .rail::before{content:"";position:absolute;left:8px;top:0;bottom:0;width:2px;background:var(--line)}
+.ev .rail::after{content:"";position:absolute;left:4px;top:17px;width:10px;height:10px;border-radius:50%;background:var(--surface);border:2px solid #c4c8ce}
+.ev.ours .rail::after{background:var(--accent);border-color:var(--accent)}
+.ev.due .rail::after{border-color:var(--due);background:var(--due)}
+.ev .t{padding:12px 0;border-bottom:1px solid var(--line2);font-size:15px;overflow-wrap:anywhere}
+.ev:last-child .t{border-bottom:0}
+.ev.ours .t{font-weight:700}
+.ev.due .t{color:var(--due);font-weight:700}
+.ev.court .t{color:var(--ink2)}
+
+/* 목록 줄 */
+.li{display:flex;gap:12px;padding:13px 16px;border-top:1px solid var(--line2);align-items:flex-start}
+.card-h+.li,.li:first-child{border-top:0}
+.li .main{flex:1;min-width:0;overflow-wrap:anywhere}
+.li .t{font-size:15px}
+.li .s{font-size:13px;color:var(--muted);margin-top:2px}
+.li .tm{flex:none;width:52px;font-size:14px;font-weight:700;font-variant-numeric:tabular-nums}
+.li.past{opacity:.5}
+.casechip{display:inline-block;font-size:12px;color:var(--accent-ink);background:var(--accent-tint);border-radius:4px;padding:0 6px;margin-right:6px}
+.dday{flex:none;font-size:12px;font-weight:700;color:var(--due);background:var(--due-tint);border-radius:6px;padding:2px 8px}
+.dday.past{color:var(--muted);background:var(--line2)}
+
+/* 진행내용 */
+.pg{display:grid;grid-template-columns:76px 1fr;gap:10px;padding:12px 16px;border-top:1px solid var(--line2);font-size:14px}
+.pg:first-child{border-top:0}
+.pg .d{color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
+.pg .c{overflow-wrap:anywhere}
+.pg .r{font-size:13px;color:var(--muted)}
+.pg.hl .c{font-weight:700}
+.pg.hl{box-shadow:inset 3px 0 0 var(--accent)}
+.pg.dim{opacity:.45}
+.pg.plan .d{color:var(--due);font-weight:600}
+.meta{font-size:12px;color:var(--muted);padding:0 2px 10px}
+
+/* 사건 정보 */
+.fr{display:grid;grid-template-columns:96px 1fr auto;gap:10px;align-items:center;padding:12px 16px;border-top:1px solid var(--line2);min-height:48px}
+.card-h+.fr{border-top:0}
+.fr .l{font-size:14px;color:var(--muted)}
+.fr .v{font-size:15px;overflow-wrap:anywhere;min-width:0}
+.fr .v.none{color:#c4c8ce}
+.fr.big .v{font-size:17px;font-weight:700}
+.call{display:inline-flex;align-items:center;gap:4px;text-decoration:none;border-radius:999px;background:var(--accent);color:#fff;font-size:13px;font-weight:600;padding:6px 12px}
+.call svg{width:14px;height:14px}
+.fr input,.fr textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 10px;background:var(--surface);font-size:15px;outline:none}
+.fr textarea{min-height:84px;resize:vertical}
+.fr input:focus,.fr textarea:focus{border-color:var(--accent)}
+.fr.memo{align-items:start}
+.link-btn{border:0;background:none;color:var(--accent-ink);font-size:14px;font-weight:600;padding:4px 0}
+.savebar{position:sticky;bottom:0;display:flex;gap:8px;padding:12px 0 calc(12px + env(safe-area-inset-bottom));background:linear-gradient(to top,var(--bg) 70%,transparent)}
+.savebar button{flex:1;border:0;border-radius:10px;padding:13px;font-size:16px;font-weight:700}
+.savebar .ok{background:var(--accent);color:#fff}
+.savebar .no{background:var(--surface);color:var(--ink2);border:1px solid var(--line)}
+.foot{font-size:12px;color:var(--muted);padding:2px 4px 12px}
+
+/* 고르기·로그인 */
+.search{width:100%;border:0;border-radius:10px;padding:11px 14px;background:var(--surface);box-shadow:var(--shadow);font-size:15px;margin-bottom:12px;outline:none}
+.pick{display:block;width:100%;text-align:left;border:0;border-top:1px solid var(--line2);background:none;padding:13px 16px}
+.pick:first-child{border-top:0}
+.pick .s{display:block;font-size:13px;color:var(--muted);margin-top:2px}
+.primary{border:0;border-radius:10px;background:var(--accent);color:#fff;font-size:16px;font-weight:700;padding:13px 24px}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);background:rgba(34,34,34,.92);color:#fff;font-size:14px;border-radius:999px;padding:9px 18px;z-index:9}
+
+/* PC: 넓은 화면 */
+@media (min-width:900px){
+  body{font-size:15px}
+  .head{padding:22px 0 12px}
+  .head h1{font-size:22px}
+  main{padding-top:20px}
+  .tabs{margin:0;padding:0}
+  .tabs button{padding:12px 14px 13px}
+  .tabs button[aria-current="page"]::after{left:14px;right:14px}
+  .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
+  .info-grid .card{margin:0}
+  .info-grid .wide{grid-column:1/-1}
+  .li:hover,.pick:hover{background:var(--line2)}
+}
 </style>
 </head>
 <body>
-<header>
-  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h1 id="title">사건방</h1><button class="chip" id="switch" hidden>사건 바꾸기</button></div>
-  <div class="sub" id="sub">불러오는 중…</div>
-  <div class="chips" id="chips"></div>
-</header>
-<div class="banner">견본 자료입니다. 아직 실제 사건 자료와 연결되지 않았습니다.</div>
+<div class="top">
+  <div class="wrap">
+    <div class="head">
+      <div class="txt"><h1 id="title">사건 정보</h1><div class="sub" id="sub">불러오는 중…</div></div>
+      <button class="btn-ghost" id="switch" hidden>사건 바꾸기</button>
+    </div>
+    <nav class="tabs" id="nav" aria-label="화면" hidden>
+      <button data-v="timeline">타임라인</button>
+      <button data-v="deadline">기한</button>
+      <button data-v="hearing">기일</button>
+      <button data-v="progress">진행내용</button>
+      <button data-v="info">사건정보</button>
+    </nav>
+  </div>
+</div>
 <main id="main"></main>
-<nav id="nav" aria-label="화면">
-  <button data-v="timeline">타임라인</button>
-  <button data-v="deadline">기한</button>
-  <button data-v="hearing">기일</button>
-  <button data-v="progress">진행내용</button>
-  <button data-v="info">사건 정보</button>
-</nav>
 <script>
-// ── 방 찾기 시험용: SDK가 주소를 바꾸기 전에 처음 들어온 정보를 기록 ──
-var FIRST = {href: location.href, referrer: document.referrer, name: window.name, hist: history.length};
-try{ if(!sessionStorage.getItem('jeongseo.firstHref')) sessionStorage.setItem('jeongseo.firstHref', location.href); FIRST.loginBefore = sessionStorage.getItem('jeongseo.firstHref'); }catch(e){}
-var DIAG = {};
 // ── 설정 ──────────────────────────────────────────────
 var WOFF_ID = 'Nxkob0LER_dfaSzH8s6flw';
 var SDK = 'https://static.worksmobile.net/static/wm/woff/edge/3.7.1/sdk.js';
 var CASE_API = 'https://nyjyemjsperpakrrgzcc.supabase.co/functions/v1/case-view';
 
-// ── 실제 자료: case-view 가 직원 확인 뒤 돌려줌 ──────────
+// ── 서버(case-view): 직원 확인 뒤에만 자료를 줌 ─────────
 function api(body){
   return fetch(CASE_API, {method:'POST', headers:{'Content-Type':'application/json','X-Works-Token':ctx.tok||''}, body:JSON.stringify(body)})
     .then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||('오류 '+r.status)); return j; }); });
 }
-// key: {room:방ID} 또는 {case:사건번호}. 결과에 hold/unpaired/notfound 가 오면 화면이 따로 안내
 function loadCase(key){ return api({action:'case', room:key.room||'', 'case':key['case']||''}); }
 function loadMyCases(){ return api({action:'mycases'}).then(function(j){ return j.cases||[]; }); }
-
-// ── 견본 자료 (웍스 밖에서 열었을 때만) ─────────────────
-function sampleCase(key){
-  // 견본: 사건번호로 열면 제목만 그 번호로 바꿔 보여 줌 (내용은 같은 견본)
-  var CUR = /^\d{4}[가-힣]+\d+$/.test(key || '') ? key : '2026고단1234';
-  return Promise.resolve({
-    caseNo: CUR, title: '사기', court: '○○지방법원 형사3단독', today: '2026-11-12',
-    events: [
-      {d:'2026-03-14',k:'court',t:'공소장 접수'},
-      {d:'2026-03-20',k:'court',t:'국선변호인 선정 결정'},
-      {d:'2026-04-02',k:'ours',t:'변호인 선임서 제출',f:'변호인선임서'},
-      {d:'2026-04-18',k:'ours',t:'증거기록 열람·복사 신청',f:null},
-      {d:'2026-05-09',k:'court',t:'제1회 공판기일 (속행)'},
-      {d:'2026-06-11',k:'ours',t:'변호인의견서 제출',f:'변호인의견서'},
-      {d:'2026-07-04',k:'court',t:'제2회 공판기일 (증인신문)'},
-      {d:'2026-09-22',k:'ours',t:'양형자료 제출 (합의서)',f:'양형자료'},
-      {d:'2026-11-10',k:'court',t:'제3회 공판기일 (속행)'},
-      {d:'2026-12-08',k:'due',t:'다음 공판기일 14:00 제302호'}
-    ],
-    deadlines: [
-      {c:CUR,t:'양형자료 추가 제출',d:'2026-11-26',why:'11.10 공판에서 재판부가 2주 안 제출 요청',st:'open'},
-      {c:CUR,t:'증인신청서 제출',d:'2026-12-01',why:'다음 기일(12.08) 1주 전까지',st:'open'},
-      {c:CUR,t:'참고자료 추가 제출',d:'2026-11-19',why:'요청일이 두 기록에서 다름 → 이른 날 기준',st:'check'},
-      {c:CUR,t:'변호인의견서 제출',d:'2026-06-11',why:'6.11 제출 확인 (로웨어 문건 목록)',st:'done'}
-    ],
-    hearings: [
-      {c:CUR,d:'2026-12-08',tm:'14:00',t:'제4회 공판기일',p:'제302호',who:'김변호사'},
-      {c:CUR,d:'2026-11-10',tm:'10:30',t:'제3회 공판기일 (속행)',p:'제302호'},
-      {c:CUR,d:'2026-07-04',tm:'14:00',t:'제2회 공판기일 (증인신문)',p:'제302호'},
-      {c:'2026노3021',d:'2026-11-17',tm:'15:00',t:'항소심 제1회 공판기일',p:'○○고등법원 제403호',who:'이변호사'},
-      {c:'2026가단5512',d:'2026-11-19',tm:'11:00',t:'변론기일',p:'○○지방법원 제210호',who:'김변호사'},
-      {c:'2026고합88',d:'2026-11-24',tm:'10:00',t:'공판준비기일',p:'○○지방법원 제501호',who:'박변호사'}
-    ],
-    progress: {updated:'11.12 09:40', rows:[
-      {d:'2026.03.14',c:'공소제기',k:''},
-      {d:'2026.03.16',c:'피고인에게 공소장부본 송달',r:'2026.03.18 도달',k:'송달'},
-      {d:'2026.04.02',c:'변호인 법무법인 정서 변호인선임서 제출',k:'제출',o:1},
-      {d:'2026.05.09',c:'제1회 공판기일(제302호 10:00)',r:'속행',k:'기일'},
-      {d:'2026.06.11',c:'변호인 법무법인 정서 의견서 제출',k:'제출',o:1},
-      {d:'2026.07.04',c:'제2회 공판기일(제302호 14:00)',r:'속행',k:'기일'},
-      {d:'2026.11.10',c:'제3회 공판기일(제302호 10:30)',r:'속행',k:'기일'},
-      {d:'2026.12.08',c:'제4회 공판기일(제302호 14:00)',r:'예정',k:'기일',p:1}
-    ]},
-    info: [
-      {h:'의뢰인',rows:[{l:'이름',v:'김○○',src:'계약대장'},{l:'주민번호',v:'900101-1******',src:'계약대장',secret:1},{l:'휴대전화',v:'010-0000-0000',src:'계약대장'},{l:'이메일',v:'',src:null}]},
-      {h:'연락 가능한 지인',note:'구속 중일 때',rows:[{l:'이름·관계',v:'',src:null},{l:'전화',v:'',src:null}]},
-      {h:'재판부',note:'재판 중',rows:[{l:'법원·재판부',v:'○○지방법원 형사3단독',src:'나의사건'},{l:'재판부 전화',v:'02-000-0000',src:'나의사건'}]}
-    ]
-  });
-}
-
 
 // ── 공통 ──────────────────────────────────────────────
 var $ = function(s){ return document.querySelector(s); };
 var q = new URLSearchParams(location.search);
 var view = q.get('view') || 'timeline';
-var ctx = {room:'', caseParam:q.get('case')||'', user:'', os:'', inClient:false};
-var data = null, sub = {f:'all', scope:'case', p:'all'};
+var ctx = {room:'', caseParam:q.get('case')||'', tok:''};
+var data = null, sub = {f:'all', scope:'case', p:'all'}, editing = false;
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 function md(d){ return Number(d.slice(5,7)) + '.' + d.slice(8,10); }
 function dd(d){ return Math.round((Date.parse(d) - Date.parse(data.today)) / 864e5); }
 function wk(d){ return '일월화수목금토'[new Date(d+'T00:00:00Z').getUTCDay()]; }
 function chips(name, items){
-  $('#chips').innerHTML = items.map(function(it){ return '<button class="chip" data-'+name+'="'+it[0]+'" aria-pressed="'+(sub[name]===it[0])+'">'+it[1]+'</button>'; }).join('');
+  return '<div class="chips">'+items.map(function(it){ return '<button class="chip" data-'+name+'="'+it[0]+'" aria-pressed="'+(sub[name]===it[0])+'">'+it[1]+'</button>'; }).join('')+'</div>';
 }
+function emptySt(title, text){ return '<div class="empty-st"><b>'+title+'</b>'+(text||'')+'</div>'; }
+function toast(t){ var e=document.createElement('div'); e.className='toast'; e.textContent=t; document.body.appendChild(e); setTimeout(function(){ e.remove(); }, 1800); }
+var PHONE_SVG = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z"/></svg>';
+function telHref(v){ var n=String(v||'').replace(/[^\d+]/g,''); return n.length>=7 ? 'tel:'+n : ''; }
 
 // ── 화면별 그리기 ─────────────────────────────────────
 var VIEWS = {
   timeline: function(){
-    chips('f', [['all','전체'],['ours','우리 서면'],['court','법원 진행'],['due','기일·기한']]);
-    var h='', yr='';
-    data.events.filter(function(e){ return sub.f==='all' || e.k===sub.f; }).forEach(function(e){
-      var y=e.d.slice(0,4); if(y!==yr){ yr=y; h+='<div class="yr">'+y+'</div>'; }
-      h+='<div class="ev '+e.k+'"><div class="d">'+md(e.d)+'</div><div class="t">'+esc(e.t)+
-        (e.f?'<button class="mini" data-file="'+esc(e.f)+'">열기</button>':(e.k==='ours'?' <span class="nofile">· 파일 없음</span>':''))+'</div></div>';
+    var list=data.events.filter(function(e){ return sub.f==='all' || e.k===sub.f; });
+    var h=chips('f', [['all','전체'],['ours','우리 서면'],['court','법원 진행'],['due','기일']]);
+    if(!list.length) return h+emptySt('표시할 내용이 없습니다');
+    var body='', yr='';
+    list.forEach(function(e){
+      var y=e.d.slice(0,4); if(y!==yr){ yr=y; body+='<div class="yr">'+y+'</div>'; }
+      body+='<div class="ev '+e.k+'"><div class="d">'+md(e.d)+'<small>'+wk(e.d)+'</small></div><div class="rail"></div><div class="t">'+esc(e.t)+'</div></div>';
     });
-    return h;
+    return h+'<div class="card">'+body+'</div>';
   },
   deadline: function(){
-    $('#chips').innerHTML='';
-    if(!data.deadlines.length) return '<div class="note">'+esc(data.deadlineNote||'기한이 없습니다.')+'</div>';
+    if(!data.deadlines.length) return emptySt('기한 계산 준비 중','새 기한 규칙이 완성되면 이곳에 표시됩니다.');
     var rows=data.deadlines.slice().sort(function(a,b){ return (a.st==='done')-(b.st==='done') || a.d.localeCompare(b.d); });
-    return rows.map(function(x){
-      var n=dd(x.d), lab=x.st==='done'?'제출':n<0?'지남':n===0?'D-day':'D-'+n, hot=x.st!=='done'&&n>=0&&n<=7?' hot':'';
-      return '<div class="row '+x.st+'"><span class="dday'+hot+'">'+lab+'</span><div><div class="t">'+esc(x.t)+(x.st==='check'?'<span class="pill">확인 필요</span>':'')+'</div><div class="s">'+md(x.d)+'('+wk(x.d)+')까지 · '+esc(x.why)+'</div></div></div>';
-    }).join('')+'<div class="note">D-7 안은 진하게 표시합니다. 기한은 항상 이 사건만 보입니다.</div>';
+    return '<div class="card">'+rows.map(function(x){
+      var n=dd(x.d), lab=x.st==='done'?'제출':n<0?'지남':n===0?'D-day':'D-'+n;
+      return '<div class="li"><div class="main"><div class="t">'+esc(x.t)+'</div><div class="s">'+md(x.d)+'('+wk(x.d)+')까지 · '+esc(x.why)+'</div></div><span class="dday'+(x.st==='done'||n<0?' past':'')+'">'+lab+'</span></div>';
+    }).join('')+'</div>';
   },
   hearing: function(){
-    chips('scope', [['case','이 사건'],['all','내 사건 전체 (4주)']]);
     var all=sub.scope==='all';
     var pick=data.hearings.filter(function(x){ return all ? dd(x.d)>=0 && dd(x.d)<=28 : x.c===data.caseNo; });
-    var up=pick.filter(function(x){return dd(x.d)>=0;}).sort(function(a,b){return a.d.localeCompare(b.d);});
-    var past=pick.filter(function(x){return dd(x.d)<0;}).sort(function(a,b){return b.d.localeCompare(a.d);});
-    var row=function(x){ return '<div class="row'+(dd(x.d)<0?' past':'')+'"><span class="d">'+esc(x.tm||'')+'</span><div><div class="t">'+(all?'<span class="case">'+esc(x.c)+'</span>':'')+esc(x.t)+'</div><div class="s">'+esc(x.p)+(x.who?' · 담당 '+esc(x.who):'')+'</div></div></div>'; };
-    var h='', last='';
-    up.forEach(function(x){ if(x.d!==last){ last=x.d; h+='<div class="hd"><b>'+md(x.d)+' ('+wk(x.d)+')</b><span>D-'+dd(x.d)+'</span></div>'; } h+=row(x); });
-    if(past.length){ h+='<div class="hd"><b>지난 기일</b><span></span></div>'; past.forEach(function(x){ h+='<div class="s" style="margin-top:8px">'+md(x.d)+' ('+wk(x.d)+')</div>'+row(x); }); }
-    return h || '<div class="note">기일이 없습니다.</div>';
+    var up=pick.filter(function(x){return dd(x.d)>=0;}).sort(function(a,b){return (a.d+a.tm).localeCompare(b.d+b.tm);});
+    var past=all?[]:pick.filter(function(x){return dd(x.d)<0;}).sort(function(a,b){return b.d.localeCompare(a.d);});
+    var row=function(x, isPast){ return '<div class="li'+(isPast?' past':'')+'"><span class="tm">'+esc(x.tm||'')+'</span><div class="main"><div class="t">'+(all?'<span class="casechip">'+esc(x.c)+'</span>':'')+esc(x.t)+'</div>'+(x.p?'<div class="s">'+esc(x.p)+'</div>':'')+'</div></div>'; };
+    var h=chips('scope', [['case','이 사건'],['all','내 사건 전체 · 4주']]), last='', card='';
+    up.forEach(function(x){
+      if(x.d!==last){ if(card) h+=card+'</div>'; last=x.d; var n=dd(x.d); card='<div class="card"><div class="card-h"><span style="color:var(--ink)">'+md(x.d)+' ('+wk(x.d)+')</span><span class="dday">'+(n===0?'오늘':'D-'+n)+'</span></div>'; }
+      card+=row(x,false);
+    });
+    if(card) h+=card+'</div>';
+    if(past.length) h+='<div class="card"><div class="card-h">지난 기일</div>'+past.map(function(x){ return row({tm:md(x.d), t:x.t, p:x.p}, true); }).join('')+'</div>';
+    return (up.length||past.length) ? h : h+emptySt('기일이 없습니다');
   },
   progress: function(){
-    chips('p', [['all','전체'],['기일','기일'],['송달','송달'],['제출','제출']]);
-    return '<div class="src">대법원 나의사건 진행내용 · 로웨어 갱신 '+esc(data.progress.updated)+(data.progress.rows.length?'':' · 최근 한 달 안에 바뀐 내용이 없습니다')+'</div>'+
-      data.progress.rows.filter(function(x){ return sub.p==='all' || x.k===sub.p; }).map(function(x){
-        return '<div class="pg'+(x.o?' ours':'')+(x.p?' plan':'')+'"><span class="d">'+x.d+'</span><div><div class="c">'+esc(x.c)+'</div>'+(x.r?'<div class="s">'+esc(x.r)+'</div>':'')+'</div></div>';
-      }).join('')+'<div class="note">파란 줄은 우리 법인이 낸 문건입니다.</div>';
+    var rows=data.progress.rows.filter(function(x){ return sub.p==='all' || x.k===sub.p; }).slice().reverse();
+    var h=chips('p', [['all','전체'],['기일','기일'],['송달','송달'],['제출','제출']])+'<div class="meta">로웨어 갱신 '+esc(data.progress.updated)+'</div>';
+    if(!rows.length) return h+emptySt('최근 한 달 진행내용이 없습니다');
+    return h+'<div class="card">'+rows.map(function(x){
+      var cls=(x.o||x.u)?' hl':x.x?' dim':'';
+      return '<div class="pg'+cls+(x.p?' plan':'')+'"><span class="d">'+x.d+'</span><div><div class="c">'+esc(x.c)+'</div>'+(x.r?'<div class="r">'+esc(x.r)+'</div>':'')+'</div></div>';
+    }).join('')+'</div>';
   },
   info: function(){
-    $('#chips').innerHTML='';
-    var h='';
-    data.info.forEach(function(s){
-      h+='<div class="sec">'+esc(s.h)+(s.note?'<small>'+esc(s.note)+'</small>':'')+'</div>';
-      s.rows.forEach(function(r){
-        var val=r.v?esc(r.v)+(r.secret?' <button class="edit" data-secret="1">보기</button>':''):'<span class="empty">비어 있음</span>';
-        var badge=r.src?'<span class="badge">자동 · '+esc(r.src)+'</span>':'<span class="badge">자동으로 못 가져옴</span>';
-        h+='<div class="fr"><span class="l">'+esc(r.l)+'</span><div>'+val+'<br>'+badge+'</div><span></span></div>';
-      });
-    });
-    return h+'<div class="note">로웨어에 적힌 값입니다. 고칠 곳은 로웨어에서 고치면 다음 갱신 때 반영됩니다. 이 화면을 열 때마다 열람 기록이 남습니다.</div>';
+    var f=data.info.fields;
+    var field=function(key, label, opt){
+      opt=opt||{};
+      var v=f[key]||'';
+      if(editing){
+        var inp = opt.memo ? '<textarea data-k="'+key+'">'+esc(v)+'</textarea>' : '<input data-k="'+key+'" value="'+esc(v)+'"'+(opt.tel?' inputmode="tel"':'')+'>';
+        return '<div class="fr'+(opt.memo?' memo':'')+'"><span class="l">'+label+'</span><div style="grid-column:2/4">'+inp+'</div></div>';
+      }
+      var tail = opt.tel && telHref(v) ? '<a class="call" href="'+telHref(v)+'">'+PHONE_SVG+'전화</a>' : '<span></span>';
+      return '<div class="fr'+(opt.big?' big':'')+(opt.memo?' memo':'')+'"><span class="l">'+label+'</span><span class="v'+(v?'':' none')+'"'+(opt.memo?' style="white-space:pre-wrap"':'')+'>'+(v?esc(v):'—')+'</span>'+tail+'</div>';
+    };
+    var ro=function(label, v, big){ return '<div class="fr'+(big?' big':'')+'"><span class="l">'+label+'</span><span class="v">'+esc(v)+'</span><span></span></div>'; };
+    var head=function(t, btn){ return '<div class="card-h"><span>'+t+'</span>'+(btn&&!editing?'<button class="link-btn" id="edit">수정</button>':'')+'</div>'; };
+    var h='<div class="info-grid">'+
+      '<div class="card wide">'+head('기본 정보', true)+ro('사건번호', data.caseNo, true)+field('case_name','사건명')+field('client_name','의뢰인')+field('client_phone','전화번호',{tel:1})+field('lawyer','담당변호사')+'</div>'+
+      '<div class="card">'+head('재판부')+field('court_dept','법원·재판부')+field('court_phone','재판부 전화',{tel:1})+'</div>'+
+      '<div class="card">'+head('수사')+field('investigator','수사기관·담당')+field('investigator_phone','수사관 전화',{tel:1})+'</div>'+
+      '<div class="card wide">'+head('메모')+field('memo','메모',{memo:1})+'</div>'+
+      (data.info.linked&&data.info.linked.length?'<div class="card wide">'+head('연결 사건')+data.info.linked.map(function(n){ return ro('사건번호', n); }).join('')+'</div>':'')+
+      '</div>';
+    if(editing) return h+'<div class="savebar"><button class="no" id="cancel">취소</button><button class="ok" id="save">저장</button></div>';
+    var foot = data.info.saved ? '마지막 수정 '+esc(data.info.updatedBy||'')+' · '+esc(fmtTime(data.info.updatedAt)) : '처음 값은 로웨어에서 복사했습니다. 저장하면 이후 로웨어와 연동되지 않습니다.';
+    return h+'<div class="foot">'+foot+'</div>';
   }
 };
+function fmtTime(t){ if(!t) return ''; var d=new Date(Date.parse(t)+9*3600e3).toISOString(); return md(d.slice(0,10))+' '+d.slice(11,16); }
 
-function diagHtml(){
-  var d = {처음주소: FIRST.href, 로그인전주소: FIRST.loginBefore, 지금주소: location.href, referrer: FIRST.referrer, windowName: FIRST.name,
-           historyLength: FIRST.hist, userAgent: navigator.userAgent, getContext: DIAG.context, getChannelId: DIAG.channelId,
-           clientType: DIAG.clientType, sdkVersion: DIAG.version, 저장소키: DIAG.storage, 직원확인: DIAG.whoami};
-  return '<details class="diag"><summary>방 찾기 시험 정보 (눌러서 펼친 뒤 전부 복사해 보내 주세요)</summary><pre style="white-space:pre-wrap;user-select:all">'+esc(JSON.stringify(d,null,1))+'</pre></details>';
-}
 function render(){
-  $('#switch').hidden = !!ctx.room; // 휴대폰(방을 앎)에서는 숨김
-  document.querySelectorAll('nav button').forEach(function(b){ b.setAttribute('aria-current', b.dataset.v===view?'page':'false'); });
-  var names={timeline:'타임라인',deadline:'기한',hearing:'기일',progress:'진행내용',info:'사건 정보'};
-  $('#title').textContent = data.caseNo + ' ' + names[view];
-  $('#sub').textContent = (q.get('closed') || data.closed ? '[종결] ' : '') + data.title + ' · ' + data.court;
-  $('#main').innerHTML = (VIEWS[view]||VIEWS.timeline)() +
-    '<div class="diag">방: '+esc(ctx.room||'(없음)')+' · 사건번호 값: '+esc(ctx.caseParam||'(없음)')+' · 사용자: '+esc(ctx.user||'(확인 전)')+' · '+esc(ctx.os)+' · 직원확인: '+esc(ctx.staff===undefined?'(시험 전)':(ctx.staff?'됨('+ctx.staff+')':'안 됨'))+'</div>' + diagHtml();
+  document.querySelectorAll('#nav button').forEach(function(b){ b.setAttribute('aria-current', b.dataset.v===view?'page':'false'); });
+  $('#nav').hidden=false;
+  $('#title').textContent = data.caseNo;
+  $('#sub').innerHTML = (q.get('closed') || data.closed ? '<span class="tag">종결</span>' : '') + esc(data.title) + ' · ' + esc(data.court);
+  $('#switch').hidden = !!ctx.room;
+  $('#main').innerHTML = (VIEWS[view]||VIEWS.timeline)();
 }
 document.addEventListener('click', function(e){
   var b=e.target.closest('button'); if(!b) return;
-  if(b.dataset.v){ view=b.dataset.v; render(); window.scrollTo(0,0); return; }
+  if(b.dataset.v){ if(editing && !confirmLeave()) return; editing=false; view=b.dataset.v; render(); window.scrollTo(0,0); return; }
   ['f','scope','p'].forEach(function(k){ if(b.dataset[k]){ sub[k]=b.dataset[k]; render(); } });
-  if(b.dataset.file || b.dataset.todo || b.dataset.secret) alert('파일 열기는 아직 준비 중입니다.');
+  if(b.id==='edit'){ editing=true; render(); var i=$('#main input'); if(i) i.focus(); }
+  if(b.id==='cancel'){ editing=false; render(); }
+  if(b.id==='save') saveInfo(b);
 });
+function confirmLeave(){ return window.confirm('저장하지 않은 수정이 있습니다. 나갈까요?'); }
+function saveInfo(btn){
+  var fields={}; document.querySelectorAll('#main [data-k]').forEach(function(el){ fields[el.dataset.k]=el.value.trim(); });
+  btn.disabled=true; btn.textContent='저장 중…';
+  api({action:'save_info', lNum:data.lNum, fields:fields}).then(function(j){
+    data.info={fields:j.fields, saved:true, updatedBy:j.updatedBy, updatedAt:j.updatedAt, linked:data.info.linked};
+    editing=false; render(); toast('저장했습니다');
+  }).catch(function(e){ btn.disabled=false; btn.textContent='저장'; toast('저장 실패: '+((e&&e.message)||e)); });
+}
 
-// 최근 고른 사건 5개 (이 PC 브라우저에만 저장)
+// 최근 고른 사건 5개 (이 브라우저에만 저장)
 function getRecent(){ try{ return JSON.parse(localStorage.getItem('jeongseo.recentCases')||'[]'); }catch(e){ return []; } }
 function addRecent(c){ try{ var r=getRecent().filter(function(x){return x!==c;}); r.unshift(c); localStorage.setItem('jeongseo.recentCases', JSON.stringify(r.slice(0,5))); }catch(e){} }
 
-// ── 사건 고르기 (PC 메뉴처럼 방을 모를 때) ─────────────
-function showPicker(){
+// ── 사건 고르기 ───────────────────────────────────────
+function showPicker(subText){
+  $('#nav').hidden=true; $('#switch').hidden=true;
+  $('#title').textContent='사건 고르기';
+  $('#sub').textContent=subText||'내 담당 사건';
+  $('#main').innerHTML='<input class="search" id="qs" placeholder="사건번호나 사건명으로 찾기"><div class="card" id="list"><div class="empty-st">불러오는 중…</div></div>';
   return loadMyCases().then(function(list){
-    $('#switch').hidden=true;
-    $('#nav').hidden=true; $('#chips').innerHTML='';
-    $('#title').textContent='사건 고르기';
-    $('#sub').textContent='PC에서는 어느 방에서 열었는지 알 수 없어, 내 사건 중에서 고릅니다.';
     var recent=getRecent();
     function draw(qs){
       var rows=list.filter(function(x){ return !qs || (x.c+x.t).indexOf(qs)>=0; });
       if(!qs) rows.sort(function(a,b){ var i=recent.indexOf(a.c), j=recent.indexOf(b.c); return (i<0?99:i)-(j<0?99:j); });
       $('#list').innerHTML=rows.map(function(x){
-        return '<button class="pick" data-case="'+esc(x.c)+'"><span class="t"><span class="case">'+esc(x.c)+'</span>'+esc(x.t)+'</span><span class="s">'+(recent.indexOf(x.c)>=0&&!qs?'최근 본 사건 · ':'')+'다음: '+esc(x.next)+'</span></button>';
-      }).join('') || '<div class="note">맞는 사건이 없습니다.</div>';
+        return '<button class="pick" data-case="'+esc(x.c)+'"><span class="casechip">'+esc(x.c)+'</span>'+esc(x.t)+'<span class="s">'+esc(x.next)+'</span></button>';
+      }).join('') || emptySt('맞는 사건이 없습니다');
     }
-    $('#main').innerHTML='<input class="search" id="qs" placeholder="사건번호나 사건명으로 찾기"><div id="list"></div><div class="note">내가 들어 있는 사건방만 보입니다. 최근 고른 사건이 맨 위에 옵니다.</div>';
     $('#qs').oninput=function(){ draw(this.value.trim()); };
-    $('#qs').focus();
     draw('');
-    $('#main').insertAdjacentHTML('beforeend', diagHtml());
-  });
+  }).catch(function(e){ $('#list').innerHTML=emptySt('불러오지 못했습니다', esc((e&&e.message)||e)); });
 }
 document.addEventListener('click', function(e){
   if(e.target.id==='switch'){ showPicker(); window.scrollTo(0,0); return; }
   var b=e.target.closest('.pick'); if(!b) return;
-  ctx.caseParam=b.dataset.case; $('#nav').hidden=false; addRecent(ctx.caseParam);
+  ctx.caseParam=b.dataset.case; addRecent(ctx.caseParam); editing=false;
   showCase({'case':ctx.caseParam}).then(function(){ window.scrollTo(0,0); });
 });
 
-// 사건 하나 열기: 보류·짝 없음·못 찾음은 각각 안내
-function message(title, sub, note){
-  $('#nav').hidden=true; $('#switch').hidden=true; $('#chips').innerHTML='';
-  $('#title').textContent=title; $('#sub').textContent=sub;
-  $('#main').innerHTML='<div class="note">'+note+'</div>'+diagHtml();
+// ── 사건 하나 열기 ────────────────────────────────────
+function message(title, subText, body){
+  $('#nav').hidden=true; $('#switch').hidden=true;
+  $('#title').textContent=title; $('#sub').textContent=subText||'';
+  $('#main').innerHTML=body||'';
 }
-function showHold(){ message('사건 미확정','이 방의 사건이 아직 정해지지 않았습니다.','사건이 확정되면 이 메뉴로 바로 열립니다. 관리자가 관리 화면에서 연결합니다.'); }
+function showHold(){ message('사건 미확정','', emptySt('이 방의 사건이 아직 정해지지 않았습니다')); }
 function showCase(key){
-  $('#sub').textContent='사건 자료를 불러오는 중…';
+  $('#sub').textContent='불러오는 중…';
   return loadCase(key).then(function(d){
     if(d.hold) return showHold();
-    if(d.unpaired) return showPicker().then(function(){ $('#sub').textContent='이 방은 아직 사건과 짝지어지지 않았어요. 아래에서 골라 주세요.'; });
-    if(d.notfound) return message('사건을 찾지 못함', esc(d.caseNo||''), '로웨어 사건 목록에서 이 사건번호를 찾지 못했습니다. 사건번호가 바뀌었거나 아직 로웨어에 등록되지 않았을 수 있어요.');
-    $('#nav').hidden=false; data=d; render();
+    if(d.unpaired) return showPicker('이 방과 연결된 사건이 없습니다');
+    if(d.notfound) return message('사건을 찾지 못함', d.caseNo||'', emptySt('로웨어에 없는 사건번호입니다'));
+    data=d; render();
   }).catch(function(e){
-    message('불러오지 못함', '', esc((e&&e.message)||e)+'<br>잠시 뒤 다시 열어 주세요. 계속되면 ?relogin=1 로 다시 로그인해 보세요.');
+    message('불러오지 못함', '', emptySt('잠시 뒤 다시 열어 주세요', esc((e&&e.message)||e)));
   });
 }
 
 // ── WOFF 시작 ─────────────────────────────────────────
 function start(){
   woff.init({woffId: WOFF_ID}).then(function(){
-    ctx.os = woff.getOS(); ctx.inClient = woff.isInClient();
     // ?relogin=1: 권한이 바뀌었을 때 새 토큰을 받도록 로그아웃 후 다시 로그인
     if(q.get('relogin') && woff.isLoggedIn()){ try{ woff.logout(); }catch(e){} }
     if(!woff.isLoggedIn()){
-      // PC 브라우저: 처음 한 번 로그인
-      $('#sub').textContent='누가 열었는지 확인이 필요합니다.';
-      $('#main').innerHTML='<div class="login"><p>웍스 계정으로 한 번 로그인해 주세요.</p><button id="lg">웍스 계정으로 로그인</button></div>';
+      message('사건 정보','', '<div class="empty-st"><b>웍스 계정으로 로그인해 주세요</b><div style="margin-top:16px"><button class="primary" id="lg">로그인</button></div></div>');
       $('#lg').onclick=function(){ woff.login({redirectUri: location.href.replace(/[?&]relogin=1/,'')}); };
       return;
     }
-    var p1 = woff.getProfile().then(function(p){ ctx.user = p.displayName || ''; }).catch(function(){});
-    var p2 = ctx.inClient && woff.getChannelId ? Promise.resolve(woff.getChannelId()).then(function(c){ ctx.room = c || ''; }).catch(function(){}) : Promise.resolve();
-    // 방 찾기 시험: PC에서도 방 정보가 오는지 전부 기록
-    try{ DIAG.context = woff.getContext(); }catch(e){ DIAG.context = '오류: '+((e&&e.message)||e); }
-    try{ DIAG.clientType = woff.getClientType ? woff.getClientType() : ''; DIAG.version = woff.getVersion ? woff.getVersion() : ''; }catch(e){}
-    var p3 = woff.getChannelId ? Promise.resolve().then(function(){ return woff.getChannelId(); }).then(function(c){ DIAG.channelId = c; }).catch(function(e){ DIAG.channelId = '오류: '+((e&&e.message)||e); }) : Promise.resolve();
-    try{ DIAG.storage = Object.keys(sessionStorage).concat(Object.keys(localStorage)).join(', '); }catch(e){}
-    // 직원 확인 시험: 웍스 토큰을 서버가 웍스에 직접 물어봄
-    var tok = ''; try{ tok = woff.getAccessToken ? woff.getAccessToken() : ''; }catch(e){}
-    ctx.tok = tok;
-    DIAG.whoami = '확인 중';
-    var p4 = fetch(CASE_API, {method:'POST', headers:{'Content-Type':'application/json','X-Works-Token':tok||''}, body:JSON.stringify({action:'whoami'})})
-      .then(function(r){ return r.json(); }).then(function(j){ DIAG.whoami = j; ctx.staff = j.ok ? (j.name||j.userId) : ''; })
-      .catch(function(e){ DIAG.whoami = '오류: '+((e&&e.message)||e); });
-    return Promise.all([p1,p2,p3,p4]).then(function(){
+    try{ ctx.tok = woff.getAccessToken ? woff.getAccessToken() : ''; }catch(e){}
+    var inClient = woff.isInClient();
+    var pRoom = inClient && woff.getChannelId ? Promise.resolve().then(function(){ return woff.getChannelId(); }).then(function(c){ ctx.room = c || ''; }).catch(function(){}) : Promise.resolve();
+    return pRoom.then(function(){
       // 보류 방: 어느 사건인지 확정 못 함 → 사건정보·서면을 띄우지 않는다
       if(q.get('hold')) return showHold();
-      if(ctx.staff === '') return message('직원 확인 안 됨','웍스 계정 확인에 실패했습니다.','주소 끝에 ?relogin=1 을 붙여 다시 로그인해 주세요.');
-      if(!ctx.room && !ctx.caseParam) return showPicker().then(function(){
-        // PC 도우미가 짝 없는 방에서 연 경우
-        if(q.get('room')) $('#sub').textContent='이 방은 아직 사건과 짝지어지지 않았어요. 아래에서 골라 주세요.';
-      });
+      if(!ctx.room && !ctx.caseParam) return showPicker(q.get('room') ? '이 방과 연결된 사건이 없습니다' : '');
       return showCase(ctx.room ? {room:ctx.room} : {'case':ctx.caseParam});
     });
   }).catch(function(e){
-    // 웍스 밖에서 열었을 때도 견본은 보이게
-    sampleCase('').then(function(d){ data=d; render(); $('#sub').textContent='웍스 연결 실패: '+((e&&e.message)||e)+' (견본만 표시)'; });
+    message('열 수 없음','', emptySt('네이버웍스 앱에서 열어 주세요', esc((e&&e.message)||e)));
   });
 }
 var s=document.createElement('script'); s.src=SDK; s.onload=start;
-s.onerror=function(){ sampleCase('').then(function(d){ data=d; render(); $('#sub').textContent='웍스 SDK를 불러오지 못했습니다 (견본만 표시)'; }); };
+s.onerror=function(){ message('열 수 없음','', emptySt('네이버웍스 연결에 실패했습니다','잠시 뒤 다시 열어 주세요.')); };
 document.head.appendChild(s);
 </script>
 </body>
