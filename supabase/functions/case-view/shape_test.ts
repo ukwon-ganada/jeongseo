@@ -1,5 +1,5 @@
 // 실행: deno test supabase/functions/case-view/shape_test.ts
-import { attachContract, attachFinalFiles, caseNoVariants, infoFields, mergeMeets, shapeCase, smsGist } from "./handler.ts";
+import { attachContract, attachFinalFiles, caseNoVariants, cleanPhones, infoFields, mergeMeets, shapeCase, smsGist } from "./handler.ts";
 function assert(c: unknown, m: string) { if (!c) throw new Error(m); }
 
 Deno.test("사건번호 후보", () => {
@@ -70,4 +70,11 @@ Deno.test("계약서는 선임 줄에, 서면 후보에서는 빠짐", () => {
   attachContract(ev, files);
   if ((ev[0] as any).cf?.id !== 1) throw new Error("계약서 안 붙음");
   if ((ev[1] as any).f?.id !== 2) throw new Error("서면에 계약서가 붙음");
+});
+
+Deno.test("추가 전화 정리", () => {
+  const t = cleanPhones(JSON.stringify([{ n: "어머니", p: "010-1234-5678" }, { n: "", p: "" }, "x"]));
+  if (t !== JSON.stringify([{ n: "어머니", p: "010-1234-5678" }])) throw new Error(t);
+  if (cleanPhones("깨진 글자") !== "") throw new Error("깨진 값");
+  if (cleanPhones("") !== "") throw new Error("빈 값");
 });

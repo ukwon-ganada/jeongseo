@@ -126,6 +126,11 @@ main{max-width:880px;margin:0 auto;padding:12px 16px 32px}
 .fr input,.fr textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 10px;background:var(--surface);font-size:15px;outline:none}
 .fr textarea{min-height:84px;resize:vertical}
 .fr input:focus,.fr textarea:focus{border-color:var(--accent)}
+/* 추가 전화(가족 등) */
+.xp-in{display:grid;grid-template-columns:96px 1fr auto;gap:6px;align-items:center}
+.xp-in input{min-width:0}
+.xp-del{border:0;background:none;color:var(--muted);font-size:13px;padding:6px 4px}
+.xp-add{display:block;width:calc(100% - 32px);margin:4px 16px 12px;border:1px dashed var(--line);border-radius:8px;background:none;padding:9px;font-size:14px;color:var(--accent-ink);font-weight:600}
 .fr.memo{align-items:start}
 .link-btn{border:0;background:none;color:var(--accent-ink);font-size:14px;font-weight:600;padding:4px 0}
 .savebar{position:sticky;bottom:0;display:flex;gap:8px;padding:12px 0 calc(12px + env(safe-area-inset-bottom));background:linear-gradient(to top,var(--bg) 70%,transparent)}
@@ -290,10 +295,19 @@ var VIEWS = {
       var tail = opt.tel && telHref(v) ? '<a class="call" href="'+telHref(v)+'">'+PHONE_SVG+'전화</a>' : '<span></span>';
       return '<div class="fr'+(opt.big?' big':'')+(opt.memo?' memo':'')+'"><span class="l">'+label+'</span><span class="v'+(v?'':' none')+'"'+(opt.memo?' style="white-space:pre-wrap"':'')+'>'+(v?esc(v):'—')+'</span>'+tail+'</div>';
     };
+    // 추가 전화(가족 등, 석원 2026-11-13): [{n:'어머니', p:'010-…'}] 를 글자(JSON)로 저장
+    var extraPhones=function(){
+      var list=parseXp(f.extra_phones);
+      if(editing) return '<div id="xp">'+list.map(xpRow).join('')+'</div><button class="xp-add" id="xp-add">+ 전화번호 추가 (가족 등)</button>';
+      return list.map(function(x){
+        var tail = telHref(x.p) ? '<a class="call" href="'+telHref(x.p)+'">'+PHONE_SVG+'전화</a>' : '<span></span>';
+        return '<div class="fr"><span class="l">'+esc(x.n||'추가 전화')+'</span><span class="v">'+esc(x.p)+'</span>'+tail+'</div>';
+      }).join('');
+    };
     var ro=function(label, v, big){ return '<div class="fr'+(big?' big':'')+'"><span class="l">'+label+'</span><span class="v">'+esc(v)+'</span><span></span></div>'; };
     var head=function(t, btn){ return '<div class="card-h"><span>'+t+'</span>'+(btn&&!editing&&!data.roomOnly?'<button class="link-btn" id="edit">수정</button>':'')+'</div>'; };
     var h='<div class="info-grid">'+
-      '<div class="card wide">'+head('기본 정보', true)+ro('사건번호', data.caseNo, true)+field('case_name','사건명')+field('client_name','의뢰인')+field('client_phone','전화번호',{tel:1})+field('lawyer','담당변호사')+'</div>'+
+      '<div class="card wide">'+head('기본 정보', true)+ro('사건번호', data.caseNo, true)+field('case_name','사건명')+field('client_name','의뢰인')+field('client_phone','전화번호',{tel:1})+extraPhones()+field('lawyer','담당변호사')+'</div>'+
       '<div class="card">'+head('재판부')+field('court_dept','법원·재판부')+field('court_phone','재판부 전화',{tel:1})+'</div>'+
       '<div class="card">'+head('수사')+field('investigator','수사기관·담당')+field('investigator_phone','수사관 전화',{tel:1})+'</div>'+
       '<div class="card wide">'+head('메모')+field('memo','메모',{memo:1})+'</div>'+
@@ -361,9 +375,17 @@ document.addEventListener('click', function(e){
   if(b.dataset.pickfor!==undefined){ sub.pick=b.dataset.pickfor; render(); }
   if(b.dataset.setfile) setFile(b);
 });
+function parseXp(t){ try{ var a=JSON.parse(t||'[]'); return Array.isArray(a)?a.filter(function(x){ return x&&(x.p||x.n); }):[]; }catch(e){ return []; } }
+function xpRow(x){ x=x||{}; return '<div class="fr xp"><div class="xp-in" style="grid-column:1/4"><input class="xp-n" placeholder="관계" value="'+esc(x.n||'')+'"><input class="xp-p" inputmode="tel" placeholder="전화번호" value="'+esc(x.p||'')+'"><button class="xp-del" type="button">삭제</button></div></div>'; }
+document.addEventListener('click', function(e){
+  if(e.target.id==='xp-add'){ var box=$('#xp'); if(box){ box.insertAdjacentHTML('beforeend', xpRow()); var ins=box.querySelectorAll('.xp-n'); ins[ins.length-1].focus(); } }
+  if(e.target.classList.contains('xp-del')){ var r=e.target.closest('.xp'); if(r) r.remove(); }
+});
 function confirmLeave(){ return window.confirm('저장하지 않은 수정이 있습니다. 나갈까요?'); }
 function saveInfo(btn){
   var fields={}; document.querySelectorAll('#main [data-k]').forEach(function(el){ fields[el.dataset.k]=el.value.trim(); });
+  var xp=[]; document.querySelectorAll('#main .xp').forEach(function(r){ var n=r.querySelector('.xp-n').value.trim(), p=r.querySelector('.xp-p').value.trim(); if(n||p) xp.push({n:n,p:p}); });
+  fields.extra_phones = xp.length ? JSON.stringify(xp) : '';
   btn.disabled=true; btn.textContent='저장 중…';
   api({action:'save_info', lNum:data.lNum, fields:fields}).then(function(j){
     data.info={fields:j.fields, saved:true, updatedBy:j.updatedBy, updatedAt:j.updatedAt, linked:data.info.linked};

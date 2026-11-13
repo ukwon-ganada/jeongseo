@@ -78,7 +78,7 @@ export function caseNoVariants(p: string): string[] {
 // "보정서"처럼 "정서"가 들어간 낱말과 헷갈리지 않게 "법무법인 정서"로 찾음
 const OUR_FIRM = /법무법인\s*정서/;
 export const PREFILL_FROM_LAWWARE = true;
-export const INFO_FIELDS = ["case_name", "client_name", "client_phone", "lawyer", "court_dept", "court_phone", "investigator", "investigator_phone", "memo"] as const;
+export const INFO_FIELDS = ["case_name", "client_name", "client_phone", "lawyer", "court_dept", "court_phone", "investigator", "investigator_phone", "memo", "extra_phones"] as const;
 const kstNow = () => new Date(Date.now() + 9 * 3600e3);
 export const kstToday = () => kstNow().toISOString().slice(0, 10);
 const dot = (d: string) => d.replace(/-/g, ".");
@@ -89,6 +89,15 @@ const nz = (v: unknown) => (v == null ? "" : String(v).trim());
 function placeOf(contents: string): string {
   const m = contents.match(/\(([^()]*)\)\s*$/);
   return m ? m[1].replace(/\s*\d{1,2}:\d{2}\s*$/, "").trim() : "";
+}
+
+// 추가 전화(가족 등): [{n:"어머니", p:"010-…"}] 를 JSON 글자로. 최대 10개, 빈 줄은 버림
+export function cleanPhones(v: unknown): string {
+  let a: any[] = [];
+  try { a = JSON.parse(nz(v) || "[]"); } catch { return ""; }
+  if (!Array.isArray(a)) return "";
+  const out = a.map((x) => ({ n: nz(x?.n).slice(0, 20), p: nz(x?.p).slice(0, 30) })).filter((x) => x.n || x.p).slice(0, 10);
+  return out.length ? JSON.stringify(out) : "";
 }
 
 // 사건 정보: 저장된 값(case_info)이 있으면 그것만, 없으면 처음 값으로 로웨어 값을 한 번 보여 줌
@@ -104,7 +113,7 @@ export function infoFields(c: any, saved: any | null, prefill = PREFILL_FROM_LAW
       lawyer: nz(c.charge_lawyer).split(/[,\s]+/)[0] || "",
       court_dept: [nz(c.court), nz(raw.l_justice_dept).replace(/\s*\(?\s*전화.*$/, "")].filter(Boolean).join(" "),
       court_phone: (nz(raw.l_justice_dept).match(/전화\s*:?\s*([\d-]{7,})/) || [])[1] || "",
-      investigator: police || (pros ? "검사 " + pros : ""), investigator_phone: nz(raw.l_police_tel) || nz(raw.l_prosecutor_tel), memo: "",
+      investigator: police || (pros ? "검사 " + pros : ""), investigator_phone: nz(raw.l_police_tel) || nz(raw.l_prosecutor_tel), memo: "", extra_phones: "",
     });
   } else for (const k of INFO_FIELDS) f[k] = "";
   return { fields: f, saved: !!saved, updatedBy: saved ? nz(saved.updated_by) : "", updatedAt: saved ? nz(saved.updated_at) : "" };
@@ -503,7 +512,7 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       if (!c) return json({ error: "사건이 없습니다" }, 404);
       const prev = (await rest(env, `case_info?select=*&l_num=eq.${lNum}`, {}, fetcher))[0] || {};
       const next: Record<string, string> = {};
-      for (const k of INFO_FIELDS) next[k] = nz(body.fields?.[k]).slice(0, k === "memo" ? 2000 : 200);
+      for (const k of INFO_FIELDS) next[k] = k === "extra_phones" ? cleanPhones(body.fields?.[k]) : nz(body.fields?.[k]).slice(0, k === "memo" ? 2000 : 200);
       const changed = INFO_FIELDS.filter((k) => nz(prev[k]) !== next[k]);
       const now = new Date().toISOString();
       await rest(env, "case_info?on_conflict=l_num", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
