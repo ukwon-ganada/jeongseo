@@ -35,10 +35,11 @@ BODY = {
     "richmenuName": NAME,
     "size": {"width": 2500, "height": 843},
     "areas": [
-        {"bounds": {"x": 0, "y": 0, "width": 1640, "height": 843},
-         "action": {"type": "uri", "label": "📱 사건 보기", "uri": WOFF + "?view=timeline"}},
+        # PC 앱은 그림 대신 이 이름(label)을 ≡ 목록으로 보여 줌 → PC에서 쓰는 칸을 맨 위에, 이름을 분명하게
         {"bounds": {"x": 1640, "y": 0, "width": 860, "height": 843},
-         "action": {"type": "postback", "label": "💻 PC로 보기", "data": "room-case"}},
+         "action": {"type": "postback", "label": "이 방 사건정보 보기", "data": "room-case"}},
+        {"bounds": {"x": 0, "y": 0, "width": 1640, "height": 843},
+         "action": {"type": "uri", "label": "휴대폰에서 보기", "uri": WOFF + "?view=timeline"}},
     ],
 }
 
