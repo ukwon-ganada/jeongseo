@@ -122,21 +122,40 @@ export function shapeCase(c: any, evs: any[], opts: { today: string; linked: str
   const ours = (e: any) => e.lp_set === "서면" && OUR_FIRM.test(nz(e.lp_contents));
   const toUs = (e: any) => e.lp_set === "송달" && OUR_FIRM.test(nz(e.lp_contents));
 
-  // 타임라인: 다른 당사자에게 가는 송달은 너무 많아서 우리에게 온 송달만
+  // 타임라인 (석원 결정 2026-11-13): "우리가 이 사건에서 한 일·해야 할 일"만.
+  //   선임(수임일) → 기일 출석 → 우리 서면 제출(항소장 등) → 선고. 앞으로의 기일은 "예정".
+  //   법원·상대방 기록(송달, 남의 서면, 명령, 번호 변경)은 나의사건 탭에만 둔다.
+  //   g: accept 선임 / ours 우리 서면 / hearing 기일·선고 / (방 대화는 src:'chat')
   const events: any[] = [];
+  const accept = isDate(raw.l_accept_date) ? raw.l_accept_date.slice(0, 10) : "";
+  if (accept) events.push({ d: accept, k: "ours", g: "accept", t: "사건 선임", f: null });
+  let verdictSeen = false;
   for (const e of list) {
-    if (e.lp_set === "송달" && !toUs(e)) continue;
     const d = e.lp_appoint_date.slice(0, 10);
-    let t = nz(e.lp_contents);
-    if (e.lp_set === "기일" && nz(e.lp_remark)) t += " · " + nz(e.lp_remark);
-    if (e.lp_set === "송달" && e.delivered_date) t += " · " + md(e.delivered_date) + " 도달";
-    events.push({ d, k: e.lp_set === "기일" ? (d >= today ? "due" : "court") : ours(e) ? "ours" : "court", t, f: null, ...(ours(e) ? { lp: e.lp_num } : {}) });
+    if (e.lp_set === "기일") {
+      const verdict = /선고/.test(nz(e.lp_contents));
+      if (verdict) verdictSeen = true;
+      let t = nz(e.lp_contents);
+      if (nz(e.lp_remark)) t += " · " + nz(e.lp_remark);
+      const future = d >= today;
+      events.push({ d, k: future ? "due" : verdict ? "ours" : "done", g: "hearing", t: (future ? "" : verdict ? "" : "출석 ") + t, f: null });
+    } else if (ours(e)) {
+      events.push({ d, k: "ours", g: "ours", t: nz(e.lp_contents).replace(/^.*?법무법인\s*정서\s*/, "") || nz(e.lp_contents), f: null, lp: e.lp_num });
+    }
   }
+  // 의뢰인에게 보낸 안내 문자도 우리가 한 일 (석원 2026-11-13). 인사말은 빼고 앞부분만.
+  for (const e of evs) {
+    if (e.lp_set !== "문자" || !isDate(e.lp_appoint_date)) continue;
+    events.push({ d: e.lp_appoint_date.slice(0, 10), k: "done", g: "msg", t: "안내 문자 · " + smsGist(nz(e.lp_contents)), f: null });
+  }
+  const jd = isDate(raw.l_judgment_date) ? raw.l_judgment_date.slice(0, 10) : "";
+  if (jd && !verdictSeen) events.push({ d: jd, k: jd >= today ? "due" : "ours", g: "hearing", t: "선고", f: null });
   const nextDate = isDate(c.next_date) ? c.next_date.slice(0, 10) : "";
   const hasNext = nextDate && list.some((e) => e.lp_set === "기일" && e.lp_appoint_date.slice(0, 10) === nextDate);
   if (nextDate >= today && !hasNext) {
-    events.push({ d: nextDate, k: "due", t: "다음 기일 " + [nz(c.next_time), nz(c.next_contents)].filter(Boolean).join(" ") });
+    events.push({ d: nextDate, k: "due", g: "hearing", t: "다음 기일 " + [nz(c.next_time), nz(c.next_contents)].filter(Boolean).join(" ") });
   }
+  events.sort((a, b) => a.d.localeCompare(b.d));
 
   // 기일: 이 사건 기일 + 내 다른 사건의 다가오는 기일(“내 사건 전체” 보기용)
   const hearings: any[] = list.filter((e) => e.lp_set === "기일").map((e) => ({
@@ -172,6 +191,15 @@ const kstMdHm = (iso: string) => new Date(Date.parse(iso) + 9 * 3600e3).toISOStr
 async function lastFeedRun(env: Env, fetcher: typeof fetch): Promise<string> {
   const r = await rest(env, `lw_feed_runs?select=finished_at&error=is.null&finished_at=not.is.null&order=id.desc&limit=1`, {}, fetcher).catch(() => []);
   return r?.[0]?.finished_at ? kstMdHm(r[0].finished_at) : "";
+}
+export function smsGist(c: string): string {
+  let t = c.replace(/^\[(SMS|LMS|MMS)\]\s*/i, "").replace(/^\[법무법인\s*정서\]\s*/, "");
+  const m = t.slice(0, 45).match(/^.*?(입니다|사무실입니다)[.\s]*/);
+  if (m) t = t.slice(m[0].length);
+  t = t.replace(/^안녕하세요[.,\s]*/, "");
+  const cut = t.search(/[.!]|\s{2}/);
+  t = (cut > 4 ? t.slice(0, cut) : t).trim();
+  return t.length > 32 ? t.slice(0, 32) + "…" : t || "문자";
 }
 function md(d: string) { return Number(d.slice(5, 7)) + "." + d.slice(8, 10); }
 
@@ -220,7 +248,7 @@ export function mergeRoomEvents(shaped: any, rows: any[], caseNo: string) {
     const key = d + tm + r.summary;
     if (seen.has(key)) continue; seen.add(key);
     const t = (tm ? tm + " " : "") + nz(r.summary);
-    shaped.events.push({ d, k: d >= shaped.today && r.state !== "완료" ? "due" : "room", t, f: null, src: "chat" });
+    shaped.events.push({ d, k: d >= shaped.today && r.state !== "완료" ? "due" : "room", t, f: null, g: "chat", src: "chat" });
     if (MEET.has(r.kind)) shaped.hearings.push({ c: caseNo, d, tm, t: nz(r.summary), p: "사건방 대화" });
   }
   shaped.events.sort((a: any, b: any) => a.d.localeCompare(b.d));
