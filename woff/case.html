@@ -87,9 +87,17 @@ var WOFF_ID = 'Nxkob0LER_dfaSzH8s6flw';
 var SDK = 'https://static.worksmobile.net/static/wm/woff/edge/3.7.1/sdk.js';
 var CASE_API = 'https://nyjyemjsperpakrrgzcc.supabase.co/functions/v1/case-view';
 
-// ── 견본 자료 (나중에 Supabase에서 받아 옴) ─────────────
-// loadCase(방ID 또는 사건번호) 한 곳만 바꾸면 실제 자료로 바뀌도록 모아 둠
-function loadCase(key){
+// ── 실제 자료: case-view 가 직원 확인 뒤 돌려줌 ──────────
+function api(body){
+  return fetch(CASE_API, {method:'POST', headers:{'Content-Type':'application/json','X-Works-Token':ctx.tok||''}, body:JSON.stringify(body)})
+    .then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||('오류 '+r.status)); return j; }); });
+}
+// key: {room:방ID} 또는 {case:사건번호}. 결과에 hold/unpaired/notfound 가 오면 화면이 따로 안내
+function loadCase(key){ return api({action:'case', room:key.room||'', 'case':key['case']||''}); }
+function loadMyCases(){ return api({action:'mycases'}).then(function(j){ return j.cases||[]; }); }
+
+// ── 견본 자료 (웍스 밖에서 열었을 때만) ─────────────────
+function sampleCase(key){
   // 견본: 사건번호로 열면 제목만 그 번호로 바꿔 보여 줌 (내용은 같은 견본)
   var CUR = /^\d{4}[가-힣]+\d+$/.test(key || '') ? key : '2026고단1234';
   return Promise.resolve({
@@ -138,15 +146,6 @@ function loadCase(key){
   });
 }
 
-// 내가 들어 있는 사건방 목록 (견본) — PC처럼 방을 모를 때 고르기용
-function loadMyCases(){
-  return Promise.resolve([
-    {c:'2026고단1234',t:'사기',next:'12.08 공판기일'},
-    {c:'2026고합88',t:'특정경제범죄가중처벌등에관한법률위반(사기)',next:'11.24 공판준비기일'},
-    {c:'2026노3021',t:'상해',next:'11.17 항소심 공판기일'},
-    {c:'2026가단5512',t:'대여금',next:'11.19 변론기일'}
-  ]);
-}
 
 // ── 공통 ──────────────────────────────────────────────
 var $ = function(s){ return document.querySelector(s); };
@@ -176,6 +175,7 @@ var VIEWS = {
   },
   deadline: function(){
     $('#chips').innerHTML='';
+    if(!data.deadlines.length) return '<div class="note">'+esc(data.deadlineNote||'기한이 없습니다.')+'</div>';
     var rows=data.deadlines.slice().sort(function(a,b){ return (a.st==='done')-(b.st==='done') || a.d.localeCompare(b.d); });
     return rows.map(function(x){
       var n=dd(x.d), lab=x.st==='done'?'제출':n<0?'지남':n===0?'D-day':'D-'+n, hot=x.st!=='done'&&n>=0&&n<=7?' hot':'';
@@ -188,7 +188,7 @@ var VIEWS = {
     var pick=data.hearings.filter(function(x){ return all ? dd(x.d)>=0 && dd(x.d)<=28 : x.c===data.caseNo; });
     var up=pick.filter(function(x){return dd(x.d)>=0;}).sort(function(a,b){return a.d.localeCompare(b.d);});
     var past=pick.filter(function(x){return dd(x.d)<0;}).sort(function(a,b){return b.d.localeCompare(a.d);});
-    var row=function(x){ return '<div class="row'+(dd(x.d)<0?' past':'')+'"><span class="d">'+x.tm+'</span><div><div class="t">'+(all?'<span class="case">'+esc(x.c)+'</span>':'')+esc(x.t)+'</div><div class="s">'+esc(x.p)+(x.who?' · 담당 '+esc(x.who):'')+'</div></div></div>'; };
+    var row=function(x){ return '<div class="row'+(dd(x.d)<0?' past':'')+'"><span class="d">'+esc(x.tm||'')+'</span><div><div class="t">'+(all?'<span class="case">'+esc(x.c)+'</span>':'')+esc(x.t)+'</div><div class="s">'+esc(x.p)+(x.who?' · 담당 '+esc(x.who):'')+'</div></div></div>'; };
     var h='', last='';
     up.forEach(function(x){ if(x.d!==last){ last=x.d; h+='<div class="hd"><b>'+md(x.d)+' ('+wk(x.d)+')</b><span>D-'+dd(x.d)+'</span></div>'; } h+=row(x); });
     if(past.length){ h+='<div class="hd"><b>지난 기일</b><span></span></div>'; past.forEach(function(x){ h+='<div class="s" style="margin-top:8px">'+md(x.d)+' ('+wk(x.d)+')</div>'+row(x); }); }
@@ -196,7 +196,7 @@ var VIEWS = {
   },
   progress: function(){
     chips('p', [['all','전체'],['기일','기일'],['송달','송달'],['제출','제출']]);
-    return '<div class="src">대법원 나의사건 진행내용 · 로웨어 갱신 '+data.progress.updated+'</div>'+
+    return '<div class="src">대법원 나의사건 진행내용 · 로웨어 갱신 '+esc(data.progress.updated)+(data.progress.rows.length?'':' · 최근 한 달 안에 바뀐 내용이 없습니다')+'</div>'+
       data.progress.rows.filter(function(x){ return sub.p==='all' || x.k===sub.p; }).map(function(x){
         return '<div class="pg'+(x.o?' ours':'')+(x.p?' plan':'')+'"><span class="d">'+x.d+'</span><div><div class="c">'+esc(x.c)+'</div>'+(x.r?'<div class="s">'+esc(x.r)+'</div>':'')+'</div></div>';
       }).join('')+'<div class="note">파란 줄은 우리 법인이 낸 문건입니다.</div>';
@@ -209,10 +209,10 @@ var VIEWS = {
       s.rows.forEach(function(r){
         var val=r.v?esc(r.v)+(r.secret?' <button class="edit" data-secret="1">보기</button>':''):'<span class="empty">비어 있음</span>';
         var badge=r.src?'<span class="badge">자동 · '+esc(r.src)+'</span>':'<span class="badge">자동으로 못 가져옴</span>';
-        h+='<div class="fr"><span class="l">'+esc(r.l)+'</span><div>'+val+'<br>'+badge+'</div><button class="edit" data-todo="1">수정</button></div>';
+        h+='<div class="fr"><span class="l">'+esc(r.l)+'</span><div>'+val+'<br>'+badge+'</div><span></span></div>';
       });
     });
-    return h+'<div class="note">수정과 주민번호 보기는 Supabase 연결 뒤에 동작합니다(열람 기록 남김).</div>';
+    return h+'<div class="note">로웨어에 적힌 값입니다. 고칠 곳은 로웨어에서 고치면 다음 갱신 때 반영됩니다. 이 화면을 열 때마다 열람 기록이 남습니다.</div>';
   }
 };
 
@@ -227,7 +227,7 @@ function render(){
   document.querySelectorAll('nav button').forEach(function(b){ b.setAttribute('aria-current', b.dataset.v===view?'page':'false'); });
   var names={timeline:'타임라인',deadline:'기한',hearing:'기일',progress:'진행내용',info:'사건 정보'};
   $('#title').textContent = data.caseNo + ' ' + names[view];
-  $('#sub').textContent = (q.get('closed') ? '[종결] ' : '') + data.title + ' · ' + data.court;
+  $('#sub').textContent = (q.get('closed') || data.closed ? '[종결] ' : '') + data.title + ' · ' + data.court;
   $('#main').innerHTML = (VIEWS[view]||VIEWS.timeline)() +
     '<div class="diag">방: '+esc(ctx.room||'(없음)')+' · 사건번호 값: '+esc(ctx.caseParam||'(없음)')+' · 사용자: '+esc(ctx.user||'(확인 전)')+' · '+esc(ctx.os)+' · 직원확인: '+esc(ctx.staff===undefined?'(시험 전)':(ctx.staff?'됨('+ctx.staff+')':'안 됨'))+'</div>' + diagHtml();
 }
@@ -235,7 +235,7 @@ document.addEventListener('click', function(e){
   var b=e.target.closest('button'); if(!b) return;
   if(b.dataset.v){ view=b.dataset.v; render(); window.scrollTo(0,0); return; }
   ['f','scope','p'].forEach(function(k){ if(b.dataset[k]){ sub[k]=b.dataset[k]; render(); } });
-  if(b.dataset.file || b.dataset.todo || b.dataset.secret) alert('견본 화면입니다. 실제 파일 열기·수정은 Supabase 연결 뒤에 동작합니다.');
+  if(b.dataset.file || b.dataset.todo || b.dataset.secret) alert('파일 열기는 아직 준비 중입니다.');
 });
 
 // 최근 고른 사건 5개 (이 PC 브라우저에만 저장)
@@ -268,8 +268,27 @@ document.addEventListener('click', function(e){
   if(e.target.id==='switch'){ showPicker(); window.scrollTo(0,0); return; }
   var b=e.target.closest('.pick'); if(!b) return;
   ctx.caseParam=b.dataset.case; $('#nav').hidden=false; addRecent(ctx.caseParam);
-  loadCase(ctx.caseParam).then(function(d){ data=d; render(); window.scrollTo(0,0); });
+  showCase({'case':ctx.caseParam}).then(function(){ window.scrollTo(0,0); });
 });
+
+// 사건 하나 열기: 보류·짝 없음·못 찾음은 각각 안내
+function message(title, sub, note){
+  $('#nav').hidden=true; $('#switch').hidden=true; $('#chips').innerHTML='';
+  $('#title').textContent=title; $('#sub').textContent=sub;
+  $('#main').innerHTML='<div class="note">'+note+'</div>'+diagHtml();
+}
+function showHold(){ message('사건 미확정','이 방의 사건이 아직 정해지지 않았습니다.','사건이 확정되면 이 메뉴로 바로 열립니다. 관리자가 관리 화면에서 연결합니다.'); }
+function showCase(key){
+  $('#sub').textContent='사건 자료를 불러오는 중…';
+  return loadCase(key).then(function(d){
+    if(d.hold) return showHold();
+    if(d.unpaired) return showPicker().then(function(){ $('#sub').textContent='이 방은 아직 사건과 짝지어지지 않았어요. 아래에서 골라 주세요.'; });
+    if(d.notfound) return message('사건을 찾지 못함', esc(d.caseNo||''), '로웨어 사건 목록에서 이 사건번호를 찾지 못했습니다. 사건번호가 바뀌었거나 아직 로웨어에 등록되지 않았을 수 있어요.');
+    $('#nav').hidden=false; data=d; render();
+  }).catch(function(e){
+    message('불러오지 못함', '', esc((e&&e.message)||e)+'<br>잠시 뒤 다시 열어 주세요. 계속되면 ?relogin=1 로 다시 로그인해 보세요.');
+  });
+}
 
 // ── WOFF 시작 ─────────────────────────────────────────
 function start(){
@@ -293,32 +312,28 @@ function start(){
     try{ DIAG.storage = Object.keys(sessionStorage).concat(Object.keys(localStorage)).join(', '); }catch(e){}
     // 직원 확인 시험: 웍스 토큰을 서버가 웍스에 직접 물어봄
     var tok = ''; try{ tok = woff.getAccessToken ? woff.getAccessToken() : ''; }catch(e){}
+    ctx.tok = tok;
     DIAG.whoami = '확인 중';
     var p4 = fetch(CASE_API, {method:'POST', headers:{'Content-Type':'application/json','X-Works-Token':tok||''}, body:JSON.stringify({action:'whoami'})})
       .then(function(r){ return r.json(); }).then(function(j){ DIAG.whoami = j; ctx.staff = j.ok ? (j.name||j.userId) : ''; })
       .catch(function(e){ DIAG.whoami = '오류: '+((e&&e.message)||e); });
     return Promise.all([p1,p2,p3,p4]).then(function(){
-      if(q.get('hold')){
-        // 보류 방: 어느 사건인지 확정 못 함 → 사건정보·서면을 띄우지 않는다
-        $('#nav').hidden=true; $('#switch').hidden=true; $('#chips').innerHTML='';
-        $('#title').textContent='사건 미확정';
-        $('#sub').textContent='이 방의 사건이 아직 정해지지 않았습니다.';
-        $('#main').innerHTML='<div class="note">사건이 확정되면 이 메뉴로 바로 열립니다. 관리자가 관리 화면에서 연결합니다.</div>';
-        return;
-      }
+      // 보류 방: 어느 사건인지 확정 못 함 → 사건정보·서면을 띄우지 않는다
+      if(q.get('hold')) return showHold();
+      if(ctx.staff === '') return message('직원 확인 안 됨','웍스 계정 확인에 실패했습니다.','주소 끝에 ?relogin=1 을 붙여 다시 로그인해 주세요.');
       if(!ctx.room && !ctx.caseParam) return showPicker().then(function(){
         // PC 도우미가 짝 없는 방에서 연 경우
         if(q.get('room')) $('#sub').textContent='이 방은 아직 사건과 짝지어지지 않았어요. 아래에서 골라 주세요.';
       });
-      return loadCase(ctx.room || ctx.caseParam).then(function(d){ data=d; render(); });
+      return showCase(ctx.room ? {room:ctx.room} : {'case':ctx.caseParam});
     });
   }).catch(function(e){
     // 웍스 밖에서 열었을 때도 견본은 보이게
-    loadCase('').then(function(d){ data=d; render(); $('#sub').textContent='웍스 연결 실패: '+((e&&e.message)||e)+' (견본만 표시)'; });
+    sampleCase('').then(function(d){ data=d; render(); $('#sub').textContent='웍스 연결 실패: '+((e&&e.message)||e)+' (견본만 표시)'; });
   });
 }
 var s=document.createElement('script'); s.src=SDK; s.onload=start;
-s.onerror=function(){ loadCase('').then(function(d){ data=d; render(); $('#sub').textContent='웍스 SDK를 불러오지 못했습니다 (견본만 표시)'; }); };
+s.onerror=function(){ sampleCase('').then(function(d){ data=d; render(); $('#sub').textContent='웍스 SDK를 불러오지 못했습니다 (견본만 표시)'; }); };
 document.head.appendChild(s);
 </script>
 </body>
