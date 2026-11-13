@@ -90,6 +90,14 @@ main{max-width:880px;margin:0 auto;padding:12px 16px 32px}
 .ev.minor .soon{color:var(--muted)}
 .ev.g-accept .rail::after{background:var(--ink);border-color:var(--ink)}
 .ev.g-accept .gt{color:var(--ink);background:var(--line2)}
+/* 법정기한(잠정): 빨간 테두리 점 + 빨간 꼬리표. 지난 기한은 흐리게 */
+.ev.g-limit .rail::after{background:var(--surface);border-color:var(--danger);border-width:2px}
+.ev.g-limit .gt{color:#fff;background:var(--danger)}
+.ev.g-limit.due .t{color:var(--danger)}
+.ev.g-limit .tent{display:inline-block;font-size:11px;font-weight:600;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 4px;margin-left:6px;vertical-align:1px}
+.ev.g-limit.done .t{color:var(--muted);font-weight:400}
+.ev.g-limit.done .gt{background:var(--line2);color:var(--muted)}
+.dlnote{font-size:12px;color:var(--muted);margin:2px 4px 10px;line-height:1.5}
 /* 실제 날짜 차이만큼 띄우기. 너무 길면 줄이고 '몇 개월' 표시 */
 .gap{display:grid;grid-template-columns:52px 18px 1fr;gap:0 8px;padding:0 16px}
 .gap .rail{position:relative}
@@ -259,7 +267,7 @@ var VIEWS = {
       var lab=long?(days>=60?'약 '+Math.round(days/30)+'개월':days+'일'):'';
       return '<div class="gap'+(long?' long':'')+'" style="height:'+h+'px"><span></span><span class="rail"></span><span class="gl">'+lab+'</span></div>';
     };
-    var GLABEL={accept:'선임',hearing:'재판',ours:'제출',meet:'접견',chat:'방 대화'};
+    var GLABEL={accept:'선임',hearing:'재판',ours:'제출',meet:'접견',chat:'방 대화',limit:'기한'};
     var list=data.events, h='';
     if(!list.length) return h+emptySt('표시할 내용이 없습니다');
     var body='', yr='', prevD='', prevY='';
@@ -268,16 +276,18 @@ var VIEWS = {
       var g=e.g||(e.src==='chat'?'chat':''), gl=GLABEL[g]||'', minor=(g==='msg'||g==='chat');
       if(prevD && y===prevY) body+=gapDiv(prevD, e.d);
       prevD=e.d; prevY=y;
-      body+='<div class="ev '+e.k+(g?' g-'+g:'')+(minor?' minor':'')+'"><div class="d">'+md(e.d)+'<small>'+wk(e.d)+'</small></div><div class="rail"></div><div class="t">'+(e.k==='due'?'<span class="soon">예정</span>':'')+(gl?'<span class="gt">'+gl+'</span>':'')+esc(e.t)+(e.cf?'<div class="fa"><button class="open" data-file="'+e.cf.id+'">계약서 열기</button><span class="fn">'+esc(e.cf.n)+'</span></div>':'')+finalFile(e)+'</div></div>';
+      body+='<div class="ev '+e.k+(g?' g-'+g:'')+(minor?' minor':'')+'"><div class="d">'+md(e.d)+'<small>'+wk(e.d)+'</small></div><div class="rail"></div><div class="t">'+(e.k==='due'&&g!=='limit'?'<span class="soon">예정</span>':'')+(gl?'<span class="gt">'+gl+'</span>':'')+esc(e.t)+(g==='limit'?'<span class="tent">'+(e.k==='due'?'잠정':'지남')+'</span>':'')+(e.cf?'<div class="fa"><button class="open" data-file="'+e.cf.id+'">계약서 열기</button><span class="fn">'+esc(e.cf.n)+'</span></div>':'')+finalFile(e)+'</div></div>';
     });
     return h+'<div class="card">'+body+'</div>';
   },
   deadline: function(){
-    if(!data.deadlines.length) return emptySt('기한 계산 준비 중','새 기한 규칙이 완성되면 이곳에 표시됩니다.');
-    var rows=data.deadlines.slice().sort(function(a,b){ return (a.st==='done')-(b.st==='done') || a.d.localeCompare(b.d); });
-    return '<div class="card">'+rows.map(function(x){
+    var note=data.deadlineNote?'<div class="dlnote">'+esc(data.deadlineNote)+'</div>':'';
+    if(!data.deadlines.length) return note+emptySt('계산된 기한이 없습니다','형사 사건의 선고·기록접수통지가 들어오면 자동으로 표시됩니다.');
+    var rows=data.deadlines.slice().sort(function(a,b){ return (a.st==='done')-(b.st==='done') || (a.d||'9').localeCompare(b.d||'9'); });
+    return note+'<div class="card">'+rows.map(function(x){
+      if(!x.d) return '<div class="li"><div class="main"><div class="t">'+esc(x.t)+'</div><div class="s">'+esc(x.why)+'</div></div><span class="dday past">도달 전</span></div>';
       var n=dd(x.d), lab=x.st==='done'?'제출':n<0?'지남':n===0?'D-day':'D-'+n;
-      return '<div class="li"><div class="main"><div class="t">'+esc(x.t)+'</div><div class="s">'+md(x.d)+'('+wk(x.d)+')까지 · '+esc(x.why)+'</div></div><span class="dday'+(x.st==='done'||n<0?' past':'')+'">'+lab+'</span></div>';
+      return '<div class="li"><div class="main"><div class="t">'+esc(x.t)+(x.st==='expected'?' (선고되면)':'')+'</div><div class="s">'+md(x.d)+'('+wk(x.d)+')까지 · '+esc(x.why)+(x.doneOn?' · '+md(x.doneOn)+' 제출':'')+'</div></div><span class="dday'+(x.st==='done'||n<0?' past':'')+'">'+lab+'</span></div>';
     }).join('')+'</div>';
   },
   hearing: function(){
