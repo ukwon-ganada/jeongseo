@@ -284,8 +284,17 @@ export function roomOnlyShape(title: string, rows: any[], today: string, myHeari
 //   실시간일 필요 없음: 로웨어에 제출이 뜬 뒤 사건 화면을 열 때 계산된다.
 //   직원이 직접 고른 파일(lp_num)이 있으면 그것이 우선.
 const DOC_RE = /\.(pdf|hwp|hwpx|doc|docx)$/i;
+// 계약서(석원 2026-11-13): 방에 올라온 파일 이름에 "계약"·"약정서"가 들어가면 서면 후보에서 빼고
+//   "사건 선임" 줄에 가장 최근 것 하나를 붙인다.
+export const CONTRACT_RE = /계약|약정서/;
+export function attachContract(events: any[], files: any[]) {
+  const acc = events.find((e) => e.g === "accept");
+  const c = files.filter((f) => CONTRACT_RE.test(f.n) && f.lp == null).sort((a, b) => b.at - a.at)[0];
+  if (acc && c) acc.cf = { id: c.id, n: c.n };
+  return events;
+}
 export function attachFinalFiles(events: any[], files: any[]) {
-  const docs = files.filter((f) => f.pdf || DOC_RE.test(f.n));
+  const docs = files.filter((f) => (f.pdf || DOC_RE.test(f.n)) && (f.lp != null || !CONTRACT_RE.test(f.n)));
   const used = new Set<number>();
   const picked = new Map<string, any>();
   for (const f of docs) if (f.lp != null && !picked.has(String(f.lp))) { picked.set(String(f.lp), f); used.add(f.id); }
@@ -398,6 +407,7 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       const shaped = shapeCase(c, evs || [], { today, linked, myHearings, status, saved });
       shaped.progress.checked = checked;
       attachFinalFiles(shaped.events, files);
+      attachContract(shaped.events, files);
       mergeRoomEvents(shaped, chat, c.l_code);
       mergeMeets(shaped, meets || []);
       // 직원이 줄마다 파일을 바꿀 때 고를 목록 (화면에 따로 나열하지 않음)

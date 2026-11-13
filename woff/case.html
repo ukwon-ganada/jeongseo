@@ -9,11 +9,15 @@
   --bg:#f5f6f8;--surface:#fff;--ink:#222;--ink2:#555;--muted:#8a8f98;--line:#ebedf0;--line2:#f2f3f5;
   --accent:#00c73c;--accent-ink:#00a83a;--accent-tint:#e8f9ee;
   --due:#ff6b00;--due-tint:#fff1e6;--danger:#f04452;
+  --g-accept:#7c5cd6;--g-accept-t:#f1edfc;--g-hearing:#2f6fe4;--g-hearing-t:#e9f0fd;--g-ours:#00a83a;--g-ours-t:#e8f9ee;
+  --g-meet:#0f9d9a;--g-meet-t:#e5f6f6;--g-msg:#d98a00;--g-msg-t:#fdf3e1;--g-chat:#8a8f98;--g-chat-t:#f2f3f5;
   --radius:12px;--shadow:0 1px 2px rgba(0,0,0,.04),0 4px 16px rgba(0,0,0,.04);
 }
 @media (prefers-color-scheme:dark){:root{
   --bg:#141518;--surface:#1e1f23;--ink:#ececee;--ink2:#c2c5cb;--muted:#8b9099;--line:#2c2e33;--line2:#26282c;
-  --accent:#16d158;--accent-ink:#3ddc78;--accent-tint:#173323;--due:#ff8a3d;--due-tint:#3a2614;--shadow:none}}
+  --accent:#16d158;--accent-ink:#3ddc78;--accent-tint:#173323;--due:#ff8a3d;--due-tint:#3a2614;--shadow:none;
+  --g-accept:#a68cf0;--g-accept-t:#2a2440;--g-hearing:#6d9cf2;--g-hearing-t:#1c2840;--g-ours:#3ddc78;--g-ours-t:#173323;
+  --g-meet:#3cc9c5;--g-meet-t:#163231;--g-msg:#f0b03c;--g-msg-t:#382a12;--g-chat:#8b9099;--g-chat-t:#26282c}}
 *{box-sizing:border-box}[hidden]{display:none!important}
 html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:Pretendard,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;font-size:15px;line-height:1.5;letter-spacing:-.2px;padding-bottom:env(safe-area-inset-bottom)}
@@ -65,6 +69,17 @@ main{max-width:880px;margin:0 auto;padding:12px 16px 32px}
 .ev.done .t{color:var(--ink)}
 .ev.room .rail::after{border-color:var(--accent);background:var(--surface)}
 .ev .src{font-size:11px;color:var(--muted);margin-left:6px;white-space:nowrap}
+/* 종류별 색: 점과 앞머리 이름표 */
+.ev{--gc:var(--g-chat);--gt:var(--g-chat-t)}
+.ev.g-accept{--gc:var(--g-accept);--gt:var(--g-accept-t)}
+.ev.g-hearing{--gc:var(--g-hearing);--gt:var(--g-hearing-t)}
+.ev.g-ours{--gc:var(--g-ours);--gt:var(--g-ours-t)}
+.ev.g-meet{--gc:var(--g-meet);--gt:var(--g-meet-t)}
+.ev.g-msg{--gc:var(--g-msg);--gt:var(--g-msg-t)}
+.ev[class*="g-"] .rail::after{background:var(--gc);border-color:var(--gc)}
+.ev[class*="g-"].due .rail::after{background:var(--surface);border-color:var(--gc)}
+.ev .gt{display:inline-block;font-size:12px;font-weight:700;border-radius:5px;padding:1px 7px;margin-right:7px;vertical-align:1px;color:var(--gc);background:var(--gt)}
+.ev .soon{display:inline-block;font-size:11px;font-weight:700;color:var(--due);margin-right:6px;vertical-align:1px}
 
 /* 목록 줄 */
 .li{display:flex;gap:12px;padding:13px 16px;border-top:1px solid var(--line2);align-items:flex-start}
@@ -216,12 +231,14 @@ function telHref(v){ var n=String(v||'').replace(/[^\d+]/g,''); return n.length>
 var VIEWS = {
   timeline: function(){
     // 타임라인 = 우리가 한 일·해야 할 일, 걸러 보기 없이 한 줄로 (기한·기일은 메뉴가 따로 있음)
+    var GLABEL={accept:'선임',hearing:'재판',ours:'제출',meet:'접견',msg:'문자',chat:'방 대화'};
     var list=data.events, h='';
     if(!list.length) return h+emptySt('표시할 내용이 없습니다');
     var body='', yr='';
     list.forEach(function(e){
       var y=e.d.slice(0,4); if(y!==yr){ yr=y; body+='<div class="yr">'+y+'</div>'; }
-      body+='<div class="ev '+e.k+'"><div class="d">'+md(e.d)+'<small>'+wk(e.d)+'</small></div><div class="rail"></div><div class="t">'+esc(e.t)+(e.src==='chat'?'<span class="src">방 대화</span>':'')+finalFile(e)+'</div></div>';
+      var g=e.g||(e.src==='chat'?'chat':''), gl=GLABEL[g]||'';
+      body+='<div class="ev '+e.k+(g?' g-'+g:'')+'"><div class="d">'+md(e.d)+'<small>'+wk(e.d)+'</small></div><div class="rail"></div><div class="t">'+(e.k==='due'?'<span class="soon">예정</span>':'')+(gl?'<span class="gt">'+gl+'</span>':'')+esc(e.t)+(e.cf?'<div class="fa"><button class="open" data-file="'+e.cf.id+'">계약서 열기</button><span class="fn">'+esc(e.cf.n)+'</span></div>':'')+finalFile(e)+'</div></div>';
     });
     return h+'<div class="card">'+body+'</div>';
   },
