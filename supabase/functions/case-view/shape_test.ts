@@ -1,5 +1,5 @@
 // 실행: deno test supabase/functions/case-view/shape_test.ts
-import { caseNoVariants, shapeCase } from "./handler.ts";
+import { caseNoVariants, infoFields, shapeCase } from "./handler.ts";
 function assert(c: unknown, m: string) { if (!c) throw new Error(m); }
 
 Deno.test("사건번호 후보", () => {
@@ -16,6 +16,7 @@ Deno.test("화면 모양", () => {
     { lp_num: 2, lp_set: "서면", lp_appoint_date: "2026-11-05", lp_contents: "피고인 변호인 법무법인 정서 의견서 제출" },
     { lp_num: 3, lp_set: "송달", lp_appoint_date: "2026-11-01", lp_contents: "피고인2 이OO 공소장 발송" },
     { lp_num: 4, lp_set: "송달", lp_appoint_date: "2026-11-02", lp_contents: "변호인 법무법인 정서 기일통지서 발송", delivered_date: "2026-11-04" },
+    { lp_num: 6, lp_set: "서면", lp_appoint_date: "2026-11-06", lp_contents: "원고 소송대리인 박혁 보정서 제출" },
     { lp_num: 5, lp_set: "문자", lp_appoint_date: "2026-11-03", lp_contents: "[SMS] 안내" },
   ];
   const d = shapeCase(c, evs, { today: "2026-11-12", linked: ["2025고단9"], myHearings: [{ c: "2026노1", d: "2026-11-20", tm: "10:00", t: "공판", p: "" }], status: "대상" });
@@ -24,7 +25,18 @@ Deno.test("화면 모양", () => {
   assert(d.events.some((e: any) => e.k === "ours"), "우리 서면");
   assert(d.events.some((e: any) => e.k === "due" && e.d === "2026-12-08"), "다음 기일");
   assert(d.hearings.some((h: any) => h.p === "411호 법정") && d.hearings.some((h: any) => h.c === "2026노1"), "기일");
-  assert(d.progress.rows.length === 4 && d.progress.updated === "11.12 09:31", "진행내용 " + d.progress.updated);
+  assert(!d.events.find((e: any) => e.t.includes("보정서"))!.k.includes("ours"), "보정서는 우리 서면 아님");
+  assert(d.progress.rows.length === 5 && d.progress.updated === "11.12 09:31", "진행내용 " + d.progress.updated);
   assert(!JSON.stringify(d).includes("비밀"), "주민번호 안 나감");
-  assert(d.info.some((s: any) => s.h === "연결 사건"), "연결 사건");
+  assert(d.info.linked[0] === "2025고단9", "연결 사건");
+  assert(d.info.fields.client_name === "김OO" && d.info.fields.case_name === "사기" && !d.info.saved, "처음 값");
+  assert(d.progress.rows.find((r: any) => r.c.includes("이OO"))!.x === 1 && d.progress.rows.find((r: any) => r.c.includes("기일통지서"))!.u === 1, "송달 진하게/흐리게");
+});
+
+Deno.test("저장된 사건 정보만 씀", () => {
+  const c = { l_num: 1, l_code: "x", l_name: "사기", charge_lawyer: "서고은,이예나", raw: { l_client: "로웨어이름", l_justice_dept: "가사 3 단독 (전화:032-620-4441(매주 금요일은 재판))" } };
+  const p = infoFields(c, null);
+  assert(p.fields.lawyer === "서고은" && p.fields.court_phone === "032-620-4441", "처음 값 " + JSON.stringify(p.fields));
+  const s = infoFields(c, { client_name: "우리가 고친 이름", updated_by: "서석원" });
+  assert(s.fields.client_name === "우리가 고친 이름" && s.fields.case_name === "" && s.saved, "저장값 우선, 로웨어 안 섞음");
 });

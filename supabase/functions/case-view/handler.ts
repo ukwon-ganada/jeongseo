@@ -11,6 +11,9 @@
 //    { "action": "case", "room": "<방ID>" }          → 방↔사건 표(works_room_case)로 찾은 사건
 //    { "action": "case", "case": "<사건번호>" }       → 사건번호로 찾은 사건
 //    { "action": "mycases" }                        → 내가 담당인 진행 사건 (고르기 화면용)
+//    { "action": "save_info", "lNum": 123, "fields": {...} } → 사건 정보 저장(case_info, 수정 기록 case_info_log)
+//  사건 정보 칸은 우리가 직접 입력·수정한다. 로웨어와 연동하지 않는다(자동으로 덮어쓰지 않음).
+//    저장된 값이 없을 때만 처음 값으로 로웨어 값을 한 번 보여 준다(PREFILL_FROM_LAWWARE).
 //  보류 방은 사건을 붙이지 않는다(잘못 붙이느니 안 붙인다) → { hold: true }
 //  가져오지 않는 것: 주민번호·주소 등 개인정보 칸
 //  배포: verify_jwt=false (웍스 토큰으로 직접 확인)
@@ -65,7 +68,10 @@ export function caseNoVariants(p: string): string[] {
 }
 
 // ── 자료를 화면 모양으로 바꾸기 ─────────────────────────
-const OUR_FIRM = "정서";
+// "보정서"처럼 "정서"가 들어간 낱말과 헷갈리지 않게 "법무법인 정서"로 찾음
+const OUR_FIRM = /법무법인\s*정서/;
+export const PREFILL_FROM_LAWWARE = true;
+export const INFO_FIELDS = ["case_name", "client_name", "client_phone", "lawyer", "court_dept", "court_phone", "investigator", "investigator_phone", "memo"] as const;
 const kstNow = () => new Date(Date.now() + 9 * 3600e3);
 export const kstToday = () => kstNow().toISOString().slice(0, 10);
 const dot = (d: string) => d.replace(/-/g, ".");
@@ -78,17 +84,36 @@ function placeOf(contents: string): string {
   return m ? m[1].replace(/\s*\d{1,2}:\d{2}\s*$/, "").trim() : "";
 }
 
-export function shapeCase(c: any, evs: any[], opts: { today: string; linked: string[]; myHearings: any[]; status?: string }) {
+// 사건 정보: 저장된 값(case_info)이 있으면 그것만, 없으면 처음 값으로 로웨어 값을 한 번 보여 줌
+export function infoFields(c: any, saved: any | null, prefill = PREFILL_FROM_LAWWARE) {
+  const raw = c.raw || {};
+  const f: Record<string, string> = {};
+  if (saved) { for (const k of INFO_FIELDS) f[k] = nz(saved[k]); }
+  else if (prefill) {
+    const police = [nz(raw.l_police_station), nz(raw.l_police_detective)].filter(Boolean).join(" ");
+    const pros = nz(raw.l_prosecutor);
+    Object.assign(f, {
+      case_name: nz(c.l_name).replace(/^\[전자\]\s*/, ""), client_name: nz(raw.l_client), client_phone: nz(raw.l_client_hp),
+      lawyer: nz(c.charge_lawyer).split(/[,\s]+/)[0] || "",
+      court_dept: [nz(c.court), nz(raw.l_justice_dept).replace(/\s*\(?\s*전화.*$/, "")].filter(Boolean).join(" "),
+      court_phone: (nz(raw.l_justice_dept).match(/전화\s*:?\s*([\d-]{7,})/) || [])[1] || "",
+      investigator: police || (pros ? "검사 " + pros : ""), investigator_phone: nz(raw.l_police_tel) || nz(raw.l_prosecutor_tel), memo: "",
+    });
+  } else for (const k of INFO_FIELDS) f[k] = "";
+  return { fields: f, saved: !!saved, updatedBy: saved ? nz(saved.updated_by) : "", updatedAt: saved ? nz(saved.updated_at) : "" };
+}
+
+export function shapeCase(c: any, evs: any[], opts: { today: string; linked: string[]; myHearings: any[]; status?: string; saved?: any }) {
   const raw = c.raw || {};
   const today = opts.today;
   const title = nz(c.l_name).replace(/^\[전자\]\s*/, "");
-  const court = [nz(c.court), nz(raw.l_justice_dept)].filter(Boolean).join(" ");
+  const court = [nz(c.court), nz(raw.l_justice_dept).replace(/\s*\(?\s*전화.*$/, "")].filter(Boolean).join(" ");
   const list = evs
     .filter((e) => isDate(e.lp_appoint_date) && e.lp_set !== "문자" && e.lp_set !== "메일")
     .sort((a, b) => (a.lp_appoint_date + (a.lp_appoint_time || "")).localeCompare(b.lp_appoint_date + (b.lp_appoint_time || "")) || (a.lp_num || 0) - (b.lp_num || 0));
 
-  const ours = (e: any) => e.lp_set === "서면" && nz(e.lp_contents).includes(OUR_FIRM);
-  const toUs = (e: any) => e.lp_set === "송달" && nz(e.lp_contents).includes(OUR_FIRM);
+  const ours = (e: any) => e.lp_set === "서면" && OUR_FIRM.test(nz(e.lp_contents));
+  const toUs = (e: any) => e.lp_set === "송달" && OUR_FIRM.test(nz(e.lp_contents));
 
   // 타임라인: 다른 당사자에게 가는 송달은 너무 많아서 우리에게 온 송달만
   const events: any[] = [];
@@ -119,23 +144,12 @@ export function shapeCase(c: any, evs: any[], opts: { today: string; linked: str
   const kind: Record<string, string> = { 기일: "기일", 송달: "송달", 서면: "제출" };
   const rows = list.slice(-400).map((e) => ({
     d: dot(e.lp_appoint_date.slice(0, 10)), c: nz(e.lp_contents), r: nz(e.lp_remark), k: kind[e.lp_set] || "",
-    o: ours(e) ? 1 : 0, p: e.lp_appoint_date.slice(0, 10) > today ? 1 : 0,
+    o: ours(e) ? 1 : 0, u: toUs(e) ? 1 : 0, x: e.lp_set === "송달" && !toUs(e) ? 1 : 0, p: e.lp_appoint_date.slice(0, 10) > today ? 1 : 0,
   }));
   const seen = evs.map((e) => nz(e.last_seen_at)).filter(Boolean).sort().pop();
   const updated = seen ? new Date(Date.parse(seen) + 9 * 3600e3).toISOString().replace(/^\d{4}-(\d\d)-(\d\d)T(\d\d:\d\d).*/, "$1.$2 $3") : "기록 없음";
 
-  // 사건 정보: 값이 있는 칸만, 개인정보(주민번호·주소)는 넣지 않음
-  const row = (l: string, v: unknown, src = "로웨어") => ({ l, v: nz(v), src: nz(v) ? src : null });
-  const info: any[] = [
-    { h: "사건", rows: [row("사건번호", c.l_code), row("사건명", title), row("상태", c.state), row("수임일", c.accept_date),
-      row("담당 변호사", c.charge_lawyer), row("수행 변호사", c.perform_lawyer), row("담당 직원", c.charge_staff)] },
-    { h: "의뢰인", rows: [row("이름", raw.l_client), row("휴대전화", raw.l_client_hp)] },
-    { h: "재판부", rows: [row("법원·재판부", court), row("비고", raw.l_court_remark)].filter((r) => r.v || r.l === "법원·재판부") },
-  ];
-  const inv = [row("경찰서", raw.l_police_station), row("담당 수사관", raw.l_police_detective), row("수사관 전화", raw.l_police_tel),
-    row("검사", raw.l_prosecutor), row("검사실 전화", raw.l_prosecutor_tel)].filter((r) => r.v);
-  if (inv.length) info.push({ h: "수사", rows: inv });
-  if (opts.linked.length) info.push({ h: "연결 사건", note: "원심 등", rows: opts.linked.map((n) => row("사건번호", n)) });
+  const info = { ...infoFields(c, opts.saved ?? null), linked: opts.linked };
 
   return {
     caseNo: c.l_code, lNum: c.l_num, title, court: court || "법원 정보 없음", today, closed: opts.status === "종결",
@@ -200,15 +214,36 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
         if (c.state === "종결") status = "종결";
       } else return json({ error: "방이나 사건번호가 없습니다" }, 400);
 
-      const [evs, mine] = await Promise.all([
+      const [evs, mine, saved] = await Promise.all([
         rest(env, `lw_process_events?select=lp_num,lp_set,lp_appoint_date,lp_appoint_time,lp_contents,lp_remark,delivered_date,court,last_seen_at&l_num=eq.${c.l_num}&order=lp_appoint_date.asc&limit=2000`, {}, fetcher),
         myCases(env, who.name || "", fetcher),
+        rest(env, `case_info?select=*&l_num=eq.${c.l_num}`, {}, fetcher).then((r: any[]) => r?.[0] ?? null).catch(() => null),
       ]);
       const end = new Date(Date.parse(today) + 28 * 864e5).toISOString().slice(0, 10);
       const myHearings = mine.filter((m: any) => isDate(m.next_date) && m.next_date.slice(0, 10) >= today && m.next_date.slice(0, 10) <= end)
         .map((m: any) => ({ c: m.l_code, d: m.next_date.slice(0, 10), tm: nz(m.next_time), t: nz(m.next_contents) || "기일", p: nz(m.court) }));
       await logView(env, who, "case", room, c, fetcher);
-      return json(shapeCase(c, evs || [], { today, linked, myHearings, status }));
+      return json(shapeCase(c, evs || [], { today, linked, myHearings, status, saved }));
+    }
+
+    if (body?.action === "save_info") {
+      const lNum = Number(body.lNum);
+      if (!Number.isFinite(lNum) || lNum <= 0) return json({ error: "사건이 없습니다" }, 400);
+      const c = (await rest(env, `cases?select=l_num,l_code&l_num=eq.${lNum}`, {}, fetcher))[0];
+      if (!c) return json({ error: "사건이 없습니다" }, 404);
+      const prev = (await rest(env, `case_info?select=*&l_num=eq.${lNum}`, {}, fetcher))[0] || {};
+      const next: Record<string, string> = {};
+      for (const k of INFO_FIELDS) next[k] = nz(body.fields?.[k]).slice(0, k === "memo" ? 2000 : 200);
+      const changed = INFO_FIELDS.filter((k) => nz(prev[k]) !== next[k]);
+      const now = new Date().toISOString();
+      await rest(env, "case_info?on_conflict=l_num", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+        body: JSON.stringify({ l_num: lNum, case_no: c.l_code, ...next, updated_by: who.name, updated_by_id: who.userId, updated_at: now }) }, fetcher);
+      if (changed.length) {
+        await rest(env, "case_info_log", { method: "POST", headers: { Prefer: "return=minimal" },
+          body: JSON.stringify(changed.map((k) => ({ l_num: lNum, field: k, old_value: prev[k] ?? null, new_value: next[k], editor: who.name, editor_id: who.userId }))) }, fetcher);
+      }
+      await logView(env, who, "save_info", "", c, fetcher);
+      return json({ ok: true, changed: changed.length, ...infoFields(c, { ...next, updated_by: who.name, updated_at: now }) });
     }
     return json({ error: "모르는 요청" }, 400);
   } catch (e) {
