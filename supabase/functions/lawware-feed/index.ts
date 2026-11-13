@@ -7,7 +7,7 @@
 //   3) 사건 상세(law_view_json)를 허용 목록 칸만 lw_case_detail 에 저장한다.
 //      오늘 바뀐 사건 먼저, 남는 시간에 오래된 사건부터 조금씩 돈다.
 //
-// 호출: POST { from?: "YYYY-MM-DD", to?: "YYYY-MM-DD", detailLimit?: number }
+// 호출: POST { from?: "YYYY-MM-DD", to?: "YYYY-MM-DD", detailLimit?: number, startOffset?: number }
 //   헤더 x-cron-secret 이 lw_settings.cron_secret 과 같아야 한다 (pg_cron 이 붙여 보냄).
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 
@@ -88,9 +88,11 @@ function kstDate(offsetDays = 0) {
   return d.toISOString().slice(0, 10);
 }
 
-async function fetchFeed(store: Record<string, string>, from: string, to: string) {
+// 한 번에 최대 5000줄. 하루에 그보다 많으면 startOffset 으로 이어 받는다(옛 내역 한꺼번에 받을 때)
+async function fetchFeed(store: Record<string, string>, from: string, to: string, start = 0) {
   const all: any[] = [];
-  for (let offset = 0; offset < 5000; offset += 100) {
+  let total = 0;
+  for (let offset = start; offset < start + 5000; offset += 100) {
     const req = {
       cmd: "get", limit: 100, offset, schSet: "", schWorkScope: "",
       schDate: from, schDate2: to, schDateFix: "1", schByUpdate: "schByUpdate",
@@ -100,10 +102,11 @@ async function fetchFeed(store: Record<string, string>, from: string, to: string
       encodeURIComponent(JSON.stringify(req)));
     const recs = data.records ?? [];
     all.push(...recs);
-    if (recs.length < 100 || all.length >= Number(data.total ?? 0)) break;
+    total = Number(data.total ?? 0);
+    if (recs.length < 100 || start + all.length >= total) break;
   }
   // 화면용 HTML 칸은 버리고 필요한 칸만 남긴다
-  return all.map((r) => ({
+  const rows = all.map((r) => ({
     lp_num: r.lp_num, l_num: r.l_num ?? r.lp_l_num, l_code: r.l_code, lp_set: r.lp_set,
     lp_work_type: r.lp_work_type, lp_appoint_date: r.lp_appoint_date, lp_appoint_time: r.lp_appoint_time,
     lp_contents: r.lp_contents, lp_remark: r.lp_remark, lp_docu_appoint_limit: r.lp_docu_appoint_limit,
@@ -111,6 +114,7 @@ async function fetchFeed(store: Record<string, string>, from: string, to: string
     lp_regdatetime: r.lp_regdatetime, lp_append_wdate: r.lp_append_wdate, lp_append_udate: r.lp_append_udate,
     l_client_postion: r.l_client_postion, l_court: r.l_court,
   }));
+  return { rows, total };
 }
 
 function parseLog(log: string) {
@@ -161,15 +165,19 @@ Deno.serve(async (req) => {
   const from = body.from ?? kstDate(-1);
   const to = body.to ?? kstDate(0);
   const detailLimit = Math.min(Number(body.detailLimit ?? 40), 200);
+  const startOffset = Math.max(0, Math.floor(Number(body.startOffset ?? 0)) || 0);
 
   const { data: run } = await db.from("lw_feed_runs").insert({ date_from: from, date_to: to }).select("id").single();
+  let total = 0;
   const result = { fetched: 0, new_count: 0, changed_count: 0, detail_count: 0, error: null as string | null };
 
   try {
     const store = await login();
 
     // 1·2) 하루 변경분 + 송달 도달일
-    const rows = await fetchFeed(store, from, to);
+    const feed = await fetchFeed(store, from, to, startOffset);
+    const rows = feed.rows;
+    total = feed.total;
     result.fetched = rows.length;
     for (let i = 0; i < rows.length; i += 200) {
       const { data, error } = await db.rpc("lw_ingest_events", { rows: rows.slice(i, i + 200) });
@@ -209,5 +217,5 @@ Deno.serve(async (req) => {
   }
 
   if (run?.id) await db.from("lw_feed_runs").update({ ...result, finished_at: new Date().toISOString() }).eq("id", run.id);
-  return json({ from, to, ...result, ms: Date.now() - t0 }, result.error ? 500 : 200);
+  return json({ from, to, startOffset, total, ...result, ms: Date.now() - t0 }, result.error ? 500 : 200);
 });
