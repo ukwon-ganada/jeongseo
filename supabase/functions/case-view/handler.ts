@@ -12,6 +12,7 @@
 //    { "action": "case", "case": "<사건번호>" }       → 사건번호로 찾은 사건
 //    { "action": "mycases" }                        → 내가 담당인 진행 사건 (고르기 화면용)
 //    { "action": "save_info", "lNum": 123, "fields": {...} } → 사건 정보 저장(case_info, 수정 기록 case_info_log)
+//    { "action": "file_open", "id": 12 }             → 사건방에 올린 서면 파일 열람 주소(5분짜리, 비공개 저장소 case-files)
 //    { "action": "helper_token" }                   → 이 직원의 PC 도우미 연결 코드 발급(한 번만 보여 줌, 서버엔 해시만)
 //  사건 정보 칸은 우리가 직접 입력·수정한다. 로웨어와 연동하지 않는다(자동으로 덮어쓰지 않음).
 //    저장된 값이 없을 때만 처음 값으로 로웨어 값을 한 번 보여 준다(PREFILL_FROM_LAWWARE).
@@ -168,6 +169,27 @@ async function myCases(env: Env, name: string, fetcher: typeof fetch) {
     `&or=(charge_staff.ilike.${n},charge_lawyer.ilike.${n},perform_lawyer.ilike.${n})&order=next_date.asc.nullslast&limit=300`, {}, fetcher) || [];
 }
 
+// 사건방에 올린 파일: 이 사건 번호로 붙은 것 + 이 사건과 짝지어진 방에 올라온 것
+export async function caseFiles(env: Env, lNum: string, fetcher: typeof fetch = fetch) {
+  const rooms = await rest(env, `works_room_case?select=channel_id&l_num=eq.${enc(lNum)}`, {}, fetcher) || [];
+  const ch = [...new Set(rooms.map((r: any) => nz(r.channel_id)).filter(Boolean))] as string[];
+  const or = ch.length ? `or=(l_num.eq.${enc(lNum)},channel_id.in.${enc(inList(ch))})` : `l_num=eq.${enc(lNum)}`;
+  const rows = await rest(env, `case_file?select=id,file_name,content_type,size_bytes,status,works_user_id,posted_at&status=in.(보관,받는중,실패)&${or}&order=posted_at.desc&limit=300`, {}, fetcher) || [];
+  // 올린 사람 이름: 사건 화면을 연 적이 있는 직원이면 열람 기록에서 이름을 찾음
+  const ids = [...new Set(rows.map((r: any) => nz(r.works_user_id)).filter(Boolean))] as string[];
+  const names: Record<string, string> = {};
+  if (ids.length) {
+    const seen = await rest(env, `case_view_log?select=works_user_id,viewer_name&works_user_id=in.${enc(inList(ids))}&viewer_name=not.is.null&order=viewed_at.desc&limit=500`, {}, fetcher).catch(() => []) || [];
+    for (const v of seen) if (!names[v.works_user_id]) names[v.works_user_id] = nz(v.viewer_name);
+  }
+  return rows.map((r: any) => {
+    const k = new Date(Date.parse(r.posted_at) + 9 * 3600e3).toISOString();
+    return { id: r.id, n: nz(r.file_name) || "파일", d: k.slice(0, 10), tm: k.slice(11, 16), by: names[r.works_user_id] || "",
+      sz: Number(r.size_bytes) || 0, pdf: /pdf/i.test(nz(r.content_type)) || /\.pdf$/i.test(nz(r.file_name)) ? 1 : 0,
+      st: r.status === "보관" ? "" : r.status };
+  });
+}
+
 async function logView(env: Env, who: WhoAmI, action: string, room: string, c: any, fetcher: typeof fetch) {
   try {
     await rest(env, "case_view_log", { method: "POST", headers: { Prefer: "return=minimal" },
@@ -215,16 +237,32 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
         if (c.state === "종결") status = "종결";
       } else return json({ error: "방이나 사건번호가 없습니다" }, 400);
 
-      const [evs, mine, saved] = await Promise.all([
+      const [evs, mine, saved, files] = await Promise.all([
         rest(env, `lw_process_events?select=lp_num,lp_set,lp_appoint_date,lp_appoint_time,lp_contents,lp_remark,delivered_date,court,last_seen_at&l_num=eq.${c.l_num}&order=lp_appoint_date.asc&limit=2000`, {}, fetcher),
         myCases(env, who.name || "", fetcher),
         rest(env, `case_info?select=*&l_num=eq.${c.l_num}`, {}, fetcher).then((r: any[]) => r?.[0] ?? null).catch(() => null),
+        caseFiles(env, String(c.l_num), fetcher).catch((e) => { console.log("files fail", String(e).slice(0, 120)); return []; }),
       ]);
       const end = new Date(Date.parse(today) + 28 * 864e5).toISOString().slice(0, 10);
       const myHearings = mine.filter((m: any) => isDate(m.next_date) && m.next_date.slice(0, 10) >= today && m.next_date.slice(0, 10) <= end)
         .map((m: any) => ({ c: m.l_code, d: m.next_date.slice(0, 10), tm: nz(m.next_time), t: nz(m.next_contents) || "기일", p: nz(m.court) }));
       await logView(env, who, "case", room, c, fetcher);
-      return json(shapeCase(c, evs || [], { today, linked, myHearings, status, saved }));
+      return json({ ...shapeCase(c, evs || [], { today, linked, myHearings, status, saved }), files });
+    }
+
+    if (body?.action === "file_open") {
+      const id = Number(body.id);
+      if (!Number.isFinite(id) || id <= 0) return json({ error: "파일이 없습니다" }, 400);
+      const f = (await rest(env, `case_file?select=id,l_num,case_no,channel_id,storage_path,file_name,status&id=eq.${id}`, {}, fetcher))[0];
+      if (!f || f.status !== "보관" || !f.storage_path) return json({ error: "보관된 파일이 아닙니다" }, 404);
+      const r = await fetcher(env.sbUrl + "/storage/v1/object/sign/case-files/" + f.storage_path.split("/").map(enc).join("/"), {
+        method: "POST", headers: { apikey: env.sbKey, Authorization: "Bearer " + env.sbKey, "Content-Type": "application/json" },
+        body: JSON.stringify({ expiresIn: 300 }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.signedURL) { console.log("sign fail", r.status); return json({ error: "파일을 열지 못했습니다" }, 500); }
+      await logView(env, who, "file_open:" + id, f.channel_id || "", { l_num: f.l_num, l_code: f.case_no }, fetcher);
+      return json({ url: env.sbUrl + "/storage/v1" + j.signedURL, name: f.file_name || "" });
     }
 
     if (body?.action === "helper_token") {
