@@ -1,4 +1,5 @@
 ﻿# 정서 사건 도우미 — 사건방 "이 방 사건 보기"를 누르면 이 PC 브라우저에 사건 화면을 연다.
+# v2.1: 따로 띄운 대화방 창도 찾음(창 제목=방 이름), 메인 창이 숨어 있어도 찾음
 # v2: 사건 화면이 "지금 어느 방?"을 물으면 웍스 창 위쪽 방 제목을 윈도우 글자 인식으로 읽어 서버에 알려 준다.
 #     (방 제목 줄만 보냄: 왼쪽 방 목록·대화 내용은 보내지 않음)
 # 화면 없이 뒤에서 돈다. 설정: %APPDATA%\JeongseoHelper\config.json (설치 때 만들어짐)
@@ -31,6 +32,19 @@ public static class JsWin {
   [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr h, IntPtr hdc, uint f);
   [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr h);
   [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
+  [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
+  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowText(IntPtr h, System.Text.StringBuilder s, int n);
+  public delegate bool EnumProc(IntPtr h, IntPtr l);
+  [DllImport("user32.dll")] public static extern bool EnumWindows(EnumProc f, IntPtr l);
+  // 맨 위 창부터 차례로 (z-order)
+  public static IntPtr[] TopWindows() {
+    var list = new System.Collections.Generic.List<IntPtr>();
+    EnumWindows((h, l) => { list.Add(h); return true; }, IntPtr.Zero);
+    return list.ToArray();
+  }
+  public static string Title(IntPtr h) { var sb = new System.Text.StringBuilder(512); GetWindowText(h, sb, 512); return sb.ToString(); }
+  public static uint Pid(IntPtr h) { uint p; GetWindowThreadProcessId(h, out p); return p; }
   public static Bitmap Capture(IntPtr h) {
     RECT r; GetWindowRect(h, out r);
     var b = new Bitmap(Math.Max(1, r.R - r.L), Math.Max(1, r.B - r.T));
@@ -60,10 +74,24 @@ function Await($op, [Type]$t) {
 # 웍스 메인 창 위쪽 18%를 찍어 읽고, 방 제목 띠(왼쪽 20% 이후, 위 12% 안)의 줄만 돌려준다
 function Read-WorksRoomTitle {
   Initialize-Ocr
-  $p = Get-Process | Where-Object { $_.MainWindowTitle -eq 'WORKS' } | Select-Object -First 1
-  if (-not $p) { throw '웍스 창 없음' }
-  $h = $p.MainWindowHandle
-  if ([JsWin]::IsIconic($h)) { throw '웍스 창 최소화됨' }
+  # 웍스 프로그램 찾기: 'WORKS' 제목 창(숨어 있어도)의 프로세스, 없으면 이름에 works 가 든 프로세스
+  $wins = [JsWin]::TopWindows()
+  $pids = @{}
+  foreach ($w in $wins) { if ([JsWin]::Title($w) -eq 'WORKS') { $pids[[int][JsWin]::Pid($w)] = 1 } }
+  if ($pids.Count -eq 0) { Get-Process | Where-Object { $_.ProcessName -match 'works' } | ForEach-Object { $pids[$_.Id] = 1 } }
+  if ($pids.Count -eq 0) { throw '웍스 프로그램 없음' }
+  # 그중 화면에 보이는 맨 위 창 = 직원이 방금 보던 창
+  $h = [IntPtr]::Zero; $title = ''
+  foreach ($w in $wins) {
+    if (-not $pids.ContainsKey([int][JsWin]::Pid($w))) { continue }
+    if (-not [JsWin]::IsWindowVisible($w) -or [JsWin]::IsIconic($w)) { continue }
+    $t = [JsWin]::Title($w)
+    if (-not $t) { continue }
+    $h = $w; $title = $t; break
+  }
+  if ($h -eq [IntPtr]::Zero) { throw '보이는 웍스 창 없음' }
+  # 대화방을 따로 띄운 창은 창 제목이 곧 방 이름 → 글자 인식 없이 바로
+  if ($title -ne 'WORKS') { return ,@(@{ x = 30; y = 5; t = $title }) }
   $full = [JsWin]::Capture($h)
   try {
     $cropH = [int]($full.Height * 0.18)
