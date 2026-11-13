@@ -2,6 +2,7 @@
 // 실행: deno test --allow-net tools/pc-helper/flow_test.ts
 import { handle as callback, hmacBase64 } from "../../supabase/functions/works-bot-callback/handler.ts";
 import { handle as wait } from "../../supabase/functions/pc-helper-wait/handler.ts";
+import { handle as caseView } from "../../supabase/functions/case-view/handler.ts";
 
 function assert(c: unknown, m: string) { if (!c) throw new Error(m); }
 
@@ -18,8 +19,12 @@ async function mockDb() {
       { channel_id: "room-A", l_num: "L1", case_no: "2026고단1234", is_primary: false },
       { channel_id: "room-A", l_num: "L2", case_no: "2026노1821", is_primary: true, status: "대상" },
       { channel_id: "room-H", l_num: "L9", case_no: "2026고단9", is_primary: true, status: "보류" },
+      { channel_id: "room-T", l_num: "L5", case_no: "2026고정100189", is_primary: true, status: "대상", room_title: "(형)홍길동-성폭력-부천지원 2026고정100189" },
+      { channel_id: "room-U", l_num: "L6", case_no: "2026고단55", is_primary: true, status: "대상", room_title: "(형)김갑동-사기 2026고단55" },
     ],
-    pc_helper_device: [{ id: "d1", works_user_id: "u1", token_hash: await sha(TOKEN), revoked_at: null }],
+    pc_locate: [],
+    case_view_log: [],
+    pc_helper_device: [{ id: "d1", works_user_id: "u1", token_hash: await sha(TOKEN), revoked_at: null, last_seen_at: null }],
     pc_open_request: [],
   };
   let seq = 0;
@@ -43,7 +48,11 @@ async function mockDb() {
       return Response.json(rows.slice(0, Number(u.searchParams.get("limit") || 99)));
     }
     const body = await req.json();
-    if (req.method === "POST") { db[t].push({ id: ++seq, created_at: new Date().toISOString(), delivered_at: null, ...body }); return new Response(null, { status: 201 }); }
+    if (req.method === "POST") {
+      const row = { id: ++seq, created_at: new Date().toISOString(), delivered_at: null, taken_at: null, done_at: null, ...body };
+      db[t].push(row);
+      return (req.headers.get("prefer") || "").includes("representation") ? Response.json([row], { status: 201 }) : new Response(null, { status: 201 });
+    }
     if (req.method === "PATCH") { rows.forEach((r) => Object.assign(r, body)); return Response.json(rows); }
     return new Response(null, { status: 405 });
   });
@@ -93,5 +102,49 @@ Deno.test("한 번 클릭 흐름", async () => {
     assert(r4.status === 200, "운영 봇 서명 통과");
     await (await wait(new Request("http://x", { headers: { authorization: "Bearer " + TOKEN } }), env)).body?.cancel();
     console.log("열 주소:", decodeURIComponent(j.url));
+  } finally { await srv.shutdown(); }
+});
+
+Deno.test("PC 방 찾기 흐름 (사건 화면 → 도우미 글자 읽기 → 방)", async () => {
+  const { db, srv, url } = await mockDb();
+  const env = { sbUrl: url, sbKey: "k", waitMs: 3000, stepMs: 100 };
+  // 웍스 직원 확인은 가짜로
+  const fetcher: typeof fetch = (input, init) => String(input).startsWith("https://www.worksapis.com/")
+    ? Promise.resolve(Response.json({ userId: "u1", userName: { lastName: "김", firstName: "석원" } }))
+    : fetch(input, init);
+  const ask = () => caseView(new Request("http://x", { method: "POST", headers: { "x-works-token": "t".repeat(30) }, body: JSON.stringify({ action: "locate" }) }), env, fetcher);
+  const helperGet = (v = "2") => wait(new Request("http://x/pc-helper-wait?v=" + v, { headers: { authorization: "Bearer " + TOKEN } }), env);
+  const helperPost = (b: unknown) => wait(new Request("http://x/pc-helper-wait", { method: "POST", headers: { authorization: "Bearer " + TOKEN }, body: JSON.stringify(b) }), env);
+  try {
+    // 도우미가 한 번도 안 들렀으면 '도우미 없음'
+    let j = await (await ask()).json();
+    assert(j.nohelper === true, "도우미 없음: " + JSON.stringify(j));
+
+    // 도우미 v2가 기다리는 중 → 화면이 물음 → 도우미가 읽은 줄 보냄 → 방 찾음
+    await (await wait(new Request("http://x?v=2", { headers: { authorization: "Bearer " + TOKEN } }), { ...env, waitMs: 10 })).body?.cancel();
+    const helper = (async () => {
+      const r = await helperGet();
+      const m = await r.json();
+      assert(m.task === "ocr" && m.id, "도우미가 일 받음: " + JSON.stringify(m));
+      const lines = [
+        { x: 9, y: 9, t: "(형)김갑동-사기 2026고단55" }, // 왼쪽 목록 (무시돼야 함)
+        { x: 28, y: 7, t: "*` (형)홍길동-성폭력-부천지원 2026고정100189" },
+      ];
+      const p = await (await helperPost({ id: m.id, lines })).json();
+      assert(p.found === true && p.how === "case-no", "서버가 방 찾음: " + JSON.stringify(p));
+    })();
+    j = await (await ask()).json();
+    await helper;
+    assert(j.room === "room-T", "사건 화면이 방 받음: " + JSON.stringify(j));
+
+    // 옛 도우미(v 없음)는 방 찾기 일을 안 받고, 화면은 3초 뒤 시간 초과
+    const old = helperGet("1");
+    j = await (await ask()).json();
+    assert(j.timeout === true, "옛 도우미면 시간 초과: " + JSON.stringify(j));
+    assert((await old).status === 204, "옛 도우미에겐 일 안 줌");
+
+    // 다른 사람 요청에는 결과를 못 적음
+    db.pc_locate.push({ id: 999, works_user_id: "u2", created_at: new Date().toISOString(), taken_at: null, done_at: null });
+    assert((await helperPost({ id: 999, lines: [] })).status === 404, "남의 요청 거부");
   } finally { await srv.shutdown(); }
 });
