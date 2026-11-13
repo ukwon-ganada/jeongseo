@@ -6,6 +6,7 @@
 //   2) 송달 비고의 'YYYY.MM.DD 도달'을 delivered_date 로 뽑는다 (lw_ingest_events 함수에서).
 //   3) 사건 상세(law_view_json)를 허용 목록 칸만 lw_case_detail 에 저장한다.
 //      오늘 바뀐 사건 먼저, 남는 시간에 오래된 사건부터 조금씩 돈다.
+//   4) 사건 목록 표(cases)에 없는 진행 사건이면 새 줄로 넣는다(있는 줄은 그대로).
 //
 // 호출: POST { from?: "YYYY-MM-DD", to?: "YYYY-MM-DD", detailLimit?: number, startOffset?: number }
 //   헤더 x-cron-secret 이 lw_settings.cron_secret 과 같아야 한다 (pg_cron 이 붙여 보냄).
@@ -117,6 +118,19 @@ async function fetchFeed(store: Record<string, string>, from: string, to: string
   return { rows, total };
 }
 
+// 상세(lw_case_detail.info) → 사건 목록 표(cases) 한 줄. 사무실 PC가 넣는 줄과 같은 칸 이름.
+export function caseRowFromDetail(d: { l_num: number; info: Record<string, any> }) {
+  const i = d.info || {};
+  const s = (v: unknown) => (v == null ? null : String(v));
+  return {
+    l_num: d.l_num, l_code: s(i.l_code), l_name: s(i.l_name), l_kind: s(i.l_kind), l_client: s(i.l_client),
+    client_position: s(i.l_client_postion), court: s(i.l_court), charge_lawyer: s(i.l_charge_lawyer),
+    perform_lawyer: s(i.l_perform_lawyer), charge_staff: s(i.l_charge_staff), state: s(i.l_state),
+    accept_date: /^\d{4}-\d{2}-\d{2}/.test(String(i.l_accept_date ?? "")) ? String(i.l_accept_date).slice(0, 10) : null,
+    raw: i, updated_at: new Date().toISOString(),
+  };
+}
+
 function parseLog(log: string) {
   let defendants: string[] | null = null;
   const related = new Map<string, any>();
@@ -212,6 +226,15 @@ Deno.serve(async (req) => {
       if (error) throw new Error("상세 저장 실패: " + error.message);
     }
     result.detail_count = details.length;
+
+    // 4) 사건 목록 표(cases)에 없는 진행 사건 채우기 (석원 2026-11-13)
+    //    cases 는 사무실 PC 도우미가 채우는데 진행 사건 일부(형사 위주)가 빠져 사건방 연결이 안 됐다.
+    //    이미 있는 줄은 절대 건드리지 않는다(ignore-duplicates). 상세에 허용된 칸만 쓴다.
+    const fill = details.filter((d) => d.info?.l_state === "진행" && d.info?.l_code).map(caseRowFromDetail);
+    if (fill.length) {
+      const { error } = await db.from("cases").upsert(fill, { onConflict: "l_num", ignoreDuplicates: true });
+      if (error) console.log("cases 채우기 실패", error.message);
+    }
   } catch (e) {
     result.error = String(e);
   }
