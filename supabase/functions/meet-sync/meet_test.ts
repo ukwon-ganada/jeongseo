@@ -1,5 +1,5 @@
 // 실행: deno test supabase/functions/meet-sync/meet_test.ts
-import { buildIndex, clientNames, kstStart, matchCase, parseMeet } from "./meet.ts";
+import { buildIndex, clientNames, kstStart, matchCase, normCaseNo, parseMeet } from "./meet.ts";
 function assert(c: unknown, m: string) { if (!c) throw new Error(m); }
 
 Deno.test("제목 읽기", () => {
@@ -38,4 +38,21 @@ Deno.test("시각", () => {
   assert(kstStart({ dateTime: "2026-11-13T14:00:00", timeZone: "Asia/Seoul" })!.time === "14:00", "현지");
   assert(kstStart({ dateTime: "2026-11-13T05:00:00Z" })!.time === "14:00", "UTC");
   assert(kstStart({ date: "2026-11-13" })!.time === "", "종일");
+});
+
+Deno.test("피고인 목록·사건번호", () => {
+  const cases = [{ l_num: 7, client: "아버지", lawyer: "서고은", extra: ["김아들"] }];
+  assert(matchCase("김아들", "서고은", cases, buildIndex(cases)) === 7, "피고인 목록으로 맞춤");
+  assert(normCaseNo("26고단 0123") === "2026고단123" && normCaseNo("2026고단123") === "2026고단123", normCaseNo("26고단 0123"));
+});
+
+Deno.test("같은 사람 1심·항소심", () => {
+  const cases = [
+    { l_num: 1, client: "박명근", lawyer: "서고은", accept: "2026-03-01" },
+    { l_num: 2, client: "박명근", lawyer: "서고은", accept: "2026-09-10" },
+  ];
+  const ix = buildIndex(cases);
+  assert(matchCase("박명근", "서고은", cases, ix, "2026-11-10") === 2, "접견일 전 가장 최근 선임 사건");
+  assert(matchCase("박명근", "서고은", cases, ix, "2026-05-01") === 1, "그 전이면 1심");
+  assert(matchCase("박명근", "서고은", cases, ix, "2026-01-01") === null, "선임 전이면 안 붙임");
 });
