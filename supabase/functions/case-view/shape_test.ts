@@ -1,5 +1,5 @@
 // 실행: deno test supabase/functions/case-view/shape_test.ts
-import { caseNoVariants, infoFields, mergeMeets, shapeCase, smsGist } from "./handler.ts";
+import { attachContract, attachFinalFiles, caseNoVariants, infoFields, mergeMeets, shapeCase, smsGist } from "./handler.ts";
 function assert(c: unknown, m: string) { if (!c) throw new Error(m); }
 
 Deno.test("사건번호 후보", () => {
@@ -58,4 +58,16 @@ Deno.test("접견 줄", () => {
     { event_id: "b", ev_date: "2026-11-20", ev_time: "", lawyer: "이예나", place: "" }]);
   assert(sh.events.length === 2 && sh.events[0].t === "14:00 접견 · 서고은 (인천)" && sh.events[0].k === "done", JSON.stringify(sh.events));
   assert(sh.events[1].t === "접견 예정 · 이예나" && sh.events[1].k === "due", JSON.stringify(sh.events));
+});
+
+Deno.test("계약서는 선임 줄에, 서면 후보에서는 빠짐", () => {
+  const ev = [{ d: "2026-10-01", k: "ours", g: "accept", t: "사건 선임" }, { d: "2026-10-01", k: "ours", g: "ours", t: "의견서 제출", lp: 7 }];
+  const files = [
+    { id: 1, n: "위임계약서_홍길동.pdf", d: "2026-10-01", at: 3, pdf: 1, lp: null },
+    { id: 2, n: "의견서.hwp", d: "2026-10-01", at: 2, pdf: 0, lp: null },
+  ];
+  attachFinalFiles(ev, files);
+  attachContract(ev, files);
+  if ((ev[0] as any).cf?.id !== 1) throw new Error("계약서 안 붙음");
+  if ((ev[1] as any).f?.id !== 2) throw new Error("서면에 계약서가 붙음");
 });
