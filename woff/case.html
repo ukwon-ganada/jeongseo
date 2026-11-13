@@ -85,15 +85,15 @@ main{max-width:880px;margin:0 auto;padding:12px 16px 32px}
 .pg.hl{box-shadow:inset 3px 0 0 var(--accent)}
 .pg.dim{opacity:.45}
 .pg.plan .d{color:var(--due);font-weight:600}
-.fl{display:flex;align-items:center;gap:10px;padding:12px 16px;border-top:1px solid var(--line2);font-size:14px}
-.fl:first-child{border-top:0}
-.fl .main{flex:1;min-width:0}
-.fl .n{overflow-wrap:anywhere;font-weight:600}
-.fl .s{font-size:12px;color:var(--muted)}
-.fl .open{flex:none;border:1px solid var(--accent);color:var(--accent-ink);background:var(--accent-tint);border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600}
-.fl .open[disabled]{opacity:.5}
-.fl .ic{flex:none;width:30px;height:36px;border-radius:4px;background:var(--line2);color:var(--muted);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center}
-.fl .ic.pdf{background:#e5484d;color:#fff}
+.fa{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
+.fa .fn{font-size:13px;color:var(--muted);overflow-wrap:anywhere;flex:1;min-width:0}
+.fa .open{flex:none;border:1px solid var(--accent);color:var(--accent-ink);background:var(--accent-tint);border-radius:8px;padding:5px 12px;font-size:13px;font-weight:600}
+.fa .open[disabled]{opacity:.5}
+.picks{margin-top:8px;border:1px solid var(--line);border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:6px}
+.picks .s{font-size:12px;color:var(--muted)}
+.pickf{display:flex;flex-direction:column;align-items:flex-start;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 10px;font-size:14px;color:var(--ink)}
+.pickf span{font-size:12px;color:var(--muted)}
+.pickf.on{border-color:var(--accent);background:var(--accent-tint)}
 .meta{font-size:12px;color:var(--muted);padding:0 2px 10px}
 
 /* 사건 정보 */
@@ -201,7 +201,7 @@ var VIEWS = {
     var body='', yr='';
     list.forEach(function(e){
       var y=e.d.slice(0,4); if(y!==yr){ yr=y; body+='<div class="yr">'+y+'</div>'; }
-      body+='<div class="ev '+e.k+'"><div class="d">'+md(e.d)+'<small>'+wk(e.d)+'</small></div><div class="rail"></div><div class="t">'+esc(e.t)+'</div></div>';
+      body+='<div class="ev '+e.k+'"><div class="d">'+md(e.d)+'<small>'+wk(e.d)+'</small></div><div class="rail"></div><div class="t">'+esc(e.t)+finalFile(e)+'</div></div>';
     });
     return h+'<div class="card">'+body+'</div>';
   },
@@ -229,16 +229,9 @@ var VIEWS = {
     return (up.length||past.length) ? h : h+emptySt('기일이 없습니다');
   },
   progress: function(){
-    var files=data.files||[];
-    var h=chips('p', [['all','전체'],['기일','기일'],['송달','송달'],['제출','제출'],['file','서면 파일'+(files.length?' '+files.length:'')]]);
-    if(sub.p==='file'){
-      h+='<div class="meta">사건방에 올린 파일을 모아 보관합니다</div>';
-      if(!files.length) return h+emptySt('아직 모은 파일이 없습니다','사건방에 서면 PDF를 올리면 이곳에 쌓입니다.');
-      return h+'<div class="card">'+files.map(fileRow).join('')+'</div>';
-    }
+    var h=chips('p', [['all','전체'],['기일','기일'],['송달','송달'],['제출','제출']]);
     var rows=data.progress.rows.filter(function(x){ return sub.p==='all' || x.k===sub.p; }).slice().reverse();
     h+='<div class="meta">로웨어 갱신 '+esc(data.progress.updated)+'</div>';
-    if(sub.p==='all' && files.length) h+='<div class="card"><div class="card-h"><span>사건방에 올린 서면</span>'+(files.length>3?'<button class="link-btn" data-p="file">모두 보기</button>':'')+'</div>'+files.slice(0,3).map(fileRow).join('')+'</div>';
     if(!rows.length) return h+emptySt('최근 한 달 진행내용이 없습니다');
     return h+'<div class="card">'+rows.map(function(x){
       var cls=(x.o||x.u)?' hl':x.x?' dim':'';
@@ -271,13 +264,29 @@ var VIEWS = {
     return h+'<div class="foot">'+foot+'</div>';
   }
 };
-function fileRow(f){
-  var ext=(f.n.match(/\.([a-z0-9]{1,5})$/i)||[])[1]||'';
-  var size=f.sz>=1048576?(f.sz/1048576).toFixed(1)+'MB':f.sz?Math.max(1,Math.round(f.sz/1024))+'KB':'';
-  var st=f.st==='받는중'?' · 받는 중':f.st==='실패'?' · 받기 실패(다시 올려 주세요)':'';
-  return '<div class="fl"><span class="ic'+(f.pdf?' pdf':'')+'">'+esc((f.pdf?'PDF':ext||'파일').toUpperCase())+'</span><div class="main"><div class="n">'+esc(f.n)+'</div><div class="s">'+
-    esc(f.d.replace(/-/g,'.')+' '+f.tm)+(f.by?' · '+esc(f.by):'')+(size?' · '+size:'')+st+'</div></div>'+
-    (f.st?'':'<button class="open" data-file="'+f.id+'">열기</button>')+'</div>';
+// 타임라인 "우리 서면" 줄: 그 제출의 최종본(그날 마지막으로 방에 올린 파일) [열기], 틀렸으면 [바꾸기]
+function nearChoices(d){
+  var t=Date.parse(d);
+  return (data.fileChoices||[]).filter(function(f){ return Math.abs(Date.parse(f.d)-t)<=14*864e5; })
+    .sort(function(a,b){ return (b.d+b.tm).localeCompare(a.d+a.tm); });
+}
+function finalFile(e){
+  if(e.k!=='ours' || e.lp==null) return '';
+  var near=nearChoices(e.d), h='';
+  if(e.f) h='<div class="fa"><button class="open" data-file="'+e.f.id+'">열기</button><span class="fn">'+esc(e.f.n)+'</span>'+(near.length>1?'<button class="link-btn" data-pickfor="'+e.lp+'">바꾸기</button>':'')+'</div>';
+  else if(near.length) h='<div class="fa"><button class="link-btn" data-pickfor="'+e.lp+'">제출본 파일 고르기</button></div>';
+  if(String(sub.pick)===String(e.lp)){
+    h+='<div class="picks"><div class="s">이 제출의 최종본을 고르세요</div>'+near.map(function(f){
+      return '<button class="pickf'+(e.f&&e.f.id===f.id?' on':'')+'" data-setfile="'+f.id+'" data-lp="'+e.lp+'"><b>'+esc(f.n)+'</b><span>'+esc(f.d.replace(/-/g,'.')+' '+f.tm)+(f.by?' · '+esc(f.by):'')+'</span></button>';
+    }).join('')+'<button class="link-btn" data-pickfor="">취소</button></div>';
+  }
+  return h;
+}
+function setFile(btn){
+  btn.disabled=true;
+  api({action:'set_file', lNum:data.lNum, lp:Number(btn.dataset.lp), id:Number(btn.dataset.setfile)}).then(function(){
+    sub.pick=''; return loadCase(ctx.key).then(function(d){ data=d; render(); toast('바꿨습니다'); });
+  }).catch(function(e){ btn.disabled=false; toast('바꾸지 못했습니다: '+((e&&e.message)||e)); });
 }
 // 파일 열기: 서버가 5분짜리 열람 주소를 줌 → 휴대폰은 바깥 브라우저, PC는 새 탭
 function openFile(btn){
@@ -309,6 +318,8 @@ document.addEventListener('click', function(e){
   if(b.id==='cancel'){ editing=false; render(); }
   if(b.id==='save') saveInfo(b);
   if(b.dataset.file) openFile(b);
+  if(b.dataset.pickfor!==undefined){ sub.pick=b.dataset.pickfor; render(); }
+  if(b.dataset.setfile) setFile(b);
 });
 function confirmLeave(){ return window.confirm('저장하지 않은 수정이 있습니다. 나갈까요?'); }
 function saveInfo(btn){
@@ -366,6 +377,7 @@ function message(title, subText, body){
 }
 function showHold(){ message('사건 미확정','', emptySt('이 방의 사건이 아직 정해지지 않았습니다')); }
 function showCase(key){
+  ctx.key=key;
   $('#sub').textContent='불러오는 중…';
   return loadCase(key).then(function(d){
     if(d.hold) return showHold();
