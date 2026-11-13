@@ -172,7 +172,24 @@ var CASE_API = 'https://nyjyemjsperpakrrgzcc.supabase.co/functions/v1/case-view'
 // ── 서버(case-view): 직원 확인 뒤에만 자료를 줌 ─────────
 function api(body){
   return fetch(CASE_API, {method:'POST', headers:{'Content-Type':'application/json','X-Works-Token':ctx.tok||''}, body:JSON.stringify(body)})
-    .then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||('오류 '+r.status)); return j; }); });
+    .then(function(r){ return r.json().then(function(j){
+      if(r.status===401) return relogin(j);
+      if(!r.ok) throw new Error(j.error||('오류 '+r.status));
+      try{ sessionStorage.removeItem('cv_relogin'); }catch(e){}
+      return j;
+    }); });
+}
+// 웍스 권한(OAuth Scopes)이 바뀌면 예전 로그인 토큰이 거절됨(401) → PC는 한 번 자동으로 다시 로그인, 휴대폰은 앱 재시작 안내
+function relogin(j){
+  var inClient=false; try{ inClient=woff.isInClient(); }catch(e){}
+  var tried=false; try{ tried=!!sessionStorage.getItem('cv_relogin'); }catch(e){}
+  if(!inClient && !tried){
+    try{ sessionStorage.setItem('cv_relogin','1'); }catch(e){}
+    try{ woff.logout(); }catch(e){}
+    woff.login({redirectUri: location.href.replace(/[?&]relogin=1/,'')});
+    return new Promise(function(){}); // 로그인 화면으로 넘어감
+  }
+  throw new Error(inClient ? '웍스 로그인이 만료됐습니다. 웍스 앱을 완전히 종료했다가 다시 열어 주세요.' : '웍스 로그인이 만료됐습니다. 이 창을 닫고 다시 열어 주세요.');
 }
 function loadCase(key){ return api({action:'case', room:key.room||'', 'case':key['case']||''}); }
 function loadMyCases(){ return api({action:'mycases'}).then(function(j){ return j.cases||[]; }); }
