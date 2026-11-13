@@ -253,6 +253,17 @@ export function mergeRoomEvents(shaped: any, rows: any[], caseNo: string) {
   }
   shaped.events.sort((a: any, b: any) => a.d.localeCompare(b.d));
 }
+// 접견(웍스 캘린더 → meet_event): 우리가 한 일. 앞으로의 접견은 "예정"
+export function mergeMeets(shaped: any, rows: any[]) {
+  const seen = new Set<string>();
+  for (const r of rows) {
+    if (seen.has(r.event_id)) continue; seen.add(r.event_id);
+    const d = String(r.ev_date).slice(0, 10), tm = nz(r.ev_time), future = d >= shaped.today;
+    const t = (tm ? tm + " " : "") + "접견" + (future ? " 예정" : "") + (nz(r.lawyer) ? " · " + nz(r.lawyer) : "") + (nz(r.place) ? " (" + nz(r.place) + ")" : "");
+    shaped.events.push({ d, k: future ? "due" : "done", g: "meet", t, f: null });
+  }
+  shaped.events.sort((a: any, b: any) => a.d.localeCompare(b.d));
+}
 // 로웨어 사건이 없는 방(보류·미연결)이라도 대화 일정이 있으면 그것만으로 화면을 만든다
 export function roomOnlyShape(title: string, rows: any[], today: string, myHearings: any[]) {
   const shaped: any = {
@@ -371,13 +382,14 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
 
       const roomRows = await rest(env, `works_room_case?select=channel_id&l_num=eq.${c.l_num}`, {}, fetcher).catch(() => []) || [];
       const chans = [...new Set([room, ...roomRows.map((r: any) => nz(r.channel_id))].filter(Boolean))] as string[];
-      const [evs, mine, saved, files, chat, checked] = await Promise.all([
+      const [evs, mine, saved, files, chat, checked, meets] = await Promise.all([
         rest(env, `lw_process_events?select=lp_num,lp_set,lp_appoint_date,lp_appoint_time,lp_contents,lp_remark,delivered_date,court,last_seen_at,lp_append_udate&l_num=eq.${c.l_num}&order=lp_appoint_date.asc&limit=2000`, {}, fetcher),
         myCases(env, who.name || "", fetcher),
         rest(env, `case_info?select=*&l_num=eq.${c.l_num}`, {}, fetcher).then((r: any[]) => r?.[0] ?? null).catch(() => null),
         caseFiles(env, String(c.l_num), fetcher).catch((e) => { console.log("files fail", String(e).slice(0, 120)); return []; }),
         roomEvents(env, String(c.l_num), chans, fetcher).catch(() => []),
         lastFeedRun(env, fetcher),
+        rest(env, `meet_event?select=event_id,ev_date,ev_time,lawyer,place&l_num=eq.${c.l_num}&order=ev_date.asc&limit=300`, {}, fetcher).catch(() => []),
       ]);
       const end = new Date(Date.parse(today) + 28 * 864e5).toISOString().slice(0, 10);
       const myHearings = mine.filter((m: any) => isDate(m.next_date) && m.next_date.slice(0, 10) >= today && m.next_date.slice(0, 10) <= end)
@@ -387,6 +399,7 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       shaped.progress.checked = checked;
       attachFinalFiles(shaped.events, files);
       mergeRoomEvents(shaped, chat, c.l_code);
+      mergeMeets(shaped, meets || []);
       // 직원이 줄마다 파일을 바꿀 때 고를 목록 (화면에 따로 나열하지 않음)
       const fileChoices = files.map((f: any) => ({ id: f.id, n: f.n, d: f.d, tm: f.tm, by: f.by }));
       return json({ ...shaped, fileChoices });

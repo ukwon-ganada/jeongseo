@@ -1,5 +1,5 @@
 // 실행: deno test supabase/functions/case-view/shape_test.ts
-import { caseNoVariants, infoFields, shapeCase, smsGist } from "./handler.ts";
+import { caseNoVariants, infoFields, mergeMeets, shapeCase, smsGist } from "./handler.ts";
 function assert(c: unknown, m: string) { if (!c) throw new Error(m); }
 
 Deno.test("사건번호 후보", () => {
@@ -50,4 +50,12 @@ Deno.test("저장된 사건 정보만 씀", () => {
 Deno.test("안내 문자 요약", () => {
   assert(smsGist("[SMS]안녕하세요 김OO님, 법무법인 정서 입니다.변론기일 안내 드립니다.사건번호 : 2026가단1") === "변론기일 안내 드립니다", smsGist("[SMS]안녕하세요 김OO님, 법무법인 정서 입니다.변론기일 안내 드립니다.사건번호"));
   assert(smsGist("[SMS]안녕하세요.서OO 사무실입니다.김OO님 조사일정안내드립니다.1.2026") === "김OO님 조사일정안내드립니다", smsGist("[SMS]안녕하세요.서OO 사무실입니다.김OO님 조사일정안내드립니다.1.2026"));
+});
+
+Deno.test("접견 줄", () => {
+  const sh: any = { today: "2026-11-13", events: [] };
+  mergeMeets(sh, [{ event_id: "a", ev_date: "2026-11-10", ev_time: "14:00", lawyer: "서고은", place: "인천" }, { event_id: "a", ev_date: "2026-11-10" },
+    { event_id: "b", ev_date: "2026-11-20", ev_time: "", lawyer: "이예나", place: "" }]);
+  assert(sh.events.length === 2 && sh.events[0].t === "14:00 접견 · 서고은 (인천)" && sh.events[0].k === "done", JSON.stringify(sh.events));
+  assert(sh.events[1].t === "접견 예정 · 이예나" && sh.events[1].k === "due", JSON.stringify(sh.events));
 });
