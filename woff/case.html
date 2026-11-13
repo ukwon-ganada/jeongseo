@@ -52,16 +52,16 @@ main{max-width:880px;margin:0 auto;padding:12px 16px 32px}
 .empty-st b{display:block;color:var(--ink);font-size:16px;margin-bottom:4px}
 
 /* 타임라인 */
-.yr{font-size:13px;font-weight:700;color:var(--muted);padding:24px 16px 4px}
+.yr{font-size:13px;font-weight:700;color:var(--muted);padding:20px 16px 2px}
 .ev{display:grid;grid-template-columns:52px 18px 1fr;gap:0 8px;padding:0 16px}
-.ev .d{font-size:13px;color:var(--muted);padding:22px 0;text-align:right;font-variant-numeric:tabular-nums}
+.ev .d{font-size:13px;color:var(--muted);padding:14px 0;text-align:right;font-variant-numeric:tabular-nums}
 .ev .d small{display:block;font-size:11px}
 .ev .rail{position:relative}
 .ev .rail::before{content:"";position:absolute;left:8px;top:0;bottom:0;width:2px;background:var(--line)}
-.ev .rail::after{content:"";position:absolute;left:4px;top:27px;width:10px;height:10px;border-radius:50%;background:var(--surface);border:2px solid #c4c8ce}
+.ev .rail::after{content:"";position:absolute;left:4px;top:18px;width:10px;height:10px;border-radius:50%;background:var(--surface);border:2px solid #c4c8ce}
 .ev.ours .rail::after{background:var(--accent);border-color:var(--accent)}
 .ev.due .rail::after{border-color:var(--due);background:var(--due)}
-.ev .t{padding:22px 0;border-bottom:1px solid var(--line2);font-size:15px;line-height:1.5;overflow-wrap:anywhere}
+.ev .t{padding:14px 0;border-bottom:1px solid var(--line2);font-size:15px;line-height:1.5;overflow-wrap:anywhere}
 .ev:last-child .t{border-bottom:0}
 .ev.ours .t{font-weight:700}
 .ev.due .t{color:var(--due);font-weight:700}
@@ -80,6 +80,22 @@ main{max-width:880px;margin:0 auto;padding:12px 16px 32px}
 .ev[class*="g-"].due .rail::after{background:var(--surface);border-color:var(--gc)}
 .ev .gt{display:inline-block;font-size:12px;font-weight:700;border-radius:5px;padding:1px 7px;margin-right:7px;vertical-align:1px;color:var(--gc);background:var(--gt)}
 .ev .soon{display:inline-block;font-size:11px;font-weight:700;color:var(--due);margin-right:6px;vertical-align:1px}
+/* 덜 중요한 줄(문자·방 대화): 작게, 색 없이 (석원 2026-11-13) */
+.ev.minor .d,.ev.minor .t{padding:6px 0}
+.ev.minor .t{font-size:13px;color:var(--muted);font-weight:400;border-bottom:0}
+.ev.minor .d{font-size:12px}
+.ev.minor .d small{display:inline;margin-left:3px}
+.ev.minor .rail::after{left:5px;top:12px;width:8px;height:8px;border-width:1px;background:var(--surface);border-color:#c4c8ce}
+.ev.minor .gt{background:none;color:var(--muted);font-weight:500;padding:0;margin-right:5px}
+.ev.minor .soon{color:var(--muted)}
+.ev.g-accept .rail::after{background:var(--ink);border-color:var(--ink)}
+.ev.g-accept .gt{color:var(--ink);background:var(--line2)}
+/* 실제 날짜 차이만큼 띄우기. 너무 길면 줄이고 '몇 개월' 표시 */
+.gap{display:grid;grid-template-columns:52px 18px 1fr;gap:0 8px;padding:0 16px}
+.gap .rail{position:relative}
+.gap .rail::before{content:"";position:absolute;left:8px;top:0;bottom:0;width:2px;background:var(--line)}
+.gap.long .rail::before{background:none;border-left:2px dashed var(--line);width:0}
+.gap .gl{align-self:center;font-size:12px;color:var(--muted)}
 
 /* 목록 줄 */
 .li{display:flex;gap:12px;padding:13px 16px;border-top:1px solid var(--line2);align-items:flex-start}
@@ -236,14 +252,23 @@ function telHref(v){ var n=String(v||'').replace(/[^\d+]/g,''); return n.length>
 var VIEWS = {
   timeline: function(){
     // 타임라인 = 우리가 한 일·해야 할 일, 걸러 보기 없이 한 줄로 (기한·기일은 메뉴가 따로 있음)
-    var GLABEL={accept:'선임',hearing:'재판',ours:'제출',meet:'접견',msg:'문자',chat:'방 대화'};
+    // 줄 사이 간격 = 실제 날짜 차이(제곱근으로 눌러서). 45일 넘으면 점선 + '약 N개월'로 줄여 보여 줌
+    var gapDiv=function(a,b){
+      var days=Math.round((Date.parse(b)-Date.parse(a))/864e5); if(days<=0) return '';
+      var long=days>=45, h=long?36:Math.round(Math.min(Math.sqrt(days)*7,44));
+      var lab=long?(days>=60?'약 '+Math.round(days/30)+'개월':days+'일'):'';
+      return '<div class="gap'+(long?' long':'')+'" style="height:'+h+'px"><span></span><span class="rail"></span><span class="gl">'+lab+'</span></div>';
+    };
+    var GLABEL={accept:'선임',hearing:'재판',ours:'제출',meet:'접견',chat:'방 대화'};
     var list=data.events, h='';
     if(!list.length) return h+emptySt('표시할 내용이 없습니다');
-    var body='', yr='';
+    var body='', yr='', prevD='', prevY='';
     list.forEach(function(e){
       var y=e.d.slice(0,4); if(y!==yr){ yr=y; body+='<div class="yr">'+y+'</div>'; }
-      var g=e.g||(e.src==='chat'?'chat':''), gl=GLABEL[g]||'';
-      body+='<div class="ev '+e.k+(g?' g-'+g:'')+'"><div class="d">'+md(e.d)+'<small>'+wk(e.d)+'</small></div><div class="rail"></div><div class="t">'+(e.k==='due'?'<span class="soon">예정</span>':'')+(gl?'<span class="gt">'+gl+'</span>':'')+esc(e.t)+(e.cf?'<div class="fa"><button class="open" data-file="'+e.cf.id+'">계약서 열기</button><span class="fn">'+esc(e.cf.n)+'</span></div>':'')+finalFile(e)+'</div></div>';
+      var g=e.g||(e.src==='chat'?'chat':''), gl=GLABEL[g]||'', minor=(g==='msg'||g==='chat');
+      if(prevD && y===prevY) body+=gapDiv(prevD, e.d);
+      prevD=e.d; prevY=y;
+      body+='<div class="ev '+e.k+(g?' g-'+g:'')+(minor?' minor':'')+'"><div class="d">'+md(e.d)+'<small>'+wk(e.d)+'</small></div><div class="rail"></div><div class="t">'+(e.k==='due'?'<span class="soon">예정</span>':'')+(gl?'<span class="gt">'+gl+'</span>':'')+esc(e.t)+(e.cf?'<div class="fa"><button class="open" data-file="'+e.cf.id+'">계약서 열기</button><span class="fn">'+esc(e.cf.n)+'</span></div>':'')+finalFile(e)+'</div></div>';
     });
     return h+'<div class="card">'+body+'</div>';
   },

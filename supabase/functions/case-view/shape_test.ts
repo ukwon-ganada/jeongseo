@@ -1,5 +1,5 @@
 // 실행: deno test supabase/functions/case-view/shape_test.ts
-import { attachContract, attachFinalFiles, caseNoVariants, cleanPhones, infoFields, mergeMeets, shapeCase, smsGist } from "./handler.ts";
+import { attachContract, attachFinalFiles, caseNoVariants, caseNosIn, cleanPhones, infoFields, mergeMeets, shapeCase, smsGist } from "./handler.ts";
 function assert(c: unknown, m: string) { if (!c) throw new Error(m); }
 
 Deno.test("사건번호 후보", () => {
@@ -77,4 +77,11 @@ Deno.test("추가 전화 정리", () => {
   if (t !== JSON.stringify([{ n: "어머니", p: "010-1234-5678" }])) throw new Error(t);
   if (cleanPhones("깨진 글자") !== "") throw new Error("깨진 값");
   if (cleanPhones("") !== "") throw new Error("빈 값");
+});
+
+Deno.test("방 제목 사건번호: 2자리 연도도", () => {
+  const a = caseNosIn("박)신)★(형/피의)홍길동_사기_인천26고단103412");
+  if (!a.includes("2026고단103412")) throw new Error(JSON.stringify(a));
+  const b = caseNosIn("인천 2026고합100351");
+  if (!b.includes("2026고합100351")) throw new Error(JSON.stringify(b));
 });

@@ -321,9 +321,11 @@ export function attachFinalFiles(events: any[], files: any[]) {
 // 방 제목에서 사건번호 꺼내기 (OCR이 0을 O로 읽는 것까지)
 export function caseNosIn(s: string): string[] {
   const out = new Set<string>();
-  for (const m of String(s || "").matchAll(/(?<!\d)((?:19|20)\d{2})\s*([가-힣]{1,4})\s*([0-9OolI|]{1,7})/g)) {
+  // 연도는 2026 처럼 4자리도, 26 처럼 2자리도 받는다(석원 2026-11-13)
+  for (const m of String(s || "").matchAll(/(?<!\d)((?:19|20)\d{2}|\d{2})\s*([가-힣]{1,4})\s*([0-9OolI|]{1,7})/g)) {
     const n = m[3].replace(/[Oo]/g, "0").replace(/[lI|]/g, "1").replace(/^0+/, "");
-    if (n) out.add(m[1] + m[2] + n);
+    const y = m[1].length === 2 ? "20" + m[1] : m[1];
+    if (n) out.add(y + m[2] + n);
   }
   return [...out];
 }
