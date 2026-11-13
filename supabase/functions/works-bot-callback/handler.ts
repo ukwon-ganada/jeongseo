@@ -6,8 +6,10 @@
 //      누가(userId)·어느 방(channelId)에서 눌렀는지 pc_open_request 에 기록한다.
 //      → 그 사람 PC의 "정서 사건 도우미"가 받아서 사건 화면을 연다.
 //    · 사건방에 파일(file 메시지)이 올라오면 웍스에서 내려받아 비공개 저장소 case-files 에
-//      보관하고 case_file 표에 기록한다 (room_file.ts). 글(text)은 받지도 저장하지도 않는다.
+//      보관하고 case_file 표에 기록한다 (room_file.ts).
 //      → 사건 화면 진행내용 탭에서 [열기]
+//    · (시험 중) 사건방 글(text)은 AI가 일정(고소장 제출·조사·송치 등)만 뽑아 room_event 에 남긴다 (room_chat.ts).
+//      글 원문은 저장하지 않는다. ROOM_CHAT_BOTS 에 든 봇(기본: 시험봇)의 방만.
 //    · 봇이 새 사건방에 초대되면(join) 방 제목의 사건번호로 사건을 자동 연결한다 (room_link.ts).
 //
 //  보안: 웍스가 보낸 것인지 X-WORKS-Signature(봇 시크릿 HMAC-SHA256, Base64)로 확인.
@@ -19,11 +21,12 @@
 //    WORKS_CLIENT_ID, WORKS_CLIENT_SECRET, WORKS_SERVICE_ACCOUNT, WORKS_PRIVATE_KEY  (파일 내려받기용, room_file.ts)
 //  배포:  supabase functions deploy works-bot-callback --no-verify-jwt
 //  콘솔:  Bot > Callback URL = https://<프로젝트>.supabase.co/functions/v1/works-bot-callback
-//         (Callback 이벤트: postback + 파일. 텍스트는 켜지 않음)
+//         (Callback 이벤트: postback + 파일 + 텍스트(시험봇만))
 // ============================================================================
 
 import { saveRoomFile } from "./room_file.ts";
 import { linkPicked, linkRoom, linkRoomAnyBot } from "./room_link.ts";
+import { handleRoomText } from "./room_chat.ts";
 
 // 우리 봇: 운영 봇(사건관리 도우미), 시험봇(정서 시험봇)
 export const BOT_IDS = ["12905890", "13580302"];
@@ -48,6 +51,7 @@ function safeEqual(a: string, b: string): boolean {
 type Env = {
   sbUrl: string; sbKey: string; botSecret: string; botSecrets?: string[];
   clientId?: string; clientSecret?: string; serviceAccount?: string; privateKey?: string;
+  anthropicKey?: string; chatModel?: string; chatBots?: string[];
 };
 
 // 응답(200)을 먼저 보내고 뒤에서 계속 일하기 (Supabase Edge Runtime)
@@ -130,6 +134,17 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       background(saveRoomFile(env, { botId, fileId: String(content.fileId), channelId, userId, fileName: content.fileName || undefined }, fetcher)
         .then((r) => console.log("file", r))
         .catch((e) => console.error("file fail", String(e?.message || e).slice(0, 200))));
+    }
+  }
+
+  // 사건방 글 → AI가 일정만 뽑아 room_event 에 (원문은 저장·로그 안 함). 시험 단계: chatBots 의 방만
+  if (ev?.type === "message" && content?.type === "text" && content?.text && channelId) {
+    const botId = req.headers.get("x-works-botid") || String(ev?.botId || "");
+    if ((env.chatBots || ["13580302"]).includes(botId)) {
+      background(handleRoomText({ sbUrl: env.sbUrl, sbKey: env.sbKey, anthropicKey: env.anthropicKey, model: env.chatModel },
+        { channelId, text: String(content.text), sentAt: ev?.issuedTime || ev?.createdTime }, fetcher)
+        .then((r) => console.log("chat", r.how, r.saved))
+        .catch((e) => console.error("chat fail", String(e?.message || e).slice(0, 200))));
     }
   }
 

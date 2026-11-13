@@ -20,6 +20,7 @@
 //  사건 정보 칸은 우리가 직접 입력·수정한다. 로웨어와 연동하지 않는다(자동으로 덮어쓰지 않음).
 //    저장된 값이 없을 때만 처음 값으로 로웨어 값을 한 번 보여 준다(PREFILL_FROM_LAWWARE).
 //  보류 방은 사건을 붙이지 않는다(잘못 붙이느니 안 붙인다) → { hold: true }
+//    단, 그 방 대화에서 AI가 뽑은 일정(room_event)이 있으면 그것만으로 화면을 준다({ roomOnly: true, ... })
 //  가져오지 않는 것: 주민번호·주소 등 개인정보 칸
 //  배포: verify_jwt=false (웍스 토큰으로 직접 확인)
 // ============================================================================
@@ -194,6 +195,40 @@ export async function caseFiles(env: Env, lNum: string, fetcher: typeof fetch = 
   });
 }
 
+// 사건방 대화에서 AI가 뽑은 일정(room_event): 수사 단계처럼 로웨어에 없는 일정
+export async function roomEvents(env: Env, lNum: string | null, channels: string[], fetcher: typeof fetch = fetch) {
+  const ors: string[] = [];
+  if (lNum) ors.push(`l_num.eq.${enc(lNum)}`);
+  if (channels.length) ors.push(`channel_id.in.${enc(inList(channels))}`);
+  if (!ors.length) return [];
+  return await rest(env, `room_event?select=id,kind,ev_date,ev_time,summary,state&hidden=eq.false&or=(${ors.join(",")})&order=ev_date.asc&limit=500`, {}, fetcher) || [];
+}
+const MEET = new Set(["조사", "출석요구", "기일"]);
+export function mergeRoomEvents(shaped: any, rows: any[], caseNo: string) {
+  const seen = new Set<string>();
+  for (const r of rows) {
+    const d = String(r.ev_date).slice(0, 10), tm = nz(r.ev_time);
+    const key = d + tm + r.summary;
+    if (seen.has(key)) continue; seen.add(key);
+    const t = (tm ? tm + " " : "") + nz(r.summary);
+    shaped.events.push({ d, k: d >= shaped.today && r.state !== "완료" ? "due" : "room", t, f: null, src: "chat" });
+    if (MEET.has(r.kind)) shaped.hearings.push({ c: caseNo, d, tm, t: nz(r.summary), p: "사건방 대화" });
+  }
+  shaped.events.sort((a: any, b: any) => a.d.localeCompare(b.d));
+}
+// 로웨어 사건이 없는 방(보류·미연결)이라도 대화 일정이 있으면 그것만으로 화면을 만든다
+export function roomOnlyShape(title: string, rows: any[], today: string, myHearings: any[]) {
+  const shaped: any = {
+    caseNo: "", lNum: null, title: title || "사건방", court: "수사 단계 · 사건방 대화 기준", today, closed: false, roomOnly: true,
+    events: [], deadlines: [], deadlineNote: "기한 계산은 새 규칙서 엔진이 완성되면 이곳에 표시됩니다.",
+    hearings: [], progress: { updated: "로웨어 사건 없음", rows: [] },
+    info: { fields: Object.fromEntries(INFO_FIELDS.map((k) => [k, ""])), saved: false, updatedBy: "", updatedAt: "", linked: [] },
+  };
+  mergeRoomEvents(shaped, rows, "");
+  for (const h of myHearings) shaped.hearings.push(h);
+  return shaped;
+}
+
 // 최종 제출본 고르기 (석원 결정 2026-11-13: "규칙은 어쨌든 마지막 서면")
 //   로웨어에 "법무법인 정서 … 제출"(우리 서면)이 찍힌 날 D마다,
 //   그 날짜(D)에 방에 올라온 문서 파일 중 마지막 하나만 그 줄에 붙인다 (석원: "그 날짜 최종서면만").
@@ -274,9 +309,19 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
         // 아직 연결 안 된 새 방: 그 자리에서 방 제목 사건번호로 자동 연결 시도
         if (!maps.length && (await autoLink(env, { channelId: room }, fetcher))?.linked) maps = await rest(env, q, {}, fetcher) || [];
         const main = maps[0];
-        if (!main) { await logView(env, who, "case:unpaired", room, null, fetcher); return json({ unpaired: true }); }
+        if (!main || main.status === "보류") {
+          // 로웨어 사건은 없지만 사건방 대화에서 뽑은 일정이 있으면 그것으로 보여 준다
+          const rows = await roomEvents(env, null, [room], fetcher).catch(() => []);
+          const act = !main ? "case:unpaired" : "case:hold";
+          if (rows.length) {
+            const t = (await rest(env, `works_room_case?select=room_title&channel_id=eq.${enc(room)}&room_title=not.is.null&limit=1`, {}, fetcher).catch(() => []))?.[0]?.room_title;
+            await logView(env, who, act + ":chat", room, null, fetcher);
+            return json(roomOnlyShape(nz(t), rows, today, []));
+          }
+          await logView(env, who, act, room, null, fetcher);
+          return json(!main ? { unpaired: true } : { hold: true });
+        }
         status = main.status;
-        if (status === "보류") { await logView(env, who, "case:hold", room, null, fetcher); return json({ hold: true }); }
         linked = maps.slice(1).map((m: any) => nz(m.case_no)).filter(Boolean);
         if (main.l_num != null) c = (await rest(env, `cases?select=*&l_num=eq.${main.l_num}`, {}, fetcher))[0];
         else if (main.case_no) c = (await rest(env, `cases?select=*&l_code=in.${enc(inList(caseNoVariants(main.case_no)))}&limit=1`, {}, fetcher))[0];
@@ -287,11 +332,14 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
         if (c.state === "종결") status = "종결";
       } else return json({ error: "방이나 사건번호가 없습니다" }, 400);
 
-      const [evs, mine, saved, files] = await Promise.all([
+      const roomRows = await rest(env, `works_room_case?select=channel_id&l_num=eq.${c.l_num}`, {}, fetcher).catch(() => []) || [];
+      const chans = [...new Set([room, ...roomRows.map((r: any) => nz(r.channel_id))].filter(Boolean))] as string[];
+      const [evs, mine, saved, files, chat] = await Promise.all([
         rest(env, `lw_process_events?select=lp_num,lp_set,lp_appoint_date,lp_appoint_time,lp_contents,lp_remark,delivered_date,court,last_seen_at&l_num=eq.${c.l_num}&order=lp_appoint_date.asc&limit=2000`, {}, fetcher),
         myCases(env, who.name || "", fetcher),
         rest(env, `case_info?select=*&l_num=eq.${c.l_num}`, {}, fetcher).then((r: any[]) => r?.[0] ?? null).catch(() => null),
         caseFiles(env, String(c.l_num), fetcher).catch((e) => { console.log("files fail", String(e).slice(0, 120)); return []; }),
+        roomEvents(env, String(c.l_num), chans, fetcher).catch(() => []),
       ]);
       const end = new Date(Date.parse(today) + 28 * 864e5).toISOString().slice(0, 10);
       const myHearings = mine.filter((m: any) => isDate(m.next_date) && m.next_date.slice(0, 10) >= today && m.next_date.slice(0, 10) <= end)
@@ -299,6 +347,7 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       await logView(env, who, "case", room, c, fetcher);
       const shaped = shapeCase(c, evs || [], { today, linked, myHearings, status, saved });
       attachFinalFiles(shaped.events, files);
+      mergeRoomEvents(shaped, chat, c.l_code);
       // 직원이 줄마다 파일을 바꿀 때 고를 목록 (화면에 따로 나열하지 않음)
       const fileChoices = files.map((f: any) => ({ id: f.id, n: f.n, d: f.d, tm: f.tm, by: f.by }));
       return json({ ...shaped, fileChoices });

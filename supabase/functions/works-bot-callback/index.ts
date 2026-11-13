@@ -11,5 +11,8 @@ Deno.serve((req) =>
       clientSecret: Deno.env.get("WORKS_CLIENT_SECRET"),
       serviceAccount: Deno.env.get("WORKS_SERVICE_ACCOUNT"),
       privateKey: Deno.env.get("WORKS_PRIVATE_KEY"),
+      anthropicKey: Deno.env.get("ANTHROPIC_API_KEY"),
+      chatModel: Deno.env.get("ROOM_CHAT_MODEL") || undefined,
+      chatBots: (Deno.env.get("ROOM_CHAT_BOTS") || "13580302").split(",").map((s) => s.trim()).filter(Boolean),
     })
   );

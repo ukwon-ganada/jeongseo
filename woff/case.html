@@ -62,6 +62,8 @@ main{max-width:880px;margin:0 auto;padding:12px 16px 32px}
 .ev.ours .t{font-weight:700}
 .ev.due .t{color:var(--due);font-weight:700}
 .ev.court .t{color:var(--ink2)}
+.ev.room .rail::after{border-color:var(--accent);background:var(--surface)}
+.ev .src{font-size:11px;color:var(--muted);margin-left:6px;white-space:nowrap}
 
 /* 목록 줄 */
 .li{display:flex;gap:12px;padding:13px 16px;border-top:1px solid var(--line2);align-items:flex-start}
@@ -195,8 +197,8 @@ function telHref(v){ var n=String(v||'').replace(/[^\d+]/g,''); return n.length>
 // ── 화면별 그리기 ─────────────────────────────────────
 var VIEWS = {
   timeline: function(){
-    var list=data.events.filter(function(e){ return sub.f==='all' || e.k===sub.f; });
-    var h=chips('f', [['all','전체'],['ours','우리 서면'],['court','법원 진행'],['due','기일']]);
+    var list=data.events.filter(function(e){ return sub.f==='all' || (sub.f==='chat' ? e.src==='chat' : e.k===sub.f); });
+    var h=chips('f', [['all','전체'],['ours','우리 서면'],['court','법원 진행'],['due','기일']].concat(data.events.some(function(e){return e.src==='chat';})?[['chat','방 대화']]:[]));
     if(!list.length) return h+emptySt('표시할 내용이 없습니다');
     var body='', yr='';
     list.forEach(function(e){
@@ -251,7 +253,7 @@ var VIEWS = {
       return '<div class="fr'+(opt.big?' big':'')+(opt.memo?' memo':'')+'"><span class="l">'+label+'</span><span class="v'+(v?'':' none')+'"'+(opt.memo?' style="white-space:pre-wrap"':'')+'>'+(v?esc(v):'—')+'</span>'+tail+'</div>';
     };
     var ro=function(label, v, big){ return '<div class="fr'+(big?' big':'')+'"><span class="l">'+label+'</span><span class="v">'+esc(v)+'</span><span></span></div>'; };
-    var head=function(t, btn){ return '<div class="card-h"><span>'+t+'</span>'+(btn&&!editing?'<button class="link-btn" id="edit">수정</button>':'')+'</div>'; };
+    var head=function(t, btn){ return '<div class="card-h"><span>'+t+'</span>'+(btn&&!editing&&!data.roomOnly?'<button class="link-btn" id="edit">수정</button>':'')+'</div>'; };
     var h='<div class="info-grid">'+
       '<div class="card wide">'+head('기본 정보', true)+ro('사건번호', data.caseNo, true)+field('case_name','사건명')+field('client_name','의뢰인')+field('client_phone','전화번호',{tel:1})+field('lawyer','담당변호사')+'</div>'+
       '<div class="card">'+head('재판부')+field('court_dept','법원·재판부')+field('court_phone','재판부 전화',{tel:1})+'</div>'+
@@ -305,7 +307,7 @@ function fmtTime(t){ if(!t) return ''; var d=new Date(Date.parse(t)+9*3600e3).to
 function render(){
   document.querySelectorAll('#nav button').forEach(function(b){ b.setAttribute('aria-current', b.dataset.v===view?'page':'false'); });
   $('#nav').hidden=false;
-  $('#title').textContent = data.caseNo;
+  $('#title').textContent = data.roomOnly ? '수사 단계' : data.caseNo;
   $('#sub').innerHTML = (q.get('closed') || data.closed ? '<span class="tag">종결</span>' : '') + esc(data.title) + ' · ' + esc(data.court);
   $('#switch').hidden = !!ctx.room;
   $('#main').innerHTML = (VIEWS[view]||VIEWS.timeline)();
