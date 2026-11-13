@@ -154,7 +154,7 @@ main{max-width:880px;margin:0 auto;padding:12px 16px 32px}
       <button data-v="timeline">타임라인</button>
       <button data-v="deadline">기한</button>
       <button data-v="hearing">기일</button>
-      <button data-v="progress">진행내용</button>
+      <button data-v="progress">나의사건</button>
       <button data-v="info">사건정보</button>
     </nav>
   </div>
@@ -390,16 +390,16 @@ function showLocate(){
 }
 
 // ── PC 도우미 연결 (?setup=pc) ────────────────────────
-var GET_CMD = 'mkdir %TEMP%\\jshelper & cd /d %TEMP%\\jshelper & for %f in (jeongseo-helper.ps1 install.ps1 install.cmd uninstall.ps1 uninstall.cmd server.json) do curl -sSLO https://raw.githubusercontent.com/ukwon-ganada/jeongseo/main/tools/pc-helper/%f & install.cmd';
+var GET_CMD = 'mkdir %TEMP%\\jshelper & cd /d %TEMP%\\jshelper & (for %f in (jeongseo-helper.ps1 install.ps1 install.cmd uninstall.ps1 uninstall.cmd server.json) do @curl -sSLO https://raw.githubusercontent.com/ukwon-ganada/jeongseo/main/tools/pc-helper/%f) & install.cmd';
 function showSetup(){
   $('#nav').hidden=true; $('#switch').hidden=true;
   $('#title').textContent='PC 도우미 연결';
-  $('#sub').textContent='사건방 메뉴 “PC에 사건 띄우기”를 이 PC에서 쓰려면 한 번만 하면 됩니다.';
+  $('#sub').textContent='PC 웍스 사건방 메뉴를 누르면 그 방 사건이 바로 열리게 하려면, 이 PC에 한 번만 하면 됩니다.';
   $('#main').innerHTML='<div class="card setup"><ol>'+
     '<li>윈도우 시작 버튼 → <b>cmd</b> 입력 → <b>명령 프롬프트</b>를 엽니다.</li>'+
     '<li>아래 명령을 복사해 명령 프롬프트에 붙여 넣고 Enter를 누릅니다.<button class="code" id="cmd">'+esc(GET_CMD)+'</button><button class="copy" data-copy="cmd">명령 복사</button></li>'+
     '<li>“토큰”을 물으면 아래 연결 코드를 붙여 넣고 Enter를 누릅니다.<div id="tokbox"><button class="primary" id="mktok" style="margin-top:8px">연결 코드 받기</button></div></li>'+
-    '<li>“설치 끝”이 나오면 완료입니다. 이제 사건방에서 <b>💻 PC에 사건 띄우기</b>를 누르면 이 PC에 사건 화면이 열립니다.</li>'+
+    '<li>“설치 끝”이 나오면 완료입니다. 이제 PC 웍스 사건방 ≡ 메뉴(타임라인·기한·기일·나의사건·사건정보)를 누르면 그 방 사건이 바로 열립니다. 웍스 창은 최소화하지 마세요.</li>'+
     '</ol></div><div class="foot">연결 코드는 이 화면에서 한 번만 보입니다. 메신저나 채팅에 붙이지 마세요.</div>';
 }
 function copyText(t){ (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function(){ toast('복사했습니다'); }).catch(function(){ toast('글자를 길게 눌러 직접 복사해 주세요'); }); }
