@@ -8,6 +8,7 @@
 //    · 사건방에 파일(file 메시지)이 올라오면 웍스에서 내려받아 비공개 저장소 case-files 에
 //      보관하고 case_file 표에 기록한다 (room_file.ts). 글(text)은 받지도 저장하지도 않는다.
 //      → 사건 화면 진행내용 탭에서 [열기]
+//    · 봇이 새 사건방에 초대되면(join) 방 제목의 사건번호로 사건을 자동 연결한다 (room_link.ts).
 //
 //  보안: 웍스가 보낸 것인지 X-WORKS-Signature(봇 시크릿 HMAC-SHA256, Base64)로 확인.
 //
@@ -22,6 +23,10 @@
 // ============================================================================
 
 import { saveRoomFile } from "./room_file.ts";
+import { linkPicked, linkRoom, linkRoomAnyBot } from "./room_link.ts";
+
+// 우리 봇: 운영 봇(사건관리 도우미), 시험봇(정서 시험봇)
+export const BOT_IDS = ["12905890", "13580302"];
 
 export const POSTBACK_ROOM_CASE = "room-case";
 
@@ -66,6 +71,22 @@ async function rest(env: Env, path: string, init: RequestInit = {}) {
 
 export async function handle(req: Request, env: Env, fetcher: typeof fetch = fetch): Promise<Response> {
   if (req.method !== "POST") return new Response("ok");
+  // 우리 서버 함수(case-view)끼리 부르는 길: 서비스 키로만. 아직 연결 안 된 방을 그 자리에서 연결
+  const internal = req.headers.get("x-internal-key");
+  if (internal) {
+    if (!env.sbKey || !safeEqual(internal, env.sbKey)) return new Response("forbidden", { status: 403 });
+    let b: any = {};
+    try { b = await req.json(); } catch { /* */ }
+    const ch = String(b?.channelId || "");
+    if (!ch) return Response.json({ error: "channelId" }, { status: 400 });
+    try {
+      const r = b?.lNum ? await linkPicked(env, BOT_IDS, ch, Number(b.lNum), fetcher) : await linkRoomAnyBot(env, BOT_IDS, ch, fetcher);
+      console.log("link(internal)", r.how, r.linked);
+      return Response.json(r);
+    } catch (e) {
+      return Response.json({ linked: 0, how: "error", error: String((e as Error)?.message || e).slice(0, 120) });
+    }
+  }
   const raw = await req.text();
   const sig = req.headers.get("x-works-signature") || "";
   // 시험봇·운영 봇 시크릿 중 하나라도 맞으면 웍스가 보낸 것
@@ -109,6 +130,16 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       background(saveRoomFile(env, { botId, fileId: String(content.fileId), channelId, userId, fileName: content.fileName || undefined }, fetcher)
         .then((r) => console.log("file", r))
         .catch((e) => console.error("file fail", String(e?.message || e).slice(0, 200))));
+    }
+  }
+
+  // 봇이 새 방에 초대됨 → 방 제목의 사건번호로 사건 자동 연결 (room_link.ts)
+  if (ev?.type === "join" && channelId) {
+    const botId = req.headers.get("x-works-botid") || String(ev?.botId || "");
+    if (botId) {
+      background(linkRoom(env, botId, channelId, fetcher)
+        .then((r) => console.log("link", r.how, r.linked))
+        .catch((e) => console.error("link fail", String(e?.message || e).slice(0, 200))));
     }
   }
 

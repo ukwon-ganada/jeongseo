@@ -14,6 +14,7 @@
 //    { "action": "save_info", "lNum": 123, "fields": {...} } → 사건 정보 저장(case_info, 수정 기록 case_info_log)
 //    { "action": "file_open", "id": 12 }             → 사건방에 올린 서면 파일 열람 주소(5분짜리, 비공개 저장소 case-files)
 //    { "action": "locate" }                         → PC: 이 직원 PC 도우미에게 웍스 창 방 제목을 읽게 해서 지금 방을 찾음(최대 8초)
+//    { "action": "link_room", "room": "<방ID>", "case": "<사건번호>" } → 연결 안 된 방에 고른 사건 기억
 //    { "action": "helper_token" }                   → 이 직원의 PC 도우미 연결 코드 발급(한 번만 보여 줌, 서버엔 해시만)
 //  사건 정보 칸은 우리가 직접 입력·수정한다. 로웨어와 연동하지 않는다(자동으로 덮어쓰지 않음).
 //    저장된 값이 없을 때만 처음 값으로 로웨어 값을 한 번 보여 준다(PREFILL_FROM_LAWWARE).
@@ -192,6 +193,26 @@ export async function caseFiles(env: Env, lNum: string, fetcher: typeof fetch = 
   });
 }
 
+// 방 제목에서 사건번호 꺼내기 (OCR이 0을 O로 읽는 것까지)
+export function caseNosIn(s: string): string[] {
+  const out = new Set<string>();
+  for (const m of String(s || "").matchAll(/(?<!\d)((?:19|20)\d{2})\s*([가-힣]{1,4})\s*([0-9OolI|]{1,7})/g)) {
+    const n = m[3].replace(/[Oo]/g, "0").replace(/[lI|]/g, "1").replace(/^0+/, "");
+    if (n) out.add(m[1] + m[2] + n);
+  }
+  return [...out];
+}
+
+// 아직 연결 안 된 방 자동 연결: works-bot-callback 함수에 부탁 (웍스 봇 열쇠가 거기 있음). 실패해도 화면은 계속
+async function autoLink(env: Env, body: { channelId: string; lNum?: number }, fetcher: typeof fetch): Promise<{ linked: number; how: string } | null> {
+  try {
+    const r = await fetcher(env.sbUrl + "/functions/v1/works-bot-callback", {
+      method: "POST", headers: { "Content-Type": "application/json", "x-internal-key": env.sbKey }, body: JSON.stringify(body),
+    });
+    return r.ok ? await r.json() : (await r.body?.cancel(), null);
+  } catch { return null; }
+}
+
 async function logView(env: Env, who: WhoAmI, action: string, room: string, c: any, fetcher: typeof fetch) {
   try {
     await rest(env, "case_view_log", { method: "POST", headers: { Prefer: "return=minimal" },
@@ -224,7 +245,10 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       const room = nz(body.room), caseParam = nz(body.case);
       let c: any = null, status: string | undefined, linked: string[] = [];
       if (room) {
-        const maps = await rest(env, `works_room_case?select=l_num,case_no,is_primary,status&channel_id=eq.${enc(room)}&order=is_primary.desc,updated_at.desc`, {}, fetcher) || [];
+        const q = `works_room_case?select=l_num,case_no,is_primary,status&channel_id=eq.${enc(room)}&order=is_primary.desc,updated_at.desc`;
+        let maps = await rest(env, q, {}, fetcher) || [];
+        // 아직 연결 안 된 새 방: 그 자리에서 방 제목 사건번호로 자동 연결 시도
+        if (!maps.length && (await autoLink(env, { channelId: room }, fetcher))?.linked) maps = await rest(env, q, {}, fetcher) || [];
         const main = maps[0];
         if (!main) { await logView(env, who, "case:unpaired", room, null, fetcher); return json({ unpaired: true }); }
         status = main.status;
@@ -280,15 +304,33 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       const until = Date.now() + (body.waitMs ?? 8000);
       while (Date.now() < until) {
         await new Promise((r) => setTimeout(r, 300));
-        const row = (await rest(env, `pc_locate?select=taken_at,done_at,channel_id,how&id=eq.${id}`, {}, fetcher))?.[0];
+        const row = (await rest(env, `pc_locate?select=taken_at,done_at,channel_id,how,header_text&id=eq.${id}`, {}, fetcher))?.[0];
         if (row?.done_at) {
           await logView(env, who, "locate:" + nz(row.how), nz(row.channel_id), null, fetcher);
-          return json(row.channel_id ? { room: row.channel_id } : { notfound: true, how: row.how });
+          if (row.channel_id) return json({ room: row.channel_id });
+          // 방 표에 없는 새 방이라도 제목에 사건번호가 있고 로웨어에 딱 하나 있으면 그 사건을 연다
+          const nos = row.how === "error" ? [] : caseNosIn(nz(row.header_text));
+          if (nos.length) {
+            const hit = await rest(env, `cases?select=l_code&l_code=in.${enc(inList(nos.flatMap(caseNoVariants)))}&limit=2`, {}, fetcher) || [];
+            if (hit.length === 1) return json({ case: hit[0].l_code });
+          }
+          return json({ notfound: true, how: row.how });
         }
         if (!row?.taken_at && Date.now() > until - 5000) break; // 3초 안에 도우미가 안 받아 가면 꺼진 것(또는 옛 버전)
       }
       await logView(env, who, "locate:timeout", "", null, fetcher);
       return json({ timeout: true });
+    }
+
+    // 사건 고르기에서 고른 사건을 아직 연결 안 된 이 방에 기억 (휴대폰: 방을 아는 경우만)
+    if (body?.action === "link_room") {
+      const room = nz(body.room), code = nz(body.case);
+      if (!room || !code) return json({ error: "방과 사건이 필요합니다" }, 400);
+      const c = (await rest(env, `cases?select=l_num,l_code&l_code=in.${enc(inList(caseNoVariants(code)))}&order=l_num.desc&limit=1`, {}, fetcher))?.[0];
+      if (!c) return json({ linked: 0, how: "no-case" });
+      const r = await autoLink(env, { channelId: room, lNum: c.l_num }, fetcher);
+      await logView(env, who, "link_room:" + nz(r?.how), room, c, fetcher);
+      return json(r || { linked: 0, how: "error" });
     }
 
     if (body?.action === "helper_token") {
