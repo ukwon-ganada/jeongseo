@@ -7,5 +7,9 @@ Deno.serve((req) =>
       sbKey: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
       botSecret: Deno.env.get("WORKS_BOT_SECRET") || "",
       botSecrets: [Deno.env.get("WORKS_BOT_SECRET_PROD") || ""],
+      clientId: Deno.env.get("WORKS_CLIENT_ID"),
+      clientSecret: Deno.env.get("WORKS_CLIENT_SECRET"),
+      serviceAccount: Deno.env.get("WORKS_SERVICE_ACCOUNT"),
+      privateKey: Deno.env.get("WORKS_PRIVATE_KEY"),
     })
   );

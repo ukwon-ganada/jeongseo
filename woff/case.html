@@ -85,6 +85,15 @@ main{max-width:880px;margin:0 auto;padding:12px 16px 32px}
 .pg.hl{box-shadow:inset 3px 0 0 var(--accent)}
 .pg.dim{opacity:.45}
 .pg.plan .d{color:var(--due);font-weight:600}
+.fl{display:flex;align-items:center;gap:10px;padding:12px 16px;border-top:1px solid var(--line2);font-size:14px}
+.fl:first-child{border-top:0}
+.fl .main{flex:1;min-width:0}
+.fl .n{overflow-wrap:anywhere;font-weight:600}
+.fl .s{font-size:12px;color:var(--muted)}
+.fl .open{flex:none;border:1px solid var(--accent);color:var(--accent-ink);background:var(--accent-tint);border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600}
+.fl .open[disabled]{opacity:.5}
+.fl .ic{flex:none;width:30px;height:36px;border-radius:4px;background:var(--line2);color:var(--muted);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.fl .ic.pdf{background:#e5484d;color:#fff}
 .meta{font-size:12px;color:var(--muted);padding:0 2px 10px}
 
 /* 사건 정보 */
@@ -220,8 +229,16 @@ var VIEWS = {
     return (up.length||past.length) ? h : h+emptySt('기일이 없습니다');
   },
   progress: function(){
+    var files=data.files||[];
+    var h=chips('p', [['all','전체'],['기일','기일'],['송달','송달'],['제출','제출'],['file','서면 파일'+(files.length?' '+files.length:'')]]);
+    if(sub.p==='file'){
+      h+='<div class="meta">사건방에 올린 파일을 모아 보관합니다</div>';
+      if(!files.length) return h+emptySt('아직 모은 파일이 없습니다','사건방에 서면 PDF를 올리면 이곳에 쌓입니다.');
+      return h+'<div class="card">'+files.map(fileRow).join('')+'</div>';
+    }
     var rows=data.progress.rows.filter(function(x){ return sub.p==='all' || x.k===sub.p; }).slice().reverse();
-    var h=chips('p', [['all','전체'],['기일','기일'],['송달','송달'],['제출','제출']])+'<div class="meta">로웨어 갱신 '+esc(data.progress.updated)+'</div>';
+    h+='<div class="meta">로웨어 갱신 '+esc(data.progress.updated)+'</div>';
+    if(sub.p==='all' && files.length) h+='<div class="card"><div class="card-h"><span>사건방에 올린 서면</span>'+(files.length>3?'<button class="link-btn" data-p="file">모두 보기</button>':'')+'</div>'+files.slice(0,3).map(fileRow).join('')+'</div>';
     if(!rows.length) return h+emptySt('최근 한 달 진행내용이 없습니다');
     return h+'<div class="card">'+rows.map(function(x){
       var cls=(x.o||x.u)?' hl':x.x?' dim':'';
@@ -254,6 +271,26 @@ var VIEWS = {
     return h+'<div class="foot">'+foot+'</div>';
   }
 };
+function fileRow(f){
+  var ext=(f.n.match(/\.([a-z0-9]{1,5})$/i)||[])[1]||'';
+  var size=f.sz>=1048576?(f.sz/1048576).toFixed(1)+'MB':f.sz?Math.max(1,Math.round(f.sz/1024))+'KB':'';
+  var st=f.st==='받는중'?' · 받는 중':f.st==='실패'?' · 받기 실패(다시 올려 주세요)':'';
+  return '<div class="fl"><span class="ic'+(f.pdf?' pdf':'')+'">'+esc((f.pdf?'PDF':ext||'파일').toUpperCase())+'</span><div class="main"><div class="n">'+esc(f.n)+'</div><div class="s">'+
+    esc(f.d.replace(/-/g,'.')+' '+f.tm)+(f.by?' · '+esc(f.by):'')+(size?' · '+size:'')+st+'</div></div>'+
+    (f.st?'':'<button class="open" data-file="'+f.id+'">열기</button>')+'</div>';
+}
+// 파일 열기: 서버가 5분짜리 열람 주소를 줌 → 휴대폰은 바깥 브라우저, PC는 새 탭
+function openFile(btn){
+  var inClient=false; try{ inClient=woff.isInClient(); }catch(e){}
+  var w = inClient ? null : window.open('', '_blank'); // PC: 팝업 차단을 피하려고 먼저 빈 탭을 엶
+  btn.disabled=true; btn.textContent='여는 중…';
+  api({action:'file_open', id:Number(btn.dataset.file)}).then(function(j){
+    if(w){ w.location.href=j.url; }
+    else if(inClient && woff.openWindow){ woff.openWindow({url:j.url, external:true}); }
+    else location.href=j.url;
+  }).catch(function(e){ if(w) w.close(); toast('열지 못했습니다: '+((e&&e.message)||e)); })
+    .then(function(){ btn.disabled=false; btn.textContent='열기'; });
+}
 function fmtTime(t){ if(!t) return ''; var d=new Date(Date.parse(t)+9*3600e3).toISOString(); return md(d.slice(0,10))+' '+d.slice(11,16); }
 
 function render(){
@@ -271,6 +308,7 @@ document.addEventListener('click', function(e){
   if(b.id==='edit'){ editing=true; render(); var i=$('#main input'); if(i) i.focus(); }
   if(b.id==='cancel'){ editing=false; render(); }
   if(b.id==='save') saveInfo(b);
+  if(b.dataset.file) openFile(b);
 });
 function confirmLeave(){ return window.confirm('저장하지 않은 수정이 있습니다. 나갈까요?'); }
 function saveInfo(btn){
@@ -309,6 +347,14 @@ document.addEventListener('click', function(e){
   if(e.target.id==='switch'){ showPicker(); window.scrollTo(0,0); return; }
   var b=e.target.closest('.pick'); if(!b) return;
   ctx.caseParam=b.dataset.case; addRecent(ctx.caseParam); editing=false;
+  // 연결 안 된 방에서 고르면 그 방에 기억해 두고(다음부터 바로 열림) 방 기준으로 연다
+  if(ctx.unpairedRoom){
+    var room=ctx.unpairedRoom; ctx.unpairedRoom='';
+    $('#sub').textContent='이 방에 연결하는 중…';
+    return api({action:'link_room', room:room, 'case':ctx.caseParam})
+      .then(function(r){ if(r.linked) toast('이 방에 사건을 연결했습니다'); return showCase(r.linked ? {room:room} : {'case':ctx.caseParam}); }, function(){ return showCase({'case':ctx.caseParam}); })
+      .then(function(){ window.scrollTo(0,0); });
+  }
   showCase({'case':ctx.caseParam}).then(function(){ window.scrollTo(0,0); });
 });
 
@@ -323,7 +369,7 @@ function showCase(key){
   $('#sub').textContent='불러오는 중…';
   return loadCase(key).then(function(d){
     if(d.hold) return showHold();
-    if(d.unpaired) return showPicker('이 방과 연결된 사건이 없습니다');
+    if(d.unpaired){ ctx.unpairedRoom=key.room||''; return showPicker('이 방과 연결된 사건이 없습니다 · 고르면 이 방에 기억됩니다'); }
     if(d.notfound) return message('사건을 찾지 못함', d.caseNo||'', emptySt('로웨어에 없는 사건번호입니다'));
     data=d; render();
   }).catch(function(e){
@@ -336,6 +382,7 @@ function showLocate(){
   message('사건 정보', '보고 있는 웍스 방을 확인하는 중…', '<div class="empty-st">잠시만 기다려 주세요</div>');
   return api({action:'locate'}).then(function(j){
     if(j.room){ ctx.room=j.room; return showCase({room:j.room}); }
+    if(j['case']){ ctx.caseParam=j['case']; return showCase({'case':j['case']}); }
     if(j.nohelper) return showPicker('PC 도우미가 켜져 있지 않아 방을 알 수 없습니다');
     if(j.timeout) return showPicker('PC 도우미가 응답하지 않습니다 (업데이트가 필요할 수 있어요)');
     return showPicker('웍스 창에서 방 이름을 읽지 못했습니다 (창을 최소화하지 마세요)');
