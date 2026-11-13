@@ -87,6 +87,11 @@ Deno.test("한 번 클릭 흐름", async () => {
     await callback(new Request("http://x", { method: "POST", body: b3, headers: { "x-works-signature": await hmacBase64(b3, env.botSecret) } }), env);
     const hz = await (await wait(new Request("http://x", { headers: { authorization: "Bearer " + TOKEN } }), env)).json();
     assert(hz.url.includes("hold=1") && !hz.url.includes("case="), "보류 방은 사건 안 붙임: " + hz.url);
+    // 운영 봇 시크릿으로 서명해도 통과
+    const b4 = JSON.stringify({ type: "postback", data: "room-case", source: { userId: "u1", channelId: "room-A" } });
+    const r4 = await callback(new Request("http://x", { method: "POST", body: b4, headers: { "x-works-signature": await hmacBase64(b4, "prodsecret") } }), { ...env, botSecrets: ["prodsecret"] });
+    assert(r4.status === 200, "운영 봇 서명 통과");
+    await (await wait(new Request("http://x", { headers: { authorization: "Bearer " + TOKEN } }), env)).body?.cancel();
     console.log("열 주소:", decodeURIComponent(j.url));
   } finally { await srv.shutdown(); }
 });

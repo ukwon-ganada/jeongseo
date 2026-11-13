@@ -113,6 +113,9 @@ main{max-width:880px;margin:0 auto;padding:12px 16px 32px}
 .pick:first-child{border-top:0}
 .pick .s{display:block;font-size:13px;color:var(--muted);margin-top:2px}
 .primary{border:0;border-radius:10px;background:var(--accent);color:#fff;font-size:16px;font-weight:700;padding:13px 24px}
+.setup ol{margin:0;padding:4px 16px 16px 36px}.setup li{padding:8px 0;font-size:15px}
+.code{display:block;width:100%;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;background:var(--line2);border:0;border-radius:8px;padding:10px 12px;margin-top:6px;overflow-wrap:anywhere;user-select:all;text-align:left}
+.copy{margin-top:6px;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:6px 12px;font-size:13px;color:var(--accent-ink);font-weight:600}
 .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);background:rgba(34,34,34,.92);color:#fff;font-size:14px;border-radius:999px;padding:9px 18px;z-index:9}
 
 /* PC: 넓은 화면 */
@@ -328,6 +331,31 @@ function showCase(key){
   });
 }
 
+// ── PC 도우미 연결 (?setup=pc) ────────────────────────
+var GET_CMD = 'mkdir %TEMP%\\jshelper & cd /d %TEMP%\\jshelper & for %f in (jeongseo-helper.ps1 install.ps1 install.cmd uninstall.ps1 uninstall.cmd server.json) do curl -sSLO https://raw.githubusercontent.com/ukwon-ganada/jeongseo/main/tools/pc-helper/%f & install.cmd';
+function showSetup(){
+  $('#nav').hidden=true; $('#switch').hidden=true;
+  $('#title').textContent='PC 도우미 연결';
+  $('#sub').textContent='사건방 메뉴 “PC에 사건 띄우기”를 이 PC에서 쓰려면 한 번만 하면 됩니다.';
+  $('#main').innerHTML='<div class="card setup"><ol>'+
+    '<li>윈도우 시작 버튼 → <b>cmd</b> 입력 → <b>명령 프롬프트</b>를 엽니다.</li>'+
+    '<li>아래 명령을 복사해 명령 프롬프트에 붙여 넣고 Enter를 누릅니다.<button class="code" id="cmd">'+esc(GET_CMD)+'</button><button class="copy" data-copy="cmd">명령 복사</button></li>'+
+    '<li>“토큰”을 물으면 아래 연결 코드를 붙여 넣고 Enter를 누릅니다.<div id="tokbox"><button class="primary" id="mktok" style="margin-top:8px">연결 코드 받기</button></div></li>'+
+    '<li>“설치 끝”이 나오면 완료입니다. 이제 사건방에서 <b>💻 PC에 사건 띄우기</b>를 누르면 이 PC에 사건 화면이 열립니다.</li>'+
+    '</ol></div><div class="foot">연결 코드는 이 화면에서 한 번만 보입니다. 메신저나 채팅에 붙이지 마세요.</div>';
+}
+function copyText(t){ (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function(){ toast('복사했습니다'); }).catch(function(){ toast('글자를 길게 눌러 직접 복사해 주세요'); }); }
+document.addEventListener('click', function(e){
+  var b=e.target.closest('button'); if(!b) return;
+  if(b.dataset.copy) copyText($('#'+b.dataset.copy).textContent);
+  if(b.id==='mktok'){
+    b.disabled=true; b.textContent='만드는 중…';
+    api({action:'helper_token'}).then(function(j){
+      $('#tokbox').innerHTML='<button class="code" id="tok">'+esc(j.token)+'</button><button class="copy" data-copy="tok">코드 복사</button>';
+    }).catch(function(err){ b.disabled=false; b.textContent='연결 코드 받기'; toast('실패: '+((err&&err.message)||err)); });
+  }
+});
+
 // ── WOFF 시작 ─────────────────────────────────────────
 function start(){
   woff.init({woffId: WOFF_ID}).then(function(){
@@ -344,6 +372,7 @@ function start(){
     return pRoom.then(function(){
       // 보류 방: 어느 사건인지 확정 못 함 → 사건정보·서면을 띄우지 않는다
       if(q.get('hold')) return showHold();
+      if(q.get('setup')==='pc') return showSetup();
       if(!ctx.room && !ctx.caseParam) return showPicker(q.get('room') ? '이 방과 연결된 사건이 없습니다' : '');
       return showCase(ctx.room ? {room:ctx.room} : {'case':ctx.caseParam});
     });

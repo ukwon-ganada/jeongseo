@@ -17,8 +17,11 @@
 4. `server.json` 에 법인 프로젝트 주소·공개키가 들어 있음(공개 가능한 값)
 5. 직원마다 토큰 발급: `select public.pc_helper_issue('<웍스 userId>', '<이름> PC');`
 
-## 설치 (직원 PC, 한 번)
-이 폴더를 PC에 복사 → `install.cmd` 더블클릭 → 받은 토큰 붙여 넣기. 윈도우가 켜질 때 자동으로 뒤에서 돕니다.
+## 설치 (직원 PC, 한 번) — 직원 혼자 할 수 있음
+PC 브라우저로 `https://woff.worksmobile.com/woff/Nxkob0LER_dfaSzH8s6flw?setup=pc` 를 열면
+1) 명령 프롬프트에 붙일 한 줄 명령 2) 그 직원 전용 연결 코드(토큰)가 나옵니다. 명령을 붙여 넣고, 토큰을 물으면 코드를 붙이면 끝.
+(코드는 웍스 로그인으로 직원 확인 뒤에만 발급, 서버엔 해시만 저장)
+윈도우가 켜질 때 자동으로 뒤에서 돕니다.
 지우기: `uninstall.cmd`. 기록: `%APPDATA%\JeongseoHelper\helper.log`
 
 ## 안전

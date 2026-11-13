@@ -11,7 +11,8 @@
 //
 //  필요한 시크릿:
 //    SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY   (Supabase 기본 주입)
-//    WORKS_BOT_SECRET                          (개발자 콘솔 > Bot > Bot Secret)
+//    WORKS_BOT_SECRET                          (개발자 콘솔 > 정서 시험봇 > Bot Secret)
+//    WORKS_BOT_SECRET_PROD                     (개발자 콘솔 > 운영 봇 > Bot Secret) — 둘 중 하나와 맞으면 통과
 //  배포:  supabase functions deploy works-bot-callback --no-verify-jwt
 //  콘솔:  Bot > Callback URL = https://<프로젝트>.supabase.co/functions/v1/works-bot-callback
 //         (Callback 이벤트에 postback 포함)
@@ -34,7 +35,7 @@ function safeEqual(a: string, b: string): boolean {
   return d === 0;
 }
 
-type Env = { sbUrl: string; sbKey: string; botSecret: string };
+type Env = { sbUrl: string; sbKey: string; botSecret: string; botSecrets?: string[] };
 
 async function rest(env: Env, path: string, init: RequestInit = {}) {
   return fetch(env.sbUrl + "/rest/v1/" + path, {
@@ -52,9 +53,11 @@ export async function handle(req: Request, env: Env): Promise<Response> {
   if (req.method !== "POST") return new Response("ok");
   const raw = await req.text();
   const sig = req.headers.get("x-works-signature") || "";
-  if (!env.botSecret || !safeEqual(sig, await hmacBase64(raw, env.botSecret))) {
-    return new Response("bad signature", { status: 401 });
-  }
+  // 시험봇·운영 봇 시크릿 중 하나라도 맞으면 웍스가 보낸 것
+  const secrets = [env.botSecret, ...(env.botSecrets || [])].filter(Boolean);
+  let okSig = false;
+  for (const sec of secrets) if (safeEqual(sig, await hmacBase64(raw, sec))) okSig = true;
+  if (!okSig) return new Response("bad signature", { status: 401 });
   let ev: any;
   try { ev = JSON.parse(raw); } catch { return new Response("bad json", { status: 400 }); }
 
