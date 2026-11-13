@@ -13,6 +13,7 @@
 //    { "action": "mycases" }                        → 내가 담당인 진행 사건 (고르기 화면용)
 //    { "action": "save_info", "lNum": 123, "fields": {...} } → 사건 정보 저장(case_info, 수정 기록 case_info_log)
 //    { "action": "file_open", "id": 12 }             → 사건방에 올린 서면 파일 열람 주소(5분짜리, 비공개 저장소 case-files)
+//    { "action": "set_file", "lNum": 1, "lp": 55, "id": 12 } → 타임라인 제출 줄에 붙을 파일을 직원이 직접 고름
 //    { "action": "locate" }                         → PC: 이 직원 PC 도우미에게 웍스 창 방 제목을 읽게 해서 지금 방을 찾음(최대 8초)
 //    { "action": "link_room", "room": "<방ID>", "case": "<사건번호>" } → 연결 안 된 방에 고른 사건 기억
 //    { "action": "helper_token" }                   → 이 직원의 PC 도우미 연결 코드 발급(한 번만 보여 줌, 서버엔 해시만)
@@ -128,7 +129,7 @@ export function shapeCase(c: any, evs: any[], opts: { today: string; linked: str
     let t = nz(e.lp_contents);
     if (e.lp_set === "기일" && nz(e.lp_remark)) t += " · " + nz(e.lp_remark);
     if (e.lp_set === "송달" && e.delivered_date) t += " · " + md(e.delivered_date) + " 도달";
-    events.push({ d, k: e.lp_set === "기일" ? (d >= today ? "due" : "court") : ours(e) ? "ours" : "court", t, f: null });
+    events.push({ d, k: e.lp_set === "기일" ? (d >= today ? "due" : "court") : ours(e) ? "ours" : "court", t, f: null, ...(ours(e) ? { lp: e.lp_num } : {}) });
   }
   const nextDate = isDate(c.next_date) ? c.next_date.slice(0, 10) : "";
   const hasNext = nextDate && list.some((e) => e.lp_set === "기일" && e.lp_appoint_date.slice(0, 10) === nextDate);
@@ -177,7 +178,7 @@ export async function caseFiles(env: Env, lNum: string, fetcher: typeof fetch = 
   const rooms = await rest(env, `works_room_case?select=channel_id&l_num=eq.${enc(lNum)}`, {}, fetcher) || [];
   const ch = [...new Set(rooms.map((r: any) => nz(r.channel_id)).filter(Boolean))] as string[];
   const or = ch.length ? `or=(l_num.eq.${enc(lNum)},channel_id.in.${enc(inList(ch))})` : `l_num=eq.${enc(lNum)}`;
-  const rows = await rest(env, `case_file?select=id,file_name,content_type,size_bytes,status,works_user_id,posted_at&status=in.(보관,받는중,실패)&${or}&order=posted_at.desc&limit=300`, {}, fetcher) || [];
+  const rows = await rest(env, `case_file?select=id,file_name,content_type,size_bytes,status,works_user_id,posted_at,lp_num&status=eq.보관&${or}&order=posted_at.desc&limit=300`, {}, fetcher) || [];
   // 올린 사람 이름: 사건 화면을 연 적이 있는 직원이면 열람 기록에서 이름을 찾음
   const ids = [...new Set(rows.map((r: any) => nz(r.works_user_id)).filter(Boolean))] as string[];
   const names: Record<string, string> = {};
@@ -189,8 +190,31 @@ export async function caseFiles(env: Env, lNum: string, fetcher: typeof fetch = 
     const k = new Date(Date.parse(r.posted_at) + 9 * 3600e3).toISOString();
     return { id: r.id, n: nz(r.file_name) || "파일", d: k.slice(0, 10), tm: k.slice(11, 16), by: names[r.works_user_id] || "",
       sz: Number(r.size_bytes) || 0, pdf: /pdf/i.test(nz(r.content_type)) || /\.pdf$/i.test(nz(r.file_name)) ? 1 : 0,
-      st: r.status === "보관" ? "" : r.status };
+      at: Date.parse(r.posted_at), lp: r.lp_num ?? null };
   });
+}
+
+// 최종 제출본 고르기 (석원 결정 2026-11-13: "규칙은 어쨌든 마지막 서면")
+//   로웨어에 "법무법인 정서 … 제출"(우리 서면)이 찍힌 날 D마다,
+//   그 날짜(D)에 방에 올라온 문서 파일 중 마지막 하나만 그 줄에 붙인다 (석원: "그 날짜 최종서면만").
+//   로웨어 제출 기록엔 시각이 없어서 "그날의 마지막"으로 본다. 초안·수정본은 화면에 내지 않는다.
+//   실시간일 필요 없음: 로웨어에 제출이 뜬 뒤 사건 화면을 열 때 계산된다.
+//   직원이 직접 고른 파일(lp_num)이 있으면 그것이 우선.
+const DOC_RE = /\.(pdf|hwp|hwpx|doc|docx)$/i;
+export function attachFinalFiles(events: any[], files: any[]) {
+  const docs = files.filter((f) => f.pdf || DOC_RE.test(f.n));
+  const used = new Set<number>();
+  const picked = new Map<string, any>();
+  for (const f of docs) if (f.lp != null && !picked.has(String(f.lp))) { picked.set(String(f.lp), f); used.add(f.id); }
+  const ours = events.filter((e) => e.k === "ours" && e.lp != null).sort((a, b) => a.d.localeCompare(b.d) || a.lp - b.lp);
+  for (const e of ours) {
+    const m = picked.get(String(e.lp));
+    if (m) { e.f = { id: m.id, n: m.n, pick: 1 }; continue; }
+    const pool = docs.filter((f) => !used.has(f.id) && f.lp == null && f.d === e.d)
+      .sort((a, b) => b.at - a.at);
+    if (pool[0]) { used.add(pool[0].id); e.f = { id: pool[0].id, n: pool[0].n, pick: 0 }; }
+  }
+  return events;
 }
 
 // 방 제목에서 사건번호 꺼내기 (OCR이 0을 O로 읽는 것까지)
@@ -273,7 +297,11 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       const myHearings = mine.filter((m: any) => isDate(m.next_date) && m.next_date.slice(0, 10) >= today && m.next_date.slice(0, 10) <= end)
         .map((m: any) => ({ c: m.l_code, d: m.next_date.slice(0, 10), tm: nz(m.next_time), t: nz(m.next_contents) || "기일", p: nz(m.court) }));
       await logView(env, who, "case", room, c, fetcher);
-      return json({ ...shapeCase(c, evs || [], { today, linked, myHearings, status, saved }), files });
+      const shaped = shapeCase(c, evs || [], { today, linked, myHearings, status, saved });
+      attachFinalFiles(shaped.events, files);
+      // 직원이 줄마다 파일을 바꿀 때 고를 목록 (화면에 따로 나열하지 않음)
+      const fileChoices = files.map((f: any) => ({ id: f.id, n: f.n, d: f.d, tm: f.tm, by: f.by }));
+      return json({ ...shaped, fileChoices });
     }
 
     if (body?.action === "file_open") {
@@ -289,6 +317,22 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       if (!r.ok || !j.signedURL) { console.log("sign fail", r.status); return json({ error: "파일을 열지 못했습니다" }, 500); }
       await logView(env, who, "file_open:" + id, f.channel_id || "", { l_num: f.l_num, l_code: f.case_no }, fetcher);
       return json({ url: env.sbUrl + "/storage/v1" + j.signedURL, name: f.file_name || "" });
+    }
+
+    if (body?.action === "set_file") {
+      const lNum = String(body.lNum ?? ""), lp = Number(body.lp), id = Number(body.id);
+      if (!lNum || !Number.isFinite(lp) || !Number.isFinite(id) || id <= 0) return json({ error: "고를 파일이 없습니다" }, 400);
+      const mine = await caseFiles(env, lNum, fetcher);
+      if (!mine.some((f: any) => f.id === id)) return json({ error: "이 사건 파일이 아닙니다" }, 404);
+      const ev = await rest(env, `lw_process_events?select=lp_num&l_num=eq.${enc(lNum)}&lp_num=eq.${lp}&limit=1`, {}, fetcher);
+      if (!ev?.length) return json({ error: "제출 기록이 없습니다" }, 404);
+      const others = mine.filter((f: any) => f.lp === lp && f.id !== id).map((f: any) => f.id);
+      if (others.length) await rest(env, `case_file?id=in.(${others.join(",")})`, { method: "PATCH", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ lp_num: null, pick_by: null, pick_at: null }) }, fetcher);
+      await rest(env, `case_file?id=eq.${id}`, { method: "PATCH", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ lp_num: lp, pick_by: who.name || who.userId, pick_at: new Date().toISOString() }) }, fetcher);
+      await logView(env, who, "set_file:" + id, "", { l_num: lNum, l_code: null }, fetcher);
+      return json({ ok: true });
     }
 
     if (body?.action === "locate") {
