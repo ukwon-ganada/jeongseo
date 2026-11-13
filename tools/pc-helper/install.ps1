@@ -3,6 +3,10 @@ $ErrorActionPreference = 'Stop'
 $src = Split-Path -Parent $MyInvocation.MyCommand.Path
 $dir = Join-Path $env:APPDATA 'JeongseoHelper'
 New-Item -ItemType Directory -Force -Path $dir | Out-Null
+# 이미 돌고 있는 옛 도우미가 있으면 끄고 새로 깐다
+Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" |
+  Where-Object { $_.CommandLine -like '*jeongseo-helper.ps1*' } |
+  ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
 Copy-Item (Join-Path $src 'jeongseo-helper.ps1') $dir -Force
 
 Write-Host ''

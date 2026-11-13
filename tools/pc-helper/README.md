@@ -10,6 +10,21 @@
   → 그 사람 PC 도우미가 pc-helper-wait 로 기다리다 받아서 브라우저로 엶
 ```
 
+## v2: 메뉴 [사건 보기](uri) 하나로 PC에서도 그 방 사건 (방 제목 읽기)
+PC 웍스는 메뉴로 연 화면에 방을 알려 주지 않는다. 그래서:
+```
+PC 사건방 메뉴 [사건 보기] → 브라우저에 사건 화면(방 모름)
+  → case-view 'locate' 가 pc_locate 에 요청 한 줄
+  → 그 직원 PC 도우미(v2)가 pc-helper-wait?v=2 로 받아 웍스 메인 창 위쪽을 찍고 윈도우 글자 인식(Windows.Media.Ocr, 한국어)
+  → 방 제목 띠(창 왼쪽 20% 이후·위 12% 안)의 줄만 POST → 서버가 works_room_case.room_title 과 맞춤
+     (사건번호 일치 → 아니면 제목 닮은 정도, 애매하면 고르지 않음: pc-helper-wait/match.ts)
+  → 화면이 그 방 사건을 띄움 (못 찾으면 사건 고르기)
+```
+- 필요: SQL `supabase/migrations/20261113b_pc_locate.sql`, 함수 `case-view`·`pc-helper-wait` 새 버전, 도우미 v2.
+- 도우미 업데이트(토큰 그대로): 명령 프롬프트에서
+  `cd /d %TEMP%\jshelper & for %f in (jeongseo-helper.ps1 update.ps1 update.cmd) do curl -sSLO https://raw.githubusercontent.com/ukwon-ganada/jeongseo/main/tools/pc-helper/%f & update.cmd`
+- 웍스 창 위치 시험: `ocr_test.ps1` (읽은 줄과 위치만 화면에 보여 줌, 아무 데도 안 보냄)
+
 ## 준비 (관리자, 한 번)
 1. SQL Editor에서 `supabase/migrations/20261112_pc_helper.sql` 실행
 2. 함수 배포: `works-bot-callback`, `pc-helper-wait` (둘 다 `--no-verify-jwt`), 시크릿 `WORKS_BOT_SECRET`
