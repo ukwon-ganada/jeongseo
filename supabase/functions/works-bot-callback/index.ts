@@ -6,5 +6,6 @@ Deno.serve((req) =>
       sbUrl: Deno.env.get("SUPABASE_URL")!,
       sbKey: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
       botSecret: Deno.env.get("WORKS_BOT_SECRET") || "",
+      botSecrets: [Deno.env.get("WORKS_BOT_SECRET_PROD") || ""],
     })
   );

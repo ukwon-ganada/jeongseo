@@ -12,6 +12,7 @@
 //    { "action": "case", "case": "<사건번호>" }       → 사건번호로 찾은 사건
 //    { "action": "mycases" }                        → 내가 담당인 진행 사건 (고르기 화면용)
 //    { "action": "save_info", "lNum": 123, "fields": {...} } → 사건 정보 저장(case_info, 수정 기록 case_info_log)
+//    { "action": "helper_token" }                   → 이 직원의 PC 도우미 연결 코드 발급(한 번만 보여 줌, 서버엔 해시만)
 //  사건 정보 칸은 우리가 직접 입력·수정한다. 로웨어와 연동하지 않는다(자동으로 덮어쓰지 않음).
 //    저장된 값이 없을 때만 처음 값으로 로웨어 값을 한 번 보여 준다(PREFILL_FROM_LAWWARE).
 //  보류 방은 사건을 붙이지 않는다(잘못 붙이느니 안 붙인다) → { hold: true }
@@ -224,6 +225,14 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
         .map((m: any) => ({ c: m.l_code, d: m.next_date.slice(0, 10), tm: nz(m.next_time), t: nz(m.next_contents) || "기일", p: nz(m.court) }));
       await logView(env, who, "case", room, c, fetcher);
       return json(shapeCase(c, evs || [], { today, linked, myHearings, status, saved }));
+    }
+
+    if (body?.action === "helper_token") {
+      if (!who.userId) return json({ error: "직원 확인이 안 됐습니다" }, 401);
+      const label = (who.name || "직원") + " PC " + today;
+      const token = await rest(env, "rpc/pc_helper_issue", { method: "POST", body: JSON.stringify({ p_user: who.userId, p_label: label }) }, fetcher);
+      await logView(env, who, "helper_token", "", null, fetcher);
+      return json({ token, label });
     }
 
     if (body?.action === "save_info") {
