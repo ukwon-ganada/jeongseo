@@ -70,8 +70,10 @@ $sw.Stop()
 Write-Host ('창 크기: ' + $full.Width + 'x' + $full.Height + ', 걸린 시간: ' + $sw.ElapsedMilliseconds + 'ms')
 Write-Host '--- 읽은 줄 ---'
 foreach ($l in $res.Lines) {
-  $w = $l.Words[0].BoundingRect
-  # 위치: 창 왼쪽에서 몇 %, 위에서 몇 % (방 목록인지 대화방 머리글인지 구분용)
-  $x = [int](100 * $w.X / $crop.Width); $y = [int](100 * $w.Y / $crop.Height * 0.18)
+  $first = $null; foreach ($wd in $l.Words) { $first = $wd; break }
+  $r = $first.BoundingRect
+  # 위치: 창 왼쪽에서 몇 %, 창 위에서 몇 % (방 목록인지 대화방 머리글인지 구분용)
+  $x = [int](100.0 * [double]$r.X / [double]$crop.Width)
+  $y = [int](18.0 * [double]$r.Y / [double]$crop.Height)
   Write-Host ('[' + $x + '%,' + $y + '%] ' + $l.Text)
 }
