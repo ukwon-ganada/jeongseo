@@ -233,7 +233,10 @@ var VIEWS = {
   progress: function(){
     var h=chips('p', [['all','전체'],['기일','기일'],['송달','송달'],['제출','제출']]);
     var rows=data.progress.rows.filter(function(x){ return sub.p==='all' || x.k===sub.p; }).slice().reverse();
-    h+='<div class="meta">로웨어 갱신 '+esc(data.progress.updated)+'</div>';
+    var pg=data.progress, ln=[];
+    ln.push('로웨어 확인 '+esc(pg.checked||pg.updated)+(pg.checked?' (매일 아침 8시~밤 9시, 15분마다)':''));
+    if(pg.changed) ln.push('이 사건 마지막 변경 '+esc(pg.changed));
+    h+='<div class="meta">'+ln.join(' · ')+'</div>';
     if(!rows.length) return h+emptySt('최근 한 달 진행내용이 없습니다');
     return h+'<div class="card">'+rows.map(function(x){
       var cls=(x.o||x.u)?' hl':x.x?' dim':'';

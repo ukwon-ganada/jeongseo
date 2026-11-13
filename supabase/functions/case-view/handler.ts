@@ -154,15 +154,24 @@ export function shapeCase(c: any, evs: any[], opts: { today: string; linked: str
     o: ours(e) ? 1 : 0, u: toUs(e) ? 1 : 0, x: e.lp_set === "송달" && !toUs(e) ? 1 : 0, p: e.lp_appoint_date.slice(0, 10) > today ? 1 : 0,
   }));
   const seen = evs.map((e) => nz(e.last_seen_at)).filter(Boolean).sort().pop();
-  const updated = seen ? new Date(Date.parse(seen) + 9 * 3600e3).toISOString().replace(/^\d{4}-(\d\d)-(\d\d)T(\d\d:\d\d).*/, "$1.$2 $3") : "기록 없음";
+  const updated = seen ? kstMdHm(seen) : "기록 없음";
+  // 이 사건 진행내역이 로웨어에서 마지막으로 추가·수정된 날 (lp_append_udate)
+  const ud = evs.map((e) => nz(e.lp_append_udate).slice(0, 10)).filter(isDate).sort().pop();
+  const changed = ud ? ud.slice(0, 4) + "." + ud.slice(5, 7) + "." + ud.slice(8, 10) : "";
 
   const info = { ...infoFields(c, opts.saved ?? null), linked: opts.linked };
 
   return {
     caseNo: c.l_code, lNum: c.l_num, title, court: court || "법원 정보 없음", today, closed: opts.status === "종결",
     events, deadlines: [], deadlineNote: "기한 계산은 새 규칙서 엔진이 완성되면 이곳에 표시됩니다. 지금은 기일·진행내용 탭을 봐 주세요.",
-    hearings, progress: { updated, rows }, info,
+    hearings, progress: { updated, checked: "", changed, rows }, info,
   };
+}
+const kstMdHm = (iso: string) => new Date(Date.parse(iso) + 9 * 3600e3).toISOString().replace(/^\d{4}-(\d\d)-(\d\d)T(\d\d:\d\d).*/, "$1.$2 $3");
+// 로웨어를 마지막으로 성공해서 읽어 온 시각 (lawware-feed, 15분마다)
+async function lastFeedRun(env: Env, fetcher: typeof fetch): Promise<string> {
+  const r = await rest(env, `lw_feed_runs?select=finished_at&error=is.null&finished_at=not.is.null&order=id.desc&limit=1`, {}, fetcher).catch(() => []);
+  return r?.[0]?.finished_at ? kstMdHm(r[0].finished_at) : "";
 }
 function md(d: string) { return Number(d.slice(5, 7)) + "." + d.slice(8, 10); }
 
@@ -334,18 +343,20 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
 
       const roomRows = await rest(env, `works_room_case?select=channel_id&l_num=eq.${c.l_num}`, {}, fetcher).catch(() => []) || [];
       const chans = [...new Set([room, ...roomRows.map((r: any) => nz(r.channel_id))].filter(Boolean))] as string[];
-      const [evs, mine, saved, files, chat] = await Promise.all([
-        rest(env, `lw_process_events?select=lp_num,lp_set,lp_appoint_date,lp_appoint_time,lp_contents,lp_remark,delivered_date,court,last_seen_at&l_num=eq.${c.l_num}&order=lp_appoint_date.asc&limit=2000`, {}, fetcher),
+      const [evs, mine, saved, files, chat, checked] = await Promise.all([
+        rest(env, `lw_process_events?select=lp_num,lp_set,lp_appoint_date,lp_appoint_time,lp_contents,lp_remark,delivered_date,court,last_seen_at,lp_append_udate&l_num=eq.${c.l_num}&order=lp_appoint_date.asc&limit=2000`, {}, fetcher),
         myCases(env, who.name || "", fetcher),
         rest(env, `case_info?select=*&l_num=eq.${c.l_num}`, {}, fetcher).then((r: any[]) => r?.[0] ?? null).catch(() => null),
         caseFiles(env, String(c.l_num), fetcher).catch((e) => { console.log("files fail", String(e).slice(0, 120)); return []; }),
         roomEvents(env, String(c.l_num), chans, fetcher).catch(() => []),
+        lastFeedRun(env, fetcher),
       ]);
       const end = new Date(Date.parse(today) + 28 * 864e5).toISOString().slice(0, 10);
       const myHearings = mine.filter((m: any) => isDate(m.next_date) && m.next_date.slice(0, 10) >= today && m.next_date.slice(0, 10) <= end)
         .map((m: any) => ({ c: m.l_code, d: m.next_date.slice(0, 10), tm: nz(m.next_time), t: nz(m.next_contents) || "기일", p: nz(m.court) }));
       await logView(env, who, "case", room, c, fetcher);
       const shaped = shapeCase(c, evs || [], { today, linked, myHearings, status, saved });
+      shaped.progress.checked = checked;
       attachFinalFiles(shaped.events, files);
       mergeRoomEvents(shaped, chat, c.l_code);
       // 직원이 줄마다 파일을 바꿀 때 고를 목록 (화면에 따로 나열하지 않음)
