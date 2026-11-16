@@ -78,18 +78,20 @@ export async function extractEvents(env: ChatEnv, text: string, sentAt: string, 
   if (!env.anthropicKey) throw new Error("ANTHROPIC_API_KEY 없음");
   const d = new Date(Date.parse(sentAt) + 9 * 3600e3);
   const user = `보낸 시각(한국): ${KST(sentAt)} (${WEEK[d.getUTCDay()]}요일)\n방 제목: ${roomTitle || "(모름)"}\n\n대화:\n${text}`;
+  const model = env.model || "claude-opus-5-5";
+  const haiku = model.includes("haiku");
   const res = await fetcher("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "x-api-key": env.anthropicKey, "anthropic-version": "2023-06-01", "content-type": "application/json",
-      "anthropic-beta": "server-side-fallback-2026-07-01",
+      ...(haiku ? {} : { "anthropic-beta": "server-side-fallback-2026-07-01" }),
     },
     body: JSON.stringify({
-      model: env.model || "claude-opus-5-5",
+      model,
       max_tokens: 4000,
       system: SYSTEM,
       output_config: { effort: "low", format: { type: "json_schema", schema: SCHEMA } },
-      fallbacks: "default",
+      ...(haiku ? {} : { fallbacks: "default" }),
       messages: [{ role: "user", content: user }],
     }),
   });
@@ -109,11 +111,12 @@ async function rest(env: ChatEnv, path: string, init: RequestInit = {}, fetcher:
 }
 
 // 방에 올라온 글 하나 처리: 낌새 확인 → AI → room_event 저장. 원문은 어디에도 남기지 않는다.
-export async function handleRoomText(env: ChatEnv, a: { channelId: string; text: string; sentAt?: string }, fetcher: typeof fetch = fetch): Promise<{ saved: number; how: string }> {
+export async function handleRoomText(env: ChatEnv, a: { channelId: string; text: string; sentAt?: string; invOnly?: boolean }, fetcher: typeof fetch = fetch): Promise<{ saved: number; how: string }> {
   if (!looksLikeEvent(a.text)) return { saved: 0, how: "no-cue" };
   const sentAt = a.sentAt && !isNaN(Date.parse(a.sentAt)) ? new Date(a.sentAt).toISOString() : new Date().toISOString();
   const m = await rest(env, `works_room_case?select=l_num,room_title,status&channel_id=eq.${encodeURIComponent(a.channelId)}&order=is_primary.desc&limit=1`, {}, fetcher);
   const room = m.ok ? (await m.json())[0] : (await m.body?.cancel(), null);
+  if (a.invOnly && !(Number(room?.l_num) < 0)) return { saved: 0, how: "not-inv" };
   const evs = await extractEvents(env, a.text.slice(0, 4000), sentAt, room?.room_title || "", fetcher);
   if (!evs.length) return { saved: 0, how: "none" };
   const rows = evs.map((e) => ({
