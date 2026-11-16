@@ -173,6 +173,7 @@ main{max-width:880px;margin:0 auto;padding:12px 16px 32px}
 .xp-add{display:block;width:calc(100% - 32px);margin:4px 16px 12px;border:1px dashed var(--line);border-radius:8px;background:none;padding:9px;font-size:14px;color:var(--accent-ink);font-weight:600}
 .fr.memo{align-items:start}
 .link-btn{border:0;background:none;color:var(--accent-ink);font-size:14px;font-weight:600;padding:4px 0}
+.link-btn.warn{color:var(--danger);margin-left:14px}
 .savebar{position:sticky;bottom:0;display:flex;gap:8px;padding:12px 0 calc(12px + env(safe-area-inset-bottom));background:linear-gradient(to top,var(--bg) 70%,transparent)}
 .savebar button{flex:1;border:0;border-radius:10px;padding:13px;font-size:16px;font-weight:700}
 .savebar .ok{background:var(--accent);color:#fff}
@@ -613,7 +614,7 @@ function tlEditView(){
       +'<button class="link-btn" data-tlx="'+i+'">'+(r.hid?'되살리기':'삭제')+'</button></div>';
   }).join('');
   return '<div class="card tled">'+(rows||'<div class="tle-h"><div class="s">고칠 줄이 없습니다</div></div>')
-    +'<div class="tle-a"><button class="link-btn" id="tladd">+ 줄 추가</button><span class="sp"></span><button class="link-btn" id="tlcancel">취소</button><button class="open" id="tlsave">저장</button></div></div>';
+    +'<div class="tle-a"><button class="link-btn" id="tladd">+ 줄 추가</button><button class="link-btn warn" id="tlreset">대화 기록 모두 지우기</button><span class="sp"></span><button class="link-btn" id="tlcancel">취소</button><button class="open" id="tlsave">저장</button></div></div>';
 }
 function tlSave(btn){
   tlRead();
@@ -634,6 +635,15 @@ function tlSave(btn){
     return loadCase(ctx.key).then(function(d){ data=d; render(); toast(j.failed?('저장 '+j.saved+'줄, 실패 '+j.failed+'줄'):'저장했습니다'); });
   }).catch(function(e){ btn.disabled=false; btn.textContent='저장'; toast('저장 실패: '+((e&&e.message)||e)); });
 }
+function tlReset(btn){
+  if(btn.disabled) return;
+  if(!btn.dataset.armed){ btn.dataset.armed='1'; btn.textContent='정말 지우기'; return; }
+  btn.disabled=true; btn.textContent='지우는 중…';
+  api({action:'chat_reset', lNum:data.lNum}).then(function(j){
+    tl.on=false;
+    return loadCase(ctx.key).then(function(d){ data=d; render(); toast(j.removed+'줄 지웠습니다'); });
+  }).catch(function(e){ btn.disabled=false; delete btn.dataset.armed; btn.textContent='대화 기록 모두 지우기'; toast('지우지 못했습니다: '+((e&&e.message)||e)); });
+}
 function tlRefresh(btn){
   if(btn.disabled) return;
   btn.disabled=true; btn.textContent='갱신 중…';
@@ -647,6 +657,7 @@ document.addEventListener('click', function(e){
   if(b.id==='tlref') tlRefresh(b);
   if(b.id==='tlcancel'){ tl.on=false; render(); }
   if(b.id==='tlsave') tlSave(b);
+  if(b.id==='tlreset') tlReset(b);
   if(b.id==='tladd'){ tlRead(); tl.rows.push({id:null, d:data.today||'', tm:'', t:'', hid:false, o:''}); render(); var ins=document.querySelectorAll('#main .tle-t'); if(ins.length) ins[ins.length-1].focus(); }
   if(b.dataset.tlx!==undefined){ tlRead(); var r=tl.rows[Number(b.dataset.tlx)]; if(r){ if(!r.id) tl.rows.splice(Number(b.dataset.tlx),1); else r.hid=!r.hid; } render(); }
 });
