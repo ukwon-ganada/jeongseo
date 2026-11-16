@@ -544,7 +544,7 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
 
     if (body?.action === "save_info") {
       const lNum = Number(body.lNum);
-      if (!Number.isFinite(lNum) || lNum <= 0) return json({ error: "사건이 없습니다" }, 400);
+      if (!Number.isFinite(lNum) || lNum === 0) return json({ error: "사건이 없습니다" }, 400); // 수사 사건은 음수 번호
       const c = (await rest(env, `case_all?select=l_num,l_code&l_num=eq.${lNum}`, {}, fetcher))[0];
       if (!c) return json({ error: "사건이 없습니다" }, 404);
       const prev = (await rest(env, `case_info?select=*&l_num=eq.${lNum}`, {}, fetcher))[0] || {};
