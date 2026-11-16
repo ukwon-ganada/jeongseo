@@ -122,3 +122,13 @@ Deno.test("수사 사건 선임일: 방 첫날·가장 이른 업무 날로 당�
   _fa(law, false);
   assertEquals(law.events.map((e: any) => e.d), ["2026-10-07"]);
 });
+
+Deno.test("같은 방 이전 사건 선임일이 더 이르면 그날로", async () => {
+  const { earliestAccept } = await import("./handler.ts");
+  const shaped: any = { events: [{ d: "2026-10-01", k: "ours", g: "accept", t: "사건 선임" }, { d: "2026-10-05", k: "ours", g: "ours", t: "x" }] };
+  earliestAccept(shaped, [{ raw: { l_accept_date: "2026-06-03 00:00:00" } }, { raw: {} }]);
+  assertEquals(shaped.events[0].d, "2026-06-03");
+  const s2: any = { events: [] };
+  earliestAccept(s2, [{ raw: { l_accept_date: "2026-06-03" } }]);
+  assertEquals(s2.events[0].t, "사건 선임");
+});

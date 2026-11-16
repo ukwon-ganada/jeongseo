@@ -1,6 +1,6 @@
 // 실행: deno test supabase/functions/works-bot-callback/inv_case_test.ts
 import { assertEquals } from "jsr:@std/assert@1";
-import { courtNosInTitle, parseInvTitle, recheckInv } from "./inv_case.ts";
+import { courtNosInTitle, parseInvTitle, recheckInv, recheckLinkedRoom, trialRank } from "./inv_case.ts";
 import { linkRoom } from "./room_link.ts";
 
 Deno.test("방 제목 읽기: 수사단계 방", () => {
@@ -78,4 +78,17 @@ Deno.test("민사 방·빈 제목은 수사 사건을 만들지 않는다", asyn
   const r = await linkRoom(ENV, "b", "ch2", fake(db, () => "(민)을지문덕-대여금"));
   assertEquals(r.how, "no-case-no");
   assertEquals(db.inv.length, 0);
+});
+
+Deno.test("로웨어 형제 사건에 연결된 방: 제목에 재판번호가 생기면 그 재판 사건을 주 사건으로", async () => {
+  assertEquals([trialRank("2026고단1"), trialRank("2026노2"), trialRank("2026도3"), trialRank("2026형제4"), trialRank("2026-5")], [1, 2, 3, 0, 0]);
+  const db = { rooms: [] as any[], cases: [{ l_num: 3072, l_code: "2025형제60934", state: "진행" }, { l_num: 3200, l_code: "2026고단777", state: "진행" }], inv: [] as any[], merged: [] as any[] };
+  const rows = [{ channel_id: "ch3", l_num: 3072, is_primary: true, room_title: "(형/피의)김갑동_사기_부천지청 2025형제60934" }];
+  let title = rows[0].room_title;
+  const f = fake(db, () => title);
+  assertEquals((await recheckLinkedRoom(ENV, ["b"], "ch3", rows, f)).how, "same");
+  title = "(형/피고)김갑동_사기_부천지원 2026고단777";
+  const r: any = await recheckLinkedRoom(ENV, ["b"], "ch3", rows, f);
+  assertEquals([r.how, r.to, r.from, r.added], ["moved", 3200, 3072, 1]);
+  assertEquals(db.rooms.map((x) => [x.l_num, x.basis]), [[3200, "제목에 새 재판번호"]]);
 });
