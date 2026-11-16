@@ -62,3 +62,11 @@ Deno.test("계산값이 있으면 같은 종류의 '대화 마감' 줄은 뺀다
   assertEquals(shaped.deadlines.map((x: any) => [x.t, x.d]), [["항고 마감", "2026-12-07"]]);
   assertEquals(shaped.events.map((e: any) => e.d), ["2026-12-07"]);
 });
+
+Deno.test("괄호 속 메모의 '재정신청'은 처분 종류로 보지 않는다 (이강효 2026고불항5875)", () => {
+  const l = computeInvDeadlines([
+    { kind: "지시", ev_date: "2026-11-12", summary: "재정신청 진행 지시 (서변호사)", source: "chat-export" },
+    { kind: "처분", ev_date: "2026-11-12", summary: "항고 기각 확인 (재정신청 마감 11/23)", source: "chat-export" },
+  ], "(형/고소)이강효", "2026-11-16");
+  assertEquals(l.map((x) => [x.t, x.d]), [["재정신청 마감", "2026-11-23"], ["재항고 마감 (재정신청 못 하는 경우)", "2026-12-14"]]);
+});
