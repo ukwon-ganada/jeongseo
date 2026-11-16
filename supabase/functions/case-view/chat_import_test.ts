@@ -1,5 +1,5 @@
 import { assertEquals } from "jsr:@std/assert@1";
-import { chunkExport, extractFromExport, tidyExport, toRows } from "./chat_import.ts";
+import { chunkExport, extractFromExport, tidyExport, toRows, dropKnown, msgsToExport } from "./chat_import.ts";
 
 const SAMPLE = `2026년 10월 7일 수요일
 13:20 원가을
@@ -56,4 +56,20 @@ Deno.test("extractFromExport: AI 응답을 정리해 날짜순으로", async () 
   assertEquals(r.events.map((e) => e.date), ["2026-10-07", "2026-10-08"]);
   assertEquals(r.events[1].summary.includes("010"), false);
   assertEquals(sent.includes("010-1234-5678"), false);
+});
+
+Deno.test("갱신: 보관 글을 내보내기 모양으로, 이미 있는 줄은 빼기", () => {
+  const t = msgsToExport([
+    { sent_at: "2026-11-15T23:30:00Z", text: "선임계 우편\n제출했습니다", works_user_id: "u1" },
+    { sent_at: "2026-11-16T01:00:00Z", text: "조사 11/20 14시", works_user_id: "u2" },
+  ], { u1: "김직원" });
+  assertEquals(t, "2026년 11월 16일 월요일\n김직원 08:30 선임계 우편 제출했습니다\n직원 10:00 조사 11/20 14시");
+  const evs = [
+    { kind: "서면제출", date: "2026-11-16", time: "", msg_time: "08:30", summary: "선임계 우편 제출", state: "완료" as const },
+    { kind: "조사", date: "2026-11-20", time: "14:00", msg_time: "10:00", summary: "피의자 조사", state: "예정" as const },
+    { kind: "지시", date: "2026-11-16", time: "", msg_time: "", summary: "의견서 제출 지시 (서변호사)", state: "완료" as const },
+  ];
+  const left = dropKnown(evs, [{ ev_date: "2026-11-20", kind: "조사" }, { ev_date: "2026-11-16", kind: "지시", summary: "다른 지시" }]);
+  assertEquals(left.map((e) => e.kind), ["서면제출", "지시"]);
+  assertEquals(toRows(-5, left, "refresh:", "chat-refresh")[0].channel_id, "refresh:-5");
 });

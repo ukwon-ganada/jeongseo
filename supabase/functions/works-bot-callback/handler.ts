@@ -166,13 +166,13 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
     }
   }
 
-  // 사건방 글 → AI가 일정만 뽑아 room_event 에 (원문은 저장·로그 안 함). 시험 봇(chatBots)은 모든 방, 운영 봇(invChatBots)은 수사 사건 방(자체 사건)만 Sonnet으로
+  // 사건방 글 → AI가 일정만 뽑아 room_event 에 (수사 사건방 글은 room_msg 에 30일 보관). 시험 봇(chatBots)은 모든 방, 운영 봇(invChatBots)은 수사 사건 방(자체 사건)만 Sonnet으로
   if (ev?.type === "message" && content?.type === "text" && content?.text && channelId) {
     const botId = req.headers.get("x-works-botid") || String(ev?.botId || "");
     const invOnly = (env.invChatBots || ["12905890"]).includes(botId);
     if (invOnly || (env.chatBots || ["13580302"]).includes(botId)) {
       background(handleRoomText({ sbUrl: env.sbUrl, sbKey: env.sbKey, anthropicKey: env.anthropicKey, model: invOnly ? (env.invChatModel || "claude-sonnet-5-5") : env.chatModel },
-        { channelId, text: String(content.text), sentAt: ev?.issuedTime || ev?.createdTime, invOnly }, fetcher)
+        { channelId, text: String(content.text), sentAt: ev?.issuedTime || ev?.createdTime, invOnly, userId }, fetcher)
         .then((r) => console.log("chat", r.how, r.saved))
         .catch((e) => console.error("chat fail", String(e?.message || e).slice(0, 200))));
     }
