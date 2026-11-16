@@ -30,7 +30,7 @@
 import { saveRoomFile } from "./room_file.ts";
 import { linkPicked, linkRoom, linkRoomAnyBot } from "./room_link.ts";
 import { handleRoomText } from "./room_chat.ts";
-import { backfillHold, recheckAll, recheckRoom } from "./inv_case.ts";
+import { backfillHold, recheckAll, recheckLinked, recheckRoom } from "./inv_case.ts";
 
 // 우리 봇: 운영 봇(사건관리 도우미), 시험봇(정서 시험봇)
 export const BOT_IDS = ["12905890", "13580302"];
@@ -104,9 +104,13 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
     try { b = await req.json(); } catch { /* */ }
     try {
       if (b?.action === "inv-backfill") return Response.json(await backfillHold(env, BOT_IDS, b?.dryRun !== false, fetcher));
+      if (b?.action === "linked-recheck") return Response.json(await recheckLinked(env, BOT_IDS, fetcher, typeof b?.part === "number" ? b.part : undefined));
       const r = await recheckAll(env, BOT_IDS, fetcher);
       console.log("inv-recheck", r.checked, r.merged, r.waiting);
-      return Response.json(r);
+      // 로웨어 사건에 연결된 방도 1/4씩 제목 다시 읽기 (새 재판번호 → 주 사건으로)
+      const l = await recheckLinked(env, BOT_IDS, fetcher).catch((e) => ({ error: String((e as Error)?.message || e).slice(0, 120) }));
+      console.log("linked-recheck", JSON.stringify(l).slice(0, 300));
+      return Response.json({ ...r, linked: l });
     } catch (e) {
       return Response.json({ error: String((e as Error)?.message || e).slice(0, 200) }, { status: 500 });
     }

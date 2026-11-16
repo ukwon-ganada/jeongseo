@@ -257,12 +257,29 @@ export async function caseFiles(env: Env, lNum: string, fetcher: typeof fetch = 
 }
 
 // 사건방 대화에서 AI가 뽑은 일정(room_event): 수사 단계처럼 로웨어에 없는 일정
-export async function roomEvents(env: Env, lNum: string | null, channels: string[], fetcher: typeof fetch = fetch) {
+export async function roomEvents(env: Env, lNum: string | null, channels: string[], fetcher: typeof fetch = fetch, more: number[] = []) {
   const ors: string[] = [];
-  if (lNum) ors.push(`l_num.eq.${enc(lNum)}`);
+  const nums = [...new Set([...(lNum ? [Number(lNum)] : []), ...more].filter((n) => Number.isFinite(n) && n !== 0))];
+  if (nums.length) ors.push(`l_num.in.(${nums.join(",")})`);
   if (channels.length) ors.push(`channel_id.in.${enc(inList(channels))}`);
   if (!ors.length) return [];
   return await rest(env, `room_event?select=id,kind,ev_date,ev_time,summary,state&hidden=eq.false&or=(${ors.join(",")})&order=ev_date.asc&limit=500`, {}, fetcher) || [];
+}
+// 같은 방에 함께 연결된 다른 사건(예: 형제번호 사건 → 재판 사건, 1심 → 항소심). 석원 2026-11-16:
+// 재판번호가 붙으면 그 사건이 주 사건이 되고, 이전 사건 기록(타임라인·접견·사건정보)은 이어서 보여 준다.
+export async function relatedNums(env: Env, lNum: number, channels: string[], fetcher: typeof fetch = fetch): Promise<number[]> {
+  if (!channels.length) return [];
+  const rows = await rest(env, `works_room_case?select=l_num&channel_id=in.${enc(inList(channels))}&l_num=not.is.null`, {}, fetcher).catch(() => []) || [];
+  return [...new Set(rows.map((r: any) => Number(r.l_num)).filter((n: number) => Number.isFinite(n) && n !== 0 && n !== lNum))] as number[];
+}
+// 이 사건에 아직 직접 저장한 사건정보가 없으면, 같은 방 이전 사건에 적어 둔 사건정보를 이어 받는다("지금 단계"는 새로 정함)
+export async function inheritedInfo(env: Env, rel: number[], fetcher: typeof fetch = fetch): Promise<any | null> {
+  if (!rel.length) return null;
+  const r = await rest(env, `case_info?select=*&l_num=in.(${rel.join(",")})&order=updated_at.desc&limit=1`, {}, fetcher).catch(() => []);
+  const x = r?.[0];
+  if (!x) return null;
+  const { cur_stage: _c, ...rest2 } = x;
+  return rest2;
 }
 const MEET = new Set(["조사", "출석요구", "기일"]);
 // 수사 단계 줄도 재판 단계와 같은 색: 우리 제출(선임계·서면) 초록, 조사·출석·기일 파랑, 송치·기소·처분 파랑 굵게, 접견 청록, 나머지는 흐린 대화 줄
@@ -304,6 +321,15 @@ export function fixAccept(shaped: any, isInv: boolean) {
   const keep = base || chatAcc[0];
   keep.d = first; keep.k = "ours"; keep.t = "사건 선임"; keep.g = "accept";
   shaped.events = ev.filter((e) => e === keep || !(e.g === "accept"));
+  shaped.events.sort((a: any, b: any) => a.d.localeCompare(b.d));
+}
+// 같은 방 이전 사건의 선임일이 더 이르면 그날을 "사건 선임"으로
+export function earliestAccept(shaped: any, relCases: any[]) {
+  const ds = relCases.map((x) => nz(x?.raw?.l_accept_date).slice(0, 10)).filter(isDate).sort();
+  if (!ds.length) return;
+  const acc = shaped.events.find((e: any) => e.g === "accept");
+  if (acc) { if (ds[0] < acc.d) acc.d = ds[0]; }
+  else shaped.events.push({ d: ds[0], k: "ours", g: "accept", t: "사건 선임", f: null });
   shaped.events.sort((a: any, b: any) => a.d.localeCompare(b.d));
 }
 export function mergeMeets(shaped: any, rows: any[]) {
@@ -445,16 +471,20 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
 
       const roomRows = await rest(env, `works_room_case?select=channel_id&l_num=eq.${c.l_num}`, {}, fetcher).catch(() => []) || [];
       const chans = [...new Set([room, ...roomRows.map((r: any) => nz(r.channel_id))].filter(Boolean))] as string[];
-      const [evs, mine, saved, files, chat, checked, meets, stageLogs] = await Promise.all([
+      const rel = await relatedNums(env, Number(c.l_num), chans, fetcher);
+      const allNums = [Number(c.l_num), ...rel].join(",");
+      const [evs, mine, savedOwn, files, chat, checked, meets, stageLogs, relCases] = await Promise.all([
         rest(env, `lw_process_events?select=lp_num,lp_set,lp_appoint_date,lp_appoint_time,lp_contents,lp_remark,delivered_date,court,last_seen_at,lp_append_udate&l_num=eq.${c.l_num}&order=lp_appoint_date.asc&limit=2000`, {}, fetcher),
         myCases(env, who.name || "", fetcher),
         rest(env, `case_info?select=*&l_num=eq.${c.l_num}`, {}, fetcher).then((r: any[]) => r?.[0] ?? null).catch(() => null),
         caseFiles(env, String(c.l_num), fetcher).catch((e) => { console.log("files fail", String(e).slice(0, 120)); return []; }),
-        roomEvents(env, String(c.l_num), chans, fetcher).catch(() => []),
+        roomEvents(env, String(c.l_num), chans, fetcher, rel).catch(() => []),
         lastFeedRun(env, fetcher),
-        rest(env, `meet_event?select=event_id,ev_date,ev_time,lawyer,place&l_num=eq.${c.l_num}&order=ev_date.asc&limit=300`, {}, fetcher).catch(() => []),
-        rest(env, `case_info_log?select=field,old_value,new_value,editor,edited_at&l_num=eq.${c.l_num}&field=like.stage.*&order=edited_at.desc&limit=300`, {}, fetcher).catch(() => []),
+        rest(env, `meet_event?select=event_id,ev_date,ev_time,lawyer,place&l_num=in.(${allNums})&order=ev_date.asc&limit=300`, {}, fetcher).catch(() => []),
+        rest(env, `case_info_log?select=field,old_value,new_value,editor,edited_at&l_num=in.(${allNums})&field=like.stage.*&order=edited_at.desc&limit=300`, {}, fetcher).catch(() => []),
+        rel.length ? rest(env, `case_all?select=l_num,raw&l_num=in.(${rel.join(",")})`, {}, fetcher).catch(() => []) : Promise.resolve([]),
       ]);
+      const saved = savedOwn ?? await inheritedInfo(env, rel, fetcher);
       const end = new Date(Date.parse(today) + 28 * 864e5).toISOString().slice(0, 10);
       const myHearings = mine.filter((m: any) => isDate(m.next_date) && m.next_date.slice(0, 10) >= today && m.next_date.slice(0, 10) <= end)
         .map((m: any) => ({ c: m.l_code, d: m.next_date.slice(0, 10), tm: nz(m.next_time), t: nz(m.next_contents) || "기일", p: nz(m.court) }));
@@ -465,6 +495,7 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       attachContract(shaped.events, files);
       mergeRoomEvents(shaped, chat, c.l_code);
       fixAccept(shaped, !!c.is_inv);
+      earliestAccept(shaped, relCases || []);
       mergeMeets(shaped, meets || []);
       // 직원이 줄마다 파일을 바꿀 때 고를 목록 (화면에 따로 나열하지 않음)
       const fileChoices = files.map((f: any) => ({ id: f.id, n: f.n, d: f.d, tm: f.tm, by: f.by }));
@@ -585,7 +616,12 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       if (!Number.isFinite(lNum) || lNum === 0) return json({ error: "사건이 없습니다" }, 400); // 수사 사건은 음수 번호
       const c = (await rest(env, `case_all?select=*&l_num=eq.${lNum}`, {}, fetcher))[0];
       if (!c) return json({ error: "사건이 없습니다" }, 404);
-      const prevRow = (await rest(env, `case_info?select=*&l_num=eq.${lNum}`, {}, fetcher))[0] || null;
+      let prevRow = (await rest(env, `case_info?select=*&l_num=eq.${lNum}`, {}, fetcher))[0] || null;
+      if (!prevRow) {
+        const rr = await rest(env, `works_room_case?select=channel_id&l_num=eq.${lNum}`, {}, fetcher).catch(() => []) || [];
+        const ch = [...new Set(rr.map((r: any) => nz(r.channel_id)).filter(Boolean))] as string[];
+        prevRow = await inheritedInfo(env, await relatedNums(env, lNum, ch, fetcher), fetcher);
+      }
       const prev = prevRow || {};
       const next: Record<string, string> = {};
       const sent = body.fields && typeof body.fields === "object" ? body.fields : {};
@@ -664,7 +700,8 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       if (!c) return json({ error: "사건이 없습니다" }, 404);
       const rooms = await rest(env, `works_room_case?select=channel_id&l_num=eq.${lNum}`, {}, fetcher).catch(() => []) || [];
       const chans = [...new Set(rooms.map((r: any) => nz(r.channel_id)).filter(Boolean))] as string[];
-      const or = `or=(l_num.eq.${lNum}${chans.length ? `,channel_id.in.${enc(inList(chans))}` : ""})`;
+      const nums = [lNum, ...(await relatedNums(env, lNum, chans, fetcher))].join(",");
+      const or = `or=(l_num.in.(${nums})${chans.length ? `,channel_id.in.${enc(inList(chans))}` : ""})`;
       const mine = await rest(env, `room_event?select=id,channel_id,kind,ev_date,ev_time,summary,state,hidden&${or}&order=ev_date.asc,ev_time.asc&limit=500`, {}, fetcher) || [];
       if (body.action === "tl_list") {
         return json({ rows: mine.map((r: any) => ({ id: r.id, d: String(r.ev_date).slice(0, 10), tm: nz(r.ev_time), t: nz(r.summary), hid: !!r.hidden })) });

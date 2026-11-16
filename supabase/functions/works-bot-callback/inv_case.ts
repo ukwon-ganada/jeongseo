@@ -175,3 +175,63 @@ export async function backfillHold(env: FileEnv, botIds: string[], dryRun: boole
   }
   return { dryRun, total: plan.length, make: plan.filter((x) => x.make).length, plan };
 }
+
+// ============================================================================
+//  로웨어 사건에 이미 연결된 방도 제목 다시 읽기 (석원 2026-11-16)
+//  수사 단계 로웨어 사건은 중복·누락될 수 있지만, 재판번호가 붙으면 로웨어에 반드시 하나 생긴다.
+//  → 방 제목에 새 재판번호(1·2·3심)가 생기고 로웨어에 그 사건이 있으면, 그 사건을 이 방의 주 사건으로 붙인다.
+//    예전 사건 줄은 지우지 않고 '덧붙은 사건'으로 남긴다(사건 화면이 같은 방의 이전 사건 기록을 이어서 보여 줌).
+// ============================================================================
+export function trialRank(code: string): number {
+  const k = (String(code || "").match(/\d{2,4}\s*([가-힣]+)\s*\d/) || [])[1] || "";
+  if (/^(재)?도$/.test(k)) return 3;
+  if (/^(재)?노$/.test(k)) return 2;
+  if (/^고(단|합|정|약|약전)?$/.test(k)) return 1;
+  return 0;
+}
+
+export async function recheckLinkedRoom(env: FileEnv, botIds: string[], channelId: string, rows: any[], fetcher: typeof fetch = fetch) {
+  let title: string | null = null;
+  for (const b of botIds) { try { title = await roomTitle(env, b, channelId, fetcher); break; } catch { /* 다음 봇 */ } }
+  if (title === null) return { channelId, how: "no-title" };
+  const now = new Date().toISOString();
+  if (rows.some((r) => String(r.room_title || "") !== title)) {
+    await rest(env, `works_room_case?channel_id=eq.${encodeURIComponent(channelId)}&l_num=gt.0`, { method: "PATCH", headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ room_title: title }) }, fetcher).then((r) => r.body?.cancel());
+  }
+  const trials = (await lawwareCases(env, title, fetcher)).filter((c) => trialRank(c.l_code) > 0)
+    .sort((a, b) => trialRank(b.l_code) - trialRank(a.l_code) || Number(b.l_num) - Number(a.l_num));
+  if (!trials.length) return { channelId, how: "same" };
+  const top = trials[0];
+  const have = new Map(rows.map((r) => [Number(r.l_num), r]));
+  const primary = rows.find((r) => r.is_primary);
+  if (primary && Number(primary.l_num) === Number(top.l_num) && trials.every((t) => have.has(Number(t.l_num)))) return { channelId, how: "same" };
+  const add = trials.filter((t) => !have.has(Number(t.l_num))).map((t) => ({
+    channel_id: channelId, l_num: Number(t.l_num), case_no: caseNosInTitle(t.l_code)[0] || t.l_code, is_primary: false,
+    status: t.state === "종결" ? "종결" : "대상", room_title: title, basis: "제목에 새 재판번호", confidence: "높음", source: "auto", updated_at: now,
+  }));
+  if (add.length) await restJson(env, "works_room_case", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify(add) }, fetcher);
+  if (!primary || Number(primary.l_num) !== Number(top.l_num)) {
+    await restJson(env, `works_room_case?channel_id=eq.${encodeURIComponent(channelId)}&is_primary=eq.true`, { method: "PATCH", headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ is_primary: false, updated_at: now }) }, fetcher);
+    await restJson(env, `works_room_case?channel_id=eq.${encodeURIComponent(channelId)}&l_num=eq.${Number(top.l_num)}`, { method: "PATCH", headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ is_primary: true, updated_at: now }) }, fetcher);
+  }
+  return { channelId, how: "moved", to: Number(top.l_num), caseNo: top.l_code, from: primary ? Number(primary.l_num) : null, added: add.length };
+}
+
+// 하루 4번 중 이번 차례 몫(방을 4묶음으로 나눠 한 번에 1/4씩)
+export async function recheckLinked(env: FileEnv, botIds: string[], fetcher: typeof fetch = fetch, part?: number) {
+  const rows: any[] = await restJson(env, `works_room_case?select=channel_id,l_num,is_primary,room_title&status=eq.대상&l_num=gt.0&limit=2000`, {}, fetcher) || [];
+  const by = new Map<string, any[]>();
+  for (const r of rows) { const ch = String(r.channel_id || ""); if (ch) (by.get(ch) || by.set(ch, []).get(ch)!).push(r); }
+  const hour = new Date(Date.now() + 9 * 3600e3).getUTCHours();
+  const p = part ?? Math.floor(hour / 3) % 4;
+  const hash = (s: string) => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
+  const out: any[] = [];
+  for (const [ch, list] of by) {
+    if (part !== -1 && hash(ch) % 4 !== p) continue;
+    try { out.push(await recheckLinkedRoom(env, botIds, ch, list, fetcher)); } catch (e) { out.push({ channelId: ch, how: "error:" + String((e as Error)?.message || e).slice(0, 80) }); }
+  }
+  return { checked: out.length, moved: out.filter((x) => x.how === "moved").length, results: out.filter((x) => x.how !== "same") };
+}
