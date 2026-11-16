@@ -16,7 +16,7 @@
 
 export const WOFF = "https://woff.worksmobile.com/woff/Nxkob0LER_dfaSzH8s6flw";
 const WAIT_MS = 25_000;
-const STEP_MS = 600;
+const STEP_MS = 250;
 const LOCATE_FRESH_SEC = 20; // 방 찾기 요청은 20초 안에 받아 간 것만 (화면이 기다리는 시간)
 const FRESH_SEC = 60; // 1분 넘게 지난 클릭은 열지 않음 (PC가 꺼져 있다 켜졌을 때 엉뚱하게 열리지 않게)
 
