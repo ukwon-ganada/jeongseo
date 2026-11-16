@@ -38,6 +38,13 @@ async function rest(env: FileEnv, path: string, init: RequestInit = {}, fetcher:
   });
 }
 
+// 직원이 "이 방 사건이 아니다"라고 푼 사건들 (자동 연결이 다시 붙이지 않게)
+export async function rejectedLNums(env: FileEnv, channelId: string, fetcher: typeof fetch = fetch): Promise<Set<number>> {
+  const r = await rest(env, `room_link_reject?select=l_num&channel_id=eq.${encodeURIComponent(channelId)}`, {}, fetcher);
+  if (!r.ok) { await r.body?.cancel(); return new Set(); }
+  return new Set(((await r.json()) as any[]).map((x) => Number(x.l_num)));
+}
+
 export async function roomTitle(env: FileEnv, botId: string, channelId: string, fetcher: typeof fetch = fetch): Promise<string> {
   const tok = await botToken(env, fetcher);
   const r = await fetcher(`https://www.worksapis.com/v1.0/bots/${botId}/channels/${encodeURIComponent(channelId)}`,
@@ -61,7 +68,8 @@ export async function linkRoom(env: FileEnv, botId: string, channelId: string, f
   const codes = [...new Set(nos.flatMap(codeVariants))];
   const inList = "(" + codes.map((c) => '"' + c.replace(/"/g, "") + '"').join(",") + ")";
   const r = await rest(env, `cases?select=l_num,l_code,state&l_code=in.${encodeURIComponent(inList)}`, {}, fetcher);
-  const found: any[] = r.ok ? await r.json() : [];
+  let found: any[] = r.ok ? await r.json() : [];
+  if (found.length) { const no = await rejectedLNums(env, channelId, fetcher); found = found.filter((c) => !no.has(Number(c.l_num))); }
   if (!found.length) return await inv("not-in-lawware");
   found.sort((a, b) => Number(b.l_num) - Number(a.l_num));
   const now = new Date().toISOString();
@@ -112,4 +120,69 @@ async function linkRoomAnyBot1(env: FileEnv, botIds: string[], channelId: string
   let t: string | null = null;
   for (const b of botIds) { try { t = await roomTitle(env, b, channelId, fetcher); break; } catch { /* 다음 봇 */ } }
   return await linkRoom(env, botIds[0], channelId, fetcher, t ?? "");
+}
+
+// 이 방에서 받은 서면 파일·대화 일정은 방을 따라간다
+async function moveRoomRows(env: FileEnv, channelId: string, lNum: number, caseNo: string | null, fetcher: typeof fetch) {
+  const enc = encodeURIComponent(channelId);
+  const h = { method: "PATCH", headers: { Prefer: "return=minimal" } };
+  await rest(env, `case_file?channel_id=eq.${enc}`, { ...h, body: JSON.stringify({ l_num: lNum, case_no: caseNo }) }, fetcher).then((x) => x.body?.cancel()).catch(() => {});
+  await rest(env, `room_event?channel_id=eq.${enc}`, { ...h, body: JSON.stringify({ l_num: lNum }) }, fetcher).then((x) => x.body?.cancel()).catch(() => {});
+}
+
+// 직원이 사건정보에서 연결 사건을 바꾸거나 풀 때. lNum 이 없으면 연결을 풀고 그 방 자체 사건(로웨어 미등록)으로 둔다.
+// 풀린 로웨어 사건은 room_link_reject 에 적어 자동 연결이 다시 붙이지 않게 한다.
+export async function relinkRoom(env: FileEnv, botIds: string[], channelId: string, lNum: number | null, by: string, fetcher: typeof fetch = fetch): Promise<LinkResult> {
+  const enc = encodeURIComponent(channelId);
+  const r0 = await rest(env, `works_room_case?select=l_num,room_title,status&channel_id=eq.${enc}`, {}, fetcher);
+  const old: any[] = r0.ok ? await r0.json() : [];
+  if (lNum && old.some((x) => Number(x.l_num) === lNum) && old.length === 1) return { linked: 0, how: "same" };
+  let c: any = null;
+  if (lNum) {
+    const rc = await rest(env, `cases?select=l_num,l_code,state&l_num=eq.${lNum}`, {}, fetcher);
+    c = rc.ok ? (await rc.json())[0] : null;
+    if (!c) return { linked: 0, how: "no-case" };
+  }
+  const reject = old.map((x) => Number(x.l_num)).filter((n) => n > 0 && n !== lNum)
+    .map((n) => ({ channel_id: channelId, l_num: n, rejected_by: by || null }));
+  if (reject.length) {
+    const ri = await rest(env, "room_link_reject?on_conflict=channel_id,l_num", { method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=minimal" }, body: JSON.stringify(reject) }, fetcher);
+    if (!ri.ok) throw new Error("기록 실패 " + ri.status);
+    await ri.body?.cancel();
+  }
+  if (lNum) await rest(env, `room_link_reject?channel_id=eq.${enc}&l_num=eq.${lNum}`, { method: "DELETE" }, fetcher).then((x) => x.body?.cancel());
+  const closed = old.some((x) => x.status === "종결");
+  const del = await rest(env, `works_room_case?channel_id=eq.${enc}`, { method: "DELETE", headers: { Prefer: "return=minimal" } }, fetcher);
+  if (!del.ok) throw new Error("연결 지우기 실패 " + del.status);
+  await del.body?.cancel();
+  let t = String(old.find((x) => x.room_title)?.room_title || "");
+  if (!t) { for (const b of botIds) { try { t = await roomTitle(env, b, channelId, fetcher); break; } catch { /* 다음 봇 */ } } }
+  if (!lNum) {
+    // 이 방에 예전에 만든 자체 사건이 있으면 다시 쓴다(입력해 둔 사건정보 유지)
+    const ri = await rest(env, `inv_case?select=l_num&channel_id=eq.${enc}&order=l_num.desc&limit=1`, {}, fetcher);
+    const prev = ri.ok ? (await ri.json())[0] : null;
+    if (prev) {
+      await rest(env, `inv_case?l_num=eq.${prev.l_num}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ merged_into: null }) }, fetcher).then((x) => x.body?.cancel());
+      const ins = await rest(env, "works_room_case", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+        channel_id: channelId, l_num: Number(prev.l_num), case_no: "수사-" + (-Number(prev.l_num)), is_primary: true, status: closed ? "종결" : "대상",
+        room_title: t, basis: "직원이 연결 해지", confidence: "높음", source: "inv", updated_at: new Date().toISOString(),
+      }]) }, fetcher);
+      if (!ins.ok) throw new Error("방 저장 실패 " + ins.status);
+      await ins.body?.cancel();
+      await moveRoomRows(env, channelId, Number(prev.l_num), "수사-" + (-Number(prev.l_num)), fetcher);
+      return { linked: 1, how: "unlinked:reuse" };
+    }
+    const n = await createInvCase(env, channelId, t, invFields(t), fetcher);
+    await moveRoomRows(env, channelId, n, "수사-" + (-n), fetcher);
+    return { linked: 1, how: "unlinked:new" };
+  }
+  const ins = await rest(env, "works_room_case", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+    channel_id: channelId, l_num: Number(c.l_num), case_no: caseNosInTitle(c.l_code)[0] || c.l_code, is_primary: true,
+    status: c.state === "종결" ? "종결" : "대상", room_title: t || null, basis: "직원이 고름", confidence: "높음", source: "picked",
+    updated_at: new Date().toISOString(),
+  }]) }, fetcher);
+  if (!ins.ok) throw new Error("방 연결 저장 실패 " + ins.status);
+  await ins.body?.cancel();
+  await moveRoomRows(env, channelId, Number(c.l_num), c.l_code, fetcher);
+  return { linked: 1, how: "relinked" };
 }

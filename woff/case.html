@@ -446,7 +446,8 @@ var VIEWS = {
     cur='basic';
     var b=open('a-b')+head('기본 정보');
     var dispNo=data.dispNo||(data.inv?'':data.caseNo)||'';
-    b+='<div class="fr big"><span class="l">사건번호</span><span class="v'+(dispNo?'':' none')+'">'+(dispNo?esc(dispNo):'아직 번호 없음')+'</span>'+copyBtn(dispNo)+'</div>';
+    if(ed()&&ctx.key&&ctx.key.room) b+='<div class="fr big"><span class="l">로웨어 사건</span><div style="grid-column:2/4"><input id="link-no" value="'+esc(linkOrig())+'" placeholder="사건번호"></div></div>';
+    else b+='<div class="fr big"><span class="l">사건번호</span><span class="v'+(dispNo?'':' none')+'">'+(dispNo?esc(dispNo):'아직 번호 없음')+'</span>'+copyBtn(dispNo)+'</div>';
     if(S&&S.prevNos&&S.prevNos.length&&!ed()) b+='<div class="hist">이전 번호 · '+S.prevNos.map(function(x){ return esc(x.s)+' '+esc(x.no); }).join(' · ')+'</div>';
     if(ed()) b+=field('case_name','사건명');
     else { var cn=f.case_name||''; b+='<div class="fr"><span class="l">사건명</span><span class="v'+(cn?'':' none')+'">'+(cn?esc(cn):'—')+'</span>'+copyBtn(cn)+'</div>'; }
@@ -685,8 +686,18 @@ document.addEventListener('click', function(e){
   if(e.target.classList.contains('xp-del')){ var r=e.target.closest('.xp'); if(r) r.remove(); }
 });
 function confirmLeave(){ return window.confirm('저장하지 않은 수정이 있습니다. 나갈까요?'); }
+// 이 방에 연결된 로웨어 사건번호(자체 사건이면 빈칸). 바꾸면 다른 사건으로 연결, 비우면 연결 해지
+function linkOrig(){ return data.inv ? '' : String(data.caseNo||''); }
+function relink(btn, no){
+  btn.disabled=true; btn.textContent='바꾸는 중…';
+  api({action:'relink_room', room:ctx.key.room, 'case':no}).then(function(){
+    editing=false; return showCase(ctx.key).then(function(){ toast(no?'연결을 바꿨습니다':'연결을 풀었습니다'); });
+  }).catch(function(e){ btn.disabled=false; btn.textContent='저장'; toast((e&&e.message)||String(e)); });
+}
 function saveInfo(btn){
   var box=$('#main .card.editing'); if(!box) return;
+  var ln=box.querySelector('#link-no');
+  if(ln){ var no=ln.value.replace(/\s+/g,''); if(no!==linkOrig().replace(/\s+/g,'')) return relink(btn, no); }
   var fields={}; box.querySelectorAll('[data-k]').forEach(function(el){ fields[el.dataset.k]=el.value.trim(); });
   if(box.querySelector('#xp')){
     var xp=[]; box.querySelectorAll('.xp').forEach(function(r){ var n=r.querySelector('.xp-n').value.trim(), p=r.querySelector('.xp-p').value.trim(); if(n||p) xp.push({n:n,p:p}); });

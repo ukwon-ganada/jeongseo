@@ -10,7 +10,7 @@
 //     제목에 든 사건번호가 로웨어(cases)에 있으면 inv_case_merge 로 하나로 합친다.
 //  3) 예전 '보류' 방 중 수사단계 방을 수사 사건으로 바꾸기(inv-backfill, 먼저 dryRun 으로 미리보기).
 // ============================================================================
-import { caseNosInTitle, codeVariants, roomTitle } from "./room_link.ts";
+import { caseNosInTitle, codeVariants, rejectedLNums, roomTitle } from "./room_link.ts";
 import type { FileEnv } from "./room_file.ts";
 
 export type InvParsed = { client: string; charge: string; role: string; agency: string; agencyNo: string };
@@ -92,12 +92,16 @@ export async function createInvCase(env: FileEnv, channelId: string, title: stri
 }
 
 // 제목 속 사건번호로 로웨어 사건 찾기 (l_num 큰 것 = 보통 상급심이 먼저)
-async function lawwareCases(env: FileEnv, title: string, fetcher: typeof fetch): Promise<any[]> {
+async function lawwareCases(env: FileEnv, title: string, fetcher: typeof fetch, channelId?: string): Promise<any[]> {
   const nos = caseNosInTitle(title);
   if (!nos.length) return [];
   const codes = [...new Set(nos.flatMap(codeVariants))];
   const inList = "(" + codes.map((c) => '"' + c.replace(/"/g, "") + '"').join(",") + ")";
-  const found: any[] = await restJson(env, `cases?select=l_num,l_code,state&l_code=in.${encodeURIComponent(inList)}`, {}, fetcher) || [];
+  let found: any[] = await restJson(env, `cases?select=l_num,l_code,state&l_code=in.${encodeURIComponent(inList)}`, {}, fetcher) || [];
+  if (channelId && found.length) {
+    const no = await rejectedLNums(env, channelId, fetcher);
+    found = found.filter((c) => !no.has(Number(c.l_num)));
+  }
   return found.sort((a, b) => Number(b.l_num) - Number(a.l_num));
 }
 
@@ -112,7 +116,7 @@ export async function recheckInv(env: FileEnv, botIds: string[], inv: { l_num: n
     await rest(env, `inv_case?l_num=eq.${inv.l_num}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ title_checked_at: now }) }, fetcher).then((r) => r.body?.cancel());
     return { lNum: inv.l_num, how: "no-title" };
   }
-  const found = await lawwareCases(env, title, fetcher);
+  const found = await lawwareCases(env, title, fetcher, inv.channel_id);
   const patch: Record<string, unknown> = { title_checked_at: now };
   if (title !== (inv.room_title ?? "")) {
     patch.room_title = title;
@@ -177,7 +181,7 @@ export async function backfillHold(env: FileEnv, botIds: string[], dryRun: boole
     seen.add(ch);
     let title = String(r.room_title || "");
     if (!title) { for (const b of botIds) { try { title = await roomTitle(env, b, ch, fetcher); break; } catch { /* */ } } }
-    const cand = title ? await lawwareCases(env, title, fetcher).catch(() => []) : [];
+    const cand = title ? await lawwareCases(env, title, fetcher, ch).catch(() => []) : [];
     const how = cand.length ? "로웨어 " + cand.map((c) => c.l_code).join(",") : "자체 사건" + (title ? "" : "(제목 못 읽음)");
     plan.push({ id: r.id, title, how });
     if (dryRun) continue;
@@ -221,7 +225,7 @@ export async function recheckLinkedRoom(env: FileEnv, botIds: string[], channelI
     await rest(env, `works_room_case?channel_id=eq.${encodeURIComponent(channelId)}&l_num=gt.0`, { method: "PATCH", headers: { Prefer: "return=minimal" },
       body: JSON.stringify({ room_title: title }) }, fetcher).then((r) => r.body?.cancel());
   }
-  const trials = (await lawwareCases(env, title, fetcher)).filter((c) => trialRank(c.l_code) > 0)
+  const trials = (await lawwareCases(env, title, fetcher, channelId)).filter((c) => trialRank(c.l_code) > 0)
     .sort((a, b) => trialRank(b.l_code) - trialRank(a.l_code) || Number(b.l_num) - Number(a.l_num));
   if (!trials.length) return { channelId, how: "same" };
   const top = trials[0];

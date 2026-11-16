@@ -407,7 +407,7 @@ export function caseNosIn(s: string): string[] {
 }
 
 // 아직 연결 안 된 방 자동 연결: works-bot-callback 함수에 부탁 (웍스 봇 열쇠가 거기 있음). 실패해도 화면은 계속
-async function autoLink(env: Env, body: { channelId: string; lNum?: number }, fetcher: typeof fetch): Promise<{ linked: number; how: string } | null> {
+async function autoLink(env: Env, body: { channelId: string; lNum?: number | null; relink?: boolean; by?: string }, fetcher: typeof fetch): Promise<{ linked: number; how: string } | null> {
   try {
     const r = await fetcher(env.sbUrl + "/functions/v1/works-bot-callback", {
       method: "POST", headers: { "Content-Type": "application/json", "x-internal-key": env.sbKey }, body: JSON.stringify(body),
@@ -591,6 +591,21 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       const r = await autoLink(env, { channelId: room, lNum: c.l_num }, fetcher);
       await logView(env, who, "link_room:" + nz(r?.how), room, c, fetcher);
       return json(r || { linked: 0, how: "error" });
+    }
+
+    // 사건정보 [수정]에서 이 방의 로웨어 사건을 바꾸거나(사건번호) 풀기(빈칸). 풀면 방 자체 사건으로 남는다
+    if (body?.action === "relink_room") {
+      const room = nz(body.room), code = nz(body.case);
+      if (!room) return json({ error: "사건방에서 연 화면에서만 바꿀 수 있습니다" }, 400);
+      let c: any = null;
+      if (code) {
+        c = (await rest(env, `cases?select=l_num,l_code&l_code=in.${enc(inList(caseNoVariants(code)))}&order=l_num.desc&limit=1`, {}, fetcher))?.[0];
+        if (!c) return json({ error: "로웨어에 없는 사건번호입니다" }, 404);
+      }
+      const r = await autoLink(env, { channelId: room, relink: true, lNum: c?.l_num ?? null, by: who.name || "" }, fetcher);
+      await logView(env, who, "relink:" + nz(r?.how), room, c, fetcher);
+      if (!r || (!r.linked && r.how !== "same")) return json({ error: "바꾸지 못했습니다" }, 500);
+      return json(r);
     }
 
     // PC 방 찾기에서 못 찾은 방: 직원이 고른 사건을 그때 읽은 제목과 함께 기억 → 다음부터 바로 열림
