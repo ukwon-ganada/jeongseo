@@ -51,8 +51,22 @@ export const DEADLINE_NOTE = "잠정 계산입니다. 재판 단계(항소·상�
 export type Env = { sbUrl: string; sbKey: string; anthropicKey?: string; chatModel?: string; refreshModel?: string };
 export type WhoAmI = { ok: boolean; status: number; userId?: string; domainId?: number | string; name?: string; error?: string };
 
+// 같은 토큰이면 5분 동안 웍스에 다시 묻지 않는다(화면을 열 때마다 0.1~0.3초 아낌). 확인된 것만 기억
+const WHO_CACHE = new Map<string, { who: WhoAmI; until: number }>();
+const WHO_TTL = 5 * 60_000;
 export async function worksWhoAmI(token: string, fetcher: typeof fetch = fetch): Promise<WhoAmI> {
   if (!token || token.length < 20) return { ok: false, status: 0, error: "토큰 없음" };
+  const hit = WHO_CACHE.get(token);
+  if (hit && hit.until > Date.now()) return hit.who;
+  const who = await askWorksWho(token, fetcher);
+  if (who.ok) {
+    if (WHO_CACHE.size > 500) WHO_CACHE.clear();
+    WHO_CACHE.set(token, { who, until: Date.now() + WHO_TTL });
+  }
+  return who;
+}
+export function clearWhoCache() { WHO_CACHE.clear(); }
+async function askWorksWho(token: string, fetcher: typeof fetch): Promise<WhoAmI> {
   const r = await fetcher("https://www.worksapis.com/v1.0/users/me", { headers: { Authorization: "Bearer " + token } });
   const t = await r.text();
   if (!r.ok) return { ok: false, status: r.status, error: t.slice(0, 200) };
@@ -478,7 +492,56 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       })) });
     }
 
+    let located: { room?: string; case?: string } | null = null;
+    if (body?.action === "locate") {
+      if (!who.userId) return json({ error: "직원 확인이 안 됐습니다" }, 401);
+      // 도우미가 최근 90초 안에 서버에 들렀어야 켜져 있는 것
+      const alive = new Date(Date.now() - 90_000).toISOString();
+      const devs = await rest(env, `pc_helper_device?select=id&revoked_at=is.null&works_user_id=eq.${enc(who.userId)}&last_seen_at=gte.${enc(alive)}&limit=1`, {}, fetcher);
+      if (!devs?.length) return json({ nohelper: true });
+      const ins = await rest(env, "pc_locate", { method: "POST", headers: { Prefer: "return=representation" },
+        body: JSON.stringify({ works_user_id: who.userId }) }, fetcher);
+      const id = ins?.[0]?.id;
+      if (!id) return json({ error: "요청을 만들지 못했습니다" }, 500);
+      const until = Date.now() + (body.waitMs ?? 8000);
+      while (Date.now() < until && !located) {
+        await new Promise((r) => setTimeout(r, 100));
+        const row = (await rest(env, `pc_locate?select=taken_at,done_at,channel_id,how,header_text&id=eq.${id}`, {}, fetcher))?.[0];
+        if (row?.done_at) {
+          await logView(env, who, "locate:" + nz(row.how), nz(row.channel_id), null, fetcher);
+          if (row.channel_id) { located = { room: row.channel_id }; break; }
+          // 방 표에 없는 새 방이라도 제목에 사건번호가 있고 로웨어에 딱 하나 있으면 그 사건을 연다
+          const nos = row.how === "error" ? [] : caseNosIn(nz(row.header_text));
+          if (nos.length) {
+            const hit = await rest(env, `cases?select=l_code&l_code=in.${enc(inList(nos.flatMap(caseNoVariants)))}&limit=2`, {}, fetcher) || [];
+            if (hit.length === 1) { located = { case: hit[0].l_code }; break; }
+          }
+          // 방 목록에 없는 방: 전에 직원이 이 제목에서 고른 사건이 있으면 그것 (석원 2026-11-16)
+          if (row.how !== "error" && nz(row.header_text)) {
+            const picks = await rest(env, `pc_title_pick?select=header_norm,l_num,case_no&order=updated_at.desc&limit=3000`, {}, fetcher).catch(() => []) || [];
+            const p = findPick(nz(row.header_text), picks);
+            if (p) {
+              const c = (await rest(env, `case_all?select=l_code&l_num=eq.${p.l_num}`, {}, fetcher))?.[0];
+              if (c) { await logView(env, who, "locate:picked-title", "", { l_num: p.l_num, l_code: c.l_code }, fetcher); located = { case: c.l_code }; break; }
+            }
+          }
+          // 못 찾음: 화면에서 직원이 고르면 이 읽은 제목과 함께 기억한다(remember_pick)
+          return json({ notfound: true, how: row.how, locate: row.how === "error" ? null : id });
+        }
+        if (!row?.taken_at && Date.now() > until - 5000) break; // 3초 안에 도우미가 안 받아 가면 꺼진 것(또는 옛 버전)
+      }
+      if (!located) {
+        await logView(env, who, "locate:timeout", "", null, fetcher);
+        return json({ timeout: true });
+      }
+      // open: 찾은 방의 사건 자료까지 이 요청에서 바로 만든다(화면이 한 번 더 묻지 않게)
+      if (!body.open) return json(located);
+      body = { action: "case", room: located.room || "", case: located.case || "" };
+    }
+
+
     if (body?.action === "case") {
+      const out = (o: any, st?: number) => json(located ? { ...o, located } : o, st);
       const room = nz(body.room), caseParam = nz(body.case);
       let c: any = null, status: string | undefined, linked: string[] = [];
       if (room) {
@@ -496,27 +559,27 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
             await logView(env, who, act + ":chat", room, null, fetcher);
             const ro = roomOnlyShape(nz(t), rows, today, []);
             applyInvDeadlines(ro, rows, nz(t));
-            return json(ro);
+            return out(ro);
           }
           await logView(env, who, act, room, null, fetcher);
-          return json(!main ? { unpaired: true } : { hold: true });
+          return out(!main ? { unpaired: true } : { hold: true });
         }
         status = main.status;
         linked = maps.slice(1).map((m: any) => nz(m.case_no)).filter(Boolean);
         if (main.l_num != null) c = (await rest(env, `case_all?select=*&l_num=eq.${main.l_num}`, {}, fetcher))[0];
         else if (main.case_no) c = (await rest(env, `case_all?select=*&l_code=in.${enc(inList(caseNoVariants(main.case_no)))}&limit=1`, {}, fetcher))[0];
-        if (!c) return json({ notfound: true, caseNo: main.case_no || "" });
+        if (!c) return out({ notfound: true, caseNo: main.case_no || "" });
       } else if (caseParam) {
         c = (await rest(env, `case_all?select=*&l_code=in.${enc(inList(caseNoVariants(caseParam)))}&order=l_num.desc&limit=1`, {}, fetcher))[0];
-        if (!c) return json({ notfound: true, caseNo: caseParam });
+        if (!c) return out({ notfound: true, caseNo: caseParam });
         if (c.state === "종결") status = "종결";
-      } else return json({ error: "방이나 사건번호가 없습니다" }, 400);
+      } else return out({ error: "방이나 사건번호가 없습니다" }, 400);
 
       const roomRows = await rest(env, `works_room_case?select=channel_id&l_num=eq.${c.l_num}`, {}, fetcher).catch(() => []) || [];
       const chans = [...new Set([room, ...roomRows.map((r: any) => nz(r.channel_id))].filter(Boolean))] as string[];
       const rel = await relatedNums(env, Number(c.l_num), chans, fetcher);
       const allNums = [Number(c.l_num), ...rel].join(",");
-      const [evs, mine, savedOwn, files, chat, checked, meets, stageLogs, relCases] = await Promise.all([
+      const [evs, mine, savedOwn, files, chat, checked, meets, stageLogs, relCases, titleRows] = await Promise.all([
         rest(env, `lw_process_events?select=lp_num,lp_set,lp_appoint_date,lp_appoint_time,lp_contents,lp_remark,delivered_date,court,last_seen_at,lp_append_udate&l_num=eq.${c.l_num}&order=lp_appoint_date.asc&limit=2000`, {}, fetcher),
         myCases(env, who.name || "", fetcher),
         rest(env, `case_info?select=*&l_num=eq.${c.l_num}`, {}, fetcher).then((r: any[]) => r?.[0] ?? null).catch(() => null),
@@ -526,19 +589,20 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
         rest(env, `meet_event?select=event_id,ev_date,ev_time,lawyer,place&l_num=in.(${allNums})&order=ev_date.asc&limit=300`, {}, fetcher).catch(() => []),
         rest(env, `case_info_log?select=field,old_value,new_value,editor,edited_at&l_num=in.(${allNums})&field=like.stage.*&order=edited_at.desc&limit=300`, {}, fetcher).catch(() => []),
         rel.length ? rest(env, `case_all?select=l_num,raw&l_num=in.(${rel.join(",")})`, {}, fetcher).catch(() => []) : Promise.resolve([]),
+        chans.length ? rest(env, `works_room_case?select=room_title&channel_id=in.${enc(inList(chans))}&room_title=not.is.null&limit=5`, {}, fetcher).catch(() => []) : Promise.resolve([]),
+        logView(env, who, "case", room, c, fetcher),
       ]);
       const saved = savedOwn ?? await inheritedInfo(env, rel, fetcher);
       const end = new Date(Date.parse(today) + 28 * 864e5).toISOString().slice(0, 10);
       const myHearings = mine.filter((m: any) => isDate(m.next_date) && m.next_date.slice(0, 10) >= today && m.next_date.slice(0, 10) <= end)
         .map((m: any) => ({ c: m.l_code, d: m.next_date.slice(0, 10), tm: nz(m.next_time), t: nz(m.next_contents) || "기일", p: nz(m.court) }));
-      await logView(env, who, "case", room, c, fetcher);
       const shaped = shapeCase(c, evs || [], { today, linked, myHearings, status, saved });
       shaped.progress.checked = checked;
       attachFinalFiles(shaped.events, files);
       attachContract(shaped.events, files);
       mergeRoomEvents(shaped, chat, c.l_code);
       // 수사 단계 기한(R18~R20): 방 제목 괄호로 의뢰인 지위를 본다
-      const titles = chans.length ? await rest(env, `works_room_case?select=room_title&channel_id=in.${enc(inList(chans))}&room_title=not.is.null&limit=5`, {}, fetcher).catch(() => []) || [] : [];
+      const titles = (titleRows || []) as any[];
       applyInvDeadlines(shaped, chat, nz(titles[0]?.room_title));
       fixAccept(shaped, !!c.is_inv);
       earliestAccept(shaped, relCases || []);
@@ -546,7 +610,7 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       // 직원이 줄마다 파일을 바꿀 때 고를 목록 (화면에 따로 나열하지 않음)
       const fileChoices = files.map((f: any) => ({ id: f.id, n: f.n, d: f.d, tm: f.tm, by: f.by }));
       const stages = shapeStages(c, saved, stageLogs || []);
-      return json({ ...shaped, fileChoices, stages, dispNo: stages.dispNo });
+      return out({ ...shaped, fileChoices, stages, dispNo: stages.dispNo });
     }
 
     if (body?.action === "file_open") {
@@ -578,47 +642,6 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
         body: JSON.stringify({ lp_num: lp, pick_by: who.name || who.userId, pick_at: new Date().toISOString() }) }, fetcher);
       await logView(env, who, "set_file:" + id, "", { l_num: lNum, l_code: null }, fetcher);
       return json({ ok: true });
-    }
-
-    if (body?.action === "locate") {
-      if (!who.userId) return json({ error: "직원 확인이 안 됐습니다" }, 401);
-      // 도우미가 최근 90초 안에 서버에 들렀어야 켜져 있는 것
-      const alive = new Date(Date.now() - 90_000).toISOString();
-      const devs = await rest(env, `pc_helper_device?select=id&revoked_at=is.null&works_user_id=eq.${enc(who.userId)}&last_seen_at=gte.${enc(alive)}&limit=1`, {}, fetcher);
-      if (!devs?.length) return json({ nohelper: true });
-      const ins = await rest(env, "pc_locate", { method: "POST", headers: { Prefer: "return=representation" },
-        body: JSON.stringify({ works_user_id: who.userId }) }, fetcher);
-      const id = ins?.[0]?.id;
-      if (!id) return json({ error: "요청을 만들지 못했습니다" }, 500);
-      const until = Date.now() + (body.waitMs ?? 8000);
-      while (Date.now() < until) {
-        await new Promise((r) => setTimeout(r, 300));
-        const row = (await rest(env, `pc_locate?select=taken_at,done_at,channel_id,how,header_text&id=eq.${id}`, {}, fetcher))?.[0];
-        if (row?.done_at) {
-          await logView(env, who, "locate:" + nz(row.how), nz(row.channel_id), null, fetcher);
-          if (row.channel_id) return json({ room: row.channel_id });
-          // 방 표에 없는 새 방이라도 제목에 사건번호가 있고 로웨어에 딱 하나 있으면 그 사건을 연다
-          const nos = row.how === "error" ? [] : caseNosIn(nz(row.header_text));
-          if (nos.length) {
-            const hit = await rest(env, `cases?select=l_code&l_code=in.${enc(inList(nos.flatMap(caseNoVariants)))}&limit=2`, {}, fetcher) || [];
-            if (hit.length === 1) return json({ case: hit[0].l_code });
-          }
-          // 방 목록에 없는 방: 전에 직원이 이 제목에서 고른 사건이 있으면 그것 (석원 2026-11-16)
-          if (row.how !== "error" && nz(row.header_text)) {
-            const picks = await rest(env, `pc_title_pick?select=header_norm,l_num,case_no&order=updated_at.desc&limit=3000`, {}, fetcher).catch(() => []) || [];
-            const p = findPick(nz(row.header_text), picks);
-            if (p) {
-              const c = (await rest(env, `case_all?select=l_code&l_num=eq.${p.l_num}`, {}, fetcher))?.[0];
-              if (c) { await logView(env, who, "locate:picked-title", "", { l_num: p.l_num, l_code: c.l_code }, fetcher); return json({ case: c.l_code }); }
-            }
-          }
-          // 못 찾음: 화면에서 직원이 고르면 이 읽은 제목과 함께 기억한다(remember_pick)
-          return json({ notfound: true, how: row.how, locate: row.how === "error" ? null : id });
-        }
-        if (!row?.taken_at && Date.now() > until - 5000) break; // 3초 안에 도우미가 안 받아 가면 꺼진 것(또는 옛 버전)
-      }
-      await logView(env, who, "locate:timeout", "", null, fetcher);
-      return json({ timeout: true });
     }
 
     // 사건 고르기에서 고른 사건을 아직 연결 안 된 이 방에 기억 (휴대폰: 방을 아는 경우만)
