@@ -11,6 +11,9 @@
 //    · (시험 중) 사건방 글(text)은 AI가 일정(고소장 제출·조사·송치 등)만 뽑아 room_event 에 남긴다 (room_chat.ts).
 //      글 원문은 저장하지 않는다. ROOM_CHAT_BOTS 에 든 봇(기본: 시험봇)의 방만.
 //    · 봇이 새 사건방에 초대되면(join) 방 제목의 사건번호로 사건을 자동 연결한다 (room_link.ts).
+//      로웨어 사건이 없는 수사단계 방이면 "수사 사건"을 만들어 붙이고, 나중에 방 제목이 재판부
+//      사건번호로 바뀌면 로웨어 사건과 합친다 (inv_case.ts). 제목 변경 신호는 웍스가 주지 않아서
+//      하루 몇 번(pg_cron, x-cron-secret) + 그 방에서 메뉴·파일이 올 때 제목을 다시 읽는다.
 //
 //  보안: 웍스가 보낸 것인지 X-WORKS-Signature(봇 시크릿 HMAC-SHA256, Base64)로 확인.
 //
@@ -27,6 +30,7 @@
 import { saveRoomFile } from "./room_file.ts";
 import { linkPicked, linkRoom, linkRoomAnyBot } from "./room_link.ts";
 import { handleRoomText } from "./room_chat.ts";
+import { backfillHold, recheckAll, recheckRoom } from "./inv_case.ts";
 
 // 우리 봇: 운영 봇(사건관리 도우미), 시험봇(정서 시험봇)
 export const BOT_IDS = ["12905890", "13580302"];
@@ -89,6 +93,22 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       return Response.json(r);
     } catch (e) {
       return Response.json({ linked: 0, how: "error", error: String((e as Error)?.message || e).slice(0, 120) });
+    }
+  }
+  // pg_cron(inv_recheck_call)이 부르는 길: 수사 사건 방 제목 다시 읽기·보류 방 바꾸기
+  const cron = req.headers.get("x-cron-secret");
+  if (cron) {
+    const sec = await rest(env, "lw_settings?select=value&key=eq.cron_secret").then((r) => r.ok ? r.json() : []).catch(() => []);
+    if (!sec?.[0]?.value || !safeEqual(cron, String(sec[0].value))) return new Response("forbidden", { status: 403 });
+    let b: any = {};
+    try { b = await req.json(); } catch { /* */ }
+    try {
+      if (b?.action === "inv-backfill") return Response.json(await backfillHold(env, BOT_IDS, b?.dryRun !== false, fetcher));
+      const r = await recheckAll(env, BOT_IDS, fetcher);
+      console.log("inv-recheck", r.checked, r.merged, r.waiting);
+      return Response.json(r);
+    } catch (e) {
+      return Response.json({ error: String((e as Error)?.message || e).slice(0, 200) }, { status: 500 });
     }
   }
   const raw = await req.text();
@@ -156,6 +176,13 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
         .then((r) => console.log("link", r.how, r.linked))
         .catch((e) => console.error("link fail", String(e?.message || e).slice(0, 200))));
     }
+  }
+
+  // 수사 사건 방에서 메뉴·파일이 오면 방 제목을 다시 읽어, 재판부 사건번호로 바뀌었으면 합친다
+  if (channelId && (ev?.type === "postback" || (ev?.type === "message" && content?.type === "file"))) {
+    background(recheckRoom(env, BOT_IDS, channelId, fetcher)
+      .then((r) => { if (r.length) console.log("inv-room", r.map((x) => x.how).join(",")); })
+      .catch((e) => console.error("inv-room fail", String(e?.message || e).slice(0, 200))));
   }
 
   // 웍스는 빨리 200을 받아야 다시 보내지 않음
