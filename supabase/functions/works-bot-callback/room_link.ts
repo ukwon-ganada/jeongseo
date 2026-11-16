@@ -97,7 +97,16 @@ export async function linkPicked(env: FileEnv, botIds: string[], channelId: stri
 
 // 봇 여러 개(운영·시험) 중 그 방에 들어가 있는 봇으로 자동 연결 시도
 // 방 제목을 어느 봇으로도 못 읽어도(권한·일시 오류) 빈 제목으로 사건을 만들고, 제목은 하루 4번 다시 읽어 채운다
-export async function linkRoomAnyBot(env: FileEnv, botIds: string[], channelId: string, fetcher: typeof fetch = fetch): Promise<LinkResult> {
+// 같은 방에서 신호가 거의 동시에 여러 개 오면 사건이 두 번 만들어지지 않게, 이 서버에서 처리 중인 방은 기다렸다가 같은 결과를 쓴다
+const inflight = new Map<string, Promise<LinkResult>>();
+export function linkRoomAnyBot(env: FileEnv, botIds: string[], channelId: string, fetcher: typeof fetch = fetch): Promise<LinkResult> {
+  const cur = inflight.get(channelId);
+  if (cur) return cur.then(() => ({ linked: 0, how: "already" }));
+  const p = linkRoomAnyBot1(env, botIds, channelId, fetcher).finally(() => inflight.delete(channelId));
+  inflight.set(channelId, p);
+  return p;
+}
+async function linkRoomAnyBot1(env: FileEnv, botIds: string[], channelId: string, fetcher: typeof fetch): Promise<LinkResult> {
   const had = await rest(env, `works_room_case?select=channel_id&limit=1&channel_id=eq.${encodeURIComponent(channelId)}`, {}, fetcher);
   if (had.ok && (await had.json()).length) return { linked: 0, how: "already" };
   let t: string | null = null;
