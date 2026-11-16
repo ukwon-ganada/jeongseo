@@ -1,6 +1,6 @@
 // 실행: deno test supabase/functions/pc-helper-wait/match_test.ts
 import { assertEquals } from "jsr:@std/assert@1";
-import { caseNos, headerText, matchRoom } from "./match.ts";
+import { caseNos, clientName, headerText, matchRoom, sameClient } from "./match.ts";
 
 // 2026-11-13 사무실 PC 시험 결과 모양(이름은 가짜)
 const LINES = [
@@ -44,4 +44,17 @@ Deno.test("애매하거나 못 읽으면 고르지 않는다", () => {
 
 Deno.test("OCR이 0을 O로 읽어도 사건번호 인식", () => {
   assertEquals(caseNos("2026고정1OO189"), ["2026고정100189"]);
+});
+
+Deno.test("의뢰인 이름이 다른 방은 제목이 닮아도 열지 않는다", () => {
+  const rooms = [
+    { channel_id: "kim", room_title: "박)신)★(형/고소)김가나_사기_인천연수경찰서_2026-8730" },
+    { channel_id: "lee", room_title: "서)최)★(형/피고인)이다라_전기통신금융사기피해방지 등_인천 26노100808" },
+  ];
+  const line = (t: string) => [{ x: 28, y: 7, t }];
+  assertEquals(matchRoom(line("서)최)!(형/피의) 최마바-사기-인천연수경찰서 2026-5079 10"), rooms).channelId, null);
+  // OCR이 이름 한 글자를 틀려도 같은 사람으로 본다
+  assertEquals(matchRoom(line("서)최)*(형/피고인)이다러-전기통신금융사기피해방지 등- 인천"), rooms).channelId, "lee");
+  assertEquals(clientName("(국선)(형/피고인3)백가나_도박_인천"), "백가나");
+  assertEquals(sameClient("최마바", "김가나"), false);
 });

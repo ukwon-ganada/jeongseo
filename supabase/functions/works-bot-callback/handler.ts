@@ -28,7 +28,7 @@
 // ============================================================================
 
 import { saveRoomFile } from "./room_file.ts";
-import { linkPicked, linkRoomAnyBot } from "./room_link.ts";
+import { linkPicked, linkRoomAnyBot, relinkRoom } from "./room_link.ts";
 import { handleRoomText } from "./room_chat.ts";
 import { backfillHold, recheckAll, recheckLinked, recheckRoom } from "./inv_case.ts";
 
@@ -88,6 +88,11 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
     const ch = String(b?.channelId || "");
     if (!ch) return Response.json({ error: "channelId" }, { status: 400 });
     try {
+      if (b?.relink) {
+        const r = await relinkRoom(env, BOT_IDS, ch, b?.lNum ? Number(b.lNum) : null, String(b?.by || ""), fetcher);
+        console.log("relink(internal)", r.how);
+        return Response.json(r);
+      }
       const r = b?.lNum ? await linkPicked(env, BOT_IDS, ch, Number(b.lNum), fetcher) : await linkRoomAnyBot(env, BOT_IDS, ch, fetcher);
       console.log("link(internal)", r.how, r.linked);
       return Response.json(r);
