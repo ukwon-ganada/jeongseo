@@ -85,3 +85,18 @@ Deno.test("방 제목 사건번호: 2자리 연도도", () => {
   const b = caseNosIn("인천 2026고합100351");
   if (!b.includes("2026고합100351")) throw new Error(JSON.stringify(b));
 });
+
+Deno.test("최종 서면: 제목이 맞는 마지막 파일, 없으면 당일 마지막", async () => {
+  const { attachFinalFiles } = await import("./handler.ts");
+  const f = (id: number, n: string, d: string, h: number) => ({ id, n, d, at: Date.parse(d) + h * 3600e3, pdf: /pdf$/.test(n) ? 1 : 0, lp: null });
+  const ev: any[] = [
+    { d: "2026-10-28", k: "ours", t: "서고은 답변서(청구취지/원인) 제출", lp: 1 },
+    { d: "2026-10-28", k: "ours", t: "서고은 변론재개신청서 제출", lp: 2 },
+    { d: "2026-11-10", k: "ours", t: "서고은준비서면 제출", lp: 3 },
+    { d: "2026-11-12", k: "ours", t: "기일연기신청 제출", lp: 4 },
+  ];
+  attachFinalFiles(ev, [f(1, "답변서 초안.hwp", "2026-10-25", 1), f(2, "변론재개신청서.pdf", "2026-10-28", 1), f(3, "답변서_최종.pdf", "2026-10-28", 2),
+    f(4, "준비서면 수정.hwp", "2026-11-08", 1), f(5, "준비서면_최종.pdf", "2026-11-09", 22), f(6, "메모.pdf", "2026-11-12", 3)]);
+  const got = ev.map((e) => e.f?.id ?? 0).join(",");
+  if (got !== "3,2,5,6") throw new Error(got);
+});

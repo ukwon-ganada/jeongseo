@@ -294,10 +294,11 @@ export function roomOnlyShape(title: string, rows: any[], today: string, myHeari
   return shaped;
 }
 
-// 최종 제출본 고르기 (석원 결정 2026-11-13: "규칙은 어쨌든 마지막 서면")
-//   로웨어에 "법무법인 정서 … 제출"(우리 서면)이 찍힌 날 D마다,
-//   그 날짜(D)에 방에 올라온 문서 파일 중 마지막 하나만 그 줄에 붙인다 (석원: "그 날짜 최종서면만").
-//   로웨어 제출 기록엔 시각이 없어서 "그날의 마지막"으로 본다. 초안·수정본은 화면에 내지 않는다.
+// 최종 제출본 고르기 (석원 결정 2026-11-13 "규칙은 어쨌든 마지막 서면", 2026-11-16 제목 기준 추가)
+//   로웨어에 "법무법인 정서 … ○○ 제출"(우리 서면)이 찍힌 날 D마다:
+//   1) D-7일 ~ D 사이 방에 올라온 문서 중 파일 이름이 서면 이름(○○)과 같거나 비슷한 것의 마지막 하나
+//   2) 그런 파일이 없으면 D 당일에 올라온 마지막 문서
+//   로웨어 제출 기록엔 시각이 없어서 날짜 단위로 본다. 초안·수정본은 화면에 내지 않는다.
 //   실시간일 필요 없음: 로웨어에 제출이 뜬 뒤 사건 화면을 열 때 계산된다.
 //   직원이 직접 고른 파일(lp_num)이 있으면 그것이 우선.
 const DOC_RE = /\.(pdf|hwp|hwpx|doc|docx)$/i;
@@ -318,12 +319,52 @@ export function attachFinalFiles(events: any[], files: any[]) {
   const ours = events.filter((e) => e.k === "ours" && e.lp != null).sort((a, b) => a.d.localeCompare(b.d) || a.lp - b.lp);
   for (const e of ours) {
     const m = picked.get(String(e.lp));
-    if (m) { e.f = { id: m.id, n: m.n, pick: 1 }; continue; }
+    if (m) e.f = { id: m.id, n: m.n, pick: 1 };
+  }
+  // 1차: 제목이 맞는 파일 (같은 날 서면이 여러 종류여도 줄마다 제 파일이 붙음)
+  for (const e of ours) {
+    if (e.f) continue;
+    const title = docTitle(e.t), lo = addDays(e.d, -TITLE_WINDOW_DAYS);
+    const pool = docs.filter((f) => !used.has(f.id) && f.lp == null && f.d <= e.d && f.d >= lo && titleMatch(f.n, title))
+      .sort((a, b) => b.at - a.at);
+    if (pool[0]) { used.add(pool[0].id); e.f = { id: pool[0].id, n: pool[0].n, pick: 0 }; }
+  }
+  // 2차: 제목 맞는 게 없으면 제출 당일 마지막 파일
+  for (const e of ours) {
+    if (e.f) continue;
     const pool = docs.filter((f) => !used.has(f.id) && f.lp == null && f.d === e.d)
       .sort((a, b) => b.at - a.at);
     if (pool[0]) { used.add(pool[0].id); e.f = { id: pool[0].id, n: pool[0].n, pick: 0 }; }
   }
   return events;
+}
+
+// ── 서면 이름 비교 ────────────────────────────────────
+export const TITLE_WINDOW_DAYS = 7;
+const addDays = (d: string, n: number) => new Date(Date.parse(d + "T00:00:00Z") + n * 864e5).toISOString().slice(0, 10);
+// "원고 소송대리인 법무법인 정서 서고은준비서면 제출" → "서고은준비서면"
+export function docTitle(t: string): string {
+  return nz(t).split(" · ")[0].replace(/^.*?법무법인\s*정서[,\s]*/, "").replace(/\s*제출\s*$/, "").trim();
+}
+const hangulOnly = (s: string) => s.replace(/\.[a-z0-9]{1,5}$/i, "").replace(/\([^)]*\)/g, "").replace(/[^가-힣]/g, "");
+// 이것만 겹치면 같은 서면으로 보지 않음 (기일변경신청서 vs 영상재판신청서 등)
+const GENERIC = /^(신청서?|제출서?|요청서?|서면|최종|수정본?|초안|변호사|소송대리인|법무법인|정서|사건|의견)$/;
+function longestCommon(a: string, b: string): string {
+  let best = "";
+  for (let i = 0; i < a.length; i++) {
+    for (let j = i + best.length + 1; j <= a.length; j++) {
+      const sub = a.slice(i, j);
+      if (b.includes(sub)) best = sub; else break;
+    }
+  }
+  return best;
+}
+export function titleMatch(fileName: string, title: string): boolean {
+  const f = hangulOnly(fileName), t = hangulOnly(title);
+  if (f.length < 2 || t.length < 2) return false;
+  const c = longestCommon(f, t);
+  if (c.length < 3 && !(c.length === 2 && (c === t || c === f))) return false;
+  return !GENERIC.test(c);
 }
 
 // 방 제목에서 사건번호 꺼내기 (OCR이 0을 O로 읽는 것까지)
