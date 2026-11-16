@@ -28,7 +28,7 @@
 // ============================================================================
 
 import { saveRoomFile } from "./room_file.ts";
-import { linkPicked, linkRoom, linkRoomAnyBot } from "./room_link.ts";
+import { linkPicked, linkRoomAnyBot } from "./room_link.ts";
 import { handleRoomText } from "./room_chat.ts";
 import { backfillHold, recheckAll, recheckLinked, recheckRoom } from "./inv_case.ts";
 
@@ -172,14 +172,14 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
     }
   }
 
-  // 봇이 새 방에 초대됨 → 방 제목의 사건번호로 사건 자동 연결 (room_link.ts)
-  if (ev?.type === "join" && channelId) {
+  // 도우미가 있는 방은 무조건 사건 하나(석원 2026-11-16): 초대·메시지·파일·메뉴 등 그 방에서 어떤 신호든 오면,
+  // 아직 등록 안 된 방이면 바로 사건과 잇는다(로웨어에 없으면 자체 사건). 신호를 보낸 봇으로 먼저 제목을 읽는다.
+  if (channelId && (ev?.type === "join" || ev?.type === "joined" || ev?.type === "message" || ev?.type === "postback")) {
     const botId = req.headers.get("x-works-botid") || String(ev?.botId || "");
-    if (botId) {
-      background(linkRoom(env, botId, channelId, fetcher)
-        .then((r) => console.log("link", r.how, r.linked))
-        .catch((e) => console.error("link fail", String(e?.message || e).slice(0, 200))));
-    }
+    const bots = [...new Set([botId, ...BOT_IDS].filter(Boolean))];
+    background(linkRoomAnyBot(env, bots, channelId, fetcher)
+      .then((r) => { if (r.how !== "already") console.log("link", ev?.type, r.how, r.linked); })
+      .catch((e) => console.error("link fail", String(e?.message || e).slice(0, 200))));
   }
 
   // 수사 사건 방에서 메뉴·파일이 오면 방 제목을 다시 읽어, 재판부 사건번호로 바뀌었으면 합친다

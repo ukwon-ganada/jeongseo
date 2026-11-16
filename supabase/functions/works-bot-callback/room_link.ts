@@ -10,7 +10,7 @@
 //  기록: source='auto', basis='방 제목 사건번호'
 // ============================================================================
 import { botToken, type FileEnv } from "./room_file.ts";
-import { createInvCase, parseInvTitle } from "./inv_case.ts";
+import { createInvCase, invFields } from "./inv_case.ts";
 
 export type LinkResult = { linked: number; how: string };
 
@@ -51,12 +51,11 @@ export async function linkRoom(env: FileEnv, botId: string, channelId: string, f
   if (had.ok && (await had.json()).length) return { linked: 0, how: "already" };
   const t = title ?? await roomTitle(env, botId, channelId, fetcher);
   const nos = caseNosInTitle(t);
-  // 로웨어 사건을 못 찾은 수사단계 방 → 도우미가 수사 사건을 만들어 붙인다 (inv_case.ts, 석원 2026-11-16)
+  // 규칙(석원 2026-11-16): 도우미가 있는 방은 무조건 사건 하나. 로웨어 사건을 못 찾으면 도우미 자체 사건을 만들어 두고,
+  // 나중에 제목의 번호가 로웨어에 생기면 합친다(inv_case.ts recheckInv). 수사 단계 방이 아니어도(민사·제목 없음) 만든다.
   const inv = async (how: string): Promise<LinkResult> => {
-    const p = parseInvTitle(t);
-    if (!p) return { linked: 0, how };
-    await createInvCase(env, channelId, t, p, fetcher);
-    return { linked: 1, how: "inv-created" };
+    await createInvCase(env, channelId, t, invFields(t), fetcher);
+    return { linked: 1, how: "inv-created:" + how };
   };
   if (!nos.length) return await inv("no-case-no");
   const codes = [...new Set(nos.flatMap(codeVariants))];
@@ -97,10 +96,20 @@ export async function linkPicked(env: FileEnv, botIds: string[], channelId: stri
 }
 
 // 봇 여러 개(운영·시험) 중 그 방에 들어가 있는 봇으로 자동 연결 시도
-export async function linkRoomAnyBot(env: FileEnv, botIds: string[], channelId: string, fetcher: typeof fetch = fetch): Promise<LinkResult> {
-  let last: LinkResult = { linked: 0, how: "no-bot" };
-  for (const b of botIds) {
-    try { return await linkRoom(env, b, channelId, fetcher); } catch (e) { last = { linked: 0, how: "error:" + String((e as Error)?.message || e).slice(0, 60) }; }
-  }
-  return last;
+// 방 제목을 어느 봇으로도 못 읽어도(권한·일시 오류) 빈 제목으로 사건을 만들고, 제목은 하루 4번 다시 읽어 채운다
+// 같은 방에서 신호가 거의 동시에 여러 개 오면 사건이 두 번 만들어지지 않게, 이 서버에서 처리 중인 방은 기다렸다가 같은 결과를 쓴다
+const inflight = new Map<string, Promise<LinkResult>>();
+export function linkRoomAnyBot(env: FileEnv, botIds: string[], channelId: string, fetcher: typeof fetch = fetch): Promise<LinkResult> {
+  const cur = inflight.get(channelId);
+  if (cur) return cur.then(() => ({ linked: 0, how: "already" }));
+  const p = linkRoomAnyBot1(env, botIds, channelId, fetcher).finally(() => inflight.delete(channelId));
+  inflight.set(channelId, p);
+  return p;
+}
+async function linkRoomAnyBot1(env: FileEnv, botIds: string[], channelId: string, fetcher: typeof fetch): Promise<LinkResult> {
+  const had = await rest(env, `works_room_case?select=channel_id&limit=1&channel_id=eq.${encodeURIComponent(channelId)}`, {}, fetcher);
+  if (had.ok && (await had.json()).length) return { linked: 0, how: "already" };
+  let t: string | null = null;
+  for (const b of botIds) { try { t = await roomTitle(env, b, channelId, fetcher); break; } catch { /* 다음 봇 */ } }
+  return await linkRoom(env, botIds[0], channelId, fetcher, t ?? "");
 }

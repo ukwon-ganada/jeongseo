@@ -653,8 +653,10 @@ document.addEventListener('change', function(e){
 function render(){
   document.querySelectorAll('#nav button').forEach(function(b){ b.setAttribute('aria-current', b.dataset.v===view?'page':'false'); });
   $('#nav').hidden=false;
-  $('#title').textContent = data.dispNo || ((data.roomOnly || data.inv) ? '수사 단계' : data.caseNo);
-  $('#sub').innerHTML = (q.get('closed') || data.closed ? '<span class="tag">종결</span>' : '') + esc(data.title) + ' · ' + esc(data.court);
+  // 로웨어에 없는 자체 사건 중 수사기관 표시도 없는 방(민사·제목 못 읽음 등)은 '로웨어 미등록'으로
+  var own = data.inv && data.court==='수사 단계', court = own ? '로웨어 미등록' : data.court;
+  $('#title').textContent = data.dispNo || (own ? '로웨어 미등록' : (data.roomOnly || data.inv) ? '수사 단계' : data.caseNo);
+  $('#sub').innerHTML = (q.get('closed') || data.closed ? '<span class="tag">종결</span>' : '') + [data.title, court].filter(Boolean).map(esc).join(' · ');
   $('#switch').hidden = !!ctx.room;
   var canTl = view==='timeline' && !!data.lNum;
   $('#impbtn').hidden = !canTl || tl.on; $('#tledit').hidden = !canTl || tl.on;

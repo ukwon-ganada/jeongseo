@@ -1,7 +1,7 @@
 // 실행: deno test supabase/functions/works-bot-callback/inv_case_test.ts
 import { assertEquals } from "jsr:@std/assert@1";
 import { courtNosInTitle, parseInvTitle, recheckInv, recheckLinkedRoom, trialRank } from "./inv_case.ts";
-import { linkRoom } from "./room_link.ts";
+import { linkRoom, linkRoomAnyBot } from "./room_link.ts";
 
 Deno.test("방 제목 읽기: 수사단계 방", () => {
   assertEquals(parseInvTitle("●(형/고소)김특별_사기_관악경찰서"),
@@ -41,6 +41,7 @@ function fake(db: { rooms: any[]; cases: any[]; inv: any[]; merged: any[] }, tit
     }
     if (t === "inv_case") {
       if (m === "POST") { const r = { l_num: -100001 - db.inv.length, ...JSON.parse(String(init!.body))[0] }; db.inv.push(r); return Response.json([r], { status: 201 }); }
+      if (m === "PATCH") (db as any).patches?.push(JSON.parse(String(init!.body)));
       return new Response(null, { status: 204 });
     }
     if (t === "rpc/inv_case_merge") { const b = JSON.parse(String(init!.body)); db.merged.push(b); return Response.json({ ok: true, into: b.p_real }); }
@@ -57,7 +58,7 @@ Deno.test("수사단계 방 초대 → 수사 사건 생성, 제목이 재판번
   let title = "◎(형/피의)홍길동_사기_부평경찰서_2026-6419";
   const f = fake(db, () => title);
   const r = await linkRoom(ENV, "b", "ch1", f);
-  assertEquals(r.how, "inv-created");
+  assertEquals(r.how, "inv-created:no-case-no");
   assertEquals(db.inv[0].client_name, "홍길동");
   assertEquals(db.rooms[0].l_num, -100001);
   assertEquals(db.rooms[0].case_no, "수사-100001");
@@ -73,11 +74,24 @@ Deno.test("수사단계 방 초대 → 수사 사건 생성, 제목이 재판번
   assertEquals(db.merged, [{ p_inv: -100001, p_real: 3100 }]);
 });
 
-Deno.test("민사 방·빈 제목은 수사 사건을 만들지 않는다", async () => {
-  const db = { rooms: [] as any[], cases: [], inv: [] as any[], merged: [] as any[] };
+Deno.test("도우미가 있는 방은 무조건 사건 하나: 민사 방·로웨어에 없는 번호·제목 못 읽은 방", async () => {
+  const db = { rooms: [] as any[], cases: [], inv: [] as any[], merged: [] as any[], patches: [] as any[] };
   const r = await linkRoom(ENV, "b", "ch2", fake(db, () => "(민)을지문덕-대여금"));
-  assertEquals(r.how, "no-case-no");
-  assertEquals(db.inv.length, 0);
+  assertEquals(r.how, "inv-created:no-case-no");
+  assertEquals([db.inv[0].client_name, db.inv[0].charge], ["", "(민)을지문덕-대여금"]);
+  const r2 = await linkRoom(ENV, "b", "ch5", fake(db, () => "서)*(형/피고)김태율-사기 등-2026고단7905의 항소심"));
+  assertEquals(r2.how, "inv-created:not-in-lawware");
+  // 제목을 못 읽어도 빈 제목으로 만들고, 나중에 읽으면 채운다
+  let fail = true;
+  const base = fake(db, () => "(형/피의)갑돌_사기_관악경찰서");
+  const f: typeof fetch = (i, init) => fail && String(i).includes("/channels/") ? Promise.resolve(new Response("no", { status: 403 })) : base(i, init);
+  const r3 = await linkRoomAnyBot(ENV, ["b", "c"], "ch6", f);
+  assertEquals(r3.linked, 1);
+  assertEquals(db.inv[2].room_title, "");
+  assertEquals((await linkRoomAnyBot(ENV, ["b"], "ch6", f)).how, "already");
+  fail = false;
+  await recheckInv(ENV, ["b"], { l_num: db.rooms[2].l_num, channel_id: "ch6", room_title: "" }, f);
+  assertEquals(db.patches.at(-1).client_name, "갑돌");
 });
 
 Deno.test("로웨어 형제 사건에 연결된 방: 제목에 재판번호가 생기면 그 재판 사건을 주 사건으로", async () => {
