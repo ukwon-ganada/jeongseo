@@ -22,6 +22,7 @@
 //    { "action": "chat_import_save", "lNum": 1, "events": [...] } → 직원이 고른 줄만 타임라인(room_event)에 저장
 //    { "action": "tl_refresh", "lNum": -100061 } → 보관된 수사 사건방 글(30일)을 AI가 다시 읽어 빠진 줄만 바로 저장
 //    { "action": "hide_event", "id": 12 }           → 타임라인의 대화 줄 하나 숨기기(예전 화면용)
+//    { "action": "chat_reset", "lNum": 1 }           → 대화 파일로 만든 줄 모두 지우기(다시 넣기 전 초기화)
 //    { "action": "tl_list", "lNum": 1 }              → 수정 화면: 이 사건의 대화·직접 입력 줄 전부(숨긴 줄 포함)
 //    { "action": "tl_save", "lNum": 1, "rows": [{id?, date, time, summary, hidden}] } → 줄 고치기·삭제(숨김)·되살리기·추가
 //  사건 정보 칸은 우리가 직접 입력·수정한다. 로웨어와 연동하지 않는다(자동으로 덮어쓰지 않음).
@@ -90,6 +91,30 @@ export function caseNoVariants(p: string): string[] {
 // ── 자료를 화면 모양으로 바꾸기 ─────────────────────────
 // "보정서"처럼 "정서"가 들어간 낱말과 헷갈리지 않게 "법무법인 정서"로 찾음
 const OUR_FIRM = /법무법인\s*정서/;
+
+// 우리 서면 알아보기. 법원 기록은 우리 이름을 "피고인1 변호인 법OOOOOO 변론요지서 제출"처럼 가리기도 한다.
+// 가려진 줄은 ① 우리가 맡은 자리(피고인1·신청인 등)와 같고 ② 우리 이름이 처음 보인 날(선임) 이후일 때만 우리 것으로 본다.
+// 맡은 자리를 모르면(선임계에 "변호인 법무법인 정서"만 있음) 선임 이후 가려진 자리가 한 곳뿐일 때만 그 자리로 본다.
+const MASKED = /^(\S*?)\s*(변호인|소송대리인)\s+법O{6}(?!O)/;
+const OUR_ROLE = /^(\S*?)\s*(변호인|소송대리인)\s+법무법인\s*정서/;
+export function ourFilingTest(list: any[]): (e: any) => boolean {
+  const day = (e: any) => nz(e.lp_appoint_date).slice(0, 10);
+  const firm = list.filter((e) => OUR_FIRM.test(nz(e.lp_contents)));
+  const since = firm.map(day).filter(Boolean).sort()[0] || "";
+  const roles = new Set<string>();
+  for (const e of firm) { const m = nz(e.lp_contents).match(OUR_ROLE); if (m && m[1]) roles.add(m[1]); }
+  if (since && !roles.size) {
+    const seen = new Set(list.filter((e) => e.lp_set === "서면" && day(e) >= since).map((e) => nz(e.lp_contents).match(MASKED)?.[1]).filter((r) => r != null) as string[]);
+    if (seen.size === 1) roles.add([...seen][0]);
+  }
+  return (e: any) => {
+    if (e.lp_set !== "서면") return false;
+    const c = nz(e.lp_contents);
+    if (OUR_FIRM.test(c)) return true;
+    const m = c.match(MASKED);
+    return !!m && !!since && day(e) >= since && roles.has(m[1]);
+  };
+}
 export const PREFILL_FROM_LAWWARE = true;
 export const INFO_FIELDS = ["case_name", "client_name", "client_phone", "lawyer", "court_dept", "court_phone", "investigator", "investigator_phone", "memo", "extra_phones"] as const;
 const kstNow = () => new Date(Date.now() + 9 * 3600e3);
@@ -144,7 +169,7 @@ export function shapeCase(c: any, evs: any[], opts: { today: string; linked: str
     .filter((e) => isDate(e.lp_appoint_date) && e.lp_set !== "문자" && e.lp_set !== "메일")
     .sort((a, b) => (a.lp_appoint_date + (a.lp_appoint_time || "")).localeCompare(b.lp_appoint_date + (b.lp_appoint_time || "")) || (a.lp_num || 0) - (b.lp_num || 0));
 
-  const ours = (e: any) => e.lp_set === "서면" && OUR_FIRM.test(nz(e.lp_contents));
+  const ours = ourFilingTest(list);
   const toUs = (e: any) => e.lp_set === "송달" && OUR_FIRM.test(nz(e.lp_contents));
 
   // 타임라인 (석원 결정 2026-11-13): "우리가 이 사건에서 한 일·해야 할 일"만.
@@ -165,7 +190,7 @@ export function shapeCase(c: any, evs: any[], opts: { today: string; linked: str
       const future = d >= today;
       events.push({ d, k: future ? "due" : verdict ? "ours" : "done", g: "hearing", t: (future ? "" : verdict ? "" : "출석 ") + t, f: null });
     } else if (ours(e)) {
-      events.push({ d, k: "ours", g: "ours", t: nz(e.lp_contents).replace(/^.*?법무법인\s*정서\s*/, "") || nz(e.lp_contents), f: null, lp: e.lp_num });
+      events.push({ d, k: "ours", g: "ours", t: nz(e.lp_contents).replace(/^.*?(법무법인\s*정서|법O{6}(?!O))\s*/, "") || nz(e.lp_contents), f: null, lp: e.lp_num });
     }
   }
   // 의뢰인에게 안내 문자를 보냈는지만 (석원 2026-11-16: 내용은 불필요). 같은 날 여러 통이어도 한 줄.
@@ -716,10 +741,22 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
         rows.push({ channel_id: "export-start:" + lNum, l_num: lNum, kind: "사건접수", ev_date: start, ev_time: "", summary: "사건 선임", state: "완료", source: "chat-export" });
       }
       if (!rows.length) return json({ ok: true, saved: 0 });
+      // 지운(숨긴) 줄과 날짜·종류가 겹치면 새 내용으로 바꾸고 다시 보이게 한다
       await rest(env, "room_event?on_conflict=channel_id,kind,ev_date,ev_time", {
-        method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=minimal" }, body: JSON.stringify(rows) }, fetcher);
+        method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify(rows.map((r) => ({ ...r, hidden: false }))) }, fetcher);
       await logView(env, who, "chat_import_save", "", c, fetcher);
       return json({ ok: true, saved: rows.length });
+    }
+
+    if (body?.action === "chat_reset") {
+      // 대화 파일로 만든 줄을 모두 지운다(직원이 직접 넣은 줄·담당자 변경 줄은 그대로)
+      const lNum = Number(body.lNum);
+      if (!Number.isFinite(lNum) || lNum === 0) return json({ error: "사건이 없습니다" }, 400);
+      const c = (await rest(env, `case_all?select=l_num,l_code&l_num=eq.${lNum}`, {}, fetcher))[0];
+      if (!c) return json({ error: "사건이 없습니다" }, 404);
+      const gone = await rest(env, `room_event?l_num=eq.${lNum}&source=eq.chat-export&select=id`, { method: "DELETE", headers: { Prefer: "return=representation" } }, fetcher) || [];
+      await logView(env, who, "chat_reset:" + gone.length, "", c, fetcher);
+      return json({ ok: true, removed: gone.length });
     }
 
     if (body?.action === "tl_refresh") {

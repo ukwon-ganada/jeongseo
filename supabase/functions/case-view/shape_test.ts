@@ -1,5 +1,5 @@
 // 실행: deno test supabase/functions/case-view/shape_test.ts
-import { attachContract, byDay, earliestAccept, attachFinalFiles, caseNoVariants, caseNosIn, cleanPhones, infoFields, mergeMeets, shapeCase, smsGist } from "./handler.ts";
+import { attachContract, byDay, earliestAccept, attachFinalFiles, caseNoVariants, caseNosIn, cleanPhones, infoFields, mergeMeets, ourFilingTest, shapeCase, smsGist } from "./handler.ts";
 function assert(c: unknown, m: string) { if (!c) throw new Error(m); }
 
 Deno.test("사건번호 후보", () => {
@@ -154,4 +154,24 @@ Deno.test("대화에서 뽑은 마감 줄은 기한 탭으로, 기일 탭에서�
   assertEquals(shaped.deadlines.map((x: any) => [x.t, x.d, x.kind]), [["항고 마감일", "2026-12-06", "대화"]]);
   assertEquals(shaped.hearings.map((h: any) => h.t), ["피의자 조사"]);
   assertEquals(shaped.events.find((e: any) => e.rid === 1).g, "limit");
+});
+
+Deno.test("법원 기록에서 가려진 우리 이름(법OOOOOO)도 우리 서면으로 본다", () => {
+  const L = (d: string, set: string, c: string) => ({ lp_appoint_date: d, lp_set: set, lp_contents: c });
+  const t = ourFilingTest([
+    L("2026-07-29", "서면", "피고인1 변호인  법OOOOOO 항소이유서 제출"),   // 우리 선임 전 → 전 변호인
+    L("2026-08-04", "서면", "변호인  법무법인 정서 변호인선임계 제출"),
+    L("2026-08-21", "송달", "피고인1 변호인  법무법인 정서 공판기일통지서(변호인용) 발송"),
+    L("2026-09-29", "서면", "피고인1 변호인  법OOOOOO 변호인 의견서 제출"),
+    L("2026-10-12", "서면", "피고인2 변호인  법OOOOOOO 참고자료 제출"),
+    L("2026-10-13", "서면", "피고인2 변호인  법OOOOOO 의견서 제출"),
+  ]);
+  assertEquals([
+    "2026-07-29|피고인1 변호인  법OOOOOO 항소이유서 제출", "2026-08-04|변호인  법무법인 정서 변호인선임계 제출",
+    "2026-09-29|피고인1 변호인  법OOOOOO 변호인 의견서 제출", "2026-10-12|피고인2 변호인  법OOOOOOO 참고자료 제출",
+    "2026-10-13|피고인2 변호인  법OOOOOO 의견서 제출",
+  ].map((x) => t({ lp_set: "서면", lp_appoint_date: x.split("|")[0], lp_contents: x.split("|")[1] })), [false, true, true, false, false]);
+  // 맡은 자리를 모를 때: 선임 뒤 가려진 자리가 하나뿐이면 그 자리
+  const u = ourFilingTest([L("2026-11-02", "서면", "변호인  법무법인 정서 변호인선임계 제출"), L("2026-11-03", "서면", "피고인1 변호인  법OOOOOO 기일변경신청서 제출")]);
+  assertEquals(u(L("2026-11-03", "서면", "피고인1 변호인  법OOOOOO 기일변경신청서 제출")), true);
 });
