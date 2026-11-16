@@ -205,13 +205,16 @@ export async function recheckLinkedRoom(env: FileEnv, botIds: string[], channelI
   const top = trials[0];
   const have = new Map(rows.map((r) => [Number(r.l_num), r]));
   const primary = rows.find((r) => r.is_primary);
-  if (primary && Number(primary.l_num) === Number(top.l_num) && trials.every((t) => have.has(Number(t.l_num)))) return { channelId, how: "same" };
+  // 주 사건은 심급이 올라갈 때만 바꾼다(같은 심급의 병합 사건 등은 주 사건을 그대로 둔다)
+  const move = !primary || trialRank(top.l_code) > trialRank(String(primary.case_no || ""));
+  if (!move && trials.every((t) => have.has(Number(t.l_num)))) return { channelId, how: "same" };
   const add = trials.filter((t) => !have.has(Number(t.l_num))).map((t) => ({
     channel_id: channelId, l_num: Number(t.l_num), case_no: caseNosInTitle(t.l_code)[0] || t.l_code, is_primary: false,
     status: t.state === "종결" ? "종결" : "대상", room_title: title, basis: "제목에 새 재판번호", confidence: "높음", source: "auto", updated_at: now,
   }));
   if (add.length) await restJson(env, "works_room_case", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify(add) }, fetcher);
-  if (!primary || Number(primary.l_num) !== Number(top.l_num)) {
+  if (!move) return { channelId, how: "added", added: add.length };
+  {
     await restJson(env, `works_room_case?channel_id=eq.${encodeURIComponent(channelId)}&is_primary=eq.true`, { method: "PATCH", headers: { Prefer: "return=minimal" },
       body: JSON.stringify({ is_primary: false, updated_at: now }) }, fetcher);
     await restJson(env, `works_room_case?channel_id=eq.${encodeURIComponent(channelId)}&l_num=eq.${Number(top.l_num)}`, { method: "PATCH", headers: { Prefer: "return=minimal" },
@@ -222,7 +225,7 @@ export async function recheckLinkedRoom(env: FileEnv, botIds: string[], channelI
 
 // 하루 4번 중 이번 차례 몫(방을 4묶음으로 나눠 한 번에 1/4씩)
 export async function recheckLinked(env: FileEnv, botIds: string[], fetcher: typeof fetch = fetch, part?: number) {
-  const rows: any[] = await restJson(env, `works_room_case?select=channel_id,l_num,is_primary,room_title&status=eq.대상&l_num=gt.0&limit=2000`, {}, fetcher) || [];
+  const rows: any[] = await restJson(env, `works_room_case?select=channel_id,l_num,case_no,is_primary,room_title&status=eq.대상&l_num=gt.0&limit=2000`, {}, fetcher) || [];
   const by = new Map<string, any[]>();
   for (const r of rows) { const ch = String(r.channel_id || ""); if (ch) (by.get(ch) || by.set(ch, []).get(ch)!).push(r); }
   const hour = new Date(Date.now() + 9 * 3600e3).getUTCHours();
