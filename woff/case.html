@@ -363,7 +363,7 @@ var VIEWS = {
       if(prevD && y===prevY) body+=gapDiv(prevD, e.d);
       prevD=e.d; prevY=y;
       var p=split(e), pill='';
-      if(g==='limit'){ var n=dd(e.d); pill='<span class="pill">'+(n<0?'지남':n===0?'오늘까지':'D-'+n)+'</span>'; p.ts=(p.ts?p.ts+' · ':'')+'잠정'; }
+      if(g==='limit'){ var n=dd(e.d); pill='<span class="pill">'+(n<0?'지남':n===0?'오늘까지':'D-'+n)+'</span>'; p.ts=(p.ts?p.ts+' · ':'')+(e.src==='chat'?'대화 기준':'잠정'); }
       else if(e.k==='due') pill='<span class="pill">예정</span>';
       body+='<div class="ev '+e.k+(g?' g-'+g:'')+(minor?' minor':'')+(key?' key':'')+'"><div class="d"><b>'+md(e.d)+'</b><small>'+wk(e.d)+'</small></div><div class="rail"></div><div class="t">'
         +'<div class="tt">'+esc(p.tt)+pill+'</div>'+(p.ts?'<div class="ts">'+esc(p.ts)+'</div>':'')

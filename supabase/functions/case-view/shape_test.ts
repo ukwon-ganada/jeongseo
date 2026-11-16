@@ -143,3 +143,15 @@ Deno.test("같은 날 사건 선임이 맨 위", () => {
   shaped.events.sort(byDay);
   assertEquals(shaped.events.map((e: any) => e.t), ["앞날", "사건 선임", "선임계 우편 제출", "기타"]);
 });
+
+Deno.test("대화에서 뽑은 마감 줄은 기한 탭으로, 기일 탭에서는 뺀다", () => {
+  const shaped: any = { today: "2026-11-16", events: [], hearings: [], deadlines: [] };
+  _mre(shaped, [
+    { id: 1, kind: "기일", ev_date: "2026-12-06", ev_time: "", summary: "항고 마감일", state: "예정" },
+    { id: 2, kind: "지시", ev_date: "2026-11-16", ev_time: "", summary: "항고장 작성 지시 (서변호사)", state: "완료" },
+    { id: 3, kind: "조사", ev_date: "2026-12-01", ev_time: "14:00", summary: "피의자 조사", state: "예정" },
+  ], "");
+  assertEquals(shaped.deadlines.map((x: any) => [x.t, x.d, x.kind]), [["항고 마감일", "2026-12-06", "대화"]]);
+  assertEquals(shaped.hearings.map((h: any) => h.t), ["피의자 조사"]);
+  assertEquals(shaped.events.find((e: any) => e.rid === 1).g, "limit");
+});
