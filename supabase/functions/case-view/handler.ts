@@ -264,19 +264,47 @@ export async function roomEvents(env: Env, lNum: string | null, channels: string
   return await rest(env, `room_event?select=id,kind,ev_date,ev_time,summary,state&hidden=eq.false&or=(${ors.join(",")})&order=ev_date.asc&limit=500`, {}, fetcher) || [];
 }
 const MEET = new Set(["조사", "출석요구", "기일"]);
+// 수사 단계 줄도 재판 단계와 같은 색: 우리 제출(선임계·서면) 초록, 조사·출석·기일 파랑, 송치·기소·처분 파랑 굵게, 접견 청록, 나머지는 흐린 대화 줄
+export function roomGroup(kind: string, summary: string): string {
+  const s = nz(summary);
+  if (kind === "접견" || /접견/.test(s)) return "meet";
+  if (["송치", "처분", "기소"].includes(kind) || /송치|불송치|기소|불기소|기소유예|약식|처분/.test(s)) return "decision";
+  if (["서면제출", "고소장제출"].includes(kind) || /선임계|선임신고서|선임서|의견서|고소장|고발장|이의신청|탄원서|서면\s*제출/.test(s)) return "ours";
+  if (MEET.has(kind) || /조사|출석/.test(s)) return "hearing";
+  if (kind === "사건접수" || s === "사건 선임") return "accept";
+  return "chat";
+}
 export function mergeRoomEvents(shaped: any, rows: any[], caseNo: string) {
   const seen = new Set<string>();
   for (const r of rows) {
     const d = String(r.ev_date).slice(0, 10), tm = nz(r.ev_time);
     const key = d + tm + r.summary;
     if (seen.has(key)) continue; seen.add(key);
-    const t = (tm ? tm + " " : "") + nz(r.summary);
-    shaped.events.push({ d, k: d >= shaped.today && r.state !== "완료" ? "due" : "room", t, f: null, g: "chat", src: "chat", rid: r.id });
-    if (MEET.has(r.kind)) shaped.hearings.push({ c: caseNo, d, tm, t: nz(r.summary), p: "사건방 대화" });
+    const t = (tm ? tm + " " : "") + (r.kind === "지시" ? "지시 · " : "") + nz(r.summary);
+    const g = roomGroup(nz(r.kind), nz(r.summary)), future = d >= shaped.today && r.state !== "완료";
+    const k = future ? "due" : g === "chat" ? "room" : g === "hearing" || g === "meet" ? "done" : "ours";
+    shaped.events.push({ d, k, t, f: null, g: g === "decision" ? "hearing" : g, src: "chat", rid: r.id });
+    if (MEET.has(r.kind) || g === "hearing") shaped.hearings.push({ c: caseNo, d, tm, t: nz(r.summary), p: "사건방 대화" });
   }
   shaped.events.sort((a: any, b: any) => a.d.localeCompare(b.d));
 }
 // 접견(웍스 캘린더 → meet_event): 우리가 한 일. 앞으로의 접견은 "예정"
+// 사건 선임 줄 하나만: 로웨어 사건은 로웨어 수임일, 수사 사건은 (방 만든 날·대화 첫날·가장 이른 업무 날) 중 가장 이른 날
+// 2026-11-16 석원: 선임계가 이미 나갔으면 그 전에 선임된 것, 우리 방식상 방을 만든 날이 선임일
+export function fixAccept(shaped: any, isInv: boolean) {
+  const ev = shaped.events as any[];
+  const base = ev.find((e) => e.g === "accept" && e.src !== "chat");
+  const chatAcc = ev.filter((e) => e.g === "accept" && e.src === "chat");
+  if (!isInv) { shaped.events = ev.filter((e) => !(e.g === "accept" && e.src === "chat")); return; }
+  const dates = ev.filter((e) => e.src === "chat" && e.d).map((e) => e.d as string);
+  if (base) dates.push(base.d);
+  if (!dates.length) return;
+  const first = dates.sort()[0];
+  const keep = base || chatAcc[0];
+  keep.d = first; keep.k = "ours"; keep.t = "사건 선임"; keep.g = "accept";
+  shaped.events = ev.filter((e) => e === keep || !(e.g === "accept"));
+  shaped.events.sort((a: any, b: any) => a.d.localeCompare(b.d));
+}
 export function mergeMeets(shaped: any, rows: any[]) {
   const seen = new Set<string>();
   for (const r of rows) {
@@ -434,6 +462,7 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       attachFinalFiles(shaped.events, files);
       attachContract(shaped.events, files);
       mergeRoomEvents(shaped, chat, c.l_code);
+      fixAccept(shaped, !!c.is_inv);
       mergeMeets(shaped, meets || []);
       // 직원이 줄마다 파일을 바꿀 때 고를 목록 (화면에 따로 나열하지 않음)
       const fileChoices = files.map((f: any) => ({ id: f.id, n: f.n, d: f.d, tm: f.tm, by: f.by }));
@@ -581,6 +610,10 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
         return json(r);
       }
       const rows = toRows(lNum, Array.isArray(body.events) ? body.events.slice(0, 300) : []);
+      const start = nz(body.startDate);
+      if (c.l_num < 0 && /^\d{4}-\d{2}-\d{2}$/.test(start) && !isNaN(Date.parse(start))) {
+        rows.push({ channel_id: "export-start:" + lNum, l_num: lNum, kind: "사건접수", ev_date: start, ev_time: "", summary: "사건 선임", state: "완료", source: "chat-export" });
+      }
       if (!rows.length) return json({ ok: true, saved: 0 });
       await rest(env, "room_event?on_conflict=channel_id,kind,ev_date,ev_time", {
         method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=minimal" }, body: JSON.stringify(rows) }, fetcher);

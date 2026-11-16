@@ -8,8 +8,19 @@
 //    · 저장 줄: channel_id 'export:<l_num>', source 'chat-export', state 완료/예정.
 // ============================================================================
 
-export const KINDS = ["사건접수", "고소장제출", "조사", "출석요구", "송치", "처분", "기소", "기일", "서면제출", "접견", "기타"] as const;
+export const KINDS = ["사건접수", "고소장제출", "조사", "출석요구", "송치", "처분", "기소", "기일", "서면제출", "접견", "지시", "기타"] as const;
 export type ImportEvent = { kind: string; date: string; time: string; msg_time: string; summary: string; state: "예정" | "완료" };
+
+// 지시 메시지를 줄로 남길 변호사(2026-11-16 석원 요청)
+export const LAWYERS = ["서고은", "강현구", "이예나"];
+
+// 내보낸 대화의 첫 날짜 머리줄 = 방을 만든 날(우리 업무 방식상 사건 선임일)
+export function firstDate(text: string): string {
+  const m = String(text || "").match(/(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일/);
+  if (!m) return "";
+  const d = `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+  return isNaN(Date.parse(d)) ? "" : d;
+}
 
 const MAX_CHARS = 60000;   // 한 번에 AI에 보낼 양
 const MAX_TOTAL = 400000;  // 파일 전체 한도(약 몇 년치)
@@ -72,6 +83,7 @@ const SYSTEM = [
   "날짜는 대화의 날짜 머리줄과 보낸 시각을 기준으로 한다. '내일', '11/5' 같은 말은 실제 날짜로 바꾼다.",
   "이미 한 일은 state=완료, 기록 마지막 날 이후의 일정은 state=예정.",
   "summary는 짧은 업무 이름으로 쓴다. 예: '선임계 킥스 전자 제출', '피의자 조사 참여 (인천광역시경찰청)', '피의자신문조서 정보공개청구'. 변호사는 '서변호사'처럼 성+변호사만 써도 된다.",
+  `변호사(${LAWYERS.join("·")})가 직원에게 남긴 지시 형태의 메시지(예: '공소청에 의견서 내주세요', '선임계 전자로 다시 넣어 주세요')는 kind=지시로 한 줄 남긴다. summary는 '의견서 공소청 제출 지시 (서변호사)'처럼 무엇을 하라는지와 성+변호사를 쓴다. 잡담·질문·감상은 지시가 아니다.`,
   "확실하지 않으면 넣지 않는다.",
 ].join("\n");
 
@@ -114,8 +126,9 @@ async function askAI(key: string, model: string, chunk: string, title: string, f
 export async function extractFromExport(
   a: { key?: string; model?: string; text: string; title: string },
   fetcher: typeof fetch = fetch,
-): Promise<{ events: ImportEvent[]; chunks: number; truncated: boolean }> {
+): Promise<{ events: ImportEvent[]; chunks: number; truncated: boolean; startDate: string }> {
   if (!a.key) throw new Error("ANTHROPIC_API_KEY 없음");
+  const startDate = firstDate(a.text);
   let text = tidyExport(a.text);
   const truncated = text.length > MAX_TOTAL;
   if (truncated) text = text.slice(-MAX_TOTAL); // 너무 길면 최근 쪽을 남김
@@ -124,7 +137,7 @@ export async function extractFromExport(
   const parts = await Promise.all(chunks.map((c) => askAI(a.key!, a.model || "claude-opus-5-5", c, a.title, fetcher)));
   const all: ImportEvent[] = parts.flat();
   all.sort((x, y) => (x.date + x.time + x.msg_time).localeCompare(y.date + y.time + y.msg_time));
-  return { events: all, chunks: chunks.length, truncated };
+  return { events: all, chunks: chunks.length, truncated, startDate };
 }
 
 // 저장할 줄 만들기: room_event 고유키(channel_id, kind, ev_date, ev_time)가 겹치면 보낸 시각으로 구분
