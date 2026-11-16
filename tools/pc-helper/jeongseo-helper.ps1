@@ -87,6 +87,10 @@ function Read-WorksRoomTitle {
     if (-not [JsWin]::IsWindowVisible($w) -or [JsWin]::IsIconic($w)) { continue }
     $t = [JsWin]::Title($w)
     if (-not $t) { continue }
+    # 웍스가 잠깐 띄우는 작은 창(메뉴·알림 등, 제목 'Form')은 건너뛴다
+    if ($t -match '^Form\d*$') { continue }
+    $rc = New-Object JsWin+RECT; [void][JsWin]::GetWindowRect($w, [ref]$rc)
+    if (($rc.R - $rc.L) -lt 300 -or ($rc.B - $rc.T) -lt 150) { continue }
     $h = $w; $title = $t; break
   }
   if ($h -eq [IntPtr]::Zero) { throw '보이는 웍스 창 없음' }
