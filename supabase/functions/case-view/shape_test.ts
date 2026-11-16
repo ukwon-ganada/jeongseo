@@ -85,3 +85,21 @@ Deno.test("방 제목 사건번호: 2자리 연도도", () => {
   const b = caseNosIn("인천 2026고합100351");
   if (!b.includes("2026고합100351")) throw new Error(JSON.stringify(b));
 });
+
+import { mergeRoomEvents as _mre, roomGroup as _rg } from "./handler.ts";
+import { assertEquals } from "jsr:@std/assert@1";
+Deno.test("수사 단계 줄 색: 선임계·서면 초록, 조사 파랑, 송치 파랑 굵게, 정보공개청구는 흐린 줄", () => {
+  assertEquals(_rg("서면제출", "선임계 우편 제출"), "ours");
+  assertEquals(_rg("기타", "선임계 킥스 다시 제출, 수사관 확인"), "ours");
+  assertEquals(_rg("조사", "피의자 조사 참여 (인천광역시경찰청)"), "hearing");
+  assertEquals(_rg("송치", "검찰 송치"), "decision");
+  assertEquals(_rg("기타", "피신조서 정보공개 결과 받음"), "chat");
+  const sh: any = { today: "2026-11-16", events: [], hearings: [] };
+  _mre(sh, [
+    { id: 1, kind: "조사", ev_date: "2026-11-05", ev_time: "11:00", summary: "피의자 조사 참여", state: "완료" },
+    { id: 2, kind: "송치", ev_date: "2026-11-10", ev_time: "", summary: "검찰 송치", state: "완료" },
+    { id: 3, kind: "조사", ev_date: "2026-11-20", ev_time: "", summary: "피의자 2회 조사", state: "예정" },
+  ], "수사-1");
+  assertEquals(sh.events.map((e: any) => [e.g, e.k]), [["hearing", "done"], ["hearing", "ours"], ["hearing", "due"]]);
+  assertEquals(sh.hearings.length, 2);
+});

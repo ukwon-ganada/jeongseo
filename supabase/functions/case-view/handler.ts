@@ -264,6 +264,16 @@ export async function roomEvents(env: Env, lNum: string | null, channels: string
   return await rest(env, `room_event?select=id,kind,ev_date,ev_time,summary,state&hidden=eq.false&or=(${ors.join(",")})&order=ev_date.asc&limit=500`, {}, fetcher) || [];
 }
 const MEET = new Set(["조사", "출석요구", "기일"]);
+// 수사 단계 줄도 재판 단계와 같은 색: 우리 제출(선임계·서면) 초록, 조사·출석·기일 파랑, 송치·기소·처분 파랑 굵게, 접견 청록, 나머지는 흐린 대화 줄
+export function roomGroup(kind: string, summary: string): string {
+  const s = nz(summary);
+  if (kind === "접견" || /접견/.test(s)) return "meet";
+  if (["송치", "처분", "기소"].includes(kind) || /송치|불송치|기소|불기소|기소유예|약식|처분/.test(s)) return "decision";
+  if (["서면제출", "고소장제출"].includes(kind) || /선임계|선임신고서|선임서|의견서|고소장|고발장|이의신청|탄원서|서면\s*제출/.test(s)) return "ours";
+  if (MEET.has(kind) || /조사|출석/.test(s)) return "hearing";
+  if (kind === "사건접수") return "accept";
+  return "chat";
+}
 export function mergeRoomEvents(shaped: any, rows: any[], caseNo: string) {
   const seen = new Set<string>();
   for (const r of rows) {
@@ -271,8 +281,10 @@ export function mergeRoomEvents(shaped: any, rows: any[], caseNo: string) {
     const key = d + tm + r.summary;
     if (seen.has(key)) continue; seen.add(key);
     const t = (tm ? tm + " " : "") + nz(r.summary);
-    shaped.events.push({ d, k: d >= shaped.today && r.state !== "완료" ? "due" : "room", t, f: null, g: "chat", src: "chat", rid: r.id });
-    if (MEET.has(r.kind)) shaped.hearings.push({ c: caseNo, d, tm, t: nz(r.summary), p: "사건방 대화" });
+    const g = roomGroup(nz(r.kind), nz(r.summary)), future = d >= shaped.today && r.state !== "완료";
+    const k = future ? "due" : g === "chat" ? "room" : g === "hearing" || g === "meet" ? "done" : "ours";
+    shaped.events.push({ d, k, t, f: null, g: g === "decision" ? "hearing" : g, src: "chat", rid: r.id });
+    if (MEET.has(r.kind) || g === "hearing") shaped.hearings.push({ c: caseNo, d, tm, t: nz(r.summary), p: "사건방 대화" });
   }
   shaped.events.sort((a: any, b: any) => a.d.localeCompare(b.d));
 }
