@@ -83,7 +83,7 @@ Deno.test("민사 방·빈 제목은 수사 사건을 만들지 않는다", asyn
 Deno.test("로웨어 형제 사건에 연결된 방: 제목에 재판번호가 생기면 그 재판 사건을 주 사건으로", async () => {
   assertEquals([trialRank("2026고단1"), trialRank("2026노2"), trialRank("2026도3"), trialRank("2026형제4"), trialRank("2026-5")], [1, 2, 3, 0, 0]);
   const db = { rooms: [] as any[], cases: [{ l_num: 3072, l_code: "2025형제60934", state: "진행" }, { l_num: 3200, l_code: "2026고단777", state: "진행" }], inv: [] as any[], merged: [] as any[] };
-  const rows = [{ channel_id: "ch3", l_num: 3072, is_primary: true, room_title: "(형/피의)김갑동_사기_부천지청 2025형제60934" }];
+  const rows = [{ channel_id: "ch3", l_num: 3072, case_no: "2025형제60934", is_primary: true, room_title: "(형/피의)김갑동_사기_부천지청 2025형제60934" }];
   let title = rows[0].room_title;
   const f = fake(db, () => title);
   assertEquals((await recheckLinkedRoom(ENV, ["b"], "ch3", rows, f)).how, "same");
@@ -91,4 +91,15 @@ Deno.test("로웨어 형제 사건에 연결된 방: 제목에 재판번호가 �
   const r: any = await recheckLinkedRoom(ENV, ["b"], "ch3", rows, f);
   assertEquals([r.how, r.to, r.from, r.added], ["moved", 3200, 3072, 1]);
   assertEquals(db.rooms.map((x) => [x.l_num, x.basis]), [[3200, "제목에 새 재판번호"]]);
+});
+
+Deno.test("같은 심급 병합 사건은 주 사건을 바꾸지 않는다", async () => {
+  const db = { rooms: [] as any[], cases: [{ l_num: 2639, l_code: "2025고단1888", state: "진행" }, { l_num: 2813, l_code: "2026고단101287", state: "진행" }], inv: [] as any[], merged: [] as any[] };
+  const title = "(형/피)갑_사기_부천지원 2025고단1888(병합 2026고단101287)";
+  const rows = [{ channel_id: "ch4", l_num: 2639, case_no: "2025고단1888", is_primary: true, room_title: title }, { channel_id: "ch4", l_num: 2813, case_no: "2026고단101287", is_primary: false, room_title: title }];
+  assertEquals((await recheckLinkedRoom(ENV, ["b"], "ch4", rows, fake(db, () => title))).how, "same");
+  const r: any = await recheckLinkedRoom(ENV, ["b"], "ch4", [rows[0]], fake(db, () => title));
+  assertEquals([r.how, r.added], ["added", 1]);
+  const up: any = await recheckLinkedRoom(ENV, ["b"], "ch4", rows, fake({ ...db, cases: [...db.cases, { l_num: 2900, l_code: "2026노55", state: "진행" }] }, () => title + " 2026노55"));
+  assertEquals([up.how, up.to], ["moved", 2900]);
 });
