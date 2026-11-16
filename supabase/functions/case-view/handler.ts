@@ -130,6 +130,9 @@ export function infoFields(c: any, saved: any | null, prefill = PREFILL_FROM_LAW
   return { fields: f, saved: !!saved, updatedBy: saved ? nz(saved.updated_by) : "", updatedAt: saved ? nz(saved.updated_at) : "" };
 }
 
+// 타임라인 정렬: 날짜순, 같은 날이면 "사건 선임"이 맨 위 (석원 2026-11-16). 나머지는 원래 순서 유지.
+export const byDay = (a: any, b: any) => a.d.localeCompare(b.d) || (b.g === "accept" ? 1 : 0) - (a.g === "accept" ? 1 : 0);
+
 export function shapeCase(c: any, evs: any[], opts: { today: string; linked: string[]; myHearings: any[]; status?: string; saved?: any }) {
   const raw = c.raw || {};
   const today = opts.today;
@@ -182,7 +185,7 @@ export function shapeCase(c: any, evs: any[], opts: { today: string; linked: str
   // 법정기한(형사, 잠정 계산) — 석원 2026-11-13. 규칙서 엔진이 생기면 그 결과로 바꾼다.
   const deadlines = computeDeadlines(c.l_code, evs, today);
   events.push(...deadlineEvents(deadlines, today));
-  events.sort((a, b) => a.d.localeCompare(b.d));
+  events.sort(byDay);
 
   // 기일: 이 사건 기일 + 내 다른 사건의 다가오는 기일(“내 사건 전체” 보기용)
   const hearings: any[] = list.filter((e) => e.lp_set === "기일").map((e) => ({
@@ -308,7 +311,7 @@ export function mergeRoomEvents(shaped: any, rows: any[], caseNo: string) {
     shaped.events.push({ d, k, t, f: null, g: g === "decision" ? "hearing" : g, src: "chat", rid: r.id });
     if (MEET.has(r.kind) || g === "hearing") shaped.hearings.push({ c: caseNo, d, tm, t: nz(r.summary), p: "사건방 대화" });
   }
-  shaped.events.sort((a: any, b: any) => a.d.localeCompare(b.d));
+  shaped.events.sort(byDay);
 }
 // 접견(웍스 캘린더 → meet_event): 우리가 한 일. 앞으로의 접견은 "예정"
 // 사건 선임 줄 하나만: 로웨어 사건은 로웨어 수임일, 수사 사건은 (방 만든 날·대화 첫날·가장 이른 업무 날) 중 가장 이른 날
@@ -325,7 +328,7 @@ export function fixAccept(shaped: any, isInv: boolean) {
   const keep = base || chatAcc[0];
   keep.d = first; keep.k = "ours"; keep.t = "사건 선임"; keep.g = "accept";
   shaped.events = ev.filter((e) => e === keep || !(e.g === "accept"));
-  shaped.events.sort((a: any, b: any) => a.d.localeCompare(b.d));
+  shaped.events.sort(byDay);
 }
 // 같은 방 이전 사건의 선임일이 더 이르면 그날을 "사건 선임"으로
 export function earliestAccept(shaped: any, relCases: any[]) {
@@ -334,7 +337,7 @@ export function earliestAccept(shaped: any, relCases: any[]) {
   const acc = shaped.events.find((e: any) => e.g === "accept");
   if (acc) { if (ds[0] < acc.d) acc.d = ds[0]; }
   else shaped.events.push({ d: ds[0], k: "ours", g: "accept", t: "사건 선임", f: null });
-  shaped.events.sort((a: any, b: any) => a.d.localeCompare(b.d));
+  shaped.events.sort(byDay);
 }
 export function mergeMeets(shaped: any, rows: any[]) {
   const seen = new Set<string>();
@@ -344,7 +347,7 @@ export function mergeMeets(shaped: any, rows: any[]) {
     const t = (tm ? tm + " " : "") + "접견" + (future ? " 예정" : "") + (nz(r.lawyer) ? " · " + nz(r.lawyer) : "") + (nz(r.place) ? " (" + nz(r.place) + ")" : "");
     shaped.events.push({ d, k: future ? "due" : "done", g: "meet", t, f: null });
   }
-  shaped.events.sort((a: any, b: any) => a.d.localeCompare(b.d));
+  shaped.events.sort(byDay);
 }
 // 로웨어 사건이 없는 방(보류·미연결)이라도 대화 일정이 있으면 그것만으로 화면을 만든다
 export function roomOnlyShape(title: string, rows: any[], today: string, myHearings: any[]) {

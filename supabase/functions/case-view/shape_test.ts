@@ -1,5 +1,5 @@
 // 실행: deno test supabase/functions/case-view/shape_test.ts
-import { attachContract, attachFinalFiles, caseNoVariants, caseNosIn, cleanPhones, infoFields, mergeMeets, shapeCase, smsGist } from "./handler.ts";
+import { attachContract, byDay, earliestAccept, attachFinalFiles, caseNoVariants, caseNosIn, cleanPhones, infoFields, mergeMeets, shapeCase, smsGist } from "./handler.ts";
 function assert(c: unknown, m: string) { if (!c) throw new Error(m); }
 
 Deno.test("사건번호 후보", () => {
@@ -131,4 +131,15 @@ Deno.test("같은 방 이전 사건 선임일이 더 이르면 그날로", async
   const s2: any = { events: [] };
   earliestAccept(s2, [{ raw: { l_accept_date: "2026-06-03" } }]);
   assertEquals(s2.events[0].t, "사건 선임");
+});
+
+Deno.test("같은 날 사건 선임이 맨 위", () => {
+  const shaped: any = { today: "2026-11-16", events: [], hearings: [] };
+  shaped.events.push({ d: "2026-08-25", k: "ours", g: "ours", t: "선임계 우편 제출", src: "chat" });
+  shaped.events.push({ d: "2026-08-24", k: "done", g: "chat", t: "앞날" });
+  shaped.events.push({ d: "2026-08-25", k: "ours", g: "accept", t: "사건 선임" });
+  shaped.events.push({ d: "2026-08-25", k: "done", g: "chat", t: "기타" });
+  earliestAccept(shaped, []);
+  shaped.events.sort(byDay);
+  assertEquals(shaped.events.map((e: any) => e.t), ["앞날", "사건 선임", "선임계 우편 제출", "기타"]);
 });
