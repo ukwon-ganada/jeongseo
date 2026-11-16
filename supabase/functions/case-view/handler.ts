@@ -43,6 +43,7 @@ const json = (b: unknown, status = 200) =>
 import { computeDeadlines, deadlineEvents } from "./deadlines.ts";
 import { findPick, normTitle } from "./title_match.ts";
 import { extractFromExport, toRows } from "./chat_import.ts";
+import { shapeStages, diffStages, personChangeLine, isStage } from "./stages.ts";
 export const DEADLINE_NOTE = "잠정 계산입니다(형사 항소·상고·이유서만). 선고일·기록접수통지 도달일로 계산했고, 알림은 보내지 않습니다. 꼭 나의사건 기록으로 한 번 더 확인해 주세요.";
 export type Env = { sbUrl: string; sbKey: string; anthropicKey?: string; chatModel?: string };
 export type WhoAmI = { ok: boolean; status: number; userId?: string; domainId?: number | string; name?: string; error?: string };
@@ -444,7 +445,7 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
 
       const roomRows = await rest(env, `works_room_case?select=channel_id&l_num=eq.${c.l_num}`, {}, fetcher).catch(() => []) || [];
       const chans = [...new Set([room, ...roomRows.map((r: any) => nz(r.channel_id))].filter(Boolean))] as string[];
-      const [evs, mine, saved, files, chat, checked, meets] = await Promise.all([
+      const [evs, mine, saved, files, chat, checked, meets, stageLogs] = await Promise.all([
         rest(env, `lw_process_events?select=lp_num,lp_set,lp_appoint_date,lp_appoint_time,lp_contents,lp_remark,delivered_date,court,last_seen_at,lp_append_udate&l_num=eq.${c.l_num}&order=lp_appoint_date.asc&limit=2000`, {}, fetcher),
         myCases(env, who.name || "", fetcher),
         rest(env, `case_info?select=*&l_num=eq.${c.l_num}`, {}, fetcher).then((r: any[]) => r?.[0] ?? null).catch(() => null),
@@ -452,6 +453,7 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
         roomEvents(env, String(c.l_num), chans, fetcher).catch(() => []),
         lastFeedRun(env, fetcher),
         rest(env, `meet_event?select=event_id,ev_date,ev_time,lawyer,place&l_num=eq.${c.l_num}&order=ev_date.asc&limit=300`, {}, fetcher).catch(() => []),
+        rest(env, `case_info_log?select=field,old_value,new_value,editor,edited_at&l_num=eq.${c.l_num}&field=like.stage.*&order=edited_at.desc&limit=300`, {}, fetcher).catch(() => []),
       ]);
       const end = new Date(Date.parse(today) + 28 * 864e5).toISOString().slice(0, 10);
       const myHearings = mine.filter((m: any) => isDate(m.next_date) && m.next_date.slice(0, 10) >= today && m.next_date.slice(0, 10) <= end)
@@ -466,7 +468,8 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       mergeMeets(shaped, meets || []);
       // 직원이 줄마다 파일을 바꿀 때 고를 목록 (화면에 따로 나열하지 않음)
       const fileChoices = files.map((f: any) => ({ id: f.id, n: f.n, d: f.d, tm: f.tm, by: f.by }));
-      return json({ ...shaped, fileChoices });
+      const stages = shapeStages(c, saved, stageLogs || []);
+      return json({ ...shaped, fileChoices, stages, dispNo: stages.dispNo });
     }
 
     if (body?.action === "file_open") {
@@ -580,21 +583,47 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
     if (body?.action === "save_info") {
       const lNum = Number(body.lNum);
       if (!Number.isFinite(lNum) || lNum === 0) return json({ error: "사건이 없습니다" }, 400); // 수사 사건은 음수 번호
-      const c = (await rest(env, `case_all?select=l_num,l_code&l_num=eq.${lNum}`, {}, fetcher))[0];
+      const c = (await rest(env, `case_all?select=*&l_num=eq.${lNum}`, {}, fetcher))[0];
       if (!c) return json({ error: "사건이 없습니다" }, 404);
-      const prev = (await rest(env, `case_info?select=*&l_num=eq.${lNum}`, {}, fetcher))[0] || {};
+      const prevRow = (await rest(env, `case_info?select=*&l_num=eq.${lNum}`, {}, fetcher))[0] || null;
+      const prev = prevRow || {};
       const next: Record<string, string> = {};
-      for (const k of INFO_FIELDS) next[k] = k === "extra_phones" ? cleanPhones(body.fields?.[k]) : nz(body.fields?.[k]).slice(0, k === "memo" ? 2000 : 200);
+      const sent = body.fields && typeof body.fields === "object" ? body.fields : {};
+      // 화면에서 보내지 않은 예전 칸(법원·재판부, 수사기관 등)은 그대로 둔다
+      for (const k of INFO_FIELDS) next[k] = !(k in sent) ? nz(prev[k]) : k === "extra_phones" ? cleanPhones(sent[k]) : nz(sent[k]).slice(0, k === "memo" ? 2000 : 200);
       const changed = INFO_FIELDS.filter((k) => nz(prev[k]) !== next[k]);
       const now = new Date().toISOString();
+      const row: Record<string, unknown> = { l_num: lNum, case_no: c.l_code, ...next, updated_by: who.name, updated_by_id: who.userId, updated_at: now };
+      const logRows: any[] = changed.map((k) => ({ l_num: lNum, field: k, old_value: prev[k] ?? null, new_value: next[k], editor: who.name, editor_id: who.userId }));
+      let stageChanges: any[] = [];
+      if (body.stages && typeof body.stages === "object") {
+        const d = diffStages(c, prevRow, body.stages);
+        row.stages = d.stages;
+        row.cur_stage = isStage(body.cur) ? body.cur : null;
+        row.start_stage = isStage(body.start) ? body.start : null;
+        stageChanges = d.changes;
+        for (const x of d.changes) logRows.push({ l_num: lNum, field: x.field, old_value: x.old, new_value: x.new, editor: who.name, editor_id: who.userId });
+        for (const k of ["cur_stage", "start_stage"]) {
+          if (nz(prev[k]) !== nz(row[k])) logRows.push({ l_num: lNum, field: k, old_value: prev[k] ?? null, new_value: row[k], editor: who.name, editor_id: who.userId });
+        }
+      }
       await rest(env, "case_info?on_conflict=l_num", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-        body: JSON.stringify({ l_num: lNum, case_no: c.l_code, ...next, updated_by: who.name, updated_by_id: who.userId, updated_at: now }) }, fetcher);
-      if (changed.length) {
-        await rest(env, "case_info_log", { method: "POST", headers: { Prefer: "return=minimal" },
-          body: JSON.stringify(changed.map((k) => ({ l_num: lNum, field: k, old_value: prev[k] ?? null, new_value: next[k], editor: who.name, editor_id: who.userId }))) }, fetcher);
+        body: JSON.stringify(row) }, fetcher);
+      if (logRows.length) {
+        await rest(env, "case_info_log", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify(logRows) }, fetcher);
+      }
+      // 수사관·공소관·재판부가 바뀌면 타임라인에 작은 줄로 남김
+      const lines = stageChanges.filter((x) => x.old && x.new && ((x.key === "person" && (x.stage === "police" || x.stage === "pros")) || (x.key === "dept" && /^c/.test(x.stage))));
+      if (lines.length) {
+        await rest(env, "room_event", { method: "POST", headers: { Prefer: "return=minimal" },
+          body: JSON.stringify(lines.map((x, i) => ({ channel_id: `stage:${lNum}:${x.stage}:${Date.now()}${i}`, l_num: lNum, kind: "기타", ev_date: today, ev_time: "",
+            summary: personChangeLine(x.stage, x.old, x.new), state: "완료", source: "stage-change" }))) }, fetcher).catch((e) => console.log("stage line fail", String(e).slice(0, 120)));
       }
       await logView(env, who, "save_info", "", c, fetcher);
-      return json({ ok: true, changed: changed.length, ...infoFields(c, { ...next, updated_by: who.name, updated_at: now }) });
+      const logs = await rest(env, `case_info_log?select=field,old_value,new_value,editor,edited_at&l_num=eq.${lNum}&field=like.stage.*&order=edited_at.desc&limit=300`, {}, fetcher).catch(() => []);
+      const savedNow = { ...prev, ...row };
+      const stages = shapeStages(c, savedNow, logs || []);
+      return json({ ok: true, changed: changed.length + stageChanges.length, ...infoFields(c, { ...next, updated_by: who.name, updated_at: now }), stages, dispNo: stages.dispNo });
     }
     if (body?.action === "chat_import_preview" || body?.action === "chat_import_save") {
       const lNum = Number(body.lNum);
