@@ -447,7 +447,7 @@ function impPreview(file){
   rd.onload=function(){
     imp={st:'busy', evs:[], on:{}, msg:''}; tl.on=false; view='timeline'; render(); window.scrollTo(0,0);
     api({action:'chat_import_preview', lNum:data.lNum, text:String(rd.result||'')}).then(function(j){
-      imp={st:'preview', evs:j.events||[], on:{}, msg:j.truncated?'파일이 길어 최근 대화만 읽었습니다':''};
+      imp={st:'preview', evs:j.events||[], on:{}, msg:j.truncated?'파일이 길어 최근 대화만 읽었습니다':'', start:j.startDate||''};
       imp.evs.forEach(function(_,i){ imp.on[i]=true; });
       render();
     }).catch(function(e){ imp={st:'', evs:[], on:{}, msg:''}; render(); toast('읽지 못했습니다: '+((e&&e.message)||e)); });
@@ -457,7 +457,7 @@ function impPreview(file){
 function impSave(btn){
   var pick=imp.evs.filter(function(_,i){ return imp.on[i]; });
   btn.disabled=true; btn.textContent='넣는 중…';
-  api({action:'chat_import_save', lNum:data.lNum, events:pick}).then(function(j){
+  api({action:'chat_import_save', lNum:data.lNum, events:pick, startDate:imp.start||''}).then(function(j){
     imp={st:'', evs:[], on:{}, msg:''};
     return loadCase(ctx.key).then(function(d){ data=d; render(); toast(j.saved+'줄 넣었습니다'); });
   }).catch(function(e){ btn.disabled=false; btn.textContent='다시 넣기'; toast('넣지 못했습니다: '+((e&&e.message)||e)); });
