@@ -103,7 +103,7 @@ export function cleanImport(raw: unknown): ImportEvent[] {
   return out;
 }
 
-async function askAI(key: string, model: string, chunk: string, title: string, fetcher: typeof fetch): Promise<ImportEvent[]> {
+async function askAI(key: string, model: string, chunk: string, title: string, fetcher: typeof fetch, known = ""): Promise<ImportEvent[]> {
   const res = await fetcher("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -114,7 +114,7 @@ async function askAI(key: string, model: string, chunk: string, title: string, f
       model, max_tokens: 8000, system: SYSTEM,
       output_config: { effort: "low", format: { type: "json_schema", schema: SCHEMA } },
       fallbacks: "default",
-      messages: [{ role: "user", content: `사건: ${title || "(모름)"}\n\n대화 기록:\n${chunk}` }],
+      messages: [{ role: "user", content: `사건: ${title || "(모름)"}\n\n${known ? `이미 타임라인에 있는 줄(같은 일은 다시 넣지 말 것):\n${known}\n\n` : ""}대화 기록:\n${chunk}` }],
     }),
   });
   if (!res.ok) throw new Error("anthropic " + res.status + " " + (await res.text().catch(() => "")).slice(0, 200));
@@ -125,7 +125,7 @@ async function askAI(key: string, model: string, chunk: string, title: string, f
 }
 
 export async function extractFromExport(
-  a: { key?: string; model?: string; text: string; title: string },
+  a: { key?: string; model?: string; text: string; title: string; known?: string },
   fetcher: typeof fetch = fetch,
 ): Promise<{ events: ImportEvent[]; chunks: number; truncated: boolean; startDate: string }> {
   if (!a.key) throw new Error("ANTHROPIC_API_KEY 없음");
@@ -135,15 +135,15 @@ export async function extractFromExport(
   if (truncated) text = text.slice(-MAX_TOTAL); // 너무 길면 최근 쪽을 남김
   const chunks = chunkExport(text);
   // 묶음은 동시에 보낸다(함수 실행 시간 한도 때문)
-  const parts = await Promise.all(chunks.map((c) => askAI(a.key!, a.model || "claude-opus-5-5", c, a.title, fetcher)));
+  const parts = await Promise.all(chunks.map((c) => askAI(a.key!, a.model || "claude-opus-5-5", c, a.title, fetcher, a.known || "")));
   const all: ImportEvent[] = parts.flat();
   all.sort((x, y) => (x.date + x.time + x.msg_time).localeCompare(y.date + y.time + y.msg_time));
   return { events: all, chunks: chunks.length, truncated, startDate };
 }
 
 // 저장할 줄 만들기: room_event 고유키(channel_id, kind, ev_date, ev_time)가 겹치면 보낸 시각으로 구분
-export function toRows(lNum: number, evs: ImportEvent[]) {
-  const ch = "export:" + lNum;
+export function toRows(lNum: number, evs: ImportEvent[], prefix = "export:", source = "chat-export") {
+  const ch = prefix + lNum;
   const used = new Set<string>();
   const rows: any[] = [];
   for (const e of cleanImport({ events: evs })) {
@@ -152,7 +152,34 @@ export function toRows(lNum: number, evs: ImportEvent[]) {
     if (used.has(key) && e.msg_time) { t = e.msg_time; key = `${e.kind}|${e.date}|${t}`; }
     if (used.has(key)) continue;
     used.add(key);
-    rows.push({ channel_id: ch, l_num: lNum, kind: e.kind, ev_date: e.date, ev_time: t, summary: e.summary, state: e.state, source: "chat-export" });
+    rows.push({ channel_id: ch, l_num: lNum, kind: e.kind, ev_date: e.date, ev_time: t, summary: e.summary, state: e.state, source });
   }
   return rows;
+}
+
+// ============================================================================
+//  타임라인 [갱신] (2026-11-16 석원 결정): 보관된 수사 사건방 글(room_msg, 30일)을
+//  내보내기 파일 모양으로 묶어 같은 AI에 다시 읽힌다. 이미 있는 줄(숨긴 줄 포함)과 같은 날·같은 종류는 넣지 않는다.
+// ============================================================================
+const WD = "일월화수목금토";
+export function msgsToExport(msgs: { sent_at: string; text: string; works_user_id?: string | null }[], names: Record<string, string> = {}): string {
+  const out: string[] = [];
+  let day = "";
+  for (const m of msgs) {
+    const t = Date.parse(m.sent_at);
+    if (isNaN(t)) continue;
+    const k = new Date(t + 9 * 3600e3);
+    const d = `${k.getUTCFullYear()}년 ${k.getUTCMonth() + 1}월 ${k.getUTCDate()}일 ${WD[k.getUTCDay()]}요일`;
+    if (d !== day) { out.push(d); day = d; }
+    const who = (m.works_user_id && names[m.works_user_id]) || "직원";
+    out.push(`${who} ${k.toISOString().slice(11, 16)} ${String(m.text || "").replace(/\n+/g, " ")}`);
+  }
+  return out.join("\n");
+}
+
+// 지시·기타는 하루에 여러 줄일 수 있어 내용까지 같아야 같은 줄로 본다
+const keyOf = (date: string, kind: string, summary: string) => date + "|" + kind + (kind === "지시" || kind === "기타" ? "|" + summary.replace(/\s+/g, "") : "");
+export function dropKnown(evs: ImportEvent[], known: { ev_date: string; kind: string; summary?: string }[]): ImportEvent[] {
+  const have = new Set(known.map((r) => keyOf(String(r.ev_date).slice(0, 10), r.kind, String(r.summary || ""))));
+  return evs.filter((e) => !have.has(keyOf(e.date, e.kind, e.summary)));
 }

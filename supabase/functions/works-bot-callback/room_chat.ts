@@ -3,7 +3,7 @@
 //
 //  2026-11-13 석원 결정: 수사 단계(경찰·검찰) 사건은 로웨어에 받아올 정보가 없으니
 //  사건방 대화에서 고소장 제출·조사 일정·송치 같은 일을 AI가 골라 그 방 타임라인에 쌓는다.
-//    · 대화 원문은 저장하지 않는다. AI가 뽑은 "일정 한 줄"만 room_event 표에 남긴다.
+//    · 2026-11-16 바뀜: 수사 사건방 글은 room_msg 에 30일 보관(타임라인 [갱신]용). 일정 줄은 room_event.
 //    · 날짜·일정 낌새가 없는 글은 AI에 보내지도 않는다(looksLikeEvent).
 //    · 같은 방·같은 종류·같은 날짜·같은 시각이면 한 번만 남긴다(겹침 방지).
 //  시험 단계: ROOM_CHAT_BOTS(기본 시험봇 13580302)에 든 봇의 방만 처리.
@@ -110,13 +110,29 @@ async function rest(env: ChatEnv, path: string, init: RequestInit = {}, fetcher:
   });
 }
 
-// 방에 올라온 글 하나 처리: 낌새 확인 → AI → room_event 저장. 원문은 어디에도 남기지 않는다.
-export async function handleRoomText(env: ChatEnv, a: { channelId: string; text: string; sentAt?: string; invOnly?: boolean }, fetcher: typeof fetch = fetch): Promise<{ saved: number; how: string }> {
-  if (!looksLikeEvent(a.text)) return { saved: 0, how: "no-cue" };
+const PII = /\d{6}\s*-\s*[1-4]\d{6}|0\d{1,2}\s*-\s*\d{3,4}\s*-\s*\d{4}|01\d\s*\d{3,4}\s*\d{4}/g;
+
+// 수사 사건방 글 보관(2026-11-16 석원 결정): 타임라인 [갱신]이 다시 읽는다. 번호는 지우고, 30일 지나면 DB가 매일 지운다.
+async function keepText(env: ChatEnv, a: { channelId: string; text: string; userId?: string }, sentAt: string, fetcher: typeof fetch) {
+  const text = a.text.replace(PII, "[번호]").slice(0, 4000);
+  const r = await rest(env, "room_msg?on_conflict=channel_id,sent_at,text_hash", {
+    method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
+    body: JSON.stringify([{ channel_id: a.channelId, works_user_id: a.userId || null, sent_at: sentAt, text }]),
+  }, fetcher);
+  if (!r.ok) console.error("room_msg 저장 실패", r.status);
+  await r.body?.cancel();
+}
+
+// 방에 올라온 글 하나 처리: 수사 사건방이면 글 보관 → 낌새 확인 → AI → room_event 저장
+export async function handleRoomText(env: ChatEnv, a: { channelId: string; text: string; sentAt?: string; invOnly?: boolean; userId?: string }, fetcher: typeof fetch = fetch): Promise<{ saved: number; how: string }> {
+  if (String(a.text || "").trim().length < 2) return { saved: 0, how: "no-cue" };
   const sentAt = a.sentAt && !isNaN(Date.parse(a.sentAt)) ? new Date(a.sentAt).toISOString() : new Date().toISOString();
   const m = await rest(env, `works_room_case?select=l_num,room_title,status&channel_id=eq.${encodeURIComponent(a.channelId)}&order=is_primary.desc&limit=1`, {}, fetcher);
   const room = m.ok ? (await m.json())[0] : (await m.body?.cancel(), null);
-  if (a.invOnly && !(Number(room?.l_num) < 0)) return { saved: 0, how: "not-inv" };
+  const inv = Number(room?.l_num) < 0;
+  if (a.invOnly && !inv) return { saved: 0, how: "not-inv" };
+  if (inv) await keepText(env, a, sentAt, fetcher);
+  if (!looksLikeEvent(a.text)) return { saved: 0, how: "no-cue" };
   const evs = await extractEvents(env, a.text.slice(0, 4000), sentAt, room?.room_title || "", fetcher);
   if (!evs.length) return { saved: 0, how: "none" };
   const rows = evs.map((e) => ({

@@ -20,6 +20,7 @@
 //    { "action": "helper_token" }                   → 이 직원의 PC 도우미 연결 코드 발급(한 번만 보여 줌, 서버엔 해시만)
 //    { "action": "chat_import_preview", "lNum": 1, "text": "<내보낸 대화>" } → AI가 뽑은 지난 업무 줄 미리보기(저장 안 함, 원문 안 남김)
 //    { "action": "chat_import_save", "lNum": 1, "events": [...] } → 직원이 고른 줄만 타임라인(room_event)에 저장
+//    { "action": "tl_refresh", "lNum": -100061 } → 보관된 수사 사건방 글(30일)을 AI가 다시 읽어 빠진 줄만 바로 저장
 //    { "action": "hide_event", "id": 12 }           → 타임라인의 대화 줄 하나 숨기기(예전 화면용)
 //    { "action": "tl_list", "lNum": 1 }              → 수정 화면: 이 사건의 대화·직접 입력 줄 전부(숨긴 줄 포함)
 //    { "action": "tl_save", "lNum": 1, "rows": [{id?, date, time, summary, hidden}] } → 줄 고치기·삭제(숨김)·되살리기·추가
@@ -42,11 +43,11 @@ const json = (b: unknown, status = 200) =>
 
 import { computeDeadlines, deadlineEvents } from "./deadlines.ts";
 import { findPick, normTitle } from "./title_match.ts";
-import { extractFromExport, toRows } from "./chat_import.ts";
+import { dropKnown, extractFromExport, msgsToExport, toRows } from "./chat_import.ts";
 import { shapeStages, diffStages, personChangeLine, isStage } from "./stages.ts";
 import { applyInvDeadlines } from "./inv_deadlines.ts";
 export const DEADLINE_NOTE = "잠정 계산입니다. 재판 단계(항소·상고·이유서)는 선고일·기록접수통지 도달일로, 수사 단계(항고·재정신청·이의신청)는 사건방 줄의 처분·통지 날짜로 계산했습니다. 알림은 보내지 않습니다. 꼭 기록으로 한 번 더 확인해 주세요.";
-export type Env = { sbUrl: string; sbKey: string; anthropicKey?: string; chatModel?: string };
+export type Env = { sbUrl: string; sbKey: string; anthropicKey?: string; chatModel?: string; refreshModel?: string };
 export type WhoAmI = { ok: boolean; status: number; userId?: string; domainId?: number | string; name?: string; error?: string };
 
 export async function worksWhoAmI(token: string, fetcher: typeof fetch = fetch): Promise<WhoAmI> {
@@ -718,6 +719,35 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       await rest(env, "room_event?on_conflict=channel_id,kind,ev_date,ev_time", {
         method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=minimal" }, body: JSON.stringify(rows) }, fetcher);
       await logView(env, who, "chat_import_save", "", c, fetcher);
+      return json({ ok: true, saved: rows.length });
+    }
+
+    if (body?.action === "tl_refresh") {
+      const lNum = Number(body.lNum);
+      if (!Number.isFinite(lNum) || lNum === 0) return json({ error: "사건이 없습니다" }, 400);
+      const c = (await rest(env, `case_all?select=l_num,l_code,l_name&l_num=eq.${lNum}`, {}, fetcher))[0];
+      if (!c) return json({ error: "사건이 없습니다" }, 404);
+      const rooms = await rest(env, `works_room_case?select=channel_id&l_num=eq.${lNum}`, {}, fetcher).catch(() => []) || [];
+      const chans = [...new Set(rooms.map((r: any) => nz(r.channel_id)).filter(Boolean))] as string[];
+      if (!chans.length) return json({ ok: true, saved: 0 });
+      const since = new Date(Date.now() - 30 * 864e5).toISOString();
+      const msgs = await rest(env, `room_msg?select=sent_at,text,works_user_id&channel_id=in.${enc(inList(chans))}&sent_at=gte.${enc(since)}&order=sent_at.asc&limit=3000`, {}, fetcher) || [];
+      if (!msgs.length) return json({ ok: true, saved: 0 });
+      const ids = [...new Set(msgs.map((m: any) => nz(m.works_user_id)).filter(Boolean))] as string[];
+      const names: Record<string, string> = {};
+      if (ids.length) {
+        const seen = await rest(env, `case_view_log?select=works_user_id,viewer_name&works_user_id=in.${enc(inList(ids))}&viewer_name=not.is.null&order=viewed_at.desc&limit=500`, {}, fetcher).catch(() => []) || [];
+        for (const v of seen) if (!names[v.works_user_id]) names[v.works_user_id] = nz(v.viewer_name);
+      }
+      const have = await rest(env, `room_event?select=kind,ev_date,summary&or=(l_num.eq.${lNum},channel_id.in.${enc(inList(chans))})&limit=500`, {}, fetcher) || [];
+      const known = have.map((r: any) => `${String(r.ev_date).slice(0, 10)} ${r.kind} ${nz(r.summary)}`).join("\n");
+      const r = await extractFromExport({ key: env.anthropicKey, model: env.refreshModel || "claude-sonnet-5-5", text: msgsToExport(msgs, names), title: nz(c.l_name), known }, fetcher);
+      const rows = toRows(lNum, dropKnown(r.events, have), "refresh:", "chat-refresh");
+      if (rows.length) {
+        await rest(env, "room_event?on_conflict=channel_id,kind,ev_date,ev_time", {
+          method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=minimal" }, body: JSON.stringify(rows) }, fetcher);
+      }
+      await logView(env, who, "tl_refresh:" + rows.length, "", c, fetcher);
       return json({ ok: true, saved: rows.length });
     }
 

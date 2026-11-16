@@ -7,5 +7,6 @@ Deno.serve((req) =>
     sbKey: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     anthropicKey: Deno.env.get("ANTHROPIC_API_KEY"),
     chatModel: Deno.env.get("ROOM_CHAT_MODEL") || undefined,
+    refreshModel: Deno.env.get("TL_REFRESH_MODEL") || undefined,
   })
 );

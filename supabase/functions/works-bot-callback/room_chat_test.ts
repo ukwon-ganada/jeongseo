@@ -59,3 +59,19 @@ Deno.test("운영 봇: 수사 사건 방(자체 사건)만 AI로 읽음", async 
   assertEquals((await handleRoomText(env, { channelId: "c1", text, invOnly: true }, f)).how, "none");
   assertEquals([calls[0].body.model, calls[0].body.fallbacks, calls[0].beta], ["claude-sonnet-5-5", "default", "server-side-fallback-2026-07-01"]);
 });
+
+Deno.test("수사 사건방 글은 번호를 지우고 보관, 다른 방은 보관 안 함", async () => {
+  let lNum = -100061; const kept: any[] = [];
+  const f: typeof fetch = async (input, init) => {
+    const u = String(input);
+    if (u.includes("/works_room_case")) return Response.json([{ l_num: lNum, room_title: "시험", status: "대상" }]);
+    if (u.includes("/room_msg")) { kept.push(...JSON.parse(String(init!.body))); return new Response(null, { status: 201 }); }
+    return new Response(null, { status: 201 });
+  };
+  const env = { sbUrl: "http://db", sbKey: "k", anthropicKey: "a" };
+  assertEquals((await handleRoomText(env, { channelId: "c1", text: "네 연락처 010-1234-5678 입니다", userId: "u1", sentAt: "2026-11-13T04:00:00Z" }, f)).how, "no-cue");
+  assertEquals(kept, [{ channel_id: "c1", works_user_id: "u1", sent_at: "2026-11-13T04:00:00.000Z", text: "네 연락처 [번호] 입니다" }]);
+  lNum = 3018;
+  await handleRoomText(env, { channelId: "c1", text: "네 알겠습니다", invOnly: true }, f);
+  assertEquals(kept.length, 1);
+});
