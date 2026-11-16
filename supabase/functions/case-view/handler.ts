@@ -44,7 +44,8 @@ import { computeDeadlines, deadlineEvents } from "./deadlines.ts";
 import { findPick, normTitle } from "./title_match.ts";
 import { extractFromExport, toRows } from "./chat_import.ts";
 import { shapeStages, diffStages, personChangeLine, isStage } from "./stages.ts";
-export const DEADLINE_NOTE = "잠정 계산입니다(형사 항소·상고·이유서만). 선고일·기록접수통지 도달일로 계산했고, 알림은 보내지 않습니다. 꼭 나의사건 기록으로 한 번 더 확인해 주세요.";
+import { applyInvDeadlines } from "./inv_deadlines.ts";
+export const DEADLINE_NOTE = "잠정 계산입니다. 재판 단계(항소·상고·이유서)는 선고일·기록접수통지 도달일로, 수사 단계(항고·재정신청·이의신청)는 사건방 줄의 처분·통지 날짜로 계산했습니다. 알림은 보내지 않습니다. 꼭 기록으로 한 번 더 확인해 주세요.";
 export type Env = { sbUrl: string; sbKey: string; anthropicKey?: string; chatModel?: string };
 export type WhoAmI = { ok: boolean; status: number; userId?: string; domainId?: number | string; name?: string; error?: string };
 
@@ -270,7 +271,7 @@ export async function roomEvents(env: Env, lNum: string | null, channels: string
   if (nums.length) ors.push(`l_num.in.(${nums.join(",")})`);
   if (channels.length) ors.push(`channel_id.in.${enc(inList(channels))}`);
   if (!ors.length) return [];
-  return await rest(env, `room_event?select=id,kind,ev_date,ev_time,summary,state&hidden=eq.false&or=(${ors.join(",")})&order=ev_date.asc&limit=500`, {}, fetcher) || [];
+  return await rest(env, `room_event?select=id,kind,ev_date,ev_time,summary,state,source&hidden=eq.false&or=(${ors.join(",")})&order=ev_date.asc&limit=500`, {}, fetcher) || [];
 }
 // 같은 방에 함께 연결된 다른 사건(예: 형제번호 사건 → 재판 사건, 1심 → 항소심). 석원 2026-11-16:
 // 재판번호가 붙으면 그 사건이 주 사건이 되고, 이전 사건 기록(타임라인·접견·사건정보)은 이어서 보여 준다.
@@ -360,7 +361,7 @@ export function mergeMeets(shaped: any, rows: any[]) {
 export function roomOnlyShape(title: string, rows: any[], today: string, myHearings: any[]) {
   const shaped: any = {
     caseNo: "", lNum: null, title: title || "사건방", court: "수사 단계 · 사건방 대화 기준", today, closed: false, roomOnly: true,
-    events: [], deadlines: [], deadlineNote: "기한 계산은 새 규칙서 엔진이 완성되면 이곳에 표시됩니다.",
+    events: [], deadlines: [], deadlineNote: DEADLINE_NOTE,
     hearings: [], progress: { updated: "로웨어 사건 없음", rows: [] },
     info: { fields: Object.fromEntries(INFO_FIELDS.map((k) => [k, ""])), saved: false, updatedBy: "", updatedAt: "", linked: [] },
   };
@@ -467,7 +468,9 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
           if (rows.length) {
             const t = (await rest(env, `works_room_case?select=room_title&channel_id=eq.${enc(room)}&room_title=not.is.null&limit=1`, {}, fetcher).catch(() => []))?.[0]?.room_title;
             await logView(env, who, act + ":chat", room, null, fetcher);
-            return json(roomOnlyShape(nz(t), rows, today, []));
+            const ro = roomOnlyShape(nz(t), rows, today, []);
+            applyInvDeadlines(ro, rows, nz(t));
+            return json(ro);
           }
           await logView(env, who, act, room, null, fetcher);
           return json(!main ? { unpaired: true } : { hold: true });
@@ -508,6 +511,9 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       attachFinalFiles(shaped.events, files);
       attachContract(shaped.events, files);
       mergeRoomEvents(shaped, chat, c.l_code);
+      // 수사 단계 기한(R18~R20): 방 제목 괄호로 의뢰인 지위를 본다
+      const titles = chans.length ? await rest(env, `works_room_case?select=room_title&channel_id=in.${enc(inList(chans))}&room_title=not.is.null&limit=5`, {}, fetcher).catch(() => []) || [] : [];
+      applyInvDeadlines(shaped, chat, nz(titles[0]?.room_title));
       fixAccept(shaped, !!c.is_inv);
       earliestAccept(shaped, relCases || []);
       mergeMeets(shaped, meets || []);

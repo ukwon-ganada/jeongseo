@@ -373,7 +373,7 @@ var VIEWS = {
   },
   deadline: function(){
     var note=data.deadlineNote?'<div class="dlnote">'+esc(data.deadlineNote)+'</div>':'';
-    if(!data.deadlines.length) return note+emptySt('계산된 기한이 없습니다','형사 사건의 선고·기록접수통지가 들어오면 자동으로 표시됩니다.');
+    if(!data.deadlines.length) return note+emptySt('계산된 기한이 없습니다','선고·기록접수통지, 또는 불기소·불송치·항고기각 줄이 들어오면 자동으로 표시됩니다.');
     var rows=data.deadlines.slice().sort(function(a,b){ return (a.st==='done')-(b.st==='done') || (a.d||'9').localeCompare(b.d||'9'); });
     return note+'<div class="card">'+rows.map(function(x){
       if(!x.d) return '<div class="li"><div class="main"><div class="t">'+esc(x.t)+'</div><div class="s">'+esc(x.why)+'</div></div><span class="dday past">도달 전</span></div>';
