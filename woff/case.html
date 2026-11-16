@@ -48,6 +48,13 @@ main{max-width:880px;margin:0 auto;padding:12px 16px 32px}
 .chip[aria-pressed="true"]{border-color:var(--accent);color:var(--accent-ink);background:var(--accent-tint);font-weight:600}
 .card{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:12px}
 .card-h{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 6px;font-size:13px;font-weight:600;color:var(--muted)}
+.imp-b{padding:4px 16px 16px}.imp-b .s{font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:10px}
+.imp-f{display:inline-block;cursor:pointer;border:1px solid var(--accent);color:var(--accent-ink);background:var(--accent-tint);border-radius:8px;padding:7px 14px;font-size:14px;font-weight:600}
+.imp-r{display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-top:1px solid var(--line2);font-size:14px}
+.imp-r input{margin-top:3px;flex:none}.imp-r .d{flex:none;width:76px;color:var(--ink2);font-variant-numeric:tabular-nums}.imp-r small{color:var(--muted)}
+.imp-a{display:flex;gap:10px;align-items:center;margin-top:12px}
+.imp-a .open{border:1px solid var(--accent);color:var(--accent-ink);background:var(--accent-tint);border-radius:8px;padding:7px 14px;font-size:14px;font-weight:600}
+.imp-a .open:disabled{opacity:.5}
 .empty-st{text-align:center;color:var(--muted);padding:56px 16px;font-size:14px}
 .empty-st b{display:block;color:var(--ink);font-size:16px;margin-bottom:4px}
 
@@ -151,6 +158,7 @@ main{max-width:880px;margin:0 auto;padding:12px 16px 32px}
 .xp-del{border:0;background:none;color:var(--muted);font-size:13px;padding:6px 4px}
 .xp-add{display:block;width:calc(100% - 32px);margin:4px 16px 12px;border:1px dashed var(--line);border-radius:8px;background:none;padding:9px;font-size:14px;color:var(--accent-ink);font-weight:600}
 .fr.memo{align-items:start}
+[data-hide]{font-size:12px!important;color:var(--muted)!important;font-weight:400!important}
 .link-btn{border:0;background:none;color:var(--accent-ink);font-size:14px;font-weight:600;padding:4px 0}
 .savebar{position:sticky;bottom:0;display:flex;gap:8px;padding:12px 0 calc(12px + env(safe-area-inset-bottom));background:linear-gradient(to top,var(--bg) 70%,transparent)}
 .savebar button{flex:1;border:0;border-radius:10px;padding:13px;font-size:16px;font-weight:700}
@@ -278,7 +286,7 @@ var VIEWS = {
       return {tt:t, ts:sub.concat(parts).join(' · ')};
     };
     var list=data.events, h='';
-    if(!list.length) return h+emptySt('표시할 내용이 없습니다');
+    if(!list.length) return h+emptySt('표시할 내용이 없습니다')+importCard();
     var body='', yr='', prevD='', prevY='', todayDone=false, today=data.today||'';
     list.forEach(function(e){
       var y=e.d.slice(0,4); if(y!==yr){ yr=y; body+='<div class="yr">'+y+'</div>'; }
@@ -291,9 +299,10 @@ var VIEWS = {
       else if(e.k==='due') pill='<span class="pill">예정</span>';
       body+='<div class="ev '+e.k+(g?' g-'+g:'')+(minor?' minor':'')+'"><div class="d"><b>'+md(e.d)+'</b><small>'+wk(e.d)+'</small></div><div class="rail"></div><div class="t">'
         +'<div class="tt">'+esc(p.tt)+pill+'</div>'+(p.ts?'<div class="ts">'+esc(p.ts)+'</div>':'')
-        +(e.cf?'<div class="fa"><button class="open" data-file="'+e.cf.id+'">계약서 열기</button><span class="fn">'+esc(e.cf.n)+'</span></div>':'')+finalFile(e)+'</div></div>';
+        +(e.cf?'<div class="fa"><button class="open" data-file="'+e.cf.id+'">계약서 열기</button><span class="fn">'+esc(e.cf.n)+'</span></div>':'')+finalFile(e)
+        +(e.rid?'<div class="fa"><button class="link-btn" data-hide="'+e.rid+'">이 줄 숨기기</button></div>':'')+'</div></div>';
     });
-    return h+'<div class="card tl">'+body+'</div>';
+    return h+'<div class="card tl">'+body+'</div>'+importCard();
   },
   deadline: function(){
     var note=data.deadlineNote?'<div class="dlnote">'+esc(data.deadlineNote)+'</div>':'';
@@ -406,6 +415,57 @@ function openFile(btn){
 }
 function fmtTime(t){ if(!t) return ''; var d=new Date(Date.parse(t)+9*3600e3).toISOString(); return md(d.slice(0,10))+' '+d.slice(11,16); }
 
+// ── 지난 대화로 타임라인 채우기: 웍스에서 내보낸 대화(.txt) → AI 미리보기 → 고른 줄만 저장 ──
+var imp = {st:'', evs:[], on:{}, msg:''};
+function importCard(){
+  if(!data.lNum) return '';
+  var h='<div class="card imp"><div class="card-h">지난 대화로 타임라인 채우기</div><div class="imp-b">';
+  if(imp.st==='busy') return h+'<div class="s">AI가 대화를 읽는 중입니다… (길면 1~2분)</div></div></div>';
+  if(imp.st==='preview'){
+    if(!imp.evs.length) return h+'<div class="s">뽑을 업무가 없었습니다.</div><button class="link-btn" data-imp="reset">다시 하기</button></div></div>';
+    var n=Object.keys(imp.on).filter(function(k){return imp.on[k];}).length;
+    h+='<div class="s">넣을 줄만 체크하세요. 대화 원문은 저장하지 않습니다.'+(imp.msg?' '+esc(imp.msg):'')+'</div>';
+    h+=imp.evs.map(function(e,i){
+      return '<label class="imp-r"><input type="checkbox" data-impi="'+i+'"'+(imp.on[i]?' checked':'')+'><span class="d">'+md(e.date)+(e.time?' '+esc(e.time):'')+'</span><span>'+esc(e.summary)+(e.state==='예정'?' <small>(예정)</small>':'')+'</span></label>';
+    }).join('');
+    return h+'<div class="imp-a"><button class="open" data-imp="save"'+(n?'':' disabled')+'>선택한 '+n+'줄 넣기</button><button class="link-btn" data-imp="reset">취소</button></div></div></div>';
+  }
+  return h+'<div class="s">웍스 사건방에서 대화를 내보낸 파일(.txt)을 올리면, AI가 선임·서면 제출·조사·정보공개청구 같은 우리 업무만 골라 보여 줍니다. 확인한 줄만 들어갑니다.</div>'
+    +'<label class="open imp-f">대화 파일 올리기<input type="file" accept=".txt,text/plain" id="impfile" hidden></label></div></div>';
+}
+function impPreview(file){
+  if(!file) return;
+  if(file.size>1500000){ toast('파일이 너무 큽니다'); return; }
+  var rd=new FileReader();
+  rd.onload=function(){
+    imp={st:'busy', evs:[], on:{}, msg:''}; render();
+    api({action:'chat_import_preview', lNum:data.lNum, text:String(rd.result||'')}).then(function(j){
+      imp={st:'preview', evs:j.events||[], on:{}, msg:j.truncated?'(파일이 길어 최근 대화만 읽었습니다)':''};
+      imp.evs.forEach(function(_,i){ imp.on[i]=true; });
+      render();
+    }).catch(function(e){ imp={st:'', evs:[], on:{}, msg:''}; render(); toast('읽지 못했습니다: '+((e&&e.message)||e)); });
+  };
+  rd.readAsText(file, 'utf-8');
+}
+function impSave(btn){
+  var pick=imp.evs.filter(function(_,i){ return imp.on[i]; });
+  btn.disabled=true; btn.textContent='넣는 중…';
+  api({action:'chat_import_save', lNum:data.lNum, events:pick}).then(function(j){
+    imp={st:'', evs:[], on:{}, msg:''};
+    return loadCase(ctx.key).then(function(d){ data=d; render(); toast(j.saved+'줄 넣었습니다'); });
+  }).catch(function(e){ btn.disabled=false; btn.textContent='다시 넣기'; toast('넣지 못했습니다: '+((e&&e.message)||e)); });
+}
+function hideEv(btn){
+  btn.disabled=true;
+  api({action:'hide_event', id:Number(btn.dataset.hide)}).then(function(){
+    return loadCase(ctx.key).then(function(d){ data=d; render(); toast('숨겼습니다'); });
+  }).catch(function(e){ btn.disabled=false; toast('숨기지 못했습니다: '+((e&&e.message)||e)); });
+}
+document.addEventListener('change', function(e){
+  if(e.target.id==='impfile') impPreview(e.target.files&&e.target.files[0]);
+  if(e.target.dataset && e.target.dataset.impi!==undefined){ imp.on[e.target.dataset.impi]=e.target.checked; render(); }
+});
+
 function render(){
   document.querySelectorAll('#nav button').forEach(function(b){ b.setAttribute('aria-current', b.dataset.v===view?'page':'false'); });
   $('#nav').hidden=false;
@@ -424,6 +484,9 @@ document.addEventListener('click', function(e){
   if(b.dataset.file) openFile(b);
   if(b.dataset.pickfor!==undefined){ sub.pick=b.dataset.pickfor; render(); }
   if(b.dataset.setfile) setFile(b);
+  if(b.dataset.hide) hideEv(b);
+  if(b.dataset.imp==='reset'){ imp={st:'', evs:[], on:{}, msg:''}; render(); }
+  if(b.dataset.imp==='save') impSave(b);
 });
 function parseXp(t){ try{ var a=JSON.parse(t||'[]'); return Array.isArray(a)?a.filter(function(x){ return x&&(x.p||x.n); }):[]; }catch(e){ return []; } }
 function xpRow(x){ x=x||{}; return '<div class="fr xp"><div class="xp-in" style="grid-column:1/4"><input class="xp-n" placeholder="관계" value="'+esc(x.n||'')+'"><input class="xp-p" inputmode="tel" placeholder="전화번호" value="'+esc(x.p||'')+'"><button class="xp-del" type="button">삭제</button></div></div>'; }

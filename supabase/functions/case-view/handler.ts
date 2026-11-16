@@ -18,6 +18,9 @@
 //    { "action": "link_room", "room": "<방ID>", "case": "<사건번호>" } → 연결 안 된 방에 고른 사건 기억
 //    { "action": "remember_pick", "locate": 12, "case": "<사건번호>" } → PC 방 찾기에서 못 찾은 방: 고른 사건을 읽은 제목과 함께 기억
 //    { "action": "helper_token" }                   → 이 직원의 PC 도우미 연결 코드 발급(한 번만 보여 줌, 서버엔 해시만)
+//    { "action": "chat_import_preview", "lNum": 1, "text": "<내보낸 대화>" } → AI가 뽑은 지난 업무 줄 미리보기(저장 안 함, 원문 안 남김)
+//    { "action": "chat_import_save", "lNum": 1, "events": [...] } → 직원이 고른 줄만 타임라인(room_event)에 저장
+//    { "action": "hide_event", "id": 12 }           → 타임라인의 대화 줄 하나 숨기기
 //  사건 정보 칸은 우리가 직접 입력·수정한다. 로웨어와 연동하지 않는다(자동으로 덮어쓰지 않음).
 //    저장된 값이 없을 때만 처음 값으로 로웨어 값을 한 번 보여 준다(PREFILL_FROM_LAWWARE).
 //  보류 방은 사건을 붙이지 않는다(잘못 붙이느니 안 붙인다) → { hold: true }
@@ -37,8 +40,9 @@ const json = (b: unknown, status = 200) =>
 
 import { computeDeadlines, deadlineEvents } from "./deadlines.ts";
 import { findPick, normTitle } from "./title_match.ts";
+import { extractFromExport, toRows } from "./chat_import.ts";
 export const DEADLINE_NOTE = "잠정 계산입니다(형사 항소·상고·이유서만). 선고일·기록접수통지 도달일로 계산했고, 알림은 보내지 않습니다. 꼭 나의사건 기록으로 한 번 더 확인해 주세요.";
-export type Env = { sbUrl: string; sbKey: string };
+export type Env = { sbUrl: string; sbKey: string; anthropicKey?: string; chatModel?: string };
 export type WhoAmI = { ok: boolean; status: number; userId?: string; domainId?: number | string; name?: string; error?: string };
 
 export async function worksWhoAmI(token: string, fetcher: typeof fetch = fetch): Promise<WhoAmI> {
@@ -265,7 +269,7 @@ export function mergeRoomEvents(shaped: any, rows: any[], caseNo: string) {
     const key = d + tm + r.summary;
     if (seen.has(key)) continue; seen.add(key);
     const t = (tm ? tm + " " : "") + nz(r.summary);
-    shaped.events.push({ d, k: d >= shaped.today && r.state !== "완료" ? "due" : "room", t, f: null, g: "chat", src: "chat" });
+    shaped.events.push({ d, k: d >= shaped.today && r.state !== "완료" ? "due" : "room", t, f: null, g: "chat", src: "chat", rid: r.id });
     if (MEET.has(r.kind)) shaped.hearings.push({ c: caseNo, d, tm, t: nz(r.summary), p: "사건방 대화" });
   }
   shaped.events.sort((a: any, b: any) => a.d.localeCompare(b.d));
@@ -560,6 +564,34 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       }
       await logView(env, who, "save_info", "", c, fetcher);
       return json({ ok: true, changed: changed.length, ...infoFields(c, { ...next, updated_by: who.name, updated_at: now }) });
+    }
+    if (body?.action === "chat_import_preview" || body?.action === "chat_import_save") {
+      const lNum = Number(body.lNum);
+      if (!Number.isFinite(lNum) || lNum === 0) return json({ error: "사건이 없습니다" }, 400);
+      const c = (await rest(env, `case_all?select=l_num,l_code,l_name&l_num=eq.${lNum}`, {}, fetcher))[0];
+      if (!c) return json({ error: "사건이 없습니다" }, 404);
+      if (body.action === "chat_import_preview") {
+        const text = String(body.text || "");
+        if (text.trim().length < 20) return json({ error: "대화 내용이 비어 있습니다" }, 400);
+        if (text.length > 1_500_000) return json({ error: "파일이 너무 큽니다" }, 400);
+        const r = await extractFromExport({ key: env.anthropicKey, model: env.chatModel, text, title: nz(c.l_name) }, fetcher);
+        await logView(env, who, "chat_import_preview", "", c, fetcher);
+        return json(r);
+      }
+      const rows = toRows(lNum, Array.isArray(body.events) ? body.events.slice(0, 300) : []);
+      if (!rows.length) return json({ ok: true, saved: 0 });
+      await rest(env, "room_event?on_conflict=channel_id,kind,ev_date,ev_time", {
+        method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=minimal" }, body: JSON.stringify(rows) }, fetcher);
+      await logView(env, who, "chat_import_save", "", c, fetcher);
+      return json({ ok: true, saved: rows.length });
+    }
+
+    if (body?.action === "hide_event") {
+      const id = Number(body.id);
+      if (!Number.isFinite(id) || id <= 0) return json({ error: "줄이 없습니다" }, 400);
+      await rest(env, `room_event?id=eq.${id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ hidden: true }) }, fetcher);
+      await logView(env, who, "hide_event:" + id, "", null, fetcher);
+      return json({ ok: true });
     }
     return json({ error: "모르는 요청" }, 400);
   } catch (e) {
