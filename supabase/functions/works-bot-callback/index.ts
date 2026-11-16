@@ -14,5 +14,7 @@ Deno.serve((req) =>
       anthropicKey: Deno.env.get("ANTHROPIC_API_KEY"),
       chatModel: Deno.env.get("ROOM_CHAT_MODEL") || undefined,
       chatBots: (Deno.env.get("ROOM_CHAT_BOTS") || "13580302").split(",").map((s) => s.trim()).filter(Boolean),
+      invChatBots: (Deno.env.get("ROOM_CHAT_INV_BOTS") || "12905890").split(",").map((s) => s.trim()).filter(Boolean),
+      invChatModel: Deno.env.get("ROOM_CHAT_INV_MODEL") || undefined,
     })
   );

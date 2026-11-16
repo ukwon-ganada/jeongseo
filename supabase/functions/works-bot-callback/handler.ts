@@ -55,7 +55,7 @@ function safeEqual(a: string, b: string): boolean {
 type Env = {
   sbUrl: string; sbKey: string; botSecret: string; botSecrets?: string[];
   clientId?: string; clientSecret?: string; serviceAccount?: string; privateKey?: string;
-  anthropicKey?: string; chatModel?: string; chatBots?: string[];
+  anthropicKey?: string; chatModel?: string; chatBots?: string[]; invChatBots?: string[]; invChatModel?: string;
 };
 
 // 응답(200)을 먼저 보내고 뒤에서 계속 일하기 (Supabase Edge Runtime)
@@ -161,12 +161,13 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
     }
   }
 
-  // 사건방 글 → AI가 일정만 뽑아 room_event 에 (원문은 저장·로그 안 함). 시험 단계: chatBots 의 방만
+  // 사건방 글 → AI가 일정만 뽑아 room_event 에 (원문은 저장·로그 안 함). 시험 봇(chatBots)은 모든 방, 운영 봇(invChatBots)은 수사 사건 방(자체 사건)만 저렴한 모델로
   if (ev?.type === "message" && content?.type === "text" && content?.text && channelId) {
     const botId = req.headers.get("x-works-botid") || String(ev?.botId || "");
-    if ((env.chatBots || ["13580302"]).includes(botId)) {
-      background(handleRoomText({ sbUrl: env.sbUrl, sbKey: env.sbKey, anthropicKey: env.anthropicKey, model: env.chatModel },
-        { channelId, text: String(content.text), sentAt: ev?.issuedTime || ev?.createdTime }, fetcher)
+    const invOnly = (env.invChatBots || ["12905890"]).includes(botId);
+    if (invOnly || (env.chatBots || ["13580302"]).includes(botId)) {
+      background(handleRoomText({ sbUrl: env.sbUrl, sbKey: env.sbKey, anthropicKey: env.anthropicKey, model: invOnly ? (env.invChatModel || "claude-haiku-5-5") : env.chatModel },
+        { channelId, text: String(content.text), sentAt: ev?.issuedTime || ev?.createdTime, invOnly }, fetcher)
         .then((r) => console.log("chat", r.how, r.saved))
         .catch((e) => console.error("chat fail", String(e?.message || e).slice(0, 200))));
     }
