@@ -184,13 +184,30 @@ main{max-width:880px;margin:0 auto;padding:12px 16px 32px}
 .hist s{color:#b0b4ba}
 .hist.hl{margin-top:-8px}
 .hist .more{border:0;background:none;padding:0 0 0 4px;font-size:12px;font-weight:600;color:var(--g-hearing)}
-.stg{display:flex;gap:6px;padding:4px 16px 14px;flex-wrap:wrap}
+.stg{display:flex;gap:6px;flex-wrap:wrap;grid-column:2/4}
 .stg span{font-size:12px;padding:4px 10px;border-radius:999px;background:var(--line2);color:var(--muted)}
 .stg span.done{color:var(--ink2)}
 .stg span.now{background:var(--g-hearing);color:#fff;font-weight:700}
 .now-pill{font-size:11px;font-weight:700;color:#fff;background:var(--g-hearing);border-radius:999px;padding:3px 8px;margin-left:4px;vertical-align:1px}
-.card.cur{box-shadow:0 0 0 2px var(--g-hearing)}
+.card.cur{}
 .card.past .card-h{padding-bottom:14px}
+.card.past:not(.editing) .card-h>span:first-child{color:var(--ink2)}
+.card-h .sum{font-weight:400;color:var(--muted);margin-left:10px}
+.card-h .hb{display:flex;align-items:center;gap:14px}
+/* 칸마다 [수정]: 누른 칸만 입력칸으로 바뀌고, 그 칸 아래에 취소·저장 */
+.info-col{max-width:720px}
+.a-s>.card:last-child{margin-bottom:12px}
+.info-col .card-h{padding:10px 16px 6px;min-height:50px;box-sizing:border-box}
+.edit-btn{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:5px 10px;font-size:13px;font-weight:600;color:var(--ink2)}
+.edit-btn svg{width:13px;height:13px}
+.edit-btn:hover{border-color:var(--accent);color:var(--accent-ink)}
+.card.editing{box-shadow:0 0 0 2px var(--accent)}
+.card.editing .card-h>span:first-child{color:var(--accent-ink)}
+.cardbar{display:flex;justify-content:flex-end;gap:8px;padding:12px 16px 14px;border-top:1px solid var(--line2)}
+.cardbar button{border-radius:8px;padding:9px 18px;font-size:15px;font-weight:700}
+.cardbar .ok{border:0;background:var(--accent);color:#fff}
+.cardbar .no{border:1px solid var(--line);background:var(--surface);color:var(--ink2)}
+@media (max-width:520px){.cardbar button{flex:1}}
 .fr select{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 10px;background:var(--surface);font-size:15px}
 @media (max-width:520px){.hist{padding-left:16px}}
 
@@ -214,10 +231,13 @@ main{max-width:880px;margin:0 auto;padding:12px 16px 32px}
   .tabs{margin:0;padding:0}
   .tabs button{padding:12px 14px 13px}
   .tabs button[aria-current="page"]::after{left:14px;right:14px}
-  .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
-  .info-grid .card{margin:0}
-  .info-grid .wide{grid-column:1/-1}
   .li:hover,.pick:hover{background:var(--line2)}
+  .wrap,main{max-width:1240px;padding-left:32px;padding-right:32px}
+  /* 사건정보: 왼쪽 기본 정보·메모, 오른쪽 단계 칸 */
+  .info-col{max-width:none;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"b s" "m s" "k s" "f s";grid-template-rows:auto auto auto 1fr;column-gap:20px;align-items:start}
+  .info-col>.a-b{grid-area:b}.info-col>.a-s{grid-area:s}.info-col>.a-m{grid-area:m}.info-col>.a-k{grid-area:k}.info-col>.foot{grid-area:f}
+  .fr{grid-template-columns:110px 1fr auto}
+  .hist{padding-left:136px}
 }
 </style>
 </head>
@@ -300,6 +320,7 @@ function chips(name, items){
 }
 function emptySt(title, text){ return '<div class="empty-st"><b>'+title+'</b>'+(text||'')+'</div>'; }
 function toast(t){ var e=document.createElement('div'); e.className='toast'; e.textContent=t; document.body.appendChild(e); setTimeout(function(){ e.remove(); }, 1800); }
+var PEN_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
 var PHONE_SVG = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z"/></svg>';
 function telHref(v){ var n=String(v||'').replace(/[^\d+]/g,''); return n.length>=7 ? 'tel:'+n : ''; }
 
@@ -389,11 +410,13 @@ var VIEWS = {
     }).join('')+'</div>';
   },
   info: function(){
-    var f=data.info.fields;
+    var f=data.info.fields, S=data.stages||null, can=!data.roomOnly;
+    var cur=null; // 지금 그리는 칸의 이름(수정 중이면 입력칸으로)
+    var ed=function(){ return editing===cur; };
     var field=function(key, label, opt){
       opt=opt||{};
       var v=f[key]||'';
-      if(editing){
+      if(ed()){
         var inp = opt.memo ? '<textarea data-k="'+key+'">'+esc(v)+'</textarea>' : '<input data-k="'+key+'" value="'+esc(v)+'"'+(opt.tel?' inputmode="tel"':'')+'>';
         return '<div class="fr'+(opt.memo?' memo':'')+'"><span class="l">'+label+'</span><div style="grid-column:2/4">'+inp+'</div></div>';
       }
@@ -403,57 +426,64 @@ var VIEWS = {
     // 추가 전화(가족 등, 석원 2026-11-13): [{n:'어머니', p:'010-…'}] 를 글자(JSON)로 저장
     var extraPhones=function(){
       var list=parseXp(f.extra_phones);
-      if(editing) return '<div id="xp">'+list.map(xpRow).join('')+'</div><button class="xp-add" id="xp-add">+ 전화번호 추가 (가족 등)</button>';
+      if(ed()) return '<div id="xp">'+list.map(xpRow).join('')+'</div><button class="xp-add" id="xp-add">+ 전화번호 추가 (가족 등)</button>';
       return list.map(function(x){
         var tail = telHref(x.p) ? '<a class="call" href="'+telHref(x.p)+'">'+PHONE_SVG+'전화</a>' : '<span></span>';
         return '<div class="fr"><span class="l">'+esc(x.n||'추가 전화')+'</span><span class="v">'+esc(x.p)+'</span>'+tail+'</div>';
       }).join('');
     };
     var ro=function(label, v, big){ return '<div class="fr'+(big?' big':'')+'"><span class="l">'+label+'</span><span class="v">'+esc(v)+'</span><span></span></div>'; };
-    var head=function(t, btn){ return '<div class="card-h"><span>'+t+'</span>'+(btn&&!editing&&!data.roomOnly?'<button class="link-btn" id="edit">수정</button>':'')+'</div>'; };
-    var S=data.stages||null;
+    // 칸 머리: 제목 + 그 칸의 [수정] (다른 칸을 고치는 중이면 숨김)
+    var head=function(t, extra){
+      var btn = can && !editing ? '<button class="edit-btn" data-edit="'+cur+'">'+PEN_SVG+'수정</button>' : '';
+      return '<div class="card-h"><span>'+t+'</span><span class="hb">'+(extra||'')+btn+'</span></div>';
+    };
+    var open=function(cls){ return '<div class="card'+(cls?' '+cls:'')+(ed()?' editing':'')+'">'; };
+    var close=function(){ return (ed()?'<div class="cardbar"><button class="no" id="cancel">취소</button><button class="ok" id="save">저장</button></div>':'')+'</div>'; };
     var copyBtn=function(v){ return v?'<button class="cp" data-copy="'+esc(v)+'">복사</button>':'<span></span>'; };
+    var out='';
     // 기본 정보
-    var basic='<div class="card wide">'+head('기본 정보', true);
+    cur='basic';
+    var b=open('a-b')+head('기본 정보');
     var dispNo=data.dispNo||(data.inv?'':data.caseNo)||'';
-    basic+='<div class="fr big"><span class="l">사건번호</span><span class="v'+(dispNo?'':' none')+'">'+(dispNo?esc(dispNo):'아직 번호 없음')+'</span>'+copyBtn(dispNo)+'</div>';
-    if(S&&S.prevNos&&S.prevNos.length&&!editing) basic+='<div class="hist">이전 번호 · '+S.prevNos.map(function(x){ return esc(x.s)+' '+esc(x.no); }).join(' · ')+'</div>';
-    if(editing) basic+=field('case_name','사건명');
-    else { var cn=f.case_name||''; basic+='<div class="fr"><span class="l">사건명</span><span class="v'+(cn?'':' none')+'">'+(cn?esc(cn):'—')+'</span>'+copyBtn(cn)+'</div>'; }
-    basic+=field('client_name','의뢰인')+field('client_phone','전화번호',{tel:1})+extraPhones()+field('lawyer','담당변호사');
+    b+='<div class="fr big"><span class="l">사건번호</span><span class="v'+(dispNo?'':' none')+'">'+(dispNo?esc(dispNo):'아직 번호 없음')+'</span>'+copyBtn(dispNo)+'</div>';
+    if(S&&S.prevNos&&S.prevNos.length&&!ed()) b+='<div class="hist">이전 번호 · '+S.prevNos.map(function(x){ return esc(x.s)+' '+esc(x.no); }).join(' · ')+'</div>';
+    if(ed()) b+=field('case_name','사건명');
+    else { var cn=f.case_name||''; b+='<div class="fr"><span class="l">사건명</span><span class="v'+(cn?'':' none')+'">'+(cn?esc(cn):'—')+'</span>'+copyBtn(cn)+'</div>'; }
+    b+=field('client_name','의뢰인')+field('client_phone','전화번호',{tel:1})+extraPhones()+field('lawyer','담당변호사');
     if(S){
       var ci=SK.indexOf(S.cur), si=SK.indexOf(S.start);
-      if(editing){
+      if(ed()){
         var opt=function(sel){ return SK.map(function(k){ return '<option value="'+k+'"'+(k===sel?' selected':'')+'>'+SL[k]+'</option>'; }).join(''); };
-        basic+='<div class="fr"><span class="l">선임 단계</span><div style="grid-column:2/4"><select id="st-start">'+opt(S.start)+'</select></div></div>'
+        b+='<div class="fr"><span class="l">선임 단계</span><div style="grid-column:2/4"><select id="st-start">'+opt(S.start)+'</select></div></div>'
           +'<div class="fr"><span class="l">지금 단계</span><div style="grid-column:2/4"><select id="st-cur">'+opt(S.cur)+'</select></div></div>';
       } else {
-        basic+='<div class="card-h" style="padding-top:8px"><span>진행 단계</span></div><div class="stg">'+SK.map(function(k,i){
+        b+='<div class="fr"><span class="l">진행 단계</span><div class="stg">'+SK.map(function(k,i){
           if(i<si) return '';
           return '<span class="'+(i<ci?'done':i===ci?'now':'')+'">'+SL[k]+(i<ci?' ✓':'')+'</span>';
-        }).join('')+'</div>';
+        }).join('')+'</div></div>';
       }
     }
-    basic+='</div>';
-    // 단계 칸
-    var stages='';
+    out+=b+close();
+    // 단계 칸: 지금 단계 먼저, 지난 단계는 접힌 줄로 아래에
     if(S){
-      var ci2=SK.indexOf(S.cur), si2=SK.indexOf(S.start);
+      var ci2=SK.indexOf(S.cur), si2=SK.indexOf(S.start), nowCard='', pastCards='';
       S.list.forEach(function(x,i){
-        var defs=SF[x.key]||SF.court;
-        if(editing){
-          stages+='<div class="card sted" data-s="'+i+'"'+(i<si2||i>ci2?' hidden':'')+'><div class="card-h"><span>'+SL[x.key]+'</span></div>'+defs.map(function(d){
-            return '<div class="fr"><span class="l">'+d[1]+'</span><div style="grid-column:2/4"><input data-sk="'+x.key+'.'+d[0]+'" value="'+esc(x[d[0]]||'')+'"'+(d[2]&&d[2].tel?' inputmode="tel"':'')+'></div></div>';
-          }).join('')+'</div>';
-          return;
-        }
         if(i<si2||i>ci2) return;
-        var past=i<ci2, open=!past||stOpen[x.key];
-        var h='<div class="card stc'+(i===ci2?' cur':'')+(past?' past':'')+'"><div class="card-h"><span>'+SL[x.key]+(i===ci2?' <span class="now-pill">진행 중</span>':' · 지난 단계')+'</span>'
-          +(past?'<button class="link-btn" data-stg="'+x.key+'">'+(open?'접기':'열기')+'</button>':'')+'</div>';
-        if(open){
+        var defs=SF[x.key]||SF.court, past=i<ci2;
+        cur='st:'+x.key;
+        var isOpen=!past||stOpen[x.key]||ed();
+        var h=open('stc'+(past?' past':' cur'));
+        var title=SL[x.key]+(past?'':' <span class="now-pill">진행 중</span>');
+        var fold=past&&!ed()?'<button class="link-btn fold" data-stg="'+x.key+'">'+(isOpen?'접기':'열기')+'</button>':'';
+        if(past&&!isOpen){
+          var sum=[x.org,x.no].filter(Boolean).join(' · ');
+          h+='<div class="card-h"><span>'+title+(sum?'<span class="sum">'+esc(sum)+'</span>':'')+'</span><span class="hb">'+fold+'</span></div>';
+        } else {
+          h+=head(title, fold);
           h+=defs.map(function(d){
             var v=x[d[0]]||'', o=d[2]||{};
+            if(ed()) return '<div class="fr"><span class="l">'+d[1]+'</span><div style="grid-column:2/4"><input data-sk="'+x.key+'.'+d[0]+'" value="'+esc(v)+'"'+(o.tel?' inputmode="tel"':'')+'></div></div>';
             var tail=o.tel&&telHref(v)?'<a class="call" href="'+telHref(v)+'">'+PHONE_SVG+'전화</a>':o.copy?copyBtn(v):'<span></span>';
             var r='<div class="fr"><span class="l">'+d[1]+'</span><span class="v'+(v?'':' none')+'">'+(v?esc(v):'—')+'</span>'+tail+'</div>';
             var hk=x.key+'.'+d[0], hl=(S.hist&&S.hist[hk])||[];
@@ -466,19 +496,19 @@ var VIEWS = {
             return r;
           }).join('');
         }
-        stages+=h+'</div>';
+        h+=close();
+        if(past) pastCards=h+pastCards; else nowCard=h;
       });
+      out+='<div class="a-s">'+nowCard+pastCards+'</div>';
     } else {
-      stages='<div class="card">'+head('재판부')+field('court_dept','법원·재판부')+field('court_phone','재판부 전화',{tel:1})+'</div>'
-        +'<div class="card">'+head('수사')+field('investigator','수사기관·담당')+field('investigator_phone','수사관 전화',{tel:1})+'</div>';
+      out+='<div class="a-s">'; cur='court'; out+=open()+head('재판부')+field('court_dept','법원·재판부')+field('court_phone','재판부 전화',{tel:1})+close();
+      cur='inv'; out+=open()+head('수사')+field('investigator','수사기관·담당')+field('investigator_phone','수사관 전화',{tel:1})+close()+'</div>';
     }
-    var h='<div class="info-grid">'+basic+stages+
-      '<div class="card wide">'+head('메모')+field('memo','메모',{memo:1})+'</div>'+
-      (data.info.linked&&data.info.linked.length?'<div class="card wide">'+head('연결 사건')+data.info.linked.map(function(n){ return ro('사건번호', n); }).join('')+'</div>':'')+
-      '</div>';
-    if(editing) return h+'<div class="savebar"><button class="no" id="cancel">취소</button><button class="ok" id="save">저장</button></div>';
-    var foot = data.info.saved ? '마지막 수정 '+esc(data.info.updatedBy||'')+' · '+esc(fmtTime(data.info.updatedAt)) : '처음 값은 로웨어에서 복사했습니다. 저장하면 이후 로웨어와 연동되지 않습니다.';
-    return h+'<div class="foot">'+foot+'</div>';
+    cur='memo'; out+=open('a-m')+head('메모')+field('memo','메모',{memo:1})+close();
+    cur=null;
+    if(data.info.linked&&data.info.linked.length) out+='<div class="card a-k"><div class="card-h"><span>연결 사건</span></div>'+data.info.linked.map(function(n){ return ro('사건번호', n); }).join('')+'</div>';
+    var foot = data.info.saved && !editing ? '<div class="foot">마지막 수정 '+esc(data.info.updatedBy||'')+' · '+esc(fmtTime(data.info.updatedAt))+'</div>' : '';
+    return '<div class="info-col">'+out+foot+'</div>';
   }
 };
 // 타임라인 "우리 서면" 줄: 그 제출의 최종본(그날 마지막으로 방에 올린 파일) [열기], 틀렸으면 [바꾸기]
@@ -634,7 +664,7 @@ document.addEventListener('click', function(e){
   var b=e.target.closest('button'); if(!b) return;
   if(b.dataset.v){ if(editing && !confirmLeave()) return; editing=false; tl.on=false; view=b.dataset.v; render(); window.scrollTo(0,0); return; }
   ['f','scope','p'].forEach(function(k){ if(b.dataset[k]){ sub[k]=b.dataset[k]; render(); } });
-  if(b.id==='edit'){ editing=true; render(); var i=$('#main input'); if(i) i.focus(); }
+  if(b.dataset.edit){ editing=b.dataset.edit; render(); var c=$('#main .card.editing'); if(c){ var i=c.querySelector('input,textarea,select'); if(i) i.focus(); if(c.getBoundingClientRect().top<0) c.scrollIntoView({block:'start'}); } }
   if(b.id==='cancel'){ editing=false; render(); }
   if(b.id==='save') saveInfo(b);
   if(b.dataset.copy){ copyText(b.dataset.copy); }
@@ -654,13 +684,17 @@ document.addEventListener('click', function(e){
 });
 function confirmLeave(){ return window.confirm('저장하지 않은 수정이 있습니다. 나갈까요?'); }
 function saveInfo(btn){
-  var fields={}; document.querySelectorAll('#main [data-k]').forEach(function(el){ fields[el.dataset.k]=el.value.trim(); });
-  var xp=[]; document.querySelectorAll('#main .xp').forEach(function(r){ var n=r.querySelector('.xp-n').value.trim(), p=r.querySelector('.xp-p').value.trim(); if(n||p) xp.push({n:n,p:p}); });
-  fields.extra_phones = xp.length ? JSON.stringify(xp) : '';
+  var box=$('#main .card.editing'); if(!box) return;
+  var fields={}; box.querySelectorAll('[data-k]').forEach(function(el){ fields[el.dataset.k]=el.value.trim(); });
+  if(box.querySelector('#xp')){
+    var xp=[]; box.querySelectorAll('.xp').forEach(function(r){ var n=r.querySelector('.xp-n').value.trim(), p=r.querySelector('.xp-p').value.trim(); if(n||p) xp.push({n:n,p:p}); });
+    fields.extra_phones = xp.length ? JSON.stringify(xp) : '';
+  }
   var body={action:'save_info', lNum:data.lNum, fields:fields};
-  if(data.stages && $('#st-cur')){
-    var st={}; document.querySelectorAll('#main .sted').forEach(function(c){ if(c.hidden) return; c.querySelectorAll('[data-sk]').forEach(function(el){ var p=el.dataset.sk.split('.'); (st[p[0]]=st[p[0]]||{})[p[1]]=el.value.trim(); }); });
-    body.stages=st; body.cur=$('#st-cur').value; body.start=$('#st-start').value;
+  if(data.stages){
+    var st={}; box.querySelectorAll('[data-sk]').forEach(function(el){ var p=el.dataset.sk.split('.'); (st[p[0]]=st[p[0]]||{})[p[1]]=el.value.trim(); });
+    var sc=box.querySelector('#st-cur'), ss=box.querySelector('#st-start');
+    if(Object.keys(st).length || sc){ body.stages=st; body.cur=sc?sc.value:data.stages.cur; body.start=ss?ss.value:data.stages.start; }
   }
   btn.disabled=true; btn.textContent='저장 중…';
   api(body).then(function(j){
