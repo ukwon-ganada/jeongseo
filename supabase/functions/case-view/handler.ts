@@ -299,6 +299,7 @@ export function roomGroup(kind: string, summary: string): string {
   if (kind === "사건접수" || s === "사건 선임") return "accept";
   return "chat";
 }
+export const isChatDeadline = (r: any) => r.kind !== "지시" && /(마감|기한)(일)?\s*$|마감일|기한\s*:/.test(nz(r.summary));
 export function mergeRoomEvents(shaped: any, rows: any[], caseNo: string) {
   const seen = new Set<string>();
   for (const r of rows) {
@@ -306,6 +307,12 @@ export function mergeRoomEvents(shaped: any, rows: any[], caseNo: string) {
     const key = d + tm + r.summary;
     if (seen.has(key)) continue; seen.add(key);
     const t = (tm ? tm + " " : "") + (r.kind === "지시" ? "지시 · " : "") + nz(r.summary);
+    // 대화에서 뽑은 "○○ 마감·기한" 줄은 기일이 아니라 기한 (석원 2026-11-16): 기한 탭에 '대화 기준'으로, 기일 탭에서는 뺌.
+    if (isChatDeadline(r)) {
+      shaped.events.push({ d, k: d >= shaped.today ? "due" : "done", g: "limit", lim: d >= shaped.today ? 1 : 0, t, f: null, src: "chat", rid: r.id });
+      (shaped.deadlines ||= []).push({ t: nz(r.summary), d, kind: "대화", st: "open", why: "사건방 대화에서 확인한 날짜 · 계산한 기한 아님" });
+      continue;
+    }
     const g = roomGroup(nz(r.kind), nz(r.summary)), future = d >= shaped.today && r.state !== "완료";
     const k = future ? "due" : g === "chat" ? "room" : g === "hearing" || g === "meet" ? "done" : "ours";
     shaped.events.push({ d, k, t, f: null, g: g === "decision" ? "hearing" : g, src: "chat", rid: r.id });
