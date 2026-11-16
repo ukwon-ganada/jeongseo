@@ -694,9 +694,7 @@ function saveInfo(btn){
   if(data.stages){
     var st={}; box.querySelectorAll('[data-sk]').forEach(function(el){ var p=el.dataset.sk.split('.'); (st[p[0]]=st[p[0]]||{})[p[1]]=el.value.trim(); });
     var sc=box.querySelector('#st-cur'), ss=box.querySelector('#st-start');
-    if(Object.keys(st).length || sc) body.stages=st;
-    // 단계를 직접 바꾼 경우에만 보냄(안 바꾸면 사건번호 따라 자동으로 넘어감)
-    if(sc && (sc.value!==data.stages.cur || ss.value!==data.stages.start)){ body.cur=sc.value; body.start=ss.value; }
+    if(Object.keys(st).length || sc){ body.stages=st; body.cur=sc?sc.value:data.stages.cur; body.start=ss?ss.value:data.stages.start; }
   }
   btn.disabled=true; btn.textContent='저장 중…';
   api(body).then(function(j){

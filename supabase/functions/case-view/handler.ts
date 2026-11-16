@@ -635,9 +635,8 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       if (body.stages && typeof body.stages === "object") {
         const d = diffStages(c, prevRow, body.stages);
         row.stages = d.stages;
-        // 단계를 화면에서 직접 고른 경우에만 바꾼다(안 보내면 이전 값 유지, 비어 있으면 사건번호 따라 자동)
-        row.cur_stage = "cur" in body ? (isStage(body.cur) ? body.cur : null) : (prev.cur_stage ?? null);
-        row.start_stage = "start" in body ? (isStage(body.start) ? body.start : null) : (prev.start_stage ?? null);
+        row.cur_stage = isStage(body.cur) ? body.cur : null;
+        row.start_stage = isStage(body.start) ? body.start : null;
         stageChanges = d.changes;
         for (const x of d.changes) logRows.push({ l_num: lNum, field: x.field, old_value: x.old, new_value: x.new, editor: who.name, editor_id: who.userId });
         for (const k of ["cur_stage", "start_stage"]) {
