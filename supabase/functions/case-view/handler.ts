@@ -197,7 +197,8 @@ export function shapeCase(c: any, evs: any[], opts: { today: string; linked: str
   const info = { ...infoFields(c, opts.saved ?? null), linked: opts.linked };
 
   return {
-    caseNo: c.l_code, lNum: c.l_num, title, court: court || "법원 정보 없음", today, closed: opts.status === "종결",
+    caseNo: c.l_code, lNum: c.l_num, title, court: c.is_inv ? ["수사 단계", [nz(raw.l_police_station), nz(raw.agency_no)].filter(Boolean).join(" ")].filter(Boolean).join(" · ") : court || "법원 정보 없음",
+    inv: !!c.is_inv, today, closed: opts.status === "종결",
     events, deadlines, deadlineNote: DEADLINE_NOTE,
     hearings, progress: { updated, checked: "", changed, rows }, info,
   };
@@ -398,11 +399,11 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
         }
         status = main.status;
         linked = maps.slice(1).map((m: any) => nz(m.case_no)).filter(Boolean);
-        if (main.l_num != null) c = (await rest(env, `cases?select=*&l_num=eq.${main.l_num}`, {}, fetcher))[0];
-        else if (main.case_no) c = (await rest(env, `cases?select=*&l_code=in.${enc(inList(caseNoVariants(main.case_no)))}&limit=1`, {}, fetcher))[0];
+        if (main.l_num != null) c = (await rest(env, `case_all?select=*&l_num=eq.${main.l_num}`, {}, fetcher))[0];
+        else if (main.case_no) c = (await rest(env, `case_all?select=*&l_code=in.${enc(inList(caseNoVariants(main.case_no)))}&limit=1`, {}, fetcher))[0];
         if (!c) return json({ notfound: true, caseNo: main.case_no || "" });
       } else if (caseParam) {
-        c = (await rest(env, `cases?select=*&l_code=in.${enc(inList(caseNoVariants(caseParam)))}&order=l_num.desc&limit=1`, {}, fetcher))[0];
+        c = (await rest(env, `case_all?select=*&l_code=in.${enc(inList(caseNoVariants(caseParam)))}&order=l_num.desc&limit=1`, {}, fetcher))[0];
         if (!c) return json({ notfound: true, caseNo: caseParam });
         if (c.state === "종결") status = "종결";
       } else return json({ error: "방이나 사건번호가 없습니다" }, 400);
@@ -492,7 +493,7 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
             const picks = await rest(env, `pc_title_pick?select=header_norm,l_num,case_no&order=updated_at.desc&limit=3000`, {}, fetcher).catch(() => []) || [];
             const p = findPick(nz(row.header_text), picks);
             if (p) {
-              const c = (await rest(env, `cases?select=l_code&l_num=eq.${p.l_num}`, {}, fetcher))?.[0];
+              const c = (await rest(env, `case_all?select=l_code&l_num=eq.${p.l_num}`, {}, fetcher))?.[0];
               if (c) { await logView(env, who, "locate:picked-title", "", { l_num: p.l_num, l_code: c.l_code }, fetcher); return json({ case: c.l_code }); }
             }
           }
@@ -544,7 +545,7 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
     if (body?.action === "save_info") {
       const lNum = Number(body.lNum);
       if (!Number.isFinite(lNum) || lNum <= 0) return json({ error: "사건이 없습니다" }, 400);
-      const c = (await rest(env, `cases?select=l_num,l_code&l_num=eq.${lNum}`, {}, fetcher))[0];
+      const c = (await rest(env, `case_all?select=l_num,l_code&l_num=eq.${lNum}`, {}, fetcher))[0];
       if (!c) return json({ error: "사건이 없습니다" }, 404);
       const prev = (await rest(env, `case_info?select=*&l_num=eq.${lNum}`, {}, fetcher))[0] || {};
       const next: Record<string, string> = {};

@@ -3,12 +3,14 @@
 //
 //  봇이 새 방에 초대되면(웍스 'join' 신호) 그 방 제목을 웍스 API로 읽고,
 //  제목 속 사건번호(2026고단1234 등)로 로웨어 사건(cases)을 찾아 works_room_case 에 넣는다.
-//    - 사건번호가 하나도 없거나 로웨어에 없는 번호면 연결하지 않는다(잘못 붙이느니 안 붙인다)
+//    - 사건번호가 하나도 없거나 로웨어에 없는 번호면 로웨어 사건에는 연결하지 않는다(잘못 붙이느니 안 붙인다)
 //    - 여러 사건이면 모두 넣고, 가장 최근 등록 사건(l_num 큰 것 = 보통 상급심)을 주 사건으로
 //    - 이미 연결된 방은 건드리지 않는다
+//    - 로웨어 사건을 못 찾았는데 수사단계 방(형사 표시·수사기관 이름)이면 수사 사건을 만들어 붙인다(inv_case.ts)
 //  기록: source='auto', basis='방 제목 사건번호'
 // ============================================================================
 import { botToken, type FileEnv } from "./room_file.ts";
+import { createInvCase, parseInvTitle } from "./inv_case.ts";
 
 export type LinkResult = { linked: number; how: string };
 
@@ -49,12 +51,19 @@ export async function linkRoom(env: FileEnv, botId: string, channelId: string, f
   if (had.ok && (await had.json()).length) return { linked: 0, how: "already" };
   const t = title ?? await roomTitle(env, botId, channelId, fetcher);
   const nos = caseNosInTitle(t);
-  if (!nos.length) return { linked: 0, how: "no-case-no" };
+  // 로웨어 사건을 못 찾은 수사단계 방 → 도우미가 수사 사건을 만들어 붙인다 (inv_case.ts, 석원 2026-11-16)
+  const inv = async (how: string): Promise<LinkResult> => {
+    const p = parseInvTitle(t);
+    if (!p) return { linked: 0, how };
+    await createInvCase(env, channelId, t, p, fetcher);
+    return { linked: 1, how: "inv-created" };
+  };
+  if (!nos.length) return await inv("no-case-no");
   const codes = [...new Set(nos.flatMap(codeVariants))];
   const inList = "(" + codes.map((c) => '"' + c.replace(/"/g, "") + '"').join(",") + ")";
   const r = await rest(env, `cases?select=l_num,l_code,state&l_code=in.${encodeURIComponent(inList)}`, {}, fetcher);
   const found: any[] = r.ok ? await r.json() : [];
-  if (!found.length) return { linked: 0, how: "not-in-lawware" };
+  if (!found.length) return await inv("not-in-lawware");
   found.sort((a, b) => Number(b.l_num) - Number(a.l_num));
   const now = new Date().toISOString();
   const rows = found.map((c, i) => ({
