@@ -48,6 +48,14 @@ export function parseInvTitle(title: string): InvParsed | null {
 }
 
 // 제목에 법원 사건번호(고단·노·초기 …)가 있으면 그 번호들
+// 수사 단계 방이 아니어도(민사·제목 없음 등) 자체 사건을 만든다: 못 읽으면 방 제목을 사건명 자리에
+export function invFields(title: string): InvParsed {
+  const p = parseInvTitle(title);
+  if (p) return p;
+  const t = String(title || "").replace(/^\s*\[?종결\]?\s*/, "").trim();
+  return { client: "", charge: t.slice(0, 60), role: "", agency: "", agencyNo: "" };
+}
+
 export function courtNosInTitle(title: string): string[] {
   return caseNosInTitle(title).filter((n) => COURT_MARK.test(n.replace(/^\d{4}/, "").replace(/\d+$/, "")));
 }
@@ -108,6 +116,11 @@ export async function recheckInv(env: FileEnv, botIds: string[], inv: { l_num: n
   const patch: Record<string, unknown> = { title_checked_at: now };
   if (title !== (inv.room_title ?? "")) {
     patch.room_title = title;
+    // 처음에 제목을 못 읽어 빈칸으로 만든 사건이면 이제 읽은 제목으로 채운다
+    if (!inv.room_title && title) {
+      const p = invFields(title);
+      Object.assign(patch, { client_name: p.client, charge: p.charge, role: p.role, agency: p.agency, agency_no: p.agencyNo });
+    }
     await rest(env, `works_room_case?l_num=eq.${inv.l_num}&channel_id=eq.${encodeURIComponent(inv.channel_id)}`,
       { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ room_title: title }) }, fetcher).then((r) => r.body?.cancel());
   }
@@ -153,6 +166,7 @@ export async function recheckRoom(env: FileEnv, botIds: string[], channelId: str
 }
 
 // 예전 '보류' 방 중 수사단계 방 → 수사 사건으로 (dryRun 이면 바꾸지 않고 목록만)
+// 보류(사건 없음) 방을 모두 사건과 잇는다: 제목 번호가 로웨어에 하나로 맞으면 그 사건, 아니면 자체 사건(제목 못 읽어도)
 export async function backfillHold(env: FileEnv, botIds: string[], dryRun: boolean, fetcher: typeof fetch = fetch, limit = 200) {
   const rows: any[] = await restJson(env, `works_room_case?select=id,channel_id,room_title,basis&status=eq.보류&l_num=is.null&limit=${limit}`, {}, fetcher) || [];
   const plan: any[] = [];
@@ -163,17 +177,25 @@ export async function backfillHold(env: FileEnv, botIds: string[], dryRun: boole
     seen.add(ch);
     let title = String(r.room_title || "");
     if (!title) { for (const b of botIds) { try { title = await roomTitle(env, b, ch, fetcher); break; } catch { /* */ } } }
-    const p = parseInvTitle(title);
-    // 제목 번호가 로웨어에 있는 방은 '후보 여러 개' 등으로 일부러 보류한 방이라 건드리지 않는다(직원 확인)
-    const cand = p ? await lawwareCases(env, title, fetcher).catch(() => []) : [];
-    const why = !title ? "제목 없음" : !p ? "수사단계 방 아님" : cand.length ? "로웨어 사건 후보 있음(" + cand.map((c) => c.l_code).join(",") + ")" : "";
-    plan.push({ id: r.id, title, parsed: p, make: !why, why });
-    if (!why && !dryRun) {
-      try { const lNum = await createInvCase(env, ch, title, p!, fetcher, Number(r.id)); plan[plan.length - 1].lNum = lNum; }
-      catch (e) { plan[plan.length - 1].error = String((e as Error)?.message || e).slice(0, 80); }
-    }
+    const cand = title ? await lawwareCases(env, title, fetcher).catch(() => []) : [];
+    const how = cand.length ? "로웨어 " + cand.map((c) => c.l_code).join(",") : "자체 사건" + (title ? "" : "(제목 못 읽음)");
+    plan.push({ id: r.id, title, how });
+    if (dryRun) continue;
+    try {
+      if (cand.length) {
+        const now = new Date().toISOString();
+        await restJson(env, `works_room_case?id=eq.${Number(r.id)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } }, fetcher);
+        await restJson(env, "works_room_case", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify(cand.map((c, i) => ({
+          channel_id: ch, l_num: Number(c.l_num), case_no: caseNosInTitle(c.l_code)[0] || c.l_code, is_primary: i === 0,
+          status: cand[0].state === "종결" ? "종결" : "대상", room_title: title, basis: "방 제목 사건번호", confidence: cand.length === 1 ? "높음" : "보통", source: "auto", updated_at: now,
+        }))) }, fetcher);
+        plan[plan.length - 1].lNum = Number(cand[0].l_num);
+      } else {
+        plan[plan.length - 1].lNum = await createInvCase(env, ch, title, invFields(title), fetcher, Number(r.id));
+      }
+    } catch (e) { plan[plan.length - 1].error = String((e as Error)?.message || e).slice(0, 80); }
   }
-  return { dryRun, total: plan.length, make: plan.filter((x) => x.make).length, plan };
+  return { dryRun, total: plan.length, plan };
 }
 
 // ============================================================================

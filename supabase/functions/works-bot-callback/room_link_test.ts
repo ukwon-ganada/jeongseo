@@ -47,13 +47,7 @@ Deno.test("새 방: 제목 사건번호로 연결, 여러 사건이면 최근 �
   assertEquals((await linkRoom(ENV, "1", "room-N", f)).how, "already");
 });
 
-// 형사·수사기관 표시가 있는 방은 수사 사건을 만든다(inv_case_test.ts). 여기선 민사 방으로 본다
-Deno.test("사건번호 없거나 로웨어에 없으면 연결 안 함", async () => {
-  const db = { rooms: [] as any[], cases: [{ l_num: 10, l_code: "2025고단987", state: "진행" }] };
-  assertEquals((await linkRoom(ENV, "1", "r1", fake(db, "(민)을지문덕-대여금").f)).how, "no-case-no");
-  assertEquals((await linkRoom(ENV, "1", "r2", fake(db, "(민)갑-대여금 2024가단1").f)).how, "not-in-lawware");
-  assertEquals(db.rooms.length, 0);
-});
+// 로웨어에 없거나 번호가 없는 방은 자체 사건을 만든다(inv_case_test.ts)
 
 Deno.test("직원이 고른 사건 기억", async () => {
   const db = { rooms: [] as any[], cases: [{ l_num: 10, l_code: "2025고단987", state: "종결" }] };
