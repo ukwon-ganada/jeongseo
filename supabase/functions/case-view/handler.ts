@@ -163,10 +163,14 @@ export function shapeCase(c: any, evs: any[], opts: { today: string; linked: str
       events.push({ d, k: "ours", g: "ours", t: nz(e.lp_contents).replace(/^.*?법무법인\s*정서\s*/, "") || nz(e.lp_contents), f: null, lp: e.lp_num });
     }
   }
-  // 의뢰인에게 보낸 안내 문자도 우리가 한 일 (석원 2026-11-13). 인사말은 빼고 앞부분만.
+  // 의뢰인에게 안내 문자를 보냈는지만 (석원 2026-11-16: 내용은 불필요). 같은 날 여러 통이어도 한 줄.
+  const smsDays = new Set<string>();
   for (const e of evs) {
     if (e.lp_set !== "문자" || !isDate(e.lp_appoint_date)) continue;
-    events.push({ d: e.lp_appoint_date.slice(0, 10), k: "done", g: "msg", t: "안내 문자 · " + smsGist(nz(e.lp_contents)), f: null });
+    const d = e.lp_appoint_date.slice(0, 10);
+    if (smsDays.has(d)) continue;
+    smsDays.add(d);
+    events.push({ d, k: "done", g: "msg", t: "안내 문자 발송", f: null });
   }
   const jd = isDate(raw.l_judgment_date) ? raw.l_judgment_date.slice(0, 10) : "";
   if (jd && !verdictSeen) events.push({ d: jd, k: jd >= today ? "due" : "ours", g: "hearing", t: "선고", f: null });
