@@ -30,10 +30,11 @@ type Ev = { key: string; d: string; manual: boolean; notice: boolean; label: str
 
 // 처분 줄 → 생기는 기한들
 function eventOf(r: any): { key: string; label: string } | null {
-  const s = nz(r.summary);
+  // 괄호 속 메모("(재정신청 마감 11/23)" 등)는 처분 종류 판단에서 뺀다
+  const s = nz(r.summary).replace(/\([^)]*\)/g, " ");
   if (r.kind === "지시" || /예정|지시|이유서|신청서|항고장|제출|작성/.test(s)) return null;
-  if (/재정신청/.test(s) && /기각/.test(s)) return { key: "jaejeong_reject", label: "재정신청 기각" };
-  if (/항고/.test(s) && /기각/.test(s)) return { key: "hanggo_reject", label: "항고 기각" };
+  if (/재정신청\s*(이|은|에\s*대한)?\s*기각/.test(s)) return { key: "jaejeong_reject", label: "재정신청 기각" };
+  if (/항고\s*(이|은|에\s*대한)?\s*기각/.test(s)) return { key: "hanggo_reject", label: "항고 기각" };
   if (/불기소/.test(s)) return { key: "nopros", label: "불기소" };
   if (/불송치/.test(s) && !/이의/.test(s)) return { key: "nosend", label: "불송치" };
   return null;
