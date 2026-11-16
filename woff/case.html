@@ -467,9 +467,14 @@ function showPicker(subText){
   }).catch(function(e){ $('#list').innerHTML=emptySt('불러오지 못했습니다', esc((e&&e.message)||e)); });
 }
 document.addEventListener('click', function(e){
-  if(e.target.id==='switch'){ showPicker(); window.scrollTo(0,0); return; }
+  if(e.target.id==='switch'){ ctx.locatePick=null; showPicker(); window.scrollTo(0,0); return; }
   var b=e.target.closest('.pick'); if(!b) return;
   ctx.caseParam=b.dataset.case; addRecent(ctx.caseParam); editing=false;
+  // PC에서 방을 못 찾은 경우: 고른 사건을 그때 읽은 방 제목과 함께 기억 → 다음부터 바로 열림
+  if(ctx.locatePick){
+    var lid=ctx.locatePick; ctx.locatePick=null;
+    api({action:'remember_pick', locate:lid, 'case':ctx.caseParam}).then(function(r){ if(r&&r.saved) toast('이 방을 기억했습니다. 다음부터 바로 열립니다'); }, function(){});
+  }
   // 연결 안 된 방에서 고르면 그 방에 기억해 두고(다음부터 바로 열림) 방 기준으로 연다
   if(ctx.unpairedRoom){
     var room=ctx.unpairedRoom; ctx.unpairedRoom='';
@@ -509,6 +514,7 @@ function showLocate(){
     if(j['case']){ ctx.caseParam=j['case']; return showCase({'case':j['case']}); }
     if(j.nohelper) return showPicker('PC 도우미가 켜져 있지 않아 방을 알 수 없습니다');
     if(j.timeout) return showPicker('PC 도우미가 응답하지 않습니다 (업데이트가 필요할 수 있어요)');
+    if(j.locate){ ctx.locatePick=j.locate; return showPicker('이 방을 찾지 못했습니다 · 사건을 한 번 고르면 다음부터 바로 열립니다'); }
     return showPicker('웍스 창에서 방 이름을 읽지 못했습니다 (창을 최소화하지 마세요)');
   }).catch(function(){ return showPicker(''); });
 }

@@ -16,6 +16,7 @@
 //    { "action": "set_file", "lNum": 1, "lp": 55, "id": 12 } → 타임라인 제출 줄에 붙을 파일을 직원이 직접 고름
 //    { "action": "locate" }                         → PC: 이 직원 PC 도우미에게 웍스 창 방 제목을 읽게 해서 지금 방을 찾음(최대 8초)
 //    { "action": "link_room", "room": "<방ID>", "case": "<사건번호>" } → 연결 안 된 방에 고른 사건 기억
+//    { "action": "remember_pick", "locate": 12, "case": "<사건번호>" } → PC 방 찾기에서 못 찾은 방: 고른 사건을 읽은 제목과 함께 기억
 //    { "action": "helper_token" }                   → 이 직원의 PC 도우미 연결 코드 발급(한 번만 보여 줌, 서버엔 해시만)
 //  사건 정보 칸은 우리가 직접 입력·수정한다. 로웨어와 연동하지 않는다(자동으로 덮어쓰지 않음).
 //    저장된 값이 없을 때만 처음 값으로 로웨어 값을 한 번 보여 준다(PREFILL_FROM_LAWWARE).
@@ -35,6 +36,7 @@ const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 
 import { computeDeadlines, deadlineEvents } from "./deadlines.ts";
+import { findPick, normTitle } from "./title_match.ts";
 export const DEADLINE_NOTE = "잠정 계산입니다(형사 항소·상고·이유서만). 선고일·기록접수통지 도달일로 계산했고, 알림은 보내지 않습니다. 꼭 나의사건 기록으로 한 번 더 확인해 주세요.";
 export type Env = { sbUrl: string; sbKey: string };
 export type WhoAmI = { ok: boolean; status: number; userId?: string; domainId?: number | string; name?: string; error?: string };
@@ -485,7 +487,17 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
             const hit = await rest(env, `cases?select=l_code&l_code=in.${enc(inList(nos.flatMap(caseNoVariants)))}&limit=2`, {}, fetcher) || [];
             if (hit.length === 1) return json({ case: hit[0].l_code });
           }
-          return json({ notfound: true, how: row.how });
+          // 방 목록에 없는 방: 전에 직원이 이 제목에서 고른 사건이 있으면 그것 (석원 2026-11-16)
+          if (row.how !== "error" && nz(row.header_text)) {
+            const picks = await rest(env, `pc_title_pick?select=header_norm,l_num,case_no&order=updated_at.desc&limit=3000`, {}, fetcher).catch(() => []) || [];
+            const p = findPick(nz(row.header_text), picks);
+            if (p) {
+              const c = (await rest(env, `cases?select=l_code&l_num=eq.${p.l_num}`, {}, fetcher))?.[0];
+              if (c) { await logView(env, who, "locate:picked-title", "", { l_num: p.l_num, l_code: c.l_code }, fetcher); return json({ case: c.l_code }); }
+            }
+          }
+          // 못 찾음: 화면에서 직원이 고르면 이 읽은 제목과 함께 기억한다(remember_pick)
+          return json({ notfound: true, how: row.how, locate: row.how === "error" ? null : id });
         }
         if (!row?.taken_at && Date.now() > until - 5000) break; // 3초 안에 도우미가 안 받아 가면 꺼진 것(또는 옛 버전)
       }
@@ -502,6 +514,23 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       const r = await autoLink(env, { channelId: room, lNum: c.l_num }, fetcher);
       await logView(env, who, "link_room:" + nz(r?.how), room, c, fetcher);
       return json(r || { linked: 0, how: "error" });
+    }
+
+    // PC 방 찾기에서 못 찾은 방: 직원이 고른 사건을 그때 읽은 제목과 함께 기억 → 다음부터 바로 열림
+    if (body?.action === "remember_pick") {
+      const id = Number(body.locate), code = nz(body.case);
+      if (!who.userId || !Number.isFinite(id) || !code) return json({ error: "기억할 내용이 없습니다" }, 400);
+      const since = new Date(Date.now() - 15 * 60_000).toISOString();
+      const row = (await rest(env, `pc_locate?select=header_text,channel_id,how&id=eq.${id}&works_user_id=eq.${enc(who.userId)}&done_at=gte.${enc(since)}`, {}, fetcher))?.[0];
+      const hn = normTitle(nz(row?.header_text));
+      if (!row || row.channel_id || row.how === "error" || hn.length < 8) return json({ saved: false });
+      const c = (await rest(env, `cases?select=l_num,l_code&l_code=in.${enc(inList(caseNoVariants(code)))}&order=l_num.desc&limit=1`, {}, fetcher))?.[0];
+      if (!c) return json({ saved: false });
+      await rest(env, "pc_title_pick?on_conflict=header_norm", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+        body: JSON.stringify({ header_norm: hn, header_text: nz(row.header_text).slice(0, 300), l_num: c.l_num, case_no: c.l_code,
+          picked_by: who.name || null, works_user_id: who.userId, updated_at: new Date().toISOString() }) }, fetcher);
+      await logView(env, who, "remember_pick", "", c, fetcher);
+      return json({ saved: true });
     }
 
     if (body?.action === "helper_token") {
