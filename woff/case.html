@@ -51,51 +51,54 @@ main{max-width:880px;margin:0 auto;padding:12px 16px 32px}
 .empty-st{text-align:center;color:var(--muted);padding:56px 16px;font-size:14px}
 .empty-st b{display:block;color:var(--ink);font-size:16px;margin-bottom:4px}
 
-/* 타임라인 */
-.yr{font-size:13px;font-weight:700;color:var(--muted);padding:20px 16px 2px}
-.ev{display:grid;grid-template-columns:52px 18px 1fr;gap:0 8px;padding:0 16px}
-.ev .d{font-size:13px;color:var(--muted);padding:14px 0;text-align:right;font-variant-numeric:tabular-nums}
-.ev .d small{display:block;font-size:11px}
+/* 타임라인 (2026-11-13 다듬음): 꼬리표·구분선 없이 점 색으로만 구분, 제목 + 회색 보조줄 */
+.tl{max-width:680px;margin:0 0 12px;padding:6px 0 14px}
+.yr{font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.2px;padding:18px 20px 4px}
+.ev{display:grid;grid-template-columns:44px 20px 1fr;gap:0 10px;padding:0 20px}
+.ev .d{padding:9px 0;text-align:right;font-variant-numeric:tabular-nums;line-height:1.25}
+.ev .d b{display:block;font-size:13px;font-weight:600;color:var(--ink2)}
+.ev .d small{display:block;font-size:11px;color:var(--muted);margin-top:1px}
 .ev .rail{position:relative}
-.ev .rail::before{content:"";position:absolute;left:8px;top:0;bottom:0;width:2px;background:var(--line)}
-.ev .rail::after{content:"";position:absolute;left:4px;top:18px;width:10px;height:10px;border-radius:50%;background:var(--surface);border:2px solid #c4c8ce}
-.ev.ours .rail::after{background:var(--accent);border-color:var(--accent)}
-.ev.due .rail::after{border-color:var(--due);background:var(--due)}
-.ev .t{padding:14px 0;border-bottom:1px solid var(--line2);font-size:15px;line-height:1.5;overflow-wrap:anywhere}
-.ev:last-child .t{border-bottom:0}
-.ev.ours .t{font-weight:700}
-.ev.due .t{color:var(--due);font-weight:700}
-.ev.court .t{color:var(--ink2)}
-.ev.done .t{color:var(--ink)}
-.ev.room .rail::after{border-color:var(--accent);background:var(--surface)}
-.ev .src{font-size:11px;color:var(--muted);margin-left:6px;white-space:nowrap}
-/* 종류별 색: 점과 앞머리 이름표 */
-.ev{--gc:var(--g-chat);--gt:var(--g-chat-t)}
-.ev.g-accept{--gc:var(--g-accept);--gt:var(--g-accept-t)}
-.ev.g-hearing{--gc:var(--g-hearing);--gt:var(--g-hearing-t)}
-.ev.g-ours{--gc:var(--g-ours);--gt:var(--g-ours-t)}
-.ev.g-meet{--gc:var(--g-meet);--gt:var(--g-meet-t)}
-.ev.g-msg{--gc:var(--g-msg);--gt:var(--g-msg-t)}
-.ev[class*="g-"] .rail::after{background:var(--gc);border-color:var(--gc)}
-.ev[class*="g-"].due .rail::after{background:var(--surface);border-color:var(--gc)}
-.ev .gt{display:inline-block;font-size:12px;font-weight:700;border-radius:5px;padding:1px 7px;margin-right:7px;vertical-align:1px;color:var(--gc);background:var(--gt)}
-.ev .soon{display:inline-block;font-size:11px;font-weight:700;color:var(--due);margin-right:6px;vertical-align:1px}
-/* 덜 중요한 줄(문자·방 대화): 작게, 색 없이 (석원 2026-11-13) */
-.ev.minor .d,.ev.minor .t{padding:6px 0}
-.ev.minor .t{font-size:13px;color:var(--muted);font-weight:400;border-bottom:0}
-.ev.minor .d{font-size:12px}
-.ev.minor .d small{display:inline;margin-left:3px}
-.ev.minor .rail::after{left:5px;top:12px;width:8px;height:8px;border-width:1px;background:var(--surface);border-color:#c4c8ce}
-.ev.minor .gt{background:none;color:var(--muted);font-weight:500;padding:0;margin-right:5px}
-.ev.minor .soon{color:var(--muted)}
-.ev.g-accept .rail::after{background:var(--ink);border-color:var(--ink)}
-.ev.g-accept .gt{color:var(--ink);background:var(--line2)}
+.ev .rail::before{content:"";position:absolute;left:9px;top:0;bottom:0;width:2px;background:var(--line2)}
+.ev .rail::after{content:"";position:absolute;left:4px;top:13px;width:8px;height:8px;border-radius:50%;background:var(--gc);border:2px solid var(--gc);box-shadow:0 0 0 3px var(--surface)}
+.ev.due .rail::after{background:var(--surface)}
+.ev .t{padding:9px 0;min-width:0}
+.ev .tt{font-size:15px;font-weight:600;color:var(--ink);line-height:1.4;overflow-wrap:anywhere}
+.ev .ts{font-size:13px;color:var(--muted);margin-top:2px;line-height:1.45;overflow-wrap:anywhere}
+.ev .pill{display:inline-block;font-size:11px;font-weight:600;line-height:1;padding:3px 6px;border-radius:999px;margin-left:6px;vertical-align:2px;background:var(--line2);color:var(--ink2)}
+.ev.due .tt{color:var(--ink)}
+/* 종류별 점 색 (꼬리표 없이) */
+.ev{--gc:#c4c8ce}
+.ev.g-accept{--gc:var(--ink)}
+.ev.g-hearing{--gc:var(--g-hearing)}
+.ev.g-ours{--gc:var(--g-ours)}
+.ev.g-meet{--gc:var(--g-meet)}
+/* 덜 중요한 줄(문자·방 대화): 한 줄, 작고 흐리게 */
+.ev.minor .d{padding:4px 0}
+.ev.minor .d b{font-size:12px;font-weight:400;color:var(--muted)}
+.ev.minor .d small{display:none}
+.ev.minor .t{padding:4px 0}
+.ev.minor .tt{font-size:13px;font-weight:400;color:var(--muted)}
+.ev.minor .rail::after{left:6px;top:9px;width:4px;height:4px;border-width:1px;background:#c4c8ce;border-color:#c4c8ce}
+/* 법정기한(잠정): 빨간 점 + 남은 날 */
+.ev.g-limit{--gc:var(--danger)}
+.ev.g-limit.due .tt{color:var(--danger)}
+.ev.g-limit .pill{background:var(--danger);color:#fff}
+.ev.g-limit.done .tt{color:var(--muted);font-weight:500}
+.ev.g-limit.done .pill{background:var(--line2);color:var(--muted)}
+/* 오늘 */
+.today{display:grid;grid-template-columns:44px 20px 1fr;gap:0 10px;padding:4px 20px;align-items:center}
+.today b{font-size:11px;font-weight:700;color:var(--accent-ink);text-align:right}
+.today .rail{position:relative;height:14px}
+.today .rail::after{content:"";position:absolute;left:3px;top:3px;width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px var(--accent-tint)}
+.today i{height:1px;background:linear-gradient(90deg,var(--accent),transparent);opacity:.5}
+.dlnote{font-size:12px;color:var(--muted);margin:2px 4px 10px;line-height:1.5}
 /* 실제 날짜 차이만큼 띄우기. 너무 길면 줄이고 '몇 개월' 표시 */
-.gap{display:grid;grid-template-columns:52px 18px 1fr;gap:0 8px;padding:0 16px}
+.gap{display:grid;grid-template-columns:44px 20px 1fr;gap:0 10px;padding:0 20px}
 .gap .rail{position:relative}
-.gap .rail::before{content:"";position:absolute;left:8px;top:0;bottom:0;width:2px;background:var(--line)}
-.gap.long .rail::before{background:none;border-left:2px dashed var(--line);width:0}
-.gap .gl{align-self:center;font-size:12px;color:var(--muted)}
+.gap .rail::before{content:"";position:absolute;left:9px;top:0;bottom:0;width:2px;background:var(--line2)}
+.gap.long .rail::before{background:none;border-left:2px dotted var(--line);width:0}
+.gap .gl{align-self:center;font-size:11px;color:var(--muted)}
 
 /* 목록 줄 */
 .li{display:flex;gap:12px;padding:13px 16px;border-top:1px solid var(--line2);align-items:flex-start}
@@ -259,25 +262,47 @@ var VIEWS = {
       var lab=long?(days>=60?'약 '+Math.round(days/30)+'개월':days+'일'):'';
       return '<div class="gap'+(long?' long':'')+'" style="height:'+h+'px"><span></span><span class="rail"></span><span class="gl">'+lab+'</span></div>';
     };
-    var GLABEL={accept:'선임',hearing:'재판',ours:'제출',meet:'접견',chat:'방 대화'};
+    // 제목과 보조줄 나누기: "공판기일(327호 법정 11:00) · 속행" → 공판기일 / 11:00 · 327호 법정 · 속행
+    var split=function(e){
+      var t=String(e.t||''), sub=[], m;
+      if(e.g==='msg'||e.g==='chat') return {tt:t, ts:''};
+      t=t.replace(/^출석\s+/,'');
+      if((m=t.match(/^(\d{1,2}:\d{2})\s+(.*)$/))){ sub.push(m[1]); t=m[2]; }
+      var parts=t.split(' · '); t=parts.shift();
+      if((m=t.match(/^(.*?)\s*\(([^()]*)\)\s*$/))){
+        t=m[1]; var inner=m[2], tm=inner.match(/\s*(\d{1,2}:\d{2})\s*$/);
+        if(tm){ sub.push(tm[1]); inner=inner.slice(0,tm.index).trim(); }
+        if(inner) sub.push(inner);
+      }
+      t=t.replace(/\s+예정$/,'');
+      return {tt:t, ts:sub.concat(parts).join(' · ')};
+    };
     var list=data.events, h='';
     if(!list.length) return h+emptySt('표시할 내용이 없습니다');
-    var body='', yr='', prevD='', prevY='';
+    var body='', yr='', prevD='', prevY='', todayDone=false, today=data.today||'';
     list.forEach(function(e){
       var y=e.d.slice(0,4); if(y!==yr){ yr=y; body+='<div class="yr">'+y+'</div>'; }
-      var g=e.g||(e.src==='chat'?'chat':''), gl=GLABEL[g]||'', minor=(g==='msg'||g==='chat');
+      if(!todayDone && today && e.d>=today && prevD && prevD<today){ body+='<div class="today"><b>오늘</b><span class="rail"></span><i></i></div>'; todayDone=true; prevD=''; }
+      var g=e.g||(e.src==='chat'?'chat':''), minor=(g==='msg'||g==='chat');
       if(prevD && y===prevY) body+=gapDiv(prevD, e.d);
       prevD=e.d; prevY=y;
-      body+='<div class="ev '+e.k+(g?' g-'+g:'')+(minor?' minor':'')+'"><div class="d">'+md(e.d)+'<small>'+wk(e.d)+'</small></div><div class="rail"></div><div class="t">'+(e.k==='due'?'<span class="soon">예정</span>':'')+(gl?'<span class="gt">'+gl+'</span>':'')+esc(e.t)+(e.cf?'<div class="fa"><button class="open" data-file="'+e.cf.id+'">계약서 열기</button><span class="fn">'+esc(e.cf.n)+'</span></div>':'')+finalFile(e)+'</div></div>';
+      var p=split(e), pill='';
+      if(g==='limit'){ var n=dd(e.d); pill='<span class="pill">'+(n<0?'지남':n===0?'오늘까지':'D-'+n)+'</span>'; p.ts=(p.ts?p.ts+' · ':'')+'잠정'; }
+      else if(e.k==='due') pill='<span class="pill">예정</span>';
+      body+='<div class="ev '+e.k+(g?' g-'+g:'')+(minor?' minor':'')+'"><div class="d"><b>'+md(e.d)+'</b><small>'+wk(e.d)+'</small></div><div class="rail"></div><div class="t">'
+        +'<div class="tt">'+esc(p.tt)+pill+'</div>'+(p.ts?'<div class="ts">'+esc(p.ts)+'</div>':'')
+        +(e.cf?'<div class="fa"><button class="open" data-file="'+e.cf.id+'">계약서 열기</button><span class="fn">'+esc(e.cf.n)+'</span></div>':'')+finalFile(e)+'</div></div>';
     });
-    return h+'<div class="card">'+body+'</div>';
+    return h+'<div class="card tl">'+body+'</div>';
   },
   deadline: function(){
-    if(!data.deadlines.length) return emptySt('기한 계산 준비 중','새 기한 규칙이 완성되면 이곳에 표시됩니다.');
-    var rows=data.deadlines.slice().sort(function(a,b){ return (a.st==='done')-(b.st==='done') || a.d.localeCompare(b.d); });
-    return '<div class="card">'+rows.map(function(x){
+    var note=data.deadlineNote?'<div class="dlnote">'+esc(data.deadlineNote)+'</div>':'';
+    if(!data.deadlines.length) return note+emptySt('계산된 기한이 없습니다','형사 사건의 선고·기록접수통지가 들어오면 자동으로 표시됩니다.');
+    var rows=data.deadlines.slice().sort(function(a,b){ return (a.st==='done')-(b.st==='done') || (a.d||'9').localeCompare(b.d||'9'); });
+    return note+'<div class="card">'+rows.map(function(x){
+      if(!x.d) return '<div class="li"><div class="main"><div class="t">'+esc(x.t)+'</div><div class="s">'+esc(x.why)+'</div></div><span class="dday past">도달 전</span></div>';
       var n=dd(x.d), lab=x.st==='done'?'제출':n<0?'지남':n===0?'D-day':'D-'+n;
-      return '<div class="li"><div class="main"><div class="t">'+esc(x.t)+'</div><div class="s">'+md(x.d)+'('+wk(x.d)+')까지 · '+esc(x.why)+'</div></div><span class="dday'+(x.st==='done'||n<0?' past':'')+'">'+lab+'</span></div>';
+      return '<div class="li"><div class="main"><div class="t">'+esc(x.t)+(x.st==='expected'?' (선고되면)':'')+'</div><div class="s">'+md(x.d)+'('+wk(x.d)+')까지 · '+esc(x.why)+(x.doneOn?' · '+md(x.doneOn)+' 제출':'')+'</div></div><span class="dday'+(x.st==='done'||n<0?' past':'')+'">'+lab+'</span></div>';
     }).join('')+'</div>';
   },
   hearing: function(){

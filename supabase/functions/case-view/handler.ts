@@ -34,6 +34,8 @@ const CORS = {
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 
+import { computeDeadlines, deadlineEvents } from "./deadlines.ts";
+export const DEADLINE_NOTE = "잠정 계산입니다(형사 항소·상고·이유서만). 선고일·기록접수통지 도달일로 계산했고, 알림은 보내지 않습니다. 꼭 나의사건 기록으로 한 번 더 확인해 주세요.";
 export type Env = { sbUrl: string; sbKey: string };
 export type WhoAmI = { ok: boolean; status: number; userId?: string; domainId?: number | string; name?: string; error?: string };
 
@@ -164,6 +166,9 @@ export function shapeCase(c: any, evs: any[], opts: { today: string; linked: str
   if (nextDate >= today && !hasNext) {
     events.push({ d: nextDate, k: "due", g: "hearing", t: "다음 기일 " + [nz(c.next_time), nz(c.next_contents)].filter(Boolean).join(" ") });
   }
+  // 법정기한(형사, 잠정 계산) — 석원 2026-11-13. 규칙서 엔진이 생기면 그 결과로 바꾼다.
+  const deadlines = computeDeadlines(c.l_code, evs, today);
+  events.push(...deadlineEvents(deadlines, today));
   events.sort((a, b) => a.d.localeCompare(b.d));
 
   // 기일: 이 사건 기일 + 내 다른 사건의 다가오는 기일(“내 사건 전체” 보기용)
@@ -191,7 +196,7 @@ export function shapeCase(c: any, evs: any[], opts: { today: string; linked: str
 
   return {
     caseNo: c.l_code, lNum: c.l_num, title, court: court || "법원 정보 없음", today, closed: opts.status === "종결",
-    events, deadlines: [], deadlineNote: "기한 계산은 새 규칙서 엔진이 완성되면 이곳에 표시됩니다. 지금은 기일·진행내용 탭을 봐 주세요.",
+    events, deadlines, deadlineNote: DEADLINE_NOTE,
     hearings, progress: { updated, checked: "", changed, rows }, info,
   };
 }
