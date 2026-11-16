@@ -20,7 +20,9 @@
 //    { "action": "helper_token" }                   → 이 직원의 PC 도우미 연결 코드 발급(한 번만 보여 줌, 서버엔 해시만)
 //    { "action": "chat_import_preview", "lNum": 1, "text": "<내보낸 대화>" } → AI가 뽑은 지난 업무 줄 미리보기(저장 안 함, 원문 안 남김)
 //    { "action": "chat_import_save", "lNum": 1, "events": [...] } → 직원이 고른 줄만 타임라인(room_event)에 저장
-//    { "action": "hide_event", "id": 12 }           → 타임라인의 대화 줄 하나 숨기기
+//    { "action": "hide_event", "id": 12 }           → 타임라인의 대화 줄 하나 숨기기(예전 화면용)
+//    { "action": "tl_list", "lNum": 1 }              → 수정 화면: 이 사건의 대화·직접 입력 줄 전부(숨긴 줄 포함)
+//    { "action": "tl_save", "lNum": 1, "rows": [{id?, date, time, summary, hidden}] } → 줄 고치기·삭제(숨김)·되살리기·추가
 //  사건 정보 칸은 우리가 직접 입력·수정한다. 로웨어와 연동하지 않는다(자동으로 덮어쓰지 않음).
 //    저장된 값이 없을 때만 처음 값으로 로웨어 값을 한 번 보여 준다(PREFILL_FROM_LAWWARE).
 //  보류 방은 사건을 붙이지 않는다(잘못 붙이느니 안 붙인다) → { hold: true }
@@ -592,6 +594,41 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       await rest(env, `room_event?id=eq.${id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ hidden: true }) }, fetcher);
       await logView(env, who, "hide_event:" + id, "", null, fetcher);
       return json({ ok: true });
+    }
+    if (body?.action === "tl_list" || body?.action === "tl_save") {
+      const lNum = Number(body.lNum);
+      if (!Number.isFinite(lNum) || lNum === 0) return json({ error: "사건이 없습니다" }, 400);
+      const c = (await rest(env, `case_all?select=l_num,l_code&l_num=eq.${lNum}`, {}, fetcher))[0];
+      if (!c) return json({ error: "사건이 없습니다" }, 404);
+      const rooms = await rest(env, `works_room_case?select=channel_id&l_num=eq.${lNum}`, {}, fetcher).catch(() => []) || [];
+      const chans = [...new Set(rooms.map((r: any) => nz(r.channel_id)).filter(Boolean))] as string[];
+      const or = `or=(l_num.eq.${lNum}${chans.length ? `,channel_id.in.${enc(inList(chans))}` : ""})`;
+      const mine = await rest(env, `room_event?select=id,channel_id,kind,ev_date,ev_time,summary,state,hidden&${or}&order=ev_date.asc,ev_time.asc&limit=500`, {}, fetcher) || [];
+      if (body.action === "tl_list") {
+        return json({ rows: mine.map((r: any) => ({ id: r.id, d: String(r.ev_date).slice(0, 10), tm: nz(r.ev_time), t: nz(r.summary), hid: !!r.hidden })) });
+      }
+      const byId = new Map(mine.map((r: any) => [Number(r.id), r]));
+      const list = Array.isArray(body.rows) ? body.rows.slice(0, 200) : [];
+      let saved = 0, failed = 0;
+      for (const x of list) {
+        const date = nz(x?.date), time = nz(x?.time), summary = nz(x?.summary).slice(0, 80), hidden = !!x?.hidden;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || isNaN(Date.parse(date)) || (time && !/^\d{2}:\d{2}$/.test(time)) || (!summary && !hidden)) { failed++; continue; }
+        const state = date > today ? "예정" : "완료";
+        try {
+          if (x?.id) {
+            const old = byId.get(Number(x.id));
+            if (!old) { failed++; continue; }
+            await rest(env, `room_event?id=eq.${Number(x.id)}`, { method: "PATCH", headers: { Prefer: "return=minimal" },
+              body: JSON.stringify({ ev_date: date, ev_time: time, summary, hidden, state }) }, fetcher);
+          } else {
+            await rest(env, "room_event", { method: "POST", headers: { Prefer: "return=minimal" },
+              body: JSON.stringify({ channel_id: `manual:${lNum}:${Date.now()}${saved}`, l_num: lNum, kind: "기타", ev_date: date, ev_time: time, summary, state, source: "manual" }) }, fetcher);
+          }
+          saved++;
+        } catch (e) { console.log("tl_save fail", String(e).slice(0, 160)); failed++; }
+      }
+      await logView(env, who, "tl_save", "", c, fetcher);
+      return json({ ok: true, saved, failed });
     }
     return json({ error: "모르는 요청" }, 400);
   } catch (e) {
