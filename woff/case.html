@@ -46,6 +46,30 @@ a{color:inherit}
 .ctabs button i{font-style:normal;font-size:11px;font-weight:700;margin-right:5px;padding:1px 5px;border-radius:4px;background:var(--line2);color:var(--ink2)}
 .ctabs button[aria-current="true"] i{background:color-mix(in srgb,var(--surface) 22%,transparent);color:var(--surface)}
 .ctabs .lk{flex:none;align-self:center;color:var(--muted);font-size:12px;margin:0 -2px}
+.ctabs .gl{flex:none;align-self:center;font-size:11px;font-weight:800;color:var(--g-hearing);margin:0 2px 0 4px}
+.ctabs .gl:first-child{margin-left:0}
+.ctabs .sep{flex:none;width:1px;background:var(--line);margin:4px 6px}
+/* 심급 띠(타임라인): 지난 심급 회색, 지금 심급 파랑 */
+.stg-band{display:grid;grid-template-columns:44px 20px 1fr;gap:0 10px;padding:16px 20px 8px;align-items:center}
+.stg-band b{font-size:13px;font-weight:800;color:var(--g-hearing);text-align:right}
+.stg-band .rail{position:relative;height:20px}
+.stg-band .rail::after{content:"";position:absolute;left:2px;top:3px;width:14px;height:14px;border-radius:4px;background:var(--g-hearing)}
+.stg-band .lab{display:flex;align-items:center;gap:6px;min-width:0;flex-wrap:wrap}
+.stg-band .lab span{flex:none;font-size:12px;font-weight:700;border-radius:999px;padding:3px 9px;background:var(--g-hearing-t);color:var(--g-hearing)}
+.stg-band .lab span i{font-style:normal;font-size:10px;margin-right:4px;opacity:.8}
+.stg-band .lab::after{content:"";flex:1;min-width:20px;height:2px;background:linear-gradient(90deg,var(--g-hearing),transparent);opacity:.35}
+.stg-band.old b,.stg-band.old .lab span{color:var(--muted)}
+.stg-band.old .rail::after{background:var(--line)}
+.stg-band.old .lab span{background:var(--line2)}
+.stg-band.old .lab::after{background:linear-gradient(90deg,var(--line),transparent)}
+/* 나의사건 심급 칸 */
+.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin:0 0 10px;background:var(--surface)}
+.seg button{flex:1;border:0;background:none;padding:9px 8px;font-size:13px;color:var(--muted);text-align:center}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button b{display:block;font-size:14px;color:var(--ink2)}
+.seg button[aria-current="true"]{background:var(--g-hearing-t)}
+.seg button[aria-current="true"] b{color:var(--g-hearing)}
+.ctag{display:inline-block;font-size:11px;font-weight:600;border-radius:4px;padding:0 5px;margin-right:5px;background:var(--line2);color:var(--ink2);vertical-align:1px}
 
 /* 본문 */
 main{max-width:880px;margin:0 auto;padding:12px 16px 32px}
@@ -391,6 +415,9 @@ var VIEWS = {
     var list=data.events, h=importCard();
     if(!list.length) return h+emptySt('표시할 내용이 없습니다');
     var body='', yr='', prevD='', prevY='', todayDone=false, today=data.today||'';
+    var lvs=(data.levels&&data.levels.length>1)?data.levels:null, shownLv=-1, topLv=lvs?lvs[lvs.length-1].lv:0;
+    var bandHtml=function(lv){ var L=lvs.filter(function(x){ return x.lv===lv; })[0]; if(!L) return '';
+      return '<div class="stg-band'+(lv<topLv?' old':'')+'"><b>'+esc(L.label)+'</b><span class="rail"></span><div class="lab">'+L.cases.map(function(c){ return '<span>'+(L.merged.indexOf(c)>=0?'<i>병합</i>':'')+esc(c)+'</span>'; }).join('')+'</div></div>'; };
     list.forEach(function(e){
       var y=e.d.slice(0,4); if(y!==yr){ yr=y; body+='<div class="yr">'+y+'</div>'; }
       if(!todayDone && today && e.d>=today && prevD && prevD<today){ body+='<div class="today"><b>오늘</b><span class="rail"></span><i></i></div>'; todayDone=true; prevD=''; }
@@ -398,6 +425,7 @@ var VIEWS = {
       // 송치·기소·조사(수사 단계 핵심 일): 글자를 키워 따로 강조 (2026-11-16 석원 요청)
       var key=!minor && g!=='limit' && /조사|송치|기소|처분/.test(e.t||'');
       if(prevD && y===prevY) body+=gapDiv(prevD, e.d);
+      if(lvs && e.lv!=null && e.lv>shownLv){ shownLv=e.lv; body+=bandHtml(e.lv); }
       prevD=e.d; prevY=y;
       var p=split(e), pill='';
       if(g==='limit'){ var n=dd(e.d); pill='<span class="pill">'+(n<0?'지남':n===0?'오늘까지':'D-'+n)+'</span>'; p.ts=(p.ts?p.ts+' · ':'')+(e.src==='chat'?'대화 기준':'잠정'); }
@@ -438,8 +466,12 @@ var VIEWS = {
     return (up.length||past.length) ? h : h+emptySt('기일이 없습니다');
   },
   progress: function(){
-    var h=chips('p', [['all','전체'],['기일','기일'],['송달','송달'],['제출','제출']]);
-    var rows=data.progress.rows.filter(function(x){ return sub.p==='all' || x.k===sub.p; }).slice().reverse();
+    var lvs=(data.levels&&data.levels.length>1)?data.levels:null, seg='';
+    if(lvs){ if(sub.lv==null || !lvs.some(function(L){ return String(L.lv)===String(sub.lv); })) sub.lv=String(data.lv);
+      seg='<div class="seg">'+lvs.map(function(L){ return '<button data-lv="'+L.lv+'" aria-current="'+(String(L.lv)===String(sub.lv))+'"><b>'+esc(L.label)+'</b>'+esc(L.main)+(L.cases.length>1?' 외 '+(L.cases.length-1):'')+'</button>'; }).join('')+'</div>'; }
+    var src=(lvs && String(sub.lv)!==String(data.lv) && data.lvRows && data.lvRows[sub.lv]) || data.progress.rows;
+    var rows=src.filter(function(x){ return sub.p==='all' || x.k===sub.p; }).slice().reverse();
+    var h=seg+chips('p', [['all','전체'],['기일','기일'],['송달','송달'],['제출','제출']]);
     var pg=data.progress, ln=[];
     ln.push('로웨어 확인 '+esc(pg.checked||pg.updated)+(pg.checked?' (매일 아침 8시~밤 9시, 15분마다)':''));
     if(pg.changed) ln.push('이 사건 마지막 변경 '+esc(pg.changed));
@@ -447,7 +479,7 @@ var VIEWS = {
     if(!rows.length) return h+emptySt('최근 한 달 진행내용이 없습니다');
     return h+'<div class="card">'+rows.map(function(x){
       var cls=(x.o||x.u)?' hl':x.x?' dim':'';
-      return '<div class="pg'+cls+(x.p?' plan':'')+'"><span class="d">'+x.d+'</span><div><div class="c">'+esc(x.c)+'</div>'+(x.r?'<div class="r">'+esc(x.r)+'</div>':'')+'</div></div>';
+      return '<div class="pg'+cls+(x.p?' plan':'')+'"><span class="d">'+x.d+'</span><div><div class="c">'+(x.cn?'<span class="ctag">'+esc(x.cn)+'</span>':'')+esc(x.c)+'</div>'+(x.r?'<div class="r">'+esc(x.r)+'</div>':'')+'</div></div>';
     }).join('')+'</div>';
   },
   info: function(){
@@ -735,7 +767,9 @@ function render(){
   $('#ctabs').hidden = ct.length<2;
   var mg=ctx.merge, isMg=function(c){ return !!mg && mg.merged.some(function(x){ return cnk(x)===cnk(c); }); };
   if(mg) ct=ct.slice().sort(function(a,b){ return (cnk(b)===cnk(mg.main))-(cnk(a)===cnk(mg.main)) || isMg(a)-isMg(b); });
-  $('#ctabs').innerHTML = ct.length<2 ? '' : ct.map(function(c,i){ var m=isMg(c), mn=!!mg&&cnk(c)===cnk(mg.main); return (m&&i?'<span class="lk">←</span>':'')+'<button data-ctab="'+esc(c)+'" aria-current="'+(c===data.caseNo)+'">'+(m?'<i>병합</i>':mn?'<i>본</i>':'')+esc(c)+'</button>'; }).join('');
+  var LV=ctx.levels&&ctx.levels.length>1?ctx.levels:null;
+  if(LV){ $('#ctabs').hidden=false; $('#ctabs').innerHTML=LV.slice().reverse().map(function(L,gi){ return (gi?'<span class="sep"></span>':'')+'<span class="gl">'+esc(L.label)+'</span>'+L.cases.map(function(c,i){ var m=L.merged.indexOf(c)>=0, mn=!m&&L.merged.length>0; return (m&&i?'<span class="lk">←</span>':'')+'<button data-ctab="'+esc(c)+'" aria-current="'+(cnk(c)===cnk(data.caseNo))+'">'+(m?'<i>병합</i>':mn?'<i>본</i>':'')+esc(c)+'</button>'; }).join(''); }).join(''); }
+  else $('#ctabs').innerHTML = ct.length<2 ? '' : ct.map(function(c,i){ var m=isMg(c), mn=!!mg&&cnk(c)===cnk(mg.main); return (m&&i?'<span class="lk">←</span>':'')+'<button data-ctab="'+esc(c)+'" aria-current="'+(c===data.caseNo)+'">'+(m?'<i>병합</i>':mn?'<i>본</i>':'')+esc(c)+'</button>'; }).join('');
   var canTl = view==='timeline' && !!data.lNum;
   $('#impbtn').hidden = !canTl || tl.on; $('#tledit').hidden = !canTl || tl.on;
   $('#tlref').hidden = !canTl || tl.on || !(Number(data.lNum) < 0);
@@ -743,9 +777,9 @@ function render(){
 }
 document.addEventListener('click', function(e){
   var b=e.target.closest('button'); if(!b) return;
-  if(b.dataset.ctab){ if(b.dataset.ctab===data.caseNo) return; if(editing && !confirmLeave()) return; editing=false; tl.on=false; sub.pick=''; showCase({'case':b.dataset.ctab}); return; }
+  if(b.dataset.ctab){ if(b.dataset.ctab===data.caseNo) return; if(editing && !confirmLeave()) return; editing=false; tl.on=false; sub.pick=''; sub.lv=null; showCase({'case':b.dataset.ctab}); return; }
   if(b.dataset.v){ if(editing && !confirmLeave()) return; editing=false; tl.on=false; view=b.dataset.v; render(); window.scrollTo(0,0); return; }
-  ['f','scope','p'].forEach(function(k){ if(b.dataset[k]){ sub[k]=b.dataset[k]; render(); } });
+  ['f','scope','p','lv'].forEach(function(k){ if(b.dataset[k]){ sub[k]=b.dataset[k]; render(); } });
   if(b.dataset.edit){ editing=b.dataset.edit; render(); var c=$('#main .card.editing'); if(c){ var i=c.querySelector('input,textarea,select'); if(i) i.focus(); if(c.getBoundingClientRect().top<0) c.scrollIntoView({block:'start'}); } }
   if(b.id==='cancel'){ editing=false; render(); }
   if(b.id==='save') saveInfo(b);
@@ -864,6 +898,7 @@ function showCaseData(key, d){
     if(d.unpaired){ ctx.unpairedRoom=key.room||''; return showPicker('이 방과 연결된 사건이 없습니다 · 고르면 이 방에 기억됩니다'); }
     if(d.notfound) return message('사건을 찾지 못함', d.caseNo||'', emptySt('로웨어에 없는 사건번호입니다'));
     if(key.room && d.caseNo) ctx.merge=(d.info&&d.info.merge)||null;
+    if(key.room && d.caseNo) ctx.levels=d.levels||null;
     if(key.room && d.caseNo) ctx.tabs=[d.caseNo].concat((d.info&&d.info.linked)||[]).filter(function(c,i,a){ return c && a.indexOf(c)===i; });
     data=d; render();
   }).catch(function(e){
