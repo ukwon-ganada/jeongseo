@@ -87,7 +87,39 @@ export function isNotice(e: any, ours: Set<string> | null = null): boolean {
 
 export type Deadline = { t: string; d: string; why: string; st: "open" | "done" | "expected"; kind: string; doneOn?: string };
 
-export function computeDeadlines(code: string, evs: any[], today: string): Deadline[] {
+// 병합 사건(규칙서 R21~R23, 석원 확정 2026-11-17): 같은 방의 다른 사건(주 사건)에 병합되면 이유서는 주 사건 기록에만 남는다.
+//  ① 다른 사건 기록에 "항소이유서(26-100177)"처럼 이 사건번호가 괄호로 붙은 이유서 줄 → 제출
+//  ② 다른 사건에 병합심리결정·분리.병합결정이 있고 그날 이후 우리 쪽 이유서 제출 줄 → 제출
+//  병합은 됐는데 제출 줄이 없으면 열어 두고 "○○에 병합됨, 그 사건에 제출"을 적는다.
+export type OtherCase = { code: string; evs: any[] };
+const MERGE_RE = /병합심리결정|분리\s*[.·]?\s*병합\s*결정/;
+const OURS_RE = /법무법인\s*정서|법O{6}(?!O)/;
+export function shortNos(code: string): string[] {
+  const m = nz(code).replace(/\s/g, "").match(/^(\d{2}|\d{4})[가-힣]+0*(\d+)$/);
+  if (!m) return [];
+  const y2 = m[1].slice(-2);
+  return [y2 + "-" + m[2], "20" + y2 + "-" + m[2], nz(code).replace(/\s/g, "")];
+}
+export function mergedReason(code: string, from: string, others: OtherCase[]): { done?: string; into?: string } {
+  const mine = shortNos(code);
+  let best: string | undefined, into: string | undefined;
+  for (const o of others || []) {
+    const list = (o.evs || []).filter((e) => isDate(e.lp_appoint_date)).map((e) => ({ d: nz(e.lp_appoint_date).slice(0, 10), c: nz(e.lp_contents), set: e.lp_set }));
+    for (const e of list) {
+      if (e.d < from || !/이유서/.test(e.c) || /연장|기간/.test(e.c)) continue;
+      const paren = e.c.match(/이유서\s*\(([^)]*)\)/);
+      if (paren && mine.some((n) => paren[1].replace(/\s/g, "") === n)) { if (!best || e.d < best) best = e.d; }
+    }
+    const merge = list.filter((e) => MERGE_RE.test(e.c)).map((e) => e.d).sort()[0];
+    if (!merge) continue;
+    into = into || o.code;
+    const f = list.find((e) => e.set === "서면" && e.d >= merge && e.d >= from && /이유서/.test(e.c) && !/연장|기간|보충/.test(e.c) && OURS_RE.test(e.c));
+    if (f && (!best || f.d < best)) best = f.d;
+  }
+  return { done: best, into };
+}
+
+export function computeDeadlines(code: string, evs: any[], today: string, others: OtherCase[] = []): Deadline[] {
   const top = courtStage(code);
   if (!top) return [];
   const list = (evs || []).filter((e) => isDate(e.lp_appoint_date))
@@ -147,9 +179,12 @@ export function computeDeadlines(code: string, evs: any[], today: string): Deadl
       const { due, moved } = dueDate(first.d, 20);
       const nextV = items.slice(i + 1).find((x) => x.kind === "v");
       const done = filings.find((f) => f._d >= it.first && (!nextV || f._d <= nextV.d) && /이유서/.test(nz(f.lp_contents)) && !/연장|기간/.test(nz(f.lp_contents)));
+      const mg = done ? {} : mergedReason(code, it.first, others);
+      const doneOn = done?._d || mg.done;
       out.push({
-        t: what + " 마감", d: due, kind: what, doneOn: done?._d, st: done ? "done" : "open",
-        why: "기록접수통지 도달 " + md(first.d) + "(" + first.who + ") + 20일" + (moved ? " (쉬는 날이라 다음 평일)" : ""),
+        t: what + " 마감", d: due, kind: what, doneOn, st: doneOn ? "done" : "open",
+        why: "기록접수통지 도달 " + md(first.d) + "(" + first.who + ") + 20일" + (moved ? " (쉬는 날이라 다음 평일)" : "") +
+          (mg.into ? " · " + mg.into + "에 병합됨" + (mg.done ? ", 그 사건에 제출 " + md(mg.done) : ", 그 사건에 제출") : ""),
       });
     }
   });

@@ -42,7 +42,7 @@ const CORS = {
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 
-import { computeDeadlines, deadlineEvents } from "./deadlines.ts";
+import { computeDeadlines, deadlineEvents, type OtherCase } from "./deadlines.ts";
 import { findPick, normTitle } from "./title_match.ts";
 import { dropKnown, extractFromExport, msgsToExport, toRows } from "./chat_import.ts";
 import { shapeStages, diffStages, personChangeLine, isStage } from "./stages.ts";
@@ -174,7 +174,7 @@ export function infoFields(c: any, saved: any | null, prefill = PREFILL_FROM_LAW
 // 타임라인 정렬: 날짜순, 같은 날이면 "사건 선임"이 맨 위 (석원 2026-11-16). 나머지는 원래 순서 유지.
 export const byDay = (a: any, b: any) => a.d.localeCompare(b.d) || (b.g === "accept" ? 1 : 0) - (a.g === "accept" ? 1 : 0);
 
-export function shapeCase(c: any, evs: any[], opts: { today: string; linked: string[]; myHearings: any[]; status?: string; saved?: any }) {
+export function shapeCase(c: any, evs: any[], opts: { today: string; linked: string[]; myHearings: any[]; status?: string; saved?: any; others?: OtherCase[] }) {
   const raw = c.raw || {};
   const today = opts.today;
   const title = nz(c.l_name).replace(/^\[전자\]\s*/, "");
@@ -224,7 +224,7 @@ export function shapeCase(c: any, evs: any[], opts: { today: string; linked: str
     events.push({ d: nextDate, k: "due", g: "hearing", t: "다음 기일 " + [nz(c.next_time), nz(c.next_contents)].filter(Boolean).join(" ") });
   }
   // 법정기한(형사, 잠정 계산) — 석원 2026-11-13. 규칙서 엔진이 생기면 그 결과로 바꾼다.
-  const deadlines = computeDeadlines(c.l_code, evs, today);
+  const deadlines = computeDeadlines(c.l_code, evs, today, opts.others || []);
   events.push(...deadlineEvents(deadlines, today));
   events.sort(byDay);
 
@@ -579,7 +579,7 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       const chans = [...new Set([room, ...roomRows.map((r: any) => nz(r.channel_id))].filter(Boolean))] as string[];
       const rel = await relatedNums(env, Number(c.l_num), chans, fetcher);
       const allNums = [Number(c.l_num), ...rel].join(",");
-      const [evs, mine, savedOwn, files, chat, checked, meets, stageLogs, relCases, titleRows] = await Promise.all([
+      const [evs, mine, savedOwn, files, chat, checked, meets, stageLogs, relCases, titleRows, _logged, relEvs] = await Promise.all([
         rest(env, `lw_process_events?select=lp_num,lp_set,lp_appoint_date,lp_appoint_time,lp_contents,lp_remark,delivered_date,court,last_seen_at,lp_append_udate&l_num=eq.${c.l_num}&order=lp_appoint_date.asc&limit=2000`, {}, fetcher),
         myCases(env, who.name || "", fetcher),
         rest(env, `case_info?select=*&l_num=eq.${c.l_num}`, {}, fetcher).then((r: any[]) => r?.[0] ?? null).catch(() => null),
@@ -588,15 +588,18 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
         lastFeedRun(env, fetcher),
         rest(env, `meet_event?select=event_id,ev_date,ev_time,lawyer,place&l_num=in.(${allNums})&order=ev_date.asc&limit=300`, {}, fetcher).catch(() => []),
         rest(env, `case_info_log?select=field,old_value,new_value,editor,edited_at&l_num=in.(${allNums})&field=like.stage.*&order=edited_at.desc&limit=300`, {}, fetcher).catch(() => []),
-        rel.length ? rest(env, `case_all?select=l_num,raw&l_num=in.(${rel.join(",")})`, {}, fetcher).catch(() => []) : Promise.resolve([]),
+        rel.length ? rest(env, `case_all?select=l_num,l_code,raw&l_num=in.(${rel.join(",")})`, {}, fetcher).catch(() => []) : Promise.resolve([]),
         chans.length ? rest(env, `works_room_case?select=room_title&channel_id=in.${enc(inList(chans))}&room_title=not.is.null&limit=5`, {}, fetcher).catch(() => []) : Promise.resolve([]),
         logView(env, who, "case", room, c, fetcher),
+        // 같은 방 다른 사건의 이유서·병합 줄(병합 사건 이유서 기한, R21~R23)
+        rel.length ? rest(env, `lw_process_events?select=l_num,lp_set,lp_appoint_date,lp_contents&l_num=in.(${rel.join(",")})&or=(lp_contents.like.*이유서*,lp_contents.like.*병합*)&limit=1000`, {}, fetcher).catch(() => []) : Promise.resolve([]),
       ]);
       const saved = savedOwn ?? await inheritedInfo(env, rel, fetcher);
       const end = new Date(Date.parse(today) + 28 * 864e5).toISOString().slice(0, 10);
       const myHearings = mine.filter((m: any) => isDate(m.next_date) && m.next_date.slice(0, 10) >= today && m.next_date.slice(0, 10) <= end)
         .map((m: any) => ({ c: m.l_code, d: m.next_date.slice(0, 10), tm: nz(m.next_time), t: nz(m.next_contents) || "기일", p: nz(m.court) }));
-      const shaped = shapeCase(c, evs || [], { today, linked, myHearings, status, saved });
+      const others: OtherCase[] = (relCases || []).filter((x: any) => x.l_code).map((x: any) => ({ code: nz(x.l_code), evs: (relEvs || []).filter((e: any) => String(e.l_num) === String(x.l_num)) }));
+      const shaped = shapeCase(c, evs || [], { today, linked, myHearings, status, saved, others });
       shaped.progress.checked = checked;
       attachFinalFiles(shaped.events, files);
       attachContract(shaped.events, files);
