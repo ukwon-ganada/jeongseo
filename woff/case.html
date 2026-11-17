@@ -515,14 +515,16 @@ var VIEWS = {
   }
 };
 // 타임라인 "우리 서면" 줄: 그 제출의 최종본(그날 마지막으로 방에 올린 파일) [열기], 틀렸으면 [바꾸기]
-function nearChoices(d){
-  var t=Date.parse(d);
-  return (data.fileChoices||[]).filter(function(f){ return Math.abs(Date.parse(f.d)-t)<=14*864e5; })
+// 다른 제출 줄에 이미 붙은 파일은 후보에서 뺀다(파일 하나는 한 줄에만 붙으므로, 고르면 그 줄에서 빠져 버림)
+function nearChoices(d, lp){
+  var t=Date.parse(d), used={};
+  (data.events||[]).forEach(function(e){ if(e.f && e.lp!=null && String(e.lp)!==String(lp)) used[e.f.id]=1; });
+  return (data.fileChoices||[]).filter(function(f){ return !used[f.id] && Math.abs(Date.parse(f.d)-t)<=14*864e5; })
     .sort(function(a,b){ return (b.d+b.tm).localeCompare(a.d+a.tm); });
 }
 function finalFile(e){
   if(e.k!=='ours' || e.lp==null) return '';
-  var near=nearChoices(e.d), h='';
+  var near=nearChoices(e.d, e.lp), h='';
   if(e.f) h='<div class="fa"><button class="open" data-file="'+e.f.id+'">열기</button><span class="fn">'+esc(e.f.n)+'</span>'+(near.length>1?'<button class="link-btn" data-pickfor="'+e.lp+'">바꾸기</button>':'')+'</div>';
   else if(near.length) h='<div class="fa"><button class="link-btn" data-pickfor="'+e.lp+'">제출본 파일 고르기</button></div>';
   if(String(sub.pick)===String(e.lp)){
