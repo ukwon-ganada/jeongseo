@@ -42,7 +42,7 @@ const CORS = {
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 
-import { computeDeadlines, deadlineEvents, type OtherCase } from "./deadlines.ts";
+import { computeDeadlines, deadlineEvents, mergeRoles, type OtherCase } from "./deadlines.ts";
 import { findPick, normTitle } from "./title_match.ts";
 import { dropKnown, extractFromExport, msgsToExport, toRows } from "./chat_import.ts";
 import { shapeStages, diffStages, personChangeLine, isStage } from "./stages.ts";
@@ -607,6 +607,7 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       // 수사 단계 기한(R18~R20): 방 제목 괄호로 의뢰인 지위를 본다
       const titles = (titleRows || []) as any[];
       applyInvDeadlines(shaped, chat, nz(titles[0]?.room_title));
+      if (linked.length) (shaped.info as any).merge = mergeRoles([{ code: nz(c.l_code), evs: evs || [] }, ...others], nz(titles[0]?.room_title));
       fixAccept(shaped, !!c.is_inv);
       earliestAccept(shaped, relCases || []);
       mergeMeets(shaped, meets || []);

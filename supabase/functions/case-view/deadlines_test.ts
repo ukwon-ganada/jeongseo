@@ -1,5 +1,5 @@
 import { assertEquals } from "jsr:@std/assert@1";
-import { computeDeadlines, dueDate } from "./deadlines.ts";
+import { computeDeadlines, dueDate, mergeRoles } from "./deadlines.ts";
 
 const S = (d: string, c: string, dd: string | null, r = "") => ({ lp_set: "송달", lp_appoint_date: d, lp_contents: c, lp_remark: r, delivered_date: dd });
 const F = (d: string, c: string) => ({ lp_set: "서면", lp_appoint_date: d, lp_contents: c });
@@ -78,4 +78,14 @@ Deno.test("병합 사건: 주 사건 기록의 '항소이유서(26-100177)' 줄�
   assertEquals(open[0].why.endsWith("2026노364에 병합됨, 그 사건에 제출"), true);
   // 다른 사건이 없으면 예전과 같음
   assertEquals(computeDeadlines("2026노100177", mine, "2026-11-17")[0].st, "open");
+});
+
+Deno.test("병합 본 사건 가리기", () => {
+  const a = { code: "2025고단1888", evs: [{ lp_contents: "(피고인 박OO) 피고인 병합심리결정" }, { lp_contents: "변론재개결정/분리.병합결정/공소장부본(2026고단101287) 발송" }] };
+  const b = { code: "2026고단101287", evs: [] };
+  assertEquals(mergeRoles([b, a]), { main: "2025고단1888", merged: ["2026고단101287"] });
+  assertEquals(mergeRoles([{ code: "2026노100177", evs: [] }, { code: "2026노364", evs: [] }], "서)안형진 26노364 (병합)26노100177"), { main: "2026노364", merged: ["2026노100177"] });
+  assertEquals(mergeRoles([{ code: "2026노100177", evs: [{ lp_contents: "종국 : 병합심리결정" }] }, { code: "2026노364", evs: [] }]), { main: "2026노364", merged: ["2026노100177"] });
+  assertEquals(mergeRoles([{ code: "2026노1", evs: [] }, { code: "2026노2", evs: [] }]), null);
+  assertEquals(mergeRoles([a]), null);
 });
