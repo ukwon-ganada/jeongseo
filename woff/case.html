@@ -117,7 +117,21 @@ main{max-width:880px;margin:0 auto;padding:12px 16px 32px}
 .today .rail{position:relative;height:14px}
 .today .rail::after{content:"";position:absolute;left:3px;top:3px;width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px var(--accent-tint)}
 .today i{height:1px;background:linear-gradient(90deg,var(--accent),transparent);opacity:.5}
-.dlnote{font-size:12px;color:var(--muted);margin:2px 4px 10px;line-height:1.5}
+.dlc{display:grid;grid-template-columns:64px 1fr auto;gap:0 16px;align-items:center;padding:16px 18px 16px 20px;position:relative}
+.dlc+.dlc{border-top:1px solid var(--line2)}
+.dlc::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:4px;border-radius:0 3px 3px 0;background:var(--uc)}
+.dlc{--uc:var(--due)}
+.dlc.hot{--uc:var(--danger)}
+.dlc.off{--uc:var(--line)}
+.dlc .dd{text-align:center;line-height:1.1}
+.dlc .dd b{display:block;font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--uc)}
+.dlc .dd small{font-size:12px;color:var(--muted)}
+.dlc .dt{font-size:16px;font-weight:700}
+.dlc .ds{font-size:12px;color:var(--muted);margin-top:3px;overflow-wrap:anywhere}
+.dlc .tag{display:inline-block;font-size:11px;font-weight:600;line-height:1;padding:3px 6px;border-radius:999px;margin-left:6px;vertical-align:2px;border:1px solid var(--uc);color:var(--uc)}
+.dlc .dn{min-width:64px;text-align:center;font-size:20px;font-weight:800;font-variant-numeric:tabular-nums;color:#fff;background:var(--uc);border-radius:10px;padding:8px 10px}
+.dlc.off .dd b,.dlc.off .dt{color:var(--muted)}
+.dlc.off .dn{background:var(--line2);color:var(--muted);font-size:14px}
 /* 실제 날짜 차이만큼 띄우기. 너무 길면 줄이고 '몇 개월' 표시 */
 .gap{display:grid;grid-template-columns:44px 20px 1fr;gap:0 10px;padding:0 20px}
 .gap .rail{position:relative}
@@ -383,13 +397,16 @@ var VIEWS = {
     return h+'<div class="card tl">'+body+'</div>';
   },
   deadline: function(){
-    var note=data.deadlineNote?'<div class="dlnote">'+esc(data.deadlineNote)+'</div>':'';
-    if(!data.deadlines.length) return note+emptySt('계산된 기한이 없습니다','선고·기록접수통지, 또는 불기소·불송치·항고기각 줄이 들어오면 자동으로 표시됩니다.');
+    if(!data.deadlines.length) return emptySt('계산된 기한이 없습니다','선고·기록접수통지, 또는 불기소·불송치·항고기각 줄이 들어오면 자동으로 표시됩니다.');
     var rows=data.deadlines.slice().sort(function(a,b){ return (a.st==='done')-(b.st==='done') || (a.d||'9').localeCompare(b.d||'9'); });
-    return note+'<div class="card">'+rows.map(function(x){
-      if(!x.d) return '<div class="li"><div class="main"><div class="t">'+esc(x.t)+'</div><div class="s">'+esc(x.why)+'</div></div><span class="dday past">도달 전</span></div>';
-      var n=dd(x.d), lab=x.st==='done'?'제출':n<0?'지남':n===0?'D-day':'D-'+n;
-      return '<div class="li"><div class="main"><div class="t">'+esc(x.t)+(x.st==='expected'?' (선고되면)':'')+'</div><div class="s">'+md(x.d)+'('+wk(x.d)+')까지 · '+esc(x.why)+(x.doneOn?' · '+md(x.doneOn)+' 제출':'')+'</div></div><span class="dday'+(x.st==='done'||n<0?' past':'')+'">'+lab+'</span></div>';
+    return '<div class="card">'+rows.map(function(x){
+      var why=String(x.why||''), tag='';
+      var m=why.match(/^미확정(\([^)]*\))?\s*·?\s*/); if(m){ tag='<span class="tag">미확정</span>'; why=why.slice(m[0].length); }
+      if(x.st==='expected') tag+='<span class="tag">선고되면</span>';
+      if(!x.d) return '<div class="dlc off"><div class="dd"><b>—</b></div><div><div class="dt">'+esc(x.t)+tag+'</div><div class="ds">'+esc(why)+'</div></div><span class="dn">도달 전</span></div>';
+      var n=dd(x.d), done=x.st==='done', off=done||n<0;
+      var lab=done?'제출'+(x.doneOn?' '+md(x.doneOn):''):n<0?'지남':n===0?'D-day':'D-'+n;
+      return '<div class="dlc'+(off?' off':n<=7?' hot':'')+'"><div class="dd"><b>'+md(x.d)+'</b><small>'+wk(x.d)+'요일</small></div><div><div class="dt">'+esc(x.t)+tag+'</div><div class="ds">'+esc(why)+'</div></div><span class="dn">'+lab+'</span></div>';
     }).join('')+'</div>';
   },
   hearing: function(){
