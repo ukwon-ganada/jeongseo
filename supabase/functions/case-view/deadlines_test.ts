@@ -58,3 +58,24 @@ Deno.test("상고심: 도달 전이면 날짜 없이 '도달 전'", () => {
 Deno.test("약식·신청 사건은 계산 안 함", () => {
   assertEquals(computeDeadlines("2026고약123", [V("2026-10-01")], "2026-11-13"), []);
 });
+
+Deno.test("병합 사건: 주 사건 기록의 '항소이유서(26-100177)' 줄이나 병합 뒤 우리 이유서 제출이면 제출 (안형진)", () => {
+  const mine = [S("2026-10-02", "피고인1 변호인  법무법인 정서 소송기록접수통지서 발송", "2026-10-13")];
+  const main = { code: "2026노364", evs: [
+    { lp_set: "명령", lp_appoint_date: "2026-10-13", lp_contents: "(피고인 안OO) 피고인 병합심리결정" },
+    F("2026-10-19", "피고인2 변호인  법OOOOOO 항소이유서 제출"),
+    S("2026-10-20", "검사  서울광역공소청 인천지부공소청장 항소이유서(26-100177) 발송", null),
+  ] };
+  const dl = computeDeadlines("2026노100177", mine, "2026-11-17", [main]);
+  assertEquals(dl.map((x) => [x.t, x.d, x.st, x.doneOn]), [["항소이유서 마감", "2026-11-02", "done", "2026-10-19"]]);
+  assertEquals(dl[0].why.includes("2026노364에 병합됨"), true);
+  // 괄호 줄만 있어도 제출
+  const only = computeDeadlines("2026노100177", mine, "2026-11-17", [{ code: "2026노364", evs: [main.evs[2]] }]);
+  assertEquals([only[0].st, only[0].doneOn], ["done", "2026-10-20"]);
+  // 병합만 되고 제출 줄이 없으면 열어 두고 안내
+  const open = computeDeadlines("2026노100177", mine, "2026-11-17", [{ code: "2026노364", evs: [main.evs[0]] }]);
+  assertEquals(open[0].st, "open");
+  assertEquals(open[0].why.endsWith("2026노364에 병합됨, 그 사건에 제출"), true);
+  // 다른 사건이 없으면 예전과 같음
+  assertEquals(computeDeadlines("2026노100177", mine, "2026-11-17")[0].st, "open");
+});
