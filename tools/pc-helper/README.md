@@ -46,3 +46,9 @@ PC 브라우저로 `https://woff.worksmobile.com/woff/Nxkob0LER_dfaSzH8s6flw?set
 
 ## 모의 시험
 `deno test --allow-net tools/pc-helper/flow_test.ts`
+
+## 스스로 업데이트 (v2.3부터)
+- 도우미는 6시간마다(켜진 뒤 1분에 한 번 먼저) `tools/pc-helper/version.txt`(main)를 읽습니다. 한 줄 형식: `버전 SHA256`.
+- 더 새 버전이고, 받은 `jeongseo-helper.ps1`의 SHA-256이 version.txt와 같을 때만 바꿔 끼우고 다시 켭니다. 다르면 아무것도 바꾸지 않습니다.
+- 도우미를 고칠 때: `$HelperVersion`을 올리고, 파일을 저장한 뒤 `sha256sum jeongseo-helper.ps1`으로 version.txt를 함께 고쳐 같은 커밋에 넣습니다.
+- v2.2 이하가 깔린 PC는 업데이트 기능이 없으므로 위 업데이트 명령을 한 번 실행해야 합니다.

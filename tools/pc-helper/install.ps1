@@ -29,5 +29,17 @@ $s.Arguments = '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' 
 $s.WindowStyle = 7
 $s.Save()
 
+# 도우미 지킴이: 로그인할 때·절전 해제/잠금 해제 뒤에도 꺼져 있으면 다시 켠다 (10분마다 확인, 이미 돌고 있으면 그냥 지나감)
+$vbs = Join-Path $dir 'start-hidden.vbs'
+$ps = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""' + (Join-Path $dir 'jeongseo-helper.ps1') + '""'
+Set-Content $vbs ('CreateObject("WScript.Shell").Run "' + $ps + '", 0, False') -Encoding ASCII
+try {
+  $act = New-ScheduledTaskAction -Execute 'wscript.exe' -Argument ('"' + $vbs + '"')
+  $t1 = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
+  $t2 = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 10)
+  $set = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 1)
+  Register-ScheduledTask -TaskName 'JeongseoHelperWatch' -Action $act -Trigger @($t1, $t2) -Settings $set -Force | Out-Null
+  Write-Host '지킴이 등록: 도우미가 꺼져도 10분 안에 다시 켜집니다.'
+} catch { Write-Host ('지킴이 등록 실패(도우미는 그대로 동작): ' + $_.Exception.Message) -ForegroundColor Yellow }
 Start-Process powershell.exe -ArgumentList $s.Arguments -WindowStyle Hidden
 Write-Host '설치 끝. 지금부터 사건방 메뉴 "이 방 사건 보기"를 누르면 이 PC에 사건 화면이 열립니다.' -ForegroundColor Green
