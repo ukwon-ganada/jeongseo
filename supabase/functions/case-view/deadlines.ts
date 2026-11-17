@@ -198,3 +198,28 @@ export function deadlineEvents(dls: Deadline[], today: string) {
     t: x.t + (x.st === "expected" ? " (선고되면)" : "") + " · " + x.why, f: null,
   }));
 }
+
+// 한 방에 사건이 둘 이상일 때 본 사건·병합된 사건 가리기 (2026-11-17 석원 요청)
+// 근거 순서: ①방 제목 "본사건 (병합)병합사건" ②"종국 : 병합" 줄이 있는 쪽 = 병합된 사건
+// ③병합 결정 줄(병합심리결정·분리.병합결정)이 있는 쪽 = 본 사건 (결정은 본 사건 기록에만 남음)
+export function mergeRoles(cases: { code: string; evs: any[] }[], title = ""): { main: string; merged: string[] } | null {
+  const list = (cases || []).filter((x) => x.code);
+  if (list.length < 2) return null;
+  const text = (e: any) => nz(e?.lp_contents ?? e?.c);
+  const has = (x: any, re: RegExp) => (x.evs || []).some((e: any) => re.test(text(e)));
+  const hit = (x: any, t: string) => {
+    const m = nz(x.code).replace(/\s/g, "").match(/^(\d{2}|\d{4})([가-힣]+)0*(\d+)$/);
+    return !!m && new RegExp("(^|[^0-9])(20)?" + m[1].slice(-2) + m[2] + m[3] + "(?![0-9])").test(t);
+  };
+  const t = nz(title).replace(/\s/g, "");
+  const mt = t.match(/^(.*?)\(병합\)(.*)$/);
+  let main = mt ? list.find((x) => hit(x, mt[1]) && !hit(x, mt[2])) : undefined;
+  if (!main) {
+    const ended = list.filter((x) => has(x, /종국\s*:\s*[^,]*병합/));
+    const deciders = list.filter((x) => has(x, MERGE_RE) && !ended.includes(x));
+    if (deciders.length === 1) main = deciders[0];
+    else if (ended.length && ended.length === list.length - 1) main = list.find((x) => !ended.includes(x));
+  }
+  if (!main) return null;
+  return { main: main.code, merged: list.filter((x) => x !== main).map((x) => x.code) };
+}

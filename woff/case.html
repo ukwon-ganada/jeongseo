@@ -43,6 +43,9 @@ a{color:inherit}
 .ctabs::-webkit-scrollbar{display:none}
 .ctabs button{flex:none;border:1px solid var(--line);background:none;border-radius:999px;padding:5px 12px;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
 .ctabs button[aria-current="true"]{background:var(--ink);border-color:var(--ink);color:var(--surface);font-weight:600}
+.ctabs button i{font-style:normal;font-size:11px;font-weight:700;margin-right:5px;padding:1px 5px;border-radius:4px;background:var(--line2);color:var(--ink2)}
+.ctabs button[aria-current="true"] i{background:color-mix(in srgb,var(--surface) 22%,transparent);color:var(--surface)}
+.ctabs .lk{flex:none;align-self:center;color:var(--muted);font-size:12px;margin:0 -2px}
 
 /* 본문 */
 main{max-width:880px;margin:0 auto;padding:12px 16px 32px}
@@ -345,6 +348,7 @@ function copyText(t){
 function fallbackCopy(t){ var a=document.createElement('textarea'); a.value=t; a.setAttribute('readonly',''); a.style.position='fixed'; a.style.opacity='0'; document.body.appendChild(a); a.select(); try{ document.execCommand('copy'); }catch(e){} a.remove(); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 var MOVED_RE=/기일변경|기일연기|연기|추정|취소/;
+function cnk(c){ var m=String(c||'').replace(/\s/g,'').match(/^(\d{2}|\d{4})([가-힣]+)0*(\d+)$/); return m?m[1].slice(-2)+m[2]+m[3]:String(c||''); }
 function md(d){ return Number(d.slice(5,7)) + '.' + d.slice(8,10); }
 function dd(d){ return Math.round((Date.parse(d) - Date.parse(data.today)) / 864e5); }
 function wk(d){ return '일월화수목금토'[new Date(d+'T00:00:00Z').getUTCDay()]; }
@@ -729,7 +733,9 @@ function render(){
   // 한 방에 로웨어 사건이 둘 이상이면(제목에 사건번호 2개 등) 사건 탭
   var ct=ctx.tabs||[];
   $('#ctabs').hidden = ct.length<2;
-  $('#ctabs').innerHTML = ct.length<2 ? '' : ct.map(function(c){ return '<button data-ctab="'+esc(c)+'" aria-current="'+(c===data.caseNo)+'">'+esc(c)+'</button>'; }).join('');
+  var mg=ctx.merge, isMg=function(c){ return !!mg && mg.merged.some(function(x){ return cnk(x)===cnk(c); }); };
+  if(mg) ct=ct.slice().sort(function(a,b){ return (cnk(b)===cnk(mg.main))-(cnk(a)===cnk(mg.main)) || isMg(a)-isMg(b); });
+  $('#ctabs').innerHTML = ct.length<2 ? '' : ct.map(function(c,i){ var m=isMg(c), mn=!!mg&&cnk(c)===cnk(mg.main); return (m&&i?'<span class="lk">←</span>':'')+'<button data-ctab="'+esc(c)+'" aria-current="'+(c===data.caseNo)+'">'+(m?'<i>병합</i>':mn?'<i>본</i>':'')+esc(c)+'</button>'; }).join('');
   var canTl = view==='timeline' && !!data.lNum;
   $('#impbtn').hidden = !canTl || tl.on; $('#tledit').hidden = !canTl || tl.on;
   $('#tlref').hidden = !canTl || tl.on || !(Number(data.lNum) < 0);
@@ -857,6 +863,7 @@ function showCaseData(key, d){
     if(d.hold) return showHold();
     if(d.unpaired){ ctx.unpairedRoom=key.room||''; return showPicker('이 방과 연결된 사건이 없습니다 · 고르면 이 방에 기억됩니다'); }
     if(d.notfound) return message('사건을 찾지 못함', d.caseNo||'', emptySt('로웨어에 없는 사건번호입니다'));
+    if(key.room && d.caseNo) ctx.merge=(d.info&&d.info.merge)||null;
     if(key.room && d.caseNo) ctx.tabs=[d.caseNo].concat((d.info&&d.info.linked)||[]).filter(function(c,i,a){ return c && a.indexOf(c)===i; });
     data=d; render();
   }).catch(function(e){
