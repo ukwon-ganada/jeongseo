@@ -47,6 +47,7 @@ import { findPick, normTitle } from "./title_match.ts";
 import { dropKnown, extractFromExport, msgsToExport, toRows } from "./chat_import.ts";
 import { shapeStages, diffStages, personChangeLine, isStage } from "./stages.ts";
 import { applyInvDeadlines } from "./inv_deadlines.ts";
+import { buildLevels, levelOf, lvByDate, shortNo } from "./levels.ts";
 export const DEADLINE_NOTE = "잠정 계산입니다. 재판 단계(항소·상고·이유서)는 선고일·기록접수통지 도달일로, 수사 단계(항고·재정신청·이의신청)는 사건방 줄의 처분·통지 날짜로 계산했습니다. 알림은 보내지 않습니다. 꼭 기록으로 한 번 더 확인해 주세요.";
 export type Env = { sbUrl: string; sbKey: string; anthropicKey?: string; chatModel?: string; refreshModel?: string };
 export type WhoAmI = { ok: boolean; status: number; userId?: string; domainId?: number | string; name?: string; error?: string };
@@ -591,8 +592,8 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
         rel.length ? rest(env, `case_all?select=l_num,l_code,raw&l_num=in.(${rel.join(",")})`, {}, fetcher).catch(() => []) : Promise.resolve([]),
         chans.length ? rest(env, `works_room_case?select=room_title&channel_id=in.${enc(inList(chans))}&room_title=not.is.null&limit=5`, {}, fetcher).catch(() => []) : Promise.resolve([]),
         logView(env, who, "case", room, c, fetcher),
-        // 같은 방 다른 사건의 이유서·병합 줄(병합 사건 이유서 기한, R21~R23)
-        rel.length ? rest(env, `lw_process_events?select=l_num,lp_set,lp_appoint_date,lp_contents&l_num=in.(${rel.join(",")})&or=(lp_contents.like.*이유서*,lp_contents.like.*병합*)&limit=1000`, {}, fetcher).catch(() => []) : Promise.resolve([]),
+        // 같은 방 다른 사건 기록 전체: 병합 이유서 기한(R21~R23), 지난 심급 타임라인·나의사건(심급 구분)
+        rel.length ? rest(env, `lw_process_events?select=l_num,lp_num,lp_set,lp_appoint_date,lp_appoint_time,lp_contents,lp_remark,delivered_date,court,last_seen_at,lp_append_udate&l_num=in.(${rel.join(",")})&order=lp_appoint_date.asc&limit=6000`, {}, fetcher).catch(() => []) : Promise.resolve([]),
       ]);
       const saved = savedOwn ?? await inheritedInfo(env, rel, fetcher);
       const end = new Date(Date.parse(today) + 28 * 864e5).toISOString().slice(0, 10);
@@ -601,16 +602,61 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       const others: OtherCase[] = (relCases || []).filter((x: any) => x.l_code).map((x: any) => ({ code: nz(x.l_code), evs: (relEvs || []).filter((e: any) => String(e.l_num) === String(x.l_num)) }));
       const shaped = shapeCase(c, evs || [], { today, linked, myHearings, status, saved, others });
       shaped.progress.checked = checked;
+      const titles = (titleRows || []) as any[];
+      const roomTitle = nz(titles[0]?.room_title);
+      // 심급 묶음: 같은 방 사건을 1심·2심…으로 묶고, 지난 심급 업무 줄과 심급별 나의사건 기록을 만든다
+      const curLv = levelOf(nz(c.l_code));
+      const relList = (relCases || []).filter((x: any) => x.l_code).map((x: any) => ({ rc: x, evs: (relEvs || []).filter((e: any) => String(e.l_num) === String(x.l_num)) }));
+      const levels = buildLevels([{ code: nz(c.l_code), evs: evs || [], accept: nz(c.raw?.l_accept_date) },
+        ...relList.map((x: any) => ({ code: nz(x.rc.l_code), evs: x.evs, accept: nz(x.rc.raw?.l_accept_date) }))], roomTitle);
+      const multi = levels.length > 1;
+      const subShape = new Map<string, any>();
+      const shapeOf = (x: any) => {
+        const k = String(x.rc.l_num);
+        if (!subShape.has(k)) subShape.set(k, shapeCase({ ...x.rc, l_name: c.l_name }, x.evs, { today, linked: [], myHearings: [], others: [] }));
+        return subShape.get(k);
+      };
+      if (multi) {
+        for (const e of shaped.events) e.lv = curLv;
+        const acc = shaped.events.find((e: any) => e.g === "accept");
+        if (acc && levels[0].lv < curLv) acc.t = (levels.find((L) => L.lv === curLv)?.label || "") + " 선임";
+        for (const x of relList) {
+          const lv = levelOf(nz(x.rc.l_code));
+          if (lv >= curLv) continue;
+          for (const e of shapeOf(x).events) shaped.events.push({ ...e, lv });
+        }
+        shaped.events.sort(byDay);
+      }
+      const lvRows: Record<string, any[]> = {};
+      for (const L of levels) {
+        if (L.cases.length < 2 && L.lv === curLv) continue;
+        const rows: any[] = [];
+        for (const code of L.cases) {
+          const isC = code === nz(c.l_code);
+          const x = isC ? null : relList.find((y: any) => nz(y.rc.l_code) === code);
+          const src = isC ? shaped.progress.rows : x ? shapeOf(x).progress.rows : [];
+          const tag = code !== L.main ? shortNo(code) : "";
+          for (const r of src) rows.push(tag ? { ...r, cn: tag } : r);
+        }
+        rows.sort((a, b) => a.d.localeCompare(b.d));
+        lvRows[L.lv] = rows.slice(-600);
+      }
+      if (lvRows[curLv]) shaped.progress.rows = lvRows[curLv];
       attachFinalFiles(shaped.events, files);
       attachContract(shaped.events, files);
       mergeRoomEvents(shaped, chat, c.l_code);
       // 수사 단계 기한(R18~R20): 방 제목 괄호로 의뢰인 지위를 본다
-      const titles = (titleRows || []) as any[];
-      applyInvDeadlines(shaped, chat, nz(titles[0]?.room_title));
-      if (linked.length) (shaped.info as any).merge = mergeRoles([{ code: nz(c.l_code), evs: evs || [] }, ...others], nz(titles[0]?.room_title));
+      applyInvDeadlines(shaped, chat, roomTitle);
+      if (linked.length) (shaped.info as any).merge = mergeRoles([{ code: nz(c.l_code), evs: evs || [] }, ...others], roomTitle);
       fixAccept(shaped, !!c.is_inv);
-      earliestAccept(shaped, relCases || []);
+      earliestAccept(shaped, (relCases || []).filter((x: any) => levelOf(nz(x.l_code)) === curLv));
       mergeMeets(shaped, meets || []);
+      if (multi) for (const e of shaped.events) if (e.lv == null) e.lv = lvByDate(levels, e.d);
+      if (levels.length > 1 || levels.some((L) => L.cases.length > 1)) {
+        (shaped as any).levels = levels.map(({ start: _s, ...L }) => L);
+        (shaped as any).lv = curLv;
+        if (multi) (shaped as any).lvRows = lvRows;
+      }
       // 직원이 줄마다 파일을 바꿀 때 고를 목록 (화면에 따로 나열하지 않음)
       const fileChoices = files.map((f: any) => ({ id: f.id, n: f.n, d: f.d, tm: f.tm, by: f.by }));
       const stages = shapeStages(c, saved, stageLogs || []);
