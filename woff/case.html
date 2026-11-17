@@ -105,6 +105,13 @@ main{max-width:880px;margin:0 auto;padding:12px 16px 32px}
 .ev.minor .t{padding:4px 0}
 .ev.minor .tt{font-size:13px;font-weight:400;color:var(--muted)}
 .ev.minor .rail::after{left:6px;top:9px;width:4px;height:4px;border-width:1px;background:#c4c8ce;border-color:#c4c8ce}
+/* 열리지 않은 기일(변경·연기): 빈 회색 점, 흐린 취소선 */
+.ev.moved{--gc:#c4c8ce}
+.ev.moved .rail::after{background:var(--surface)}
+.ev.moved .tt{color:var(--muted);font-weight:500;text-decoration:line-through;text-decoration-color:var(--muted)}
+.ev.moved .pill,.li .mv{background:var(--line2);color:var(--ink2);text-decoration:none}
+.li .mv{display:inline-block;font-size:11px;font-weight:600;line-height:1;padding:3px 6px;border-radius:999px;margin-left:6px;vertical-align:2px}
+.li.moved .t>span.x{text-decoration:line-through;color:var(--muted)}
 /* 법정기한(잠정): 빨간 점 + 남은 날 */
 .ev.g-limit{--gc:var(--danger)}
 .ev.g-limit.due .tt{color:var(--danger)}
@@ -337,6 +344,7 @@ function copyText(t){
 }
 function fallbackCopy(t){ var a=document.createElement('textarea'); a.value=t; a.setAttribute('readonly',''); a.style.position='fixed'; a.style.opacity='0'; document.body.appendChild(a); a.select(); try{ document.execCommand('copy'); }catch(e){} a.remove(); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+var MOVED_RE=/기일변경|기일연기|연기|추정|취소/;
 function md(d){ return Number(d.slice(5,7)) + '.' + d.slice(8,10); }
 function dd(d){ return Math.round((Date.parse(d) - Date.parse(data.today)) / 864e5); }
 function wk(d){ return '일월화수목금토'[new Date(d+'T00:00:00Z').getUTCDay()]; }
@@ -390,7 +398,8 @@ var VIEWS = {
       var p=split(e), pill='';
       if(g==='limit'){ var n=dd(e.d); pill='<span class="pill">'+(n<0?'지남':n===0?'오늘까지':'D-'+n)+'</span>'; p.ts=(p.ts?p.ts+' · ':'')+(e.src==='chat'?'대화 기준':'잠정'); }
       else if(e.k==='due') pill='<span class="pill">예정</span>';
-      body+='<div class="ev '+e.k+(g?' g-'+g:'')+(minor?' minor':'')+(key?' key':'')+'"><div class="d"><b>'+md(e.d)+'</b><small>'+wk(e.d)+'</small></div><div class="rail"></div><div class="t">'
+      var moved=g==='hearing' && MOVED_RE.test(p.ts); if(moved){ pill='<span class="pill">'+(p.ts.match(MOVED_RE)[0])+'</span>'; p.ts=p.ts.replace(/\s*·\s*(기일변경|기일연기|연기|추정|취소)\s*$/,''); }
+      body+='<div class="ev '+e.k+(g?' g-'+g:'')+(minor?' minor':'')+(key&&!moved?' key':'')+(moved?' moved':'')+'"><div class="d"><b>'+md(e.d)+'</b><small>'+wk(e.d)+'</small></div><div class="rail"></div><div class="t">'
         +'<div class="tt">'+esc(p.tt)+pill+'</div>'+(p.ts?'<div class="ts">'+esc(p.ts)+'</div>':'')
         +(e.cf?'<div class="fa"><button class="open" data-file="'+e.cf.id+'">계약서 열기</button><span class="fn">'+esc(e.cf.n)+'</span></div>':'')+finalFile(e)+'</div></div>';
     });
@@ -414,7 +423,7 @@ var VIEWS = {
     var pick=data.hearings.filter(function(x){ return all ? dd(x.d)>=0 && dd(x.d)<=28 : x.c===data.caseNo; });
     var up=pick.filter(function(x){return dd(x.d)>=0;}).sort(function(a,b){return (a.d+a.tm).localeCompare(b.d+b.tm);});
     var past=all?[]:pick.filter(function(x){return dd(x.d)<0;}).sort(function(a,b){return b.d.localeCompare(a.d);});
-    var row=function(x, isPast){ return '<div class="li'+(isPast?' past':'')+'"><span class="tm">'+esc(x.tm||'')+'</span><div class="main"><div class="t">'+(all?'<span class="casechip">'+esc(x.c)+'</span>':'')+esc(x.t)+'</div>'+(x.p?'<div class="s">'+esc(x.p)+'</div>':'')+'</div></div>'; };
+    var row=function(x, isPast){ var t=String(x.t||''), mv=t.match(MOVED_RE); if(mv) t=t.replace(/\s*\((기일변경|기일연기|연기|추정|취소)\)\s*$/,''); return '<div class="li'+(isPast?' past':'')+(mv?' moved':'')+'"><span class="tm">'+esc(x.tm||'')+'</span><div class="main"><div class="t">'+(all?'<span class="casechip">'+esc(x.c)+'</span>':'')+(mv?'<span class="x">'+esc(t)+'</span><span class="mv">'+mv[0]+'</span>':esc(t))+'</div>'+(x.p?'<div class="s">'+esc(x.p)+'</div>':'')+'</div></div>'; };
     var h=chips('scope', [['case','이 사건'],['all','내 사건 전체 · 4주']]), last='', card='';
     up.forEach(function(x){
       if(x.d!==last){ if(card) h+=card+'</div>'; last=x.d; var n=dd(x.d); card='<div class="card"><div class="card-h"><span style="color:var(--ink)">'+md(x.d)+' ('+wk(x.d)+')</span><span class="dday">'+(n===0?'오늘':'D-'+n)+'</span></div>'; }
