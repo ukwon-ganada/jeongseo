@@ -91,7 +91,7 @@ async function refreshTitles(env: Env, channels: string[]): Promise<boolean> {
   try {
     const r = await fetch(env.sbUrl + "/functions/v1/works-bot-callback", {
       method: "POST", headers: { "Content-Type": "application/json", "x-internal-key": env.sbKey },
-      body: JSON.stringify({ titles: channels }), signal: AbortSignal.timeout(4000),
+      body: JSON.stringify({ titles: channels }), signal: AbortSignal.timeout(5000),
     });
     if (!r.ok) { await r.body?.cancel(); return false; }
     const j = await r.json();

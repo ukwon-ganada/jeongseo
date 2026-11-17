@@ -102,7 +102,7 @@ export function matchRoom(lines: OcrLine[], rooms: Room[]): MatchResult {
 }
 
 // 방을 못 찾았을 때: 저장된 제목이 옛 제목일 수 있으니, 비슷한 방 몇 개의 현재 제목을 웍스에서 다시 읽어 보기 위한 후보
-export function nearRooms(lines: OcrLine[], rooms: Room[], n = 5): string[] {
+export function nearRooms(lines: OcrLine[], rooms: Room[], n = 4): string[] {
   const header = headerText(lines);
   const h = norm(header);
   if (h.length < 4) return [];

@@ -269,7 +269,9 @@ export async function recheckLinked(env: FileEnv, botIds: string[], fetcher: typ
 // 로웨어 사건이 붙은 방은 recheckLinkedRoom(새 재판번호가 로웨어에 있으면 주 사건도 옮김), 수사 방은 recheckInv 와 같은 길.
 export async function refreshRoomTitles(env: FileEnv, botIds: string[], channels: string[], fetcher: typeof fetch = fetch) {
   const rows: any[] = channels.length ? await restJson(env, `works_room_case?select=channel_id,l_num,case_no,is_primary,room_title&channel_id=in.(${channels.map((c) => encodeURIComponent(c)).join(",")})`, {}, fetcher) || [] : [];
-  const results: number[] = await Promise.all(channels.map(async (ch): Promise<number> => {
+  // 웍스 제목 읽기는 동시에 여러 번 부르면 막히므로(no-title) 하나씩 차례로
+  const results: number[] = [];
+  for (const ch of channels) results.push(await (async (): Promise<number> => {
     const mine = rows.filter((r) => r.channel_id === ch);
     const old = String(mine[0]?.room_title || "");
     let title: string | null = null;
@@ -282,6 +284,6 @@ export async function refreshRoomTitles(env: FileEnv, botIds: string[], channels
     await rest(env, `inv_case?channel_id=eq.${encodeURIComponent(ch)}`, { method: "PATCH", headers: { Prefer: "return=minimal" },
       body: JSON.stringify({ room_title: title }) }, fetcher).then((r) => r.body?.cancel());
     return 1;
-  }));
+  })());
   return { changed: results.reduce((a: number, b) => a + b, 0 as number) };
 }
