@@ -30,7 +30,7 @@
 import { saveRoomFile } from "./room_file.ts";
 import { linkPicked, linkRoomAnyBot, relinkRoom } from "./room_link.ts";
 import { handleRoomText } from "./room_chat.ts";
-import { backfillHold, recheckAll, recheckLinked, recheckRoom } from "./inv_case.ts";
+import { backfillHold, recheckAll, recheckLinked, recheckRoom, refreshRoomTitles } from "./inv_case.ts";
 
 // 우리 봇: 운영 봇(사건관리 도우미), 시험봇(정서 시험봇)
 export const BOT_IDS = ["12905890", "13580302"];
@@ -85,6 +85,13 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
     if (!env.sbKey || !safeEqual(internal, env.sbKey)) return new Response("forbidden", { status: 403 });
     let b: any = {};
     try { b = await req.json(); } catch { /* */ }
+    // PC 도우미가 방을 못 찾았을 때(pc-helper-wait): 후보 방들의 현재 제목을 다시 읽어 저장
+    if (Array.isArray(b?.titles)) {
+      const chs = [...new Set(b.titles.map((x: unknown) => String(x || "")).filter(Boolean))].slice(0, 8) as string[];
+      const r = await refreshRoomTitles(env, BOT_IDS, chs, fetcher).catch((e) => ({ changed: 0, error: String(e?.message || e).slice(0, 120) }));
+      console.log("titles(internal)", chs.length, (r as any).changed);
+      return Response.json(r);
+    }
     const ch = String(b?.channelId || "");
     if (!ch) return Response.json({ error: "channelId" }, { status: 400 });
     try {
