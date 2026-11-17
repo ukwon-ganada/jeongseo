@@ -130,7 +130,7 @@ export function ourFilingTest(list: any[]): (e: any) => boolean {
   };
 }
 export const PREFILL_FROM_LAWWARE = true;
-export const INFO_FIELDS = ["case_name", "client_name", "client_phone", "lawyer", "court_dept", "court_phone", "investigator", "investigator_phone", "memo", "extra_phones"] as const;
+export const INFO_FIELDS = ["case_name", "client_name", "client_rrn", "client_phone", "lawyer", "court_dept", "court_phone", "investigator", "investigator_phone", "memo", "extra_phones"] as const;
 const kstNow = () => new Date(Date.now() + 9 * 3600e3);
 export const kstToday = () => kstNow().toISOString().slice(0, 10);
 const dot = (d: string) => d.replace(/-/g, ".");
@@ -161,7 +161,7 @@ export function infoFields(c: any, saved: any | null, prefill = PREFILL_FROM_LAW
     const police = [nz(raw.l_police_station), nz(raw.l_police_detective)].filter(Boolean).join(" ");
     const pros = nz(raw.l_prosecutor);
     Object.assign(f, {
-      case_name: nz(c.l_name).replace(/^\[전자\]\s*/, ""), client_name: nz(raw.l_client), client_phone: nz(raw.l_client_hp),
+      case_name: nz(c.l_name).replace(/^\[전자\]\s*/, ""), client_name: nz(raw.l_client), client_rrn: "", client_phone: nz(raw.l_client_hp),
       lawyer: nz(c.charge_lawyer).split(/[,\s]+/)[0] || "",
       court_dept: [nz(c.court), nz(raw.l_justice_dept).replace(/\s*\(?\s*전화.*$/, "")].filter(Boolean).join(" "),
       court_phone: (nz(raw.l_justice_dept).match(/전화\s*:?\s*([\d-]{7,})/) || [])[1] || "",
