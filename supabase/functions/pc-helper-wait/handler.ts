@@ -94,7 +94,9 @@ export async function handle(req: Request, env: Env): Promise<Response> {
   if (!/^[0-9a-f]{48}$/.test(tok)) return new Response("unauthorized", { status: 401 });
   const h = await sha256Hex(tok);
   const d = await rest(env, "pc_helper_device?select=id,works_user_id&revoked_at=is.null&token_hash=eq." + h);
-  const dev = d.ok ? (await d.json())[0] : null;
+  // 서버(DB) 확인이 잠깐 실패한 것은 "토큰이 틀림"(401)이 아니라 503 → 도우미가 꺼지지 않고 다시 시도
+  if (!d.ok) { await d.body?.cancel(); return new Response("retry", { status: 503 }); }
+  const dev = (await d.json())[0] ?? null;
   if (!dev) return new Response("unauthorized", { status: 401 });
   if (req.method === "POST") return report(req, env, dev.works_user_id);
   // 도우미 버전(?v=2 이상)만 방 찾기 일을 받는다. 옛 도우미는 받아도 처리 못 하므로 주지 않음

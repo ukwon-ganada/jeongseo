@@ -6,3 +6,4 @@ Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" |
 Remove-Item (Join-Path ([Environment]::GetFolderPath('Startup')) '정서 사건 도우미.lnk') -ErrorAction SilentlyContinue
 Remove-Item $dir -Recurse -Force -ErrorAction SilentlyContinue
 Write-Host '정서 사건 도우미를 지웠습니다.'
+try { Unregister-ScheduledTask -TaskName 'JeongseoHelperWatch' -Confirm:$false -ErrorAction SilentlyContinue } catch {}

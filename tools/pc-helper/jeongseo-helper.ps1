@@ -1,4 +1,5 @@
 ﻿# 정서 사건 도우미 — 사건방 "이 방 사건 보기"를 누르면 이 PC 브라우저에 사건 화면을 연다.
+# v2.2: 절전·네트워크 끊김·서버 오류가 있어도 꺼지지 않고 계속 다시 연결(401이어도 5분 뒤 다시 시도)
 # v2.1: 따로 띄운 대화방 창도 찾음(창 제목=방 이름), 메인 창이 숨어 있어도 찾음
 # v2: 사건 화면이 "지금 어느 방?"을 물으면 웍스 창 위쪽 방 제목을 윈도우 글자 인식으로 읽어 서버에 알려 준다.
 #     (방 제목 줄만 보냄: 왼쪽 방 목록·대화 내용은 보내지 않음)
@@ -131,7 +132,7 @@ function Send-Report($id, $lines, $err) {
     -Body ([Text.Encoding]::UTF8.GetBytes($json)) -TimeoutSec 15 -UseBasicParsing | Out-Null
 }
 
-Write-Log '시작 v2'
+Write-Log '시작 v2.2'
 $fail = 0
 while ($true) {
   try {
@@ -153,7 +154,13 @@ while ($true) {
   } catch {
     $code = $null
     try { $code = [int]$_.Exception.Response.StatusCode } catch {}
-    if ($code -eq 401) { Write-Log '토큰이 막혔거나 틀림 - 종료'; break }
+    # 절대 스스로 끝내지 않는다: 절전에서 깨어날 때 등 일시 오류로 401이 와도 기다렸다 다시 시도
+    if ($code -eq 401) {
+      Write-Log '토큰 확인 실패(401) - 5분 뒤 다시 시도'
+      Start-Sleep -Seconds 300
+      try { $cfg = Get-Content (Join-Path $dir 'config.json') -Raw -Encoding UTF8 | ConvertFrom-Json; $headers = @{ Authorization = "Bearer $($cfg.token)"; apikey = $cfg.anon } } catch {}
+      continue
+    }
     $fail++
     Write-Log "연결 실패($fail): $($_.Exception.Message)"
     Start-Sleep -Seconds ([Math]::Min(60, 3 * $fail))
