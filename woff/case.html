@@ -333,8 +333,8 @@ var ctx = {room:'', caseParam:q.get('case')||'', tok:''};
 var data = null, sub = {f:'all', scope:'case', p:'all'}, editing = false;
 // 사건정보 단계 칸 (석원 2026-11-16): 경찰·공소청·1심·2심·3심, 지난 단계는 접어 둠
 var SK=['police','pros','c1','c2','c3'], SL={police:'경찰',pros:'공소청',c1:'1심',c2:'2심',c3:'3심'};
-var SF={police:[['org','경찰서·팀'],['no','접수번호',{copy:1}],['person','수사관',{hist:1}],['phone','전화',{tel:1,hist:1}]],
-  pros:[['org','공소청'],['no','형제번호',{copy:1}],['person','공소관',{hist:1}],['phone','전화',{tel:1,hist:1}]],
+var SF={police:[['org','경찰서·팀'],['no','접수번호',{copy:1}],['person','수사관',{hist:1}],['phone','전화',{tel:1,hist:1}],['mobile','휴대전화',{tel:1}]],
+  pros:[['org','공소청'],['no','형제번호',{copy:1}],['person','공소관',{hist:1}],['phone','전화',{tel:1,hist:1}],['mobile','휴대전화',{tel:1}]],
   court:[['org','법원'],['no','사건번호',{copy:1}],['dept','재판부',{hist:1}],['phone','재판부 전화',{tel:1,hist:1}]]};
 var stOpen={};
 function copyText(t){

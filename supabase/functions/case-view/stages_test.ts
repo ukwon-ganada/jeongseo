@@ -55,7 +55,7 @@ Deno.test("이송·수사관 변경: 바뀌기 전 모습이 이전 기록으로
   assertEquals((d.stages.police as any).prev, undefined);
   // 이송: 경찰서가 바뀌면 이전 모습이 남음
   d = diffStages(c, saved, { police: { org: "인천연수경찰서", no: "2026-77", person: "박경사", phone: "032-1" } });
-  assertEquals((d.stages.police as any).prev, [{ org: "관악경찰서", no: "2026-1", dept: "", person: "김경위", phone: "02-1" }]);
+  assertEquals((d.stages.police as any).prev, [{ org: "관악경찰서", no: "2026-1", dept: "", person: "김경위", phone: "02-1", mobile: "" }]);
   const s = shapeStages(c, { stages: d.stages }, []);
   assertEquals(s.list[0].prev.length, 1);
   // 직원이 이전 기록을 고치거나 지움, 빈 줄은 버림
