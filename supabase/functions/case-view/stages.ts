@@ -90,8 +90,17 @@ export function cleanStage(v: any): StageVal {
   for (const k of STAGE_FIELDS) o[k] = nz(v?.[k]).slice(0, 120);
   return o;
 }
+// 이전 기록(2026-11-17 석원): 이송 전 기관·지난 수사관 등. 최근 것이 앞. 누가·언제는 남기지 않는다
+export function cleanPrev(list: any): StageVal[] {
+  return (Array.isArray(list) ? list : []).map(cleanStage).filter(hasAny).slice(0, 30);
+}
+// 기관·번호·담당이 바뀌면 바뀌기 전 모습을 이전 기록 맨 앞에 남긴다(전화만 바뀐 것은 고친 것으로 봄)
+const MOVE_KEYS = ["org", "no", "dept", "person"] as const;
+export function movedOut(o: StageVal, n: StageVal): boolean {
+  return MOVE_KEYS.some((k) => o[k] && o[k] !== n[k]);
+}
 const isStage = (s: unknown): s is StageKey => (STAGES as readonly string[]).includes(String(s));
-const hasAny = (v: StageVal) => STAGE_FIELDS.some((k) => !!v[k]);
+function hasAny(v: StageVal) { return STAGE_FIELDS.some((k) => !!v[k]); }
 
 // 화면에 줄 모양 만들기
 export function shapeStages(c: any, saved: any | null, logs: any[]) {
@@ -122,7 +131,7 @@ export function shapeStages(c: any, saved: any | null, logs: any[]) {
   }
   return {
     cur, start: STAGES[si], dispNo, prevNos,
-    list: STAGES.map((s, i) => ({ key: s, label: STAGE_LABEL[s], ...vals[s], idx: i })),
+    list: STAGES.map((s, i) => ({ key: s, label: STAGE_LABEL[s], ...vals[s], idx: i, prev: cleanPrev(st[s]?.prev) })),
     hist,
   };
 }
@@ -131,13 +140,16 @@ export function shapeStages(c: any, saved: any | null, logs: any[]) {
 export function diffStages(c: any, saved: any | null, body: any) {
   const before = shapeStages(c, saved, []);
   const prevVals = Object.fromEntries(before.list.map((x: any) => [x.key, cleanStage(x)])) as Record<StageKey, StageVal>;
-  const next: Record<string, StageVal> = { ...(saved?.stages && typeof saved.stages === "object" ? saved.stages : {}) };
+  const next: Record<string, any> = { ...(saved?.stages && typeof saved.stages === "object" ? saved.stages : {}) };
   const changes: { field: string; old: string; new: string; stage: StageKey; key: string }[] = [];
   const inBody = body && typeof body === "object" ? body : {};
   for (const s of STAGES) {
     if (!inBody[s]) continue;
     const v = cleanStage(inBody[s]);
-    next[s] = v;
+    const oldPrev = cleanPrev(next[s]?.prev);
+    let prev = Array.isArray(inBody[s].prev) ? cleanPrev(inBody[s].prev) : oldPrev;
+    if (movedOut(prevVals[s], v)) prev = [prevVals[s], ...prev].slice(0, 30);
+    next[s] = { ...v, ...(prev.length ? { prev } : {}) } as any;
     for (const k of TRACK) {
       const o = prevVals[s][k as keyof StageVal], n = v[k as keyof StageVal];
       if (o !== n) changes.push({ field: `stage.${s}.${k}`, old: o, new: n, stage: s, key: k });
