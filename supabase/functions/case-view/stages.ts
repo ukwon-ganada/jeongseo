@@ -10,13 +10,13 @@
 export const STAGES = ["police", "pros", "c1", "c2", "c3"] as const;
 export type StageKey = typeof STAGES[number];
 export const STAGE_LABEL: Record<StageKey, string> = { police: "경찰", pros: "공소청", c1: "1심", c2: "2심", c3: "3심" };
-export const STAGE_FIELDS = ["org", "no", "dept", "person", "phone"] as const;
-export type StageVal = { org: string; no: string; dept: string; person: string; phone: string };
+export const STAGE_FIELDS = ["org", "no", "dept", "person", "phone", "mobile"] as const;
+export type StageVal = { org: string; no: string; dept: string; person: string; phone: string; mobile: string };
 // 이력에 남길 칸(사람·전화가 자주 바뀜). 번호·기관도 남긴다.
-export const TRACK = ["org", "no", "dept", "person", "phone"];
+export const TRACK = ["org", "no", "dept", "person", "phone", "mobile"];
 
 const nz = (v: unknown) => (v == null ? "" : String(v).trim());
-const empty = (): StageVal => ({ org: "", no: "", dept: "", person: "", phone: "" });
+const empty = (): StageVal => ({ org: "", no: "", dept: "", person: "", phone: "", mobile: "" });
 const PROS_RE = /공소청|검찰|지검|지청/;
 
 // 사건번호 모양으로 단계 고르기
