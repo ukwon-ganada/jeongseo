@@ -264,3 +264,26 @@ export async function recheckLinked(env: FileEnv, botIds: string[], fetcher: typ
   }
   return { checked: out.length, moved: out.filter((x) => x.how === "moved").length, results: out.filter((x) => x.how !== "same") };
 }
+
+// PC 도우미가 방을 못 찾았을 때 부름: 몇 개 방의 현재 제목을 웍스에서 읽어, 바뀐 방만 저장(사건 연결은 그대로).
+// 로웨어 사건이 붙은 방은 recheckLinkedRoom(새 재판번호가 로웨어에 있으면 주 사건도 옮김), 수사 방은 recheckInv 와 같은 길.
+export async function refreshRoomTitles(env: FileEnv, botIds: string[], channels: string[], fetcher: typeof fetch = fetch) {
+  const rows: any[] = channels.length ? await restJson(env, `works_room_case?select=channel_id,l_num,case_no,is_primary,room_title&channel_id=in.(${channels.map((c) => encodeURIComponent(c)).join(",")})`, {}, fetcher) || [] : [];
+  // 웍스 제목 읽기는 동시에 여러 번 부르면 막히므로(no-title) 하나씩 차례로
+  const results: number[] = [];
+  for (const ch of channels) results.push(await (async (): Promise<number> => {
+    const mine = rows.filter((r) => r.channel_id === ch);
+    const old = String(mine[0]?.room_title || "");
+    let title: string | null = null;
+    for (const b of botIds) { try { title = await roomTitle(env, b, ch, fetcher); break; } catch { /* 다음 봇 */ } }
+    if (title === null || title === old) return 0;
+    const linked = mine.filter((r) => Number(r.l_num) > 0);
+    if (linked.length) await recheckLinkedRoom(env, botIds, ch, linked, fetcher);
+    await rest(env, `works_room_case?channel_id=eq.${encodeURIComponent(ch)}`, { method: "PATCH", headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ room_title: title }) }, fetcher).then((r) => r.body?.cancel());
+    await rest(env, `inv_case?channel_id=eq.${encodeURIComponent(ch)}`, { method: "PATCH", headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ room_title: title }) }, fetcher).then((r) => r.body?.cancel());
+    return 1;
+  })());
+  return { changed: results.reduce((a: number, b) => a + b, 0 as number) };
+}

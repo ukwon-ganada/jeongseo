@@ -100,3 +100,18 @@ export function matchRoom(lines: OcrLine[], rooms: Room[]): MatchResult {
   if (best.s >= 0.6 && best.s - second >= 0.08) return { channelId: best.ch, how: "title", score: best.s, header };
   return { channelId: null, how: best.s >= 0.6 ? "ambiguous" : "no-match", score: best.s, header };
 }
+
+// 방을 못 찾았을 때: 저장된 제목이 옛 제목일 수 있으니, 비슷한 방 몇 개의 현재 제목을 웍스에서 다시 읽어 보기 위한 후보
+export function nearRooms(lines: OcrLine[], rooms: Room[], n = 4): string[] {
+  const header = headerText(lines);
+  const h = norm(header);
+  if (h.length < 4) return [];
+  const hName = clientName(header);
+  const seen = new Map<string, number>();
+  for (const r of rooms) {
+    if (!r.room_title || seen.has(r.channel_id)) continue;
+    if (hName && !sameClient(hName, clientName(r.room_title))) continue;
+    seen.set(r.channel_id, dice(h, norm(r.room_title)));
+  }
+  return [...seen].filter(([, s]) => s >= 0.3).sort((a, b) => b[1] - a[1]).slice(0, n).map(([ch]) => ch);
+}
