@@ -1,4 +1,5 @@
-﻿# 정서 사건 도우미 설치 — install.cmd 가 부름
+﻿# 정서 사건 도우미 설치 — install.cmd 가 부름 (install.cmd <연결코드> 로 부르면 묻지 않고 바로 설치)
+param([string]$Token = '')
 $ErrorActionPreference = 'Stop'
 $src = Split-Path -Parent $MyInvocation.MyCommand.Path
 $dir = Join-Path $env:APPDATA 'JeongseoHelper'
@@ -11,9 +12,11 @@ Copy-Item (Join-Path $src 'jeongseo-helper.ps1') $dir -Force
 
 Write-Host ''
 Write-Host '정서 사건 도우미 설치' -ForegroundColor Cyan
-Write-Host '관리자에게 받은 도우미 토큰(48자리)을 붙여 넣고 Enter를 누르세요.'
-Write-Host '(토큰은 이 PC에만 저장됩니다. 메신저·채팅에 붙이지 마세요.)'
-$token = (Read-Host '토큰').Trim()
+if (-not $Token) {
+  Write-Host '관리자에게 받은 도우미 토큰(48자리)을 붙여 넣고 Enter를 누르세요.'
+  Write-Host '(토큰은 이 PC에만 저장됩니다. 메신저·채팅에 붙이지 마세요.)'
+}
+$token = if ($Token) { $Token.Trim() } else { (Read-Host '토큰').Trim() }
 if ($token -notmatch '^[0-9a-f]{48}$') { Write-Host '토큰 모양이 맞지 않습니다. 다시 실행해 주세요.' -ForegroundColor Red; exit 1 }
 
 $cfg = Get-Content (Join-Path $src 'server.json') -Raw -Encoding UTF8 | ConvertFrom-Json
