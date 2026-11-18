@@ -595,7 +595,8 @@ var VIEWS = {
     return '<div class="info-col">'+out+foot+'</div>';
   }
 };
-// 타임라인 "우리 서면" 줄: 그 제출의 최종본(그날 마지막으로 방에 올린 파일) [열기], 틀렸으면 [바꾸기]
+// 타임라인 "우리 서면" 줄: 그 제출의 최종본(제목이 비슷한 마지막 파일) [열기], 틀렸으면 [바꾸기]에서 다른 파일이나 빼기
+// 열람복사신청 같은 중요하지 않은 제출(e.minor)은 파일 칸을 두지 않는다
 // 다른 제출 줄에 이미 붙은 파일은 후보에서 뺀다(파일 하나는 한 줄에만 붙으므로, 고르면 그 줄에서 빠져 버림)
 function nearChoices(d, lp){
   var t=Date.parse(d), used={};
@@ -604,21 +605,21 @@ function nearChoices(d, lp){
     .sort(function(a,b){ return (b.d+b.tm).localeCompare(a.d+a.tm); });
 }
 function finalFile(e){
-  if(e.k!=='ours' || e.lp==null) return '';
+  if(e.k!=='ours' || e.lp==null || e.minor) return '';
   var near=nearChoices(e.d, e.lp), h='';
-  if(e.f) h='<div class="fa"><button class="open" data-file="'+e.f.id+'">열기</button><span class="fn">'+esc(e.f.n)+'</span>'+(near.length>1?'<button class="link-btn" data-pickfor="'+e.lp+'">바꾸기</button>':'')+'</div>';
+  if(e.f) h='<div class="fa"><button class="open" data-file="'+e.f.id+'">열기</button><span class="fn">'+esc(e.f.n)+'</span><button class="link-btn" data-pickfor="'+e.lp+'">바꾸기</button></div>';
   else if(near.length) h='<div class="fa"><button class="link-btn" data-pickfor="'+e.lp+'">제출본 파일 고르기</button></div>';
   if(String(sub.pick)===String(e.lp)){
-    h+='<div class="picks"><div class="s">이 제출의 최종본을 고르세요</div>'+near.map(function(f){
+    h+='<div class="picks">'+near.map(function(f){
       return '<button class="pickf'+(e.f&&e.f.id===f.id?' on':'')+'" data-setfile="'+f.id+'" data-lp="'+e.lp+'"><b>'+esc(f.n)+'</b><span>'+esc(f.d.replace(/-/g,'.')+' '+f.tm)+(f.by?' · '+esc(f.by):'')+'</span></button>';
-    }).join('')+'<button class="link-btn" data-pickfor="">취소</button></div>';
+    }).join('')+(e.f?'<button class="link-btn" data-setfile="0" data-lp="'+e.lp+'">빼기</button>':'')+'<button class="link-btn" data-pickfor="">취소</button></div>';
   }
   return h;
 }
 function setFile(btn){
   btn.disabled=true;
   api({action:'set_file', lNum:data.lNum, lp:Number(btn.dataset.lp), id:Number(btn.dataset.setfile)}).then(function(){
-    sub.pick=''; return loadCase(ctx.key).then(function(d){ data=d; render(); toast('바꿨습니다'); });
+    sub.pick=''; return loadCase(ctx.key).then(function(d){ data=d; render(); toast(btn.dataset.setfile==='0'?'뺐습니다':'바꿨습니다'); });
   }).catch(function(e){ btn.disabled=false; toast('바꾸지 못했습니다: '+((e&&e.message)||e)); });
 }
 // 파일 열기: 서버가 5분짜리 열람 주소를 줌 → 휴대폰은 바깥 브라우저, PC는 새 탭
@@ -787,7 +788,7 @@ document.addEventListener('click', function(e){
   if(b.dataset.stg){ stOpen[b.dataset.stg]=!stOpen[b.dataset.stg]; render(); }
   if(b.dataset.file) openFile(b);
   if(b.dataset.pickfor!==undefined){ sub.pick=b.dataset.pickfor; render(); }
-  if(b.dataset.setfile) setFile(b);
+  if(b.dataset.setfile!==undefined) setFile(b);
   if(b.dataset.imp==='reset'){ imp={st:'', evs:[], on:{}, msg:''}; render(); }
   if(b.dataset.imp==='save') impSave(b);
 });

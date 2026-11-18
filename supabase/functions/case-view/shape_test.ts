@@ -175,3 +175,25 @@ Deno.test("법원 기록에서 가려진 우리 이름(법OOOOOO)도 우리 서�
   const u = ourFilingTest([L("2026-11-02", "서면", "변호인  법무법인 정서 변호인선임계 제출"), L("2026-11-03", "서면", "피고인1 변호인  법OOOOOO 기일변경신청서 제출")]);
   assertEquals(u(L("2026-11-03", "서면", "피고인1 변호인  법OOOOOO 기일변경신청서 제출")), true);
 });
+
+Deno.test("최종 서면: 제목이 비슷한 파일만, 중요하지 않은 제출·뺀 줄은 비움", () => {
+  // 2026고합100415 실제 사례(2026-11-18): 선임계·열람복사신청 같은 날 제출, 방엔 선임신고서·편지·계약서
+  const ev: any[] = [
+    { d: "2026-11-17", k: "ours", g: "ours", t: "변호인선임계 제출", lp: 75860 },
+    { d: "2026-11-17", k: "ours", g: "ours", t: "변호사 서고은 열람및복사신청 제출", lp: 75861 },
+    { d: "2026-11-20", k: "ours", g: "ours", t: "변호사 서고은 의견서 제출", lp: 9 },
+    { d: "2026-11-25", k: "ours", g: "ours", t: "보석허가청구서 제출", lp: 10 },
+  ];
+  const files = [
+    { id: 35, n: "이상한_변호인선임신고서_261117.pdf", d: "2026-11-17", at: 3, pdf: 1, lp: null },
+    { id: 26, n: "이상한_편지_261117.pdf", d: "2026-11-17", at: 2, pdf: 1, lp: null },
+    { id: 15, n: "(형사)송무위임계약서_이상한.pdf", d: "2026-11-16", at: 1, pdf: 1, lp: null },
+    { id: 40, n: "서고은_메모.pdf", d: "2026-11-20", at: 5, pdf: 1, lp: null },
+    { id: 41, n: "보석허가청구서_최종.pdf", d: "2026-11-24", at: 6, pdf: 1, lp: null },
+  ];
+  attachFinalFiles(ev, files, new Set(["10"]));
+  if (ev[0].f?.id !== 35) throw new Error("선임계 " + JSON.stringify(ev[0]));
+  if (ev[1].f || !ev[1].minor) throw new Error("열람복사에 파일 " + JSON.stringify(ev[1]));
+  if (ev[2].f) throw new Error("변호사 이름만 겹친 파일이 붙음 " + JSON.stringify(ev[2]));
+  if (ev[3].f) throw new Error("뺀 줄에 다시 붙음");
+});
