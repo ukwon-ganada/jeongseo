@@ -86,7 +86,8 @@ main{max-width:880px;margin:0 auto;padding:12px 16px 32px}
 .tled .tle:first-child{border-top:0}
 .tle input{min-width:0;border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:14px;background:var(--surface);color:var(--ink)}
 .tle.off input{opacity:.45;text-decoration:line-through}
-.tle-a{display:flex;align-items:center;gap:14px;margin-top:12px}.tle-a .sp{flex:1}
+.tle-a{display:flex;align-items:center;flex-wrap:wrap;gap:8px 14px;margin-top:12px}.tle-a .sp{flex:1}.tle-a button{white-space:nowrap}
+@media (max-width:520px){.tle-a .sp{flex-basis:100%;height:0}.tle-a #tlcancel{margin-left:auto}}
 .tle-a .open{border:1px solid var(--accent);color:var(--accent-ink);background:var(--accent-tint);border-radius:8px;padding:7px 16px;font-size:14px;font-weight:600}
 @media (max-width:520px){.tle{grid-template-columns:1fr 64px auto}.tle .tle-t{grid-column:1/3}}
 .imp-r{display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-top:1px solid var(--line2);font-size:14px}
@@ -195,15 +196,18 @@ main{max-width:880px;margin:0 auto;padding:12px 16px 32px}
 .pg.hl{box-shadow:inset 3px 0 0 var(--accent)}
 .pg.dim{opacity:.45}
 .pg.plan .d{color:var(--due);font-weight:600}
-.fa{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
-.fa .fn{font-size:13px;color:var(--muted);overflow-wrap:anywhere;flex:1;min-width:0}
-.fa .open{flex:none;border:1px solid var(--accent);color:var(--accent-ink);background:var(--accent-tint);border-radius:8px;padding:5px 12px;font-size:13px;font-weight:600}
-.fa .open[disabled]{opacity:.5}
-.picks{margin-top:8px;border:1px solid var(--line);border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:6px}
-.picks .s{font-size:12px;color:var(--muted)}
-.pickf{display:flex;flex-direction:column;align-items:flex-start;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 10px;font-size:14px;color:var(--ink)}
-.pickf span{font-size:12px;color:var(--muted)}
-.pickf.on{border-color:var(--accent);background:var(--accent-tint)}
+/* 타임라인 파일: 제목 옆 작은 칩(파일 이름은 마우스를 올리면) */
+.fchip{display:inline-flex;align-items:center;gap:3px;margin-left:6px;vertical-align:1px;border:1px solid var(--line);background:var(--surface);color:var(--accent-ink);border-radius:999px;padding:1px 7px 1px 6px;font-size:11px;font-weight:600;line-height:16px;cursor:pointer}
+.fchip svg{width:11px;height:11px;flex:none}
+.fchip:hover{border-color:var(--accent)}
+.fchip[disabled]{opacity:.5}
+/* 타임라인 [수정]: 제출 서면마다 붙일 파일 고르기 */
+.tlf-h{font-size:12px;font-weight:600;color:var(--muted);padding:12px 0 4px}
+.tlf{display:grid;grid-template-columns:60px minmax(0,1fr) minmax(0,1.2fr);gap:8px;align-items:center;padding:7px 0;border-top:1px solid var(--line2)}
+.tlf .d{font-size:13px;color:var(--ink2);font-variant-numeric:tabular-nums}
+.tlf .t{font-size:14px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tlf select{min-width:0;width:100%;border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:13px;background:var(--surface);color:var(--ink)}
+@media (max-width:520px){.tlf{grid-template-columns:52px minmax(0,1fr)}.tlf select{grid-column:1/3}}
 .meta{font-size:12px;color:var(--muted);padding:0 2px 10px}
 
 /* 사건 정보 */
@@ -432,8 +436,7 @@ var VIEWS = {
       else if(e.k==='due') pill='<span class="pill">예정</span>';
       var moved=g==='hearing' && MOVED_RE.test(p.ts); if(moved){ pill='<span class="pill">'+(p.ts.match(MOVED_RE)[0])+'</span>'; p.ts=p.ts.replace(/\s*·\s*(기일변경|기일연기|연기|추정|취소)\s*$/,''); }
       body+='<div class="ev '+e.k+(g?' g-'+g:'')+(minor?' minor':'')+(key&&!moved?' key':'')+(moved?' moved':'')+'"><div class="d"><b>'+md(e.d)+'</b><small>'+wk(e.d)+'</small></div><div class="rail"></div><div class="t">'
-        +'<div class="tt">'+esc(p.tt)+pill+'</div>'+(p.ts?'<div class="ts">'+esc(p.ts)+'</div>':'')
-        +(e.cf?'<div class="fa"><button class="open" data-file="'+e.cf.id+'">계약서 열기</button><span class="fn">'+esc(e.cf.n)+'</span></div>':'')+finalFile(e)+'</div></div>';
+        +'<div class="tt">'+esc(p.tt)+pill+(e.cf?fileChip(e.cf,'계약서'):'')+(e.f&&!e.minor?fileChip(e.f,'열기'):'')+'</div>'+(p.ts?'<div class="ts">'+esc(p.ts)+'</div>':'')+'</div></div>';
     });
     return h+'<div class="card tl">'+body+'</div>';
   },
@@ -595,44 +598,47 @@ var VIEWS = {
     return '<div class="info-col">'+out+foot+'</div>';
   }
 };
-// 타임라인 "우리 서면" 줄: 그 제출의 최종본(제목이 비슷한 마지막 파일) [열기], 틀렸으면 [바꾸기]에서 다른 파일이나 빼기
-// 열람복사신청 같은 중요하지 않은 제출(e.minor)은 파일 칸을 두지 않는다
-// 다른 제출 줄에 이미 붙은 파일은 후보에서 뺀다(파일 하나는 한 줄에만 붙으므로, 고르면 그 줄에서 빠져 버림)
+// 타임라인 파일(2026-11-18 석원): 이벤트가 주인공. 제목 옆 작은 칩만, 파일 이름은 툴팁으로.
+// 파일 바꾸기·빼기는 오른쪽 위 [수정]에서 (줄마다 버튼을 흩어 놓지 않음)
+// 다른 제출 줄에 이미 붙은 파일은 후보에서 뺀다(파일 하나는 한 줄에만 붙음)
+var DOC_SVG='<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 1.8h5l3 3v9.4H4z"/><path d="M9 1.8v3h3"/></svg>';
+function fileChip(f, label){
+  return '<button class="fchip" data-file="'+f.id+'" data-label="'+label+'" title="'+esc(f.n)+'">'+DOC_SVG+label+'</button>';
+}
 function nearChoices(d, lp){
   var t=Date.parse(d), used={};
   (data.events||[]).forEach(function(e){ if(e.f && e.lp!=null && String(e.lp)!==String(lp)) used[e.f.id]=1; });
   return (data.fileChoices||[]).filter(function(f){ return !used[f.id] && Math.abs(Date.parse(f.d)-t)<=14*864e5; })
     .sort(function(a,b){ return (b.d+b.tm).localeCompare(a.d+a.tm); });
 }
-function finalFile(e){
-  if(e.k!=='ours' || e.lp==null || e.minor) return '';
-  var near=nearChoices(e.d, e.lp), h='';
-  if(e.f) h='<div class="fa"><button class="open" data-file="'+e.f.id+'">열기</button><span class="fn">'+esc(e.f.n)+'</span><button class="link-btn" data-pickfor="'+e.lp+'">바꾸기</button></div>';
-  else if(near.length) h='<div class="fa"><button class="link-btn" data-pickfor="'+e.lp+'">제출본 파일 고르기</button></div>';
-  if(String(sub.pick)===String(e.lp)){
-    h+='<div class="picks">'+near.map(function(f){
-      return '<button class="pickf'+(e.f&&e.f.id===f.id?' on':'')+'" data-setfile="'+f.id+'" data-lp="'+e.lp+'"><b>'+esc(f.n)+'</b><span>'+esc(f.d.replace(/-/g,'.')+' '+f.tm)+(f.by?' · '+esc(f.by):'')+'</span></button>';
-    }).join('')+(e.f?'<button class="link-btn" data-setfile="0" data-lp="'+e.lp+'">빼기</button>':'')+'<button class="link-btn" data-pickfor="">취소</button></div>';
-  }
-  return h;
+// [수정] 화면의 제출 서면 줄들 (열람복사신청 같은 중요하지 않은 제출은 뺌)
+function tlFileRows(){
+  var list=(data.events||[]).filter(function(e){ return e.k==='ours' && e.lp!=null && !e.minor && (e.f || nearChoices(e.d,e.lp).length); });
+  if(!list.length) return '';
+  return '<div class="tlf-h">제출 서면 파일</div>'+list.map(function(e){
+    var cur=e.f?String(e.f.id):'', near=nearChoices(e.d,e.lp), tt=String(e.t||'').split(' · ')[0];
+    return '<div class="tlf"><span class="d">'+md(e.d)+'</span><span class="t" title="'+esc(tt)+'">'+esc(tt)+'</span>'
+      +'<select class="tlf-s" data-lp="'+e.lp+'" data-o="'+cur+'"><option value="">없음</option>'
+      +near.map(function(f){ return '<option value="'+f.id+'"'+(String(f.id)===cur?' selected':'')+'>'+esc(f.n)+' ('+esc(md(f.d)+' '+f.tm)+')</option>'; }).join('')
+      +'</select></div>';
+  }).join('');
 }
-function setFile(btn){
-  btn.disabled=true;
-  api({action:'set_file', lNum:data.lNum, lp:Number(btn.dataset.lp), id:Number(btn.dataset.setfile)}).then(function(){
-    sub.pick=''; return loadCase(ctx.key).then(function(d){ data=d; render(); toast(btn.dataset.setfile==='0'?'뺐습니다':'바꿨습니다'); });
-  }).catch(function(e){ btn.disabled=false; toast('바꾸지 못했습니다: '+((e&&e.message)||e)); });
+function tlFileChanges(){
+  var out=[];
+  document.querySelectorAll('#main .tlf-s').forEach(function(el){ if(el.value!==el.dataset.o) out.push({lp:Number(el.dataset.lp), id:el.value?Number(el.value):0}); });
+  return out;
 }
 // 파일 열기: 서버가 5분짜리 열람 주소를 줌 → 휴대폰은 바깥 브라우저, PC는 새 탭
 function openFile(btn){
   var inClient=false; try{ inClient=woff.isInClient(); }catch(e){}
   var w = inClient ? null : window.open('', '_blank'); // PC: 팝업 차단을 피하려고 먼저 빈 탭을 엶
-  btn.disabled=true; btn.textContent='여는 중…';
+  btn.disabled=true;
   api({action:'file_open', id:Number(btn.dataset.file)}).then(function(j){
     if(w){ w.location.href=j.url; }
     else if(inClient && woff.openWindow){ woff.openWindow({url:j.url, external:true}); }
     else location.href=j.url;
   }).catch(function(e){ if(w) w.close(); toast('열지 못했습니다: '+((e&&e.message)||e)); })
-    .then(function(){ btn.disabled=false; btn.textContent='열기'; });
+    .then(function(){ btn.disabled=false; });
 }
 function fmtTime(t){ if(!t) return ''; var d=new Date(Date.parse(t)+9*3600e3).toISOString(); return md(d.slice(0,10))+' '+d.slice(11,16); }
 
@@ -697,7 +703,8 @@ function tlEditView(){
       +'<input class="tle-t" placeholder="내용" value="'+esc(r.t)+'"'+(r.hid?' disabled':'')+'>'
       +'<button class="link-btn" data-tlx="'+i+'">'+(r.hid?'되살리기':'삭제')+'</button></div>';
   }).join('');
-  return '<div class="card tled">'+(rows||'<div class="tle-h"><div class="s">고칠 줄이 없습니다</div></div>')
+  var files=tlFileRows();
+  return '<div class="card tled">'+(files?files+'<div class="tlf-h">타임라인 줄</div>':'')+(rows||(files?'':'<div class="tle-h"><div class="s">고칠 줄이 없습니다</div></div>'))
     +'<div class="tle-a"><button class="link-btn" id="tladd">+ 줄 추가</button><button class="link-btn warn" id="tlreset">대화 기록 모두 지우기</button><span class="sp"></span><button class="link-btn" id="tlcancel">취소</button><button class="open" id="tlsave">저장</button></div></div>';
 }
 function tlSave(btn){
@@ -712,9 +719,12 @@ function tlSave(btn){
     if(r.id && JSON.stringify([r.d,r.tm,r.t,r.hid])===r.o) continue;
     ch.push({id:r.id||null, date:r.d, time:r.tm, summary:r.t, hidden:r.hid});
   }
-  if(!ch.length){ tl.on=false; render(); return; }
+  var fc=tlFileChanges();
+  if(!ch.length && !fc.length){ tl.on=false; render(); return; }
   btn.disabled=true; btn.textContent='저장 중…';
-  api({action:'tl_save', lNum:data.lNum, rows:ch}).then(function(j){
+  var chain=Promise.resolve();
+  fc.forEach(function(x){ chain=chain.then(function(){ return api({action:'set_file', lNum:data.lNum, lp:x.lp, id:x.id}); }); });
+  chain.then(function(){ return ch.length ? api({action:'tl_save', lNum:data.lNum, rows:ch}) : {saved:0, failed:0}; }).then(function(j){
     tl.on=false;
     return loadCase(ctx.key).then(function(d){ data=d; render(); toast(j.failed?('저장 '+j.saved+'줄, 실패 '+j.failed+'줄'):'저장했습니다'); });
   }).catch(function(e){ btn.disabled=false; btn.textContent='저장'; toast('저장 실패: '+((e&&e.message)||e)); });
@@ -778,7 +788,7 @@ function render(){
 }
 document.addEventListener('click', function(e){
   var b=e.target.closest('button'); if(!b) return;
-  if(b.dataset.ctab){ if(b.dataset.ctab===data.caseNo) return; if(editing && !confirmLeave()) return; editing=false; tl.on=false; sub.pick=''; sub.lv=null; showCase({'case':b.dataset.ctab}); return; }
+  if(b.dataset.ctab){ if(b.dataset.ctab===data.caseNo) return; if(editing && !confirmLeave()) return; editing=false; tl.on=false; sub.lv=null; showCase({'case':b.dataset.ctab}); return; }
   if(b.dataset.v){ if(editing && !confirmLeave()) return; editing=false; tl.on=false; view=b.dataset.v; render(); window.scrollTo(0,0); return; }
   ['f','scope','p','lv'].forEach(function(k){ if(b.dataset[k]){ sub[k]=b.dataset[k]; render(); } });
   if(b.dataset.edit){ editing=b.dataset.edit; render(); var c=$('#main .card.editing'); if(c){ var i=c.querySelector('input,textarea,select'); if(i) i.focus(); if(c.getBoundingClientRect().top<0) c.scrollIntoView({block:'start'}); } }
@@ -787,8 +797,6 @@ document.addEventListener('click', function(e){
   if(b.dataset.copy){ copyText(b.dataset.copy); }
   if(b.dataset.stg){ stOpen[b.dataset.stg]=!stOpen[b.dataset.stg]; render(); }
   if(b.dataset.file) openFile(b);
-  if(b.dataset.pickfor!==undefined){ sub.pick=b.dataset.pickfor; render(); }
-  if(b.dataset.setfile!==undefined) setFile(b);
   if(b.dataset.imp==='reset'){ imp={st:'', evs:[], on:{}, msg:''}; render(); }
   if(b.dataset.imp==='save') impSave(b);
 });
