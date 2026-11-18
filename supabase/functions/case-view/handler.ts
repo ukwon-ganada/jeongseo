@@ -48,8 +48,9 @@ import { dropKnown, extractFromExport, msgsToExport, toRows } from "./chat_impor
 import { shapeStages, diffStages, personChangeLine, isStage } from "./stages.ts";
 import { applyInvDeadlines } from "./inv_deadlines.ts";
 import { buildLevels, levelOf, lvByDate, shortNo } from "./levels.ts";
+import { applyMatches, askMatch, buildPrompt, candidateLines, fileSig, pendingFiles, type MatchRow } from "./file_ai.ts";
 export const DEADLINE_NOTE = "잠정 계산입니다. 재판 단계(항소·상고·이유서)는 선고일·기록접수통지 도달일로, 수사 단계(항고·재정신청·이의신청)는 사건방 줄의 처분·통지 날짜로 계산했습니다. 알림은 보내지 않습니다. 꼭 기록으로 한 번 더 확인해 주세요.";
-export type Env = { sbUrl: string; sbKey: string; anthropicKey?: string; chatModel?: string; refreshModel?: string };
+export type Env = { sbUrl: string; sbKey: string; anthropicKey?: string; chatModel?: string; refreshModel?: string; fileModel?: string };
 export type WhoAmI = { ok: boolean; status: number; userId?: string; domainId?: number | string; name?: string; error?: string };
 
 // 같은 토큰이면 5분 동안 웍스에 다시 묻지 않는다(화면을 열 때마다 0.1~0.3초 아낌). 확인된 것만 기억
@@ -429,7 +430,7 @@ export function attachContract(events: any[], files: any[]) {
 }
 export const TITLE_WINDOW_DAYS = 7;
 // 중요하지 않은 제출: 방에 서면을 올리지 않는 서류 (석원 2026-11-18)
-export const MINOR_RE = /열람|복사|등사|기일\s*(변경|연기)|연기\s*신청|증명원|송달|주소\s*보정|영상\s*재판|중계|녹음|녹화/;
+export const MINOR_RE = /열람|복사|등사|정보\s*공개|기일\s*(변경|연기)|연기\s*신청|증명원|송달|주소\s*보정|영상\s*재판|중계|녹음|녹화/;
 // 로웨어 제출 줄 글 → 서면 제목 ("변호인 법무법인 정서 변호사 서고은 열람및복사신청 제출" → "열람및복사신청")
 export function docTitle(t: string): string {
   return nz(t).split(" · ")[0].replace(/^.*?법무법인\s*정서[,\s]*/, "").replace(/^변호사\s*[가-힣]{2,4}\s+/, "")
@@ -455,8 +456,8 @@ export function titleMatch(fileName: string, title: string): boolean {
   return c.length >= 3 || (c.length >= 2 && c === b);
 }
 const addDays = (d: string, n: number) => new Date(Date.parse(d) + n * 864e5).toISOString().slice(0, 10);
-export function attachFinalFiles(events: any[], files: any[], none: Set<string> = new Set()) {
-  const docs = files.filter((f) => (f.pdf || DOC_RE.test(f.n)) && (f.lp != null || !CONTRACT_RE.test(f.n)));
+export function attachFinalFiles(events: any[], files: any[], none: Set<string> = new Set(), auto = true) {
+  const docs = files.filter((f) => (f.pdf || DOC_RE.test(f.n)) && (f.lp != null || (!CONTRACT_RE.test(f.n) && !JUDG_RE.test(f.n))));
   const used = new Set<number>();
   const picked = new Map<string, any>();
   for (const f of docs) if (f.lp != null && !picked.has(String(f.lp))) { picked.set(String(f.lp), f); used.add(f.id); }
@@ -465,13 +466,72 @@ export function attachFinalFiles(events: any[], files: any[], none: Set<string> 
     const m = picked.get(String(e.lp));
     if (m) { e.f = { id: m.id, n: m.n, pick: 1 }; continue; }
     if (isMinor(e.t)) { e.minor = 1; continue; }
-    if (none.has(String(e.lp))) continue;
+    if (none.has(String(e.lp))) { e.none = 1; continue; }
+    if (!auto) continue;
     const title = docTitle(e.t), lo = addDays(e.d, -TITLE_WINDOW_DAYS);
     const pool = docs.filter((f) => !used.has(f.id) && f.lp == null && f.d <= e.d && f.d >= lo && titleMatch(f.n, title))
       .sort((a, b) => b.at - a.at);
     if (pool[0]) { used.add(pool[0].id); e.f = { id: pool[0].id, n: pool[0].n, pick: 0 }; }
   }
   return events;
+}
+
+// 판결문(2026-11-18 석원): 파일 이름에 "판결"이 들어가면 그날이나 그 전 가장 가까운(60일 안) 선고 줄에 붙인다
+export const JUDG_RE = /판결/;
+const isVerdictLine = (e: any) => e.g === "hearing" && e.k !== "due" && /선고/.test(nz(e.t)) && !/연기|변경|취소|추정/.test(nz(e.t));
+export function attachJudgment(events: any[], files: any[]) {
+  const used = new Set(events.flatMap((e) => [e.f?.id, e.cf?.id]).filter((x) => x != null));
+  const lines = events.filter(isVerdictLine).sort((a, b) => b.d.localeCompare(a.d));
+  for (const f of files.filter((x) => JUDG_RE.test(x.n) && x.lp == null && !used.has(x.id)).sort((a, b) => b.at - a.at)) {
+    const e = lines.find((l) => l.d <= f.d && f.d <= addDays(l.d, 60));
+    if (e && !e.f) { e.f = { id: f.id, n: f.n, pick: 0 }; used.add(f.id); }
+  }
+  return events;
+}
+// 사건방 대화에서 뽑은 우리 제출 줄(수사 단계 등, 로웨어 줄 없음)에도 제목이 비슷한 파일을 붙인다 (2026-11-18 석원)
+//   선임계·선임신고서는 "선임"만 겹쳐도 짝으로 본다. 열람복사·정보공개청구 같은 줄은 붙이지 않는다.
+export function attachChatFiles(events: any[], files: any[]) {
+  const used = new Set(events.flatMap((e) => [e.f?.id, e.cf?.id]).filter((x) => x != null));
+  const docs = files.filter((f) => (f.pdf || DOC_RE.test(f.n)) && f.lp == null && !CONTRACT_RE.test(f.n) && !JUDG_RE.test(f.n));
+  const lines = events.filter((e) => e.src === "chat" && e.g === "ours" && !e.f).sort((a, b) => a.d.localeCompare(b.d));
+  for (const e of lines) {
+    const t = nz(e.t);
+    if (MINOR_RE.test(t)) continue;
+    const lo = addDays(e.d, -TITLE_WINDOW_DAYS), sel = /선임/.test(t);
+    const pool = docs.filter((f) => !used.has(f.id) && f.d <= e.d && f.d >= lo && (titleMatch(f.n, t) || (sel && /선임/.test(f.n))))
+      .sort((a, b) => b.at - a.at);
+    if (pool[0]) { used.add(pool[0].id); e.f = { id: pool[0].id, n: pool[0].n, pick: 0 }; }
+  }
+  return events;
+}
+
+// AI로 파일 붙이기: 기억된 판단을 먼저 붙이고, 새 파일·줄 목록이 바뀐 파일만 한 번에 묻는다. 결과는 case_file_match에
+export async function attachByAI(env: Env, events: any[], files: any[], chans: string[], title: string, fetcher: typeof fetch = fetch): Promise<boolean> {
+  if (!env.anthropicKey) return false;
+  const docs = files.filter((f) => (f.pdf || DOC_RE.test(f.n)) && f.lp == null && !CONTRACT_RE.test(f.n));
+  if (!docs.length) return true;
+  const lines = candidateLines(events, MINOR_RE);
+  const rows = await rest(env, `case_file_match?select=file_id,line_key,sig&file_id=in.(${docs.map((f) => Number(f.id)).join(",")})`, {}, fetcher);
+  const cache = new Map<number, MatchRow>((rows || []).map((r: any) => [Number(r.file_id), r]));
+  applyMatches(events, docs, cache, lines);
+  const pend = pendingFiles(docs, lines, cache, () => false);
+  if (!pend.length) return true;
+  const lo = new Date(Math.min(...pend.map((f) => f.at)) - 6 * 3600e3).toISOString();
+  const hi = new Date(Math.max(...pend.map((f) => f.at)) + 6 * 3600e3).toISOString();
+  const msgs = chans.length ? await rest(env, `room_msg?select=sent_at,text&channel_id=in.${enc(inList(chans))}&sent_at=gte.${enc(lo)}&sent_at=lte.${enc(hi)}&order=sent_at.asc&limit=200`, {}, fetcher).catch(() => []) : [];
+  const { user, lineIds, fileIds } = buildPrompt(title, lines, pend, (msgs || []).map((m: any) => ({ at: Date.parse(m.sent_at), text: nz(m.text) })));
+  const picks = await askMatch({ key: env.anthropicKey, model: env.fileModel }, user, fetcher);
+  const save: any[] = [];
+  for (const [fid, f] of fileIds) {
+    const p = picks.find((x) => x.file === fid);
+    const row = { file_id: Number(f.id), line_key: (p?.line && lineIds.get(p.line)) || null, sig: fileSig(f, lines), reason: nz(p?.why).slice(0, 300) || "답 없음",
+      model: env.fileModel || "claude-haiku-5-5", decided_at: new Date().toISOString() };
+    cache.set(row.file_id, row); save.push(row);
+  }
+  await rest(env, "case_file_match?on_conflict=file_id", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify(save) }, fetcher)
+    .catch((e) => console.log("file ai save fail", String(e).slice(0, 120)));
+  applyMatches(events, docs, cache, lines);
+  return true;
 }
 
 // 방 제목에서 사건번호 꺼내기 (OCR이 0을 O로 읽는 것까지)
@@ -675,9 +735,19 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       if (lvRows[curLv]) shaped.progress.rows = lvRows[curLv];
       const ourLps = shaped.events.filter((e: any) => e.k === "ours" && e.lp != null).map((e: any) => Number(e.lp)).filter(Number.isFinite);
       const noneRows = ourLps.length ? await rest(env, `case_file_none?select=lp_num&lp_num=in.(${ourLps.join(",")})`, {}, fetcher).catch(() => []) : [];
-      attachFinalFiles(shaped.events, files, new Set((noneRows || []).map((r: any) => String(r.lp_num))));
+      const noneSet = new Set<string>((noneRows || []).map((r: any) => String(r.lp_num)));
+      attachFinalFiles(shaped.events, files, noneSet, false);
       attachContract(shaped.events, files);
       mergeRoomEvents(shaped, chat, c.l_code);
+      // 파일을 붙일 줄은 AI가 고른다(2026-11-18 석원). AI를 못 쓰면 예전 이름 규칙으로
+      const aiOk = await attachByAI(env, shaped.events, files, chans, nz(c.l_name), fetcher)
+        .catch((e) => { console.log("file ai fail", String(e).slice(0, 160)); return false; });
+      if (!aiOk) {
+        for (const e of shaped.events) if (e.f?.ai) e.f = null;
+        attachFinalFiles(shaped.events, files, noneSet, true);
+        attachJudgment(shaped.events, files);
+        attachChatFiles(shaped.events, files);
+      }
       // 수사 단계 기한(R18~R20): 방 제목 괄호로 의뢰인 지위를 본다
       applyInvDeadlines(shaped, chat, roomTitle);
       if (linked.length) (shaped.info as any).merge = mergeRoles([{ code: nz(c.l_code), evs: evs || [] }, ...others], roomTitle);
