@@ -13,7 +13,7 @@
 //    { "action": "mycases" }                        → 내가 담당인 진행 사건 (고르기 화면용)
 //    { "action": "save_info", "lNum": 123, "fields": {...} } → 사건 정보 저장(case_info, 수정 기록 case_info_log)
 //    { "action": "file_open", "id": 12 }             → 사건방에 올린 서면 파일 열람 주소(5분짜리, 비공개 저장소 case-files)
-//    { "action": "set_file", "lNum": 1, "lp": 55, "id": 12 } → 타임라인 제출 줄에 붙을 파일을 직원이 직접 고름
+//    { "action": "set_file", "lNum": 1, "lp": 55, "id": 12 } → 타임라인 제출 줄에 붙을 파일을 직원이 직접 고름 (id 0 = 빼기)
 //    { "action": "locate" }                         → PC: 이 직원 PC 도우미에게 웍스 창 방 제목을 읽게 해서 지금 방을 찾음(최대 8초)
 //    { "action": "link_room", "room": "<방ID>", "case": "<사건번호>" } → 연결 안 된 방에 고른 사건 기억
 //    { "action": "remember_pick", "locate": 12, "case": "<사건번호>" } → PC 방 찾기에서 못 찾은 방: 고른 사건을 읽은 제목과 함께 기억
@@ -411,12 +411,12 @@ export function roomOnlyShape(title: string, rows: any[], today: string, myHeari
   return shaped;
 }
 
-// 최종 제출본 고르기 (석원 결정 2026-11-13: "규칙은 어쨌든 마지막 서면")
-//   로웨어에 "법무법인 정서 … 제출"(우리 서면)이 찍힌 날 D마다,
-//   그 날짜(D)에 방에 올라온 문서 파일 중 마지막 하나만 그 줄에 붙인다 (석원: "그 날짜 최종서면만").
-//   로웨어 제출 기록엔 시각이 없어서 "그날의 마지막"으로 본다. 초안·수정본은 화면에 내지 않는다.
-//   실시간일 필요 없음: 로웨어에 제출이 뜬 뒤 사건 화면을 열 때 계산된다.
-//   직원이 직접 고른 파일(lp_num)이 있으면 그것이 우선.
+// 최종 제출본 고르기 (석원 결정 2026-11-13 "규칙은 어쨌든 마지막 서면", 2026-11-18 보완)
+//   로웨어에 "법무법인 정서 … 제출"(우리 서면)이 찍힌 줄마다,
+//   제출일 D-7 ~ D 사이 방에 올라온 문서 파일 중 "파일 이름이 서면 제목과 비슷한" 마지막 하나만 붙인다.
+//   제목이 안 맞으면 아무것도 붙이지 않는다(2026-11-18 석원: 관계없는 파일이 붙으면 안 됨 → 날짜만 보고 붙이던 규칙 없앰).
+//   열람복사신청 같은 중요하지 않은 제출(MINOR_RE)은 파일을 붙이지 않는다.
+//   직원이 직접 고른 파일(lp_num)이 있으면 그것이 우선, 직원이 뺀 줄(case_file_none)은 비워 둔다.
 const DOC_RE = /\.(pdf|hwp|hwpx|doc|docx)$/i;
 // 계약서(석원 2026-11-13): 방에 올라온 파일 이름에 "계약"·"약정서"가 들어가면 서면 후보에서 빼고
 //   "사건 선임" 줄에 가장 최근 것 하나를 붙인다.
@@ -427,7 +427,35 @@ export function attachContract(events: any[], files: any[]) {
   if (acc && c) acc.cf = { id: c.id, n: c.n };
   return events;
 }
-export function attachFinalFiles(events: any[], files: any[]) {
+export const TITLE_WINDOW_DAYS = 7;
+// 중요하지 않은 제출: 방에 서면을 올리지 않는 서류 (석원 2026-11-18)
+export const MINOR_RE = /열람|복사|등사|기일\s*(변경|연기)|연기\s*신청|증명원|송달|주소\s*보정|영상\s*재판|중계|녹음|녹화/;
+// 로웨어 제출 줄 글 → 서면 제목 ("변호인 법무법인 정서 변호사 서고은 열람및복사신청 제출" → "열람및복사신청")
+export function docTitle(t: string): string {
+  return nz(t).split(" · ")[0].replace(/^.*?법무법인\s*정서[,\s]*/, "").replace(/^변호사\s*[가-힣]{2,4}\s+/, "")
+    .replace(/\s*제출\s*$/, "").trim();
+}
+export const isMinor = (t: string) => MINOR_RE.test(docTitle(t));
+const hangulOnly = (s: string) => s.replace(/\.[a-z0-9]{1,5}$/i, "").replace(/\([^)]*\)/g, "").replace(/[^가-힣]/g, "");
+const GENERIC = /^(신청서?|제출서?|요청서?|서면|최종|수정본?|초안|변호사|변호인|소송대리인|법무법인|정서|사건|의견)$/;
+function longestCommon(a: string, b: string): string {
+  let best = "";
+  for (let i = 0; i < a.length; i++) for (let j = i + best.length + 1; j <= a.length; j++) {
+    const sub = a.slice(i, j);
+    if (b.includes(sub)) best = sub; else break;
+  }
+  return best;
+}
+// 파일 이름과 서면 제목이 비슷한가: 한글 공통 부분이 3글자 이상(제목 전체가 2글자면 2글자), 흔한 말만 겹친 건 제외
+export function titleMatch(fileName: string, title: string): boolean {
+  const a = hangulOnly(nz(fileName)), b = hangulOnly(nz(title));
+  if (!a || !b) return false;
+  const c = longestCommon(b, a);
+  if (GENERIC.test(c)) return false;
+  return c.length >= 3 || (c.length >= 2 && c === b);
+}
+const addDays = (d: string, n: number) => new Date(Date.parse(d) + n * 864e5).toISOString().slice(0, 10);
+export function attachFinalFiles(events: any[], files: any[], none: Set<string> = new Set()) {
   const docs = files.filter((f) => (f.pdf || DOC_RE.test(f.n)) && (f.lp != null || !CONTRACT_RE.test(f.n)));
   const used = new Set<number>();
   const picked = new Map<string, any>();
@@ -436,7 +464,10 @@ export function attachFinalFiles(events: any[], files: any[]) {
   for (const e of ours) {
     const m = picked.get(String(e.lp));
     if (m) { e.f = { id: m.id, n: m.n, pick: 1 }; continue; }
-    const pool = docs.filter((f) => !used.has(f.id) && f.lp == null && f.d === e.d)
+    if (isMinor(e.t)) { e.minor = 1; continue; }
+    if (none.has(String(e.lp))) continue;
+    const title = docTitle(e.t), lo = addDays(e.d, -TITLE_WINDOW_DAYS);
+    const pool = docs.filter((f) => !used.has(f.id) && f.lp == null && f.d <= e.d && f.d >= lo && titleMatch(f.n, title))
       .sort((a, b) => b.at - a.at);
     if (pool[0]) { used.add(pool[0].id); e.f = { id: pool[0].id, n: pool[0].n, pick: 0 }; }
   }
@@ -642,7 +673,9 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
         lvRows[L.lv] = rows.slice(-600);
       }
       if (lvRows[curLv]) shaped.progress.rows = lvRows[curLv];
-      attachFinalFiles(shaped.events, files);
+      const ourLps = shaped.events.filter((e: any) => e.k === "ours" && e.lp != null).map((e: any) => Number(e.lp)).filter(Number.isFinite);
+      const noneRows = ourLps.length ? await rest(env, `case_file_none?select=lp_num&lp_num=in.(${ourLps.join(",")})`, {}, fetcher).catch(() => []) : [];
+      attachFinalFiles(shaped.events, files, new Set((noneRows || []).map((r: any) => String(r.lp_num))));
       attachContract(shaped.events, files);
       mergeRoomEvents(shaped, chat, c.l_code);
       // 수사 단계 기한(R18~R20): 방 제목 괄호로 의뢰인 지위를 본다
@@ -658,7 +691,7 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
         if (multi) (shaped as any).lvRows = lvRows;
       }
       // 직원이 줄마다 파일을 바꿀 때 고를 목록 (화면에 따로 나열하지 않음)
-      const fileChoices = files.map((f: any) => ({ id: f.id, n: f.n, d: f.d, tm: f.tm, by: f.by }));
+      const fileChoices = files.filter((f: any) => f.lp != null || !CONTRACT_RE.test(f.n)).map((f: any) => ({ id: f.id, n: f.n, d: f.d, tm: f.tm, by: f.by }));
       const stages = shapeStages(c, saved, stageLogs || []);
       return out({ ...shaped, fileChoices, stages, dispNo: stages.dispNo });
     }
@@ -680,16 +713,25 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
 
     if (body?.action === "set_file") {
       const lNum = String(body.lNum ?? ""), lp = Number(body.lp), id = Number(body.id);
-      if (!lNum || !Number.isFinite(lp) || !Number.isFinite(id) || id <= 0) return json({ error: "고를 파일이 없습니다" }, 400);
+      if (!lNum || !Number.isFinite(lp) || !Number.isFinite(id) || id < 0) return json({ error: "고를 파일이 없습니다" }, 400);
       const mine = await caseFiles(env, lNum, fetcher);
-      if (!mine.some((f: any) => f.id === id)) return json({ error: "이 사건 파일이 아닙니다" }, 404);
+      if (id > 0 && !mine.some((f: any) => f.id === id)) return json({ error: "이 사건 파일이 아닙니다" }, 404);
       const ev = await rest(env, `lw_process_events?select=lp_num&l_num=eq.${enc(lNum)}&lp_num=eq.${lp}&limit=1`, {}, fetcher);
       if (!ev?.length) return json({ error: "제출 기록이 없습니다" }, 404);
       const others = mine.filter((f: any) => f.lp === lp && f.id !== id).map((f: any) => f.id);
       if (others.length) await rest(env, `case_file?id=in.(${others.join(",")})`, { method: "PATCH", headers: { Prefer: "return=minimal" },
         body: JSON.stringify({ lp_num: null, pick_by: null, pick_at: null }) }, fetcher);
+      const by = who.name || who.userId;
+      if (id === 0) {
+        // 빼기: 이 줄은 파일 없이 둔다 (자동으로 다시 붙지 않게 기록)
+        await rest(env, "case_file_none?on_conflict=lp_num", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+          body: JSON.stringify({ lp_num: lp, l_num: lNum, pick_by: by, pick_at: new Date().toISOString() }) }, fetcher);
+        await logView(env, who, "unset_file:" + lp, "", { l_num: lNum, l_code: null }, fetcher);
+        return json({ ok: true });
+      }
       await rest(env, `case_file?id=eq.${id}`, { method: "PATCH", headers: { Prefer: "return=minimal" },
-        body: JSON.stringify({ lp_num: lp, pick_by: who.name || who.userId, pick_at: new Date().toISOString() }) }, fetcher);
+        body: JSON.stringify({ lp_num: lp, pick_by: by, pick_at: new Date().toISOString() }) }, fetcher);
+      await rest(env, `case_file_none?lp_num=eq.${lp}`, { method: "DELETE", headers: { Prefer: "return=minimal" } }, fetcher).catch(() => null);
       await logView(env, who, "set_file:" + id, "", { l_num: lNum, l_code: null }, fetcher);
       return json({ ok: true });
     }
