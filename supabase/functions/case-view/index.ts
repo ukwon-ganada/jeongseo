@@ -8,5 +8,6 @@ Deno.serve((req) =>
     anthropicKey: Deno.env.get("ANTHROPIC_API_KEY"),
     chatModel: Deno.env.get("ROOM_CHAT_MODEL") || undefined,
     refreshModel: Deno.env.get("TL_REFRESH_MODEL") || undefined,
+    fileModel: Deno.env.get("FILE_MATCH_MODEL") || undefined,
   })
 );
