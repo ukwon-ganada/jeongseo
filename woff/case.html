@@ -196,6 +196,23 @@ main{max-width:880px;margin:0 auto;padding:12px 16px 32px}
 .pg.hl{box-shadow:inset 3px 0 0 var(--accent)}
 .pg.dim{opacity:.45}
 .pg.plan .d{color:var(--due);font-weight:600}
+/* 파일 보기 창: 화면 전체, 왼쪽 위 ← 로 그대로 타임라인 */
+.fv{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;flex-direction:column}
+.fv[hidden]{display:none}
+html.fv-on,html.fv-on body{overflow:hidden}
+.fv-bar{flex:none;display:flex;align-items:center;gap:6px;height:52px;padding:0 8px;background:var(--surface);border-bottom:1px solid var(--line)}
+.fv-btn{flex:none;width:40px;height:40px;display:flex;align-items:center;justify-content:center;border:0;background:none;color:var(--ink);border-radius:10px;cursor:pointer}
+.fv-btn svg{width:22px;height:22px}
+.fv-btn:hover{background:var(--line2)}
+.fv-btn#fvext{color:var(--muted)}
+.fv-btn#fvext svg{width:19px;height:19px}
+.fv-name{flex:1;min-width:0;font-size:15px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fv-body{flex:1;overflow:auto;-webkit-overflow-scrolling:touch}
+.fv-pages{max-width:900px;margin:0 auto;padding:12px 0 40px;display:flex;flex-direction:column;align-items:center;gap:10px}
+.fv-pages canvas{display:block;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.12)}
+.fv-load{padding:80px 0;display:flex;justify-content:center}
+.fv-load span{width:26px;height:26px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--accent);animation:fvspin .8s linear infinite}
+@keyframes fvspin{to{transform:rotate(360deg)}}
 /* 타임라인 파일: 제목 옆 작은 칩(파일 이름은 마우스를 올리면) */
 .fchip{display:inline-flex;align-items:center;gap:3px;margin-left:6px;vertical-align:1px;border:1px solid var(--line);background:var(--surface);color:var(--accent-ink);border-radius:999px;padding:1px 7px 1px 6px;font-size:11px;font-weight:600;line-height:16px;cursor:pointer}
 .fchip svg{width:11px;height:11px;flex:none}
@@ -629,17 +646,104 @@ function tlFileChanges(){
   return out;
 }
 // 파일 열기: 서버가 5분짜리 열람 주소를 줌 → 휴대폰은 바깥 브라우저, PC는 새 탭
-function openFile(btn){
-  var inClient=false; try{ inClient=woff.isInClient(); }catch(e){}
-  var w = inClient ? null : window.open('', '_blank'); // PC: 팝업 차단을 피하려고 먼저 빈 탭을 엶
-  btn.disabled=true;
-  api({action:'file_open', id:Number(btn.dataset.file)}).then(function(j){
-    if(w){ w.location.href=j.url; }
-    else if(inClient && woff.openWindow){ woff.openWindow({url:j.url, external:true}); }
-    else location.href=j.url;
-  }).catch(function(e){ if(w) w.close(); toast('열지 못했습니다: '+((e&&e.message)||e)); })
-    .then(function(){ btn.disabled=false; });
+// 파일 보기(2026-11-18 석원: 연 뒤 돌아가기가 직관적이지 않고, 돌아가면 타임라인이 아님)
+//  PDF는 사건 화면 안의 보기 창에서 바로 보여 준다(PDF.js). 왼쪽 위 ← 또는 휴대폰 뒤로 가기 → 그대로 타임라인.
+//  한 번 연 파일은 열람 주소(5분)와 내려받은 내용을 기억해 다시 열 때 바로 뜬다. 첫 쪽부터 먼저 그린다.
+//  PDF가 아닌 파일(한글 등)은 예전처럼 바깥에서 연다.
+var PDFJS='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+var fv={el:null, id:null, run:0}, fvUrl={}, fvDoc={}, pdfLib=null;
+function loadPdfLib(){
+  if(pdfLib) return pdfLib;
+  pdfLib=new Promise(function(ok,no){
+    var s=document.createElement('script'); s.src=PDFJS+'pdf.min.js';
+    s.onload=function(){ window.pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS+'pdf.worker.min.js'; ok(window.pdfjsLib); };
+    s.onerror=function(){ pdfLib=null; no(new Error('보기 도구를 불러오지 못했습니다')); };
+    document.head.appendChild(s);
+  });
+  return pdfLib;
 }
+function fileUrl(id){
+  var c=fvUrl[id];
+  if(c && c.until>Date.now()) return Promise.resolve(c.url);
+  return api({action:'file_open', id:id}).then(function(j){ fvUrl[id]={url:j.url, until:Date.now()+240e3}; return j.url; });
+}
+function fileName(id){
+  var f=(data&&data.fileChoices||[]).find(function(x){ return x.id===id; });
+  if(f) return f.n;
+  var b=document.querySelector('[data-file="'+id+'"]'); return b ? (b.title||'') : '';
+}
+function openExternal(url){
+  var inClient=false; try{ inClient=woff.isInClient(); }catch(e){}
+  if(inClient && woff.openWindow) woff.openWindow({url:url, external:true});
+  else window.open(url,'_blank');
+}
+function openFile(btn){
+  var id=Number(btn.dataset.file), name=fileName(id);
+  if(name && !/\.pdf$/i.test(name)){
+    var inClient=false; try{ inClient=woff.isInClient(); }catch(e){}
+    var w = inClient ? null : window.open('', '_blank');
+    btn.disabled=true;
+    return fileUrl(id).then(function(u){ if(w) w.location.href=u; else openExternal(u); })
+      .catch(function(e){ if(w) w.close(); toast('열지 못했습니다: '+((e&&e.message)||e)); })
+      .then(function(){ btn.disabled=false; });
+  }
+  showViewer(id, name);
+}
+var BACK_SVG='<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.5 4.5 7 10l5.5 5.5"/></svg>';
+var EXT_SVG='<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 3.5h5.5V9"/><path d="M16.5 3.5 9 11"/><path d="M14 11.5v4a1 1 0 0 1-1 1H4.5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h4"/></svg>';
+function showViewer(id, name){
+  if(!fv.el){
+    fv.el=document.createElement('div'); fv.el.className='fv'; fv.el.hidden=true;
+    fv.el.innerHTML='<div class="fv-bar"><button class="fv-btn" id="fvback" aria-label="돌아가기">'+BACK_SVG+'</button><div class="fv-name"></div><button class="fv-btn" id="fvext" aria-label="바깥에서 열기">'+EXT_SVG+'</button></div><div class="fv-body"><div class="fv-pages"></div></div>';
+    document.body.appendChild(fv.el);
+  }
+  var run=++fv.run; fv.id=id;
+  fv.el.querySelector('.fv-name').textContent=name||'';
+  var pages=fv.el.querySelector('.fv-pages'); pages.innerHTML='<div class="fv-load"><span></span></div>';
+  fv.el.querySelector('.fv-body').scrollTop=0;
+  if(fv.el.hidden){ fv.el.hidden=false; document.documentElement.classList.add('fv-on'); try{ history.pushState({fv:1},''); }catch(e){} }
+  var docP=fvDoc[id];
+  if(!docP){
+    docP=fvDoc[id]=Promise.all([loadPdfLib(), fileUrl(id)]).then(function(r){ return r[0].getDocument({url:r[1], cMapUrl:PDFJS+'cmaps/', cMapPacked:true, standardFontDataUrl:PDFJS+'standard_fonts/'}).promise; });
+    docP.catch(function(){ delete fvDoc[id]; });
+    var keys=Object.keys(fvDoc); if(keys.length>4) delete fvDoc[keys[0]];
+  }
+  docP.then(function(doc){
+    if(run!==fv.run) return;
+    pages.innerHTML='';
+    var wCss=Math.min((pages.clientWidth||window.innerWidth)-16, 860), dpr=Math.min(window.devicePixelRatio||1, 2);
+    var n=0;
+    (function next(){
+      if(run!==fv.run || ++n>doc.numPages) return;
+      doc.getPage(n).then(function(pg){
+        if(run!==fv.run) return;
+        var v1=pg.getViewport({scale:1}), sc=wCss/v1.width, vp=pg.getViewport({scale:sc*dpr});
+        var cv=document.createElement('canvas'); cv.width=Math.floor(vp.width); cv.height=Math.floor(vp.height);
+        cv.style.width=Math.floor(v1.width*sc)+'px'; cv.style.height=Math.floor(v1.height*sc)+'px';
+        pages.appendChild(cv);
+        return pg.render({canvasContext:cv.getContext('2d'), viewport:vp}).promise;
+      }).then(next, next);
+    })();
+  }).catch(function(e){
+    if(run!==fv.run) return;
+    // 보기 창에서 못 그리면 바깥에서 연다
+    closeViewer();
+    fileUrl(id).then(openExternal).catch(function(){ toast('열지 못했습니다: '+((e&&e.message)||e)); });
+  });
+}
+function closeViewer(fromPop){
+  if(!fv.el || fv.el.hidden) return;
+  fv.run++; fv.el.hidden=true; document.documentElement.classList.remove('fv-on');
+  fv.el.querySelector('.fv-pages').innerHTML='';
+  if(!fromPop){ try{ if(history.state && history.state.fv) history.back(); }catch(e){} }
+}
+window.addEventListener('popstate', function(){ closeViewer(true); });
+document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeViewer(); });
+document.addEventListener('click', function(e){
+  var b=e.target.closest('button'); if(!b) return;
+  if(b.id==='fvback') closeViewer();
+  if(b.id==='fvext' && fv.id!=null){ fileUrl(fv.id).then(openExternal).catch(function(err){ toast('열지 못했습니다: '+((err&&err.message)||err)); }); }
+});
 function fmtTime(t){ if(!t) return ''; var d=new Date(Date.parse(t)+9*3600e3).toISOString(); return md(d.slice(0,10))+' '+d.slice(11,16); }
 
 // ── 지난 대화로 타임라인 채우기: 웍스에서 내보낸 대화(.txt) → AI 미리보기 → 고른 줄만 저장 ──
