@@ -1,5 +1,5 @@
 // 실행: deno test supabase/functions/case-view/shape_test.ts
-import { attachContract, byDay, earliestAccept, attachFinalFiles, caseNoVariants, caseNosIn, cleanPhones, infoFields, mergeMeets, ourFilingTest, shapeCase, smsGist } from "./handler.ts";
+import { attachChatFiles, attachJudgment, attachContract, byDay, earliestAccept, attachFinalFiles, caseNoVariants, caseNosIn, cleanPhones, infoFields, mergeMeets, ourFilingTest, shapeCase, smsGist } from "./handler.ts";
 function assert(c: unknown, m: string) { if (!c) throw new Error(m); }
 
 Deno.test("사건번호 후보", () => {
@@ -196,4 +196,25 @@ Deno.test("최종 서면: 제목이 비슷한 파일만, 중요하지 않은 제
   if (ev[1].f || !ev[1].minor) throw new Error("열람복사에 파일 " + JSON.stringify(ev[1]));
   if (ev[2].f) throw new Error("변호사 이름만 겹친 파일이 붙음 " + JSON.stringify(ev[2]));
   if (ev[3].f) throw new Error("뺀 줄에 다시 붙음");
+});
+
+Deno.test("판결문은 선고 줄에, 수사 방 대화 줄엔 선임신고서", () => {
+  // 2026노952(2026-11-18): 판결등본 줄이 아니라 선고 줄 / 정상우 방: 대화 줄 "선임계 우편 제출"
+  const ev: any[] = [
+    { d: "2026-11-17", k: "ours", g: "hearing", t: "선고기일 · 319호 법정" },
+    { d: "2026-11-18", k: "ours", g: "ours", t: "판결등본", lp: 76064 },
+    { d: "2026-11-18", k: "ours", g: "ours", t: "선임계 우편 제출(연수서)", src: "chat" },
+    { d: "2026-11-18", k: "ours", g: "ours", t: "고소장 정보공개청구", src: "chat" },
+  ];
+  const files = [
+    { id: 89, n: "이향원_판결문_2026노952.pdf", d: "2026-11-18", at: 5, pdf: 1, lp: null },
+    { id: 49, n: "변호인선임신고서_정상우.pdf", d: "2026-11-18", at: 3, pdf: 1, lp: null },
+  ];
+  attachFinalFiles(ev, files);
+  attachJudgment(ev, files);
+  attachChatFiles(ev, files);
+  if (ev[0].f?.id !== 89) throw new Error("선고 줄 " + JSON.stringify(ev[0]));
+  if (ev[1].f) throw new Error("판결등본 줄에 붙음");
+  if (ev[2].f?.id !== 49) throw new Error("선임계 줄 " + JSON.stringify(ev[2]));
+  if (ev[3].f) throw new Error("정보공개청구 줄에 붙음");
 });

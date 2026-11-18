@@ -52,6 +52,8 @@ const SYSTEM = [
   "날짜는 보낸 시각(한국 시간)을 기준으로 '내일', '다음 주 화요일' 같은 말을 실제 날짜로 바꾼다. 연도가 없으면 보낸 날 이후 가장 가까운 날로 본다.",
   "이미 일어난 일이면 state=완료, 앞으로의 일이면 state=예정.",
   "summary에는 사람 이름·전화번호·주민번호·주소를 넣지 않는다. 예: '인천논현서 피의자 조사', '고소장 제출(연수서)'.",
+  "'앞 글'과 '최근 올라온 파일'은 맥락으로만 쓴다. 일정은 '대화'(이번 글)에서만 뽑는다.",
+  "이번 글이 '우편제출완료하였습니다'처럼 무슨 서류인지 빠져 있으면 앞 글과 파일 이름을 보고 서류 이름을 summary에 적는다. 예: '선임계 우편 제출(연수서)', '의견서 제출(인천지검)'.",
   "골라낼 것이 없으면 events를 빈 배열로 한다. 확실하지 않으면 넣지 않는다.",
 ].join("\n");
 
@@ -74,10 +76,10 @@ export function cleanEvents(raw: unknown): RoomEvent[] {
   return out;
 }
 
-export async function extractEvents(env: ChatEnv, text: string, sentAt: string, roomTitle: string, fetcher: typeof fetch = fetch): Promise<RoomEvent[]> {
+export async function extractEvents(env: ChatEnv, text: string, sentAt: string, roomTitle: string, fetcher: typeof fetch = fetch, context = ""): Promise<RoomEvent[]> {
   if (!env.anthropicKey) throw new Error("ANTHROPIC_API_KEY 없음");
   const d = new Date(Date.parse(sentAt) + 9 * 3600e3);
-  const user = `보낸 시각(한국): ${KST(sentAt)} (${WEEK[d.getUTCDay()]}요일)\n방 제목: ${roomTitle || "(모름)"}\n\n대화:\n${text}`;
+  const user = `보낸 시각(한국): ${KST(sentAt)} (${WEEK[d.getUTCDay()]}요일)\n방 제목: ${roomTitle || "(모름)"}\n${context ? "\n" + context + "\n" : ""}\n대화:\n${text}`;
   const model = env.model || "claude-opus-5-5";
   const haiku = model.includes("haiku");
   const res = await fetcher("https://api.anthropic.com/v1/messages", {
@@ -123,6 +125,21 @@ async function keepText(env: ChatEnv, a: { channelId: string; text: string; user
   await r.body?.cancel();
 }
 
+// 짧은 답글("우편제출완료하였습니다")도 무슨 서류인지 알 수 있게: 같은 방 최근 이틀 글 6개 + 올라온 파일 이름 (2026-11-18 석원 사례)
+export async function recentContext(env: ChatEnv, channelId: string, sentAt: string, text: string, fetcher: typeof fetch = fetch): Promise<string> {
+  const ch = encodeURIComponent(channelId), from = encodeURIComponent(new Date(Date.parse(sentAt) - 2 * 864e5).toISOString()), to = encodeURIComponent(sentAt);
+  const [m, f] = await Promise.all([
+    rest(env, `room_msg?select=sent_at,text&channel_id=eq.${ch}&sent_at=gte.${from}&sent_at=lte.${to}&order=sent_at.desc&limit=8`, {}, fetcher),
+    rest(env, `case_file?select=file_name,posted_at&channel_id=eq.${ch}&posted_at=gte.${from}&posted_at=lte.${to}&file_name=not.is.null&order=posted_at.desc&limit=5`, {}, fetcher),
+  ]);
+  const msgs = m.ok ? await m.json() : (await m.body?.cancel(), []);
+  const files = f.ok ? await f.json() : (await f.body?.cancel(), []);
+  const prev = (msgs as any[]).filter((x) => String(x.text || "").trim() !== String(text || "").trim()).slice(0, 6).reverse()
+    .map((x) => `${KST(x.sent_at)} ${String(x.text || "").replace(/\n+/g, " ").slice(0, 200)}`);
+  const names = (files as any[]).map((x) => `${KST(x.posted_at)} ${String(x.file_name).slice(0, 80)}`);
+  return [prev.length ? "앞 글:\n" + prev.join("\n") : "", names.length ? "최근 올라온 파일:\n" + names.join("\n") : ""].filter(Boolean).join("\n\n");
+}
+
 // 방에 올라온 글 하나 처리: 수사 사건방이면 글 보관 → 낌새 확인 → AI → room_event 저장
 export async function handleRoomText(env: ChatEnv, a: { channelId: string; text: string; sentAt?: string; invOnly?: boolean; userId?: string }, fetcher: typeof fetch = fetch): Promise<{ saved: number; how: string }> {
   if (String(a.text || "").trim().length < 2) return { saved: 0, how: "no-cue" };
@@ -133,7 +150,8 @@ export async function handleRoomText(env: ChatEnv, a: { channelId: string; text:
   if (a.invOnly && !inv) return { saved: 0, how: "not-inv" };
   if (inv) await keepText(env, a, sentAt, fetcher);
   if (!looksLikeEvent(a.text)) return { saved: 0, how: "no-cue" };
-  const evs = await extractEvents(env, a.text.slice(0, 4000), sentAt, room?.room_title || "", fetcher);
+  const ctx = await recentContext(env, a.channelId, sentAt, a.text, fetcher).catch(() => "");
+  const evs = await extractEvents(env, a.text.slice(0, 4000), sentAt, room?.room_title || "", fetcher, ctx);
   if (!evs.length) return { saved: 0, how: "none" };
   const rows = evs.map((e) => ({
     channel_id: a.channelId, l_num: room?.status === "보류" ? null : room?.l_num ?? null,

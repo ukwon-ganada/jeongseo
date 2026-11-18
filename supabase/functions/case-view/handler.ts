@@ -429,7 +429,7 @@ export function attachContract(events: any[], files: any[]) {
 }
 export const TITLE_WINDOW_DAYS = 7;
 // 중요하지 않은 제출: 방에 서면을 올리지 않는 서류 (석원 2026-11-18)
-export const MINOR_RE = /열람|복사|등사|기일\s*(변경|연기)|연기\s*신청|증명원|송달|주소\s*보정|영상\s*재판|중계|녹음|녹화/;
+export const MINOR_RE = /열람|복사|등사|정보\s*공개|기일\s*(변경|연기)|연기\s*신청|증명원|송달|주소\s*보정|영상\s*재판|중계|녹음|녹화/;
 // 로웨어 제출 줄 글 → 서면 제목 ("변호인 법무법인 정서 변호사 서고은 열람및복사신청 제출" → "열람및복사신청")
 export function docTitle(t: string): string {
   return nz(t).split(" · ")[0].replace(/^.*?법무법인\s*정서[,\s]*/, "").replace(/^변호사\s*[가-힣]{2,4}\s+/, "")
@@ -456,7 +456,7 @@ export function titleMatch(fileName: string, title: string): boolean {
 }
 const addDays = (d: string, n: number) => new Date(Date.parse(d) + n * 864e5).toISOString().slice(0, 10);
 export function attachFinalFiles(events: any[], files: any[], none: Set<string> = new Set()) {
-  const docs = files.filter((f) => (f.pdf || DOC_RE.test(f.n)) && (f.lp != null || !CONTRACT_RE.test(f.n)));
+  const docs = files.filter((f) => (f.pdf || DOC_RE.test(f.n)) && (f.lp != null || (!CONTRACT_RE.test(f.n) && !JUDG_RE.test(f.n))));
   const used = new Set<number>();
   const picked = new Map<string, any>();
   for (const f of docs) if (f.lp != null && !picked.has(String(f.lp))) { picked.set(String(f.lp), f); used.add(f.id); }
@@ -468,6 +468,35 @@ export function attachFinalFiles(events: any[], files: any[], none: Set<string> 
     if (none.has(String(e.lp))) continue;
     const title = docTitle(e.t), lo = addDays(e.d, -TITLE_WINDOW_DAYS);
     const pool = docs.filter((f) => !used.has(f.id) && f.lp == null && f.d <= e.d && f.d >= lo && titleMatch(f.n, title))
+      .sort((a, b) => b.at - a.at);
+    if (pool[0]) { used.add(pool[0].id); e.f = { id: pool[0].id, n: pool[0].n, pick: 0 }; }
+  }
+  return events;
+}
+
+// 판결문(2026-11-18 석원): 파일 이름에 "판결"이 들어가면 그날이나 그 전 가장 가까운(60일 안) 선고 줄에 붙인다
+export const JUDG_RE = /판결/;
+const isVerdictLine = (e: any) => e.g === "hearing" && e.k !== "due" && /선고/.test(nz(e.t)) && !/연기|변경|취소|추정/.test(nz(e.t));
+export function attachJudgment(events: any[], files: any[]) {
+  const used = new Set(events.flatMap((e) => [e.f?.id, e.cf?.id]).filter((x) => x != null));
+  const lines = events.filter(isVerdictLine).sort((a, b) => b.d.localeCompare(a.d));
+  for (const f of files.filter((x) => JUDG_RE.test(x.n) && x.lp == null && !used.has(x.id)).sort((a, b) => b.at - a.at)) {
+    const e = lines.find((l) => l.d <= f.d && f.d <= addDays(l.d, 60));
+    if (e && !e.f) { e.f = { id: f.id, n: f.n, pick: 0 }; used.add(f.id); }
+  }
+  return events;
+}
+// 사건방 대화에서 뽑은 우리 제출 줄(수사 단계 등, 로웨어 줄 없음)에도 제목이 비슷한 파일을 붙인다 (2026-11-18 석원)
+//   선임계·선임신고서는 "선임"만 겹쳐도 짝으로 본다. 열람복사·정보공개청구 같은 줄은 붙이지 않는다.
+export function attachChatFiles(events: any[], files: any[]) {
+  const used = new Set(events.flatMap((e) => [e.f?.id, e.cf?.id]).filter((x) => x != null));
+  const docs = files.filter((f) => (f.pdf || DOC_RE.test(f.n)) && f.lp == null && !CONTRACT_RE.test(f.n) && !JUDG_RE.test(f.n));
+  const lines = events.filter((e) => e.src === "chat" && e.g === "ours" && !e.f).sort((a, b) => a.d.localeCompare(b.d));
+  for (const e of lines) {
+    const t = nz(e.t);
+    if (MINOR_RE.test(t)) continue;
+    const lo = addDays(e.d, -TITLE_WINDOW_DAYS), sel = /선임/.test(t);
+    const pool = docs.filter((f) => !used.has(f.id) && f.d <= e.d && f.d >= lo && (titleMatch(f.n, t) || (sel && /선임/.test(f.n))))
       .sort((a, b) => b.at - a.at);
     if (pool[0]) { used.add(pool[0].id); e.f = { id: pool[0].id, n: pool[0].n, pick: 0 }; }
   }
@@ -678,6 +707,8 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       attachFinalFiles(shaped.events, files, new Set((noneRows || []).map((r: any) => String(r.lp_num))));
       attachContract(shaped.events, files);
       mergeRoomEvents(shaped, chat, c.l_code);
+      attachJudgment(shaped.events, files);
+      attachChatFiles(shaped.events, files);
       // 수사 단계 기한(R18~R20): 방 제목 괄호로 의뢰인 지위를 본다
       applyInvDeadlines(shaped, chat, roomTitle);
       if (linked.length) (shaped.info as any).merge = mergeRoles([{ code: nz(c.l_code), evs: evs || [] }, ...others], roomTitle);

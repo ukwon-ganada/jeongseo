@@ -75,3 +75,17 @@ Deno.test("수사 사건방 글은 번호를 지우고 보관, 다른 방은 보
   await handleRoomText(env, { channelId: "c1", text: "네 알겠습니다", invOnly: true }, f);
   assertEquals(kept.length, 1);
 });
+
+Deno.test("짧은 답글도 앞 글·파일 이름을 함께 AI에 보냄(정상우 사례 2026-11-18)", async () => {
+  let prompt = "";
+  const f: typeof fetch = async (input, init) => {
+    const u = String(input);
+    if (u.includes("api.anthropic.com")) { prompt = JSON.parse(String(init!.body)).messages[0].content; return Response.json({ stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ events: [] }) }] }); }
+    if (u.includes("/works_room_case")) return Response.json([{ l_num: -100086, room_title: "시험", status: "대상" }]);
+    if (u.includes("/room_msg?select")) return Response.json([{ sent_at: "2026-11-18T07:55:00Z", text: "우편제출완료하였습니다" }, { sent_at: "2026-11-18T00:35:00Z", text: "선임신고서 우편제출하겠습니다" }]);
+    if (u.includes("/case_file?select")) return Response.json([{ file_name: "변호인선임신고서_홍길동.pdf", posted_at: "2026-11-18T00:32:00Z" }]);
+    return new Response(null, { status: 201 });
+  };
+  await handleRoomText({ sbUrl: "http://db", sbKey: "k", anthropicKey: "a" }, { channelId: "c1", text: "우편제출완료하였습니다", sentAt: "2026-11-18T07:55:00Z", invOnly: true }, f);
+  assertEquals([prompt.includes("선임신고서 우편제출하겠습니다"), prompt.includes("변호인선임신고서_홍길동.pdf"), prompt.split("우편제출완료하였습니다").length - 1], [true, true, 1]);
+});
