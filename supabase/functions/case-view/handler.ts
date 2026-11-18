@@ -563,11 +563,34 @@ async function logView(env: Env, who: WhoAmI, action: string, room: string, c: a
   } catch (e) { console.log("log fail", String(e).slice(0, 120)); }
 }
 
+// 이미 올라온 파일 전부 다시 맞추기(2026-11-18 석원 요청): 파일이 있는 방마다 사건 화면을 한 번씩 만들어 AI 판단을 채운다.
+//   예약 작업과 같은 열쇠(lw_settings.cron_secret)로만 부른다. 열람 기록에는 "자동 정리"로 남는다.
+async function fileBackfill(req: Request, env: Env, fetcher: typeof fetch): Promise<Response> {
+  const sec = (await rest(env, "lw_settings?select=value&key=eq.cron_secret", {}, fetcher).catch(() => []))?.[0]?.value;
+  if (!sec || req.headers.get("x-cron-secret") !== sec) return json({ error: "forbidden" }, 403);
+  const rows = await rest(env, "case_file?select=channel_id&status=eq.보관&channel_id=not.is.null&limit=2000", {}, fetcher) || [];
+  const rooms = [...new Set(rows.map((r: any) => nz(r.channel_id)).filter(Boolean))] as string[];
+  const token = "backfill-" + crypto.randomUUID();
+  WHO_CACHE.set(token, { who: { ok: true, status: 200, userId: "system-backfill", name: "자동 정리" }, until: Date.now() + 10 * 60_000 });
+  let ok = 0, fail = 0;
+  try {
+    for (let i = 0; i < rooms.length; i += 4) {
+      await Promise.all(rooms.slice(i, i + 4).map(async (room) => {
+        const r = await handle(new Request("http://local/", { method: "POST", headers: { "content-type": "application/json", "x-works-token": token },
+          body: JSON.stringify({ action: "case", room }) }), env, fetcher).catch(() => null);
+        if (r?.ok) ok++; else fail++;
+      }));
+    }
+  } finally { WHO_CACHE.delete(token); }
+  return json({ rooms: rooms.length, ok, fail });
+}
+
 export async function handle(req: Request, env: Env, fetcher: typeof fetch = fetch): Promise<Response> {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
   let body: any = {};
   try { body = await req.json(); } catch { /* 빈 몸 허용 */ }
+  if (body?.action === "file_backfill") return await fileBackfill(req, env, fetcher);
   const token = req.headers.get("x-works-token") || "";
   const who = await worksWhoAmI(token, fetcher);
   console.log("whoami", body?.action, who.ok, who.status, who.error ? who.error.slice(0, 80) : "");
