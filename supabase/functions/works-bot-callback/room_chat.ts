@@ -13,6 +13,8 @@
 export type ChatEnv = { sbUrl: string; sbKey: string; anthropicKey?: string; model?: string };
 export type RoomEvent = { kind: string; date: string; time: string | null; summary: string; state: "예정" | "완료" };
 
+// 시각을 남기는 종류(약속 시각이 있는 일). 나머지는 같은 날 같은 종류면 한 줄 (2026-11-19 재정신청서 세 줄)
+const APPT = new Set(["조사", "출석요구", "기일"]);
 export const KINDS = ["사건접수", "고소장제출", "조사", "출석요구", "송치", "처분", "기소", "기일", "서면제출", "기타"] as const;
 
 // 날짜·시각·수사 절차 낱말이 하나라도 있어야 AI에 보낸다
@@ -54,6 +56,9 @@ const SYSTEM = [
   "summary에는 사람 이름·전화번호·주민번호·주소를 넣지 않는다. 예: '인천논현서 피의자 조사', '고소장 제출(연수서)'.",
   "'앞 글'과 '최근 올라온 파일'은 맥락으로만 쓴다. 일정은 '대화'(이번 글)에서만 뽑는다.",
   "이번 글이 '우편제출완료하였습니다'처럼 무슨 서류인지 빠져 있으면 앞 글과 파일 이름을 보고 서류 이름을 summary에 적는다. 예: '선임계 우편 제출(연수서)', '의견서 제출(인천지검)'.",
+  "time은 조사·출석·재판 기일처럼 약속된 시각이 있을 때만 쓴다. 서면 제출·처분·접수 같은 일은 글을 보낸 시각을 쓰지 말고 null로 한다.",
+  "제출처(경찰서·공소청·법원 등)는 대화나 앞 글에 분명히 나올 때만 적는다. 짐작해서 '추정'·'불명'으로 적지 말고, 모르면 제출처 없이 '재정신청서 제출'처럼 쓴다.",
+  "'보내겠습니다'처럼 할 일이면 예정, '제출했습니다'·'발송 완료'처럼 끝난 일이면 완료로 한다. 같은 제출을 두고 여러 글이 오가도 한 일이다.",
   "골라낼 것이 없으면 events를 빈 배열로 한다. 확실하지 않으면 넣지 않는다.",
 ].join("\n");
 
@@ -155,12 +160,18 @@ export async function handleRoomText(env: ChatEnv, a: { channelId: string; text:
   if (!evs.length) return { saved: 0, how: "none" };
   const rows = evs.map((e) => ({
     channel_id: a.channelId, l_num: room?.status === "보류" ? null : room?.l_num ?? null,
-    kind: e.kind, ev_date: e.date, ev_time: e.time ?? "", summary: e.summary, state: e.state, msg_at: sentAt, source: "chat-ai",
+    kind: e.kind, ev_date: e.date, ev_time: APPT.has(e.kind) ? e.time ?? "" : "", summary: e.summary, state: e.state, msg_at: sentAt, source: "chat-ai",
   }));
   const ins = await rest(env, "room_event?on_conflict=channel_id,kind,ev_date,ev_time", {
     method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=minimal" }, body: JSON.stringify(rows),
   }, fetcher);
   if (!ins.ok) throw new Error("room_event 저장 실패 " + ins.status + " " + (await ins.text()).slice(0, 120));
   await ins.body?.cancel();
+  // 같은 날 같은 일이 '예정'으로 먼저 들어와 있으면, 끝났다는 글이 왔을 때 그 줄을 '완료'로 바꾼다
+  for (const r of rows.filter((x) => x.state === "완료")) {
+    const q = `room_event?channel_id=eq.${encodeURIComponent(r.channel_id)}&kind=eq.${encodeURIComponent(r.kind)}&ev_date=eq.${r.ev_date}&ev_time=eq.${encodeURIComponent(r.ev_time)}&state=eq.${encodeURIComponent("예정")}&source=eq.chat-ai`;
+    const up = await rest(env, q, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ state: "완료", summary: r.summary, msg_at: sentAt }) }, fetcher);
+    await up.body?.cancel();
+  }
   return { saved: rows.length, how: "ai" };
 }

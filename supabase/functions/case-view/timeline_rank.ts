@@ -88,7 +88,7 @@ export function rankEvents(events: any[]) {
 //   화면에서만 합친다. 저장된 줄은 그대로라 [수정]에서 다시 볼 수 있다.
 const DOCS: [string, RegExp][] = [
   ["선임계", /선임계|선임\s*신고|선임서|변호인\s*선임/], ["고소장", /고소장/], ["고발장", /고발장/],
-  ["의견서", /의견서/], ["이의신청서", /이의\s*신청서?/], ["항고장", /항고장/], ["항소장", /항소장/], ["상고장", /상고장/],
+  ["의견서", /의견서/], ["이의신청서", /이의\s*신청서?/], ["항고장", /항고장/], ["재정신청서", /재정\s*신청서?/], ["재항고장", /재항고/], ["항소장", /항소장/], ["상고장", /상고장/],
   ["항소이유서", /항소\s*(보충\s*)?이유서/], ["상고이유서", /상고\s*이유서/], ["참고자료", /참고\s*자료/], ["탄원서", /탄원서/],
   ["합의서", /합의서/], ["변론요지서", /변론\s*요지서/], ["정식재판청구", /정식\s*재판\s*청구/], ["취하서", /취하서/],
   ["판결문", /판결\s*(문|등본|정본)/], ["정보공개", /정보\s*공개/], ["열람복사", /열람|복사|등사/],
@@ -113,8 +113,11 @@ const DEC_WORDS: [string, RegExp][] = [["불송치", /불송치/], ["송치", /(
   ["약식명령", /약식\s*명령/], ["선고", /선고/], ["보완수사", /보완\s*수사/], ["기각", /기각/], ["각하", /각하/], ["확정", /확정/]];
 const decOf = (t: string) => DEC_WORDS.filter(([, re]) => re.test(t)).map(([k]) => k).sort().join("+");
 const dayDiff = (a: string, b: string) => (Date.parse(b) - Date.parse(a)) / 864e5;
+const GUESS = /추정|불명|미상/;
 const better = (a: any, b: any) => {
-  const sa = (a.src === "chat" ? 0 : 2) + (a.f ? 1 : 0), sb = (b.src === "chat" ? 0 : 2) + (b.f ? 1 : 0);
+  // 나의사건 줄 > 이미 한 일(예정 아님) > 파일 있는 줄 > 긴 줄
+  const sc = (x: any) => (x.src === "chat" ? 0 : 4) + (x.k === "due" ? 0 : 2) + (x.f ? 1 : 0);
+  const sa = sc(a), sb = sc(b);
   if (sa !== sb) return sa > sb ? a : b;
   return nz(a.t).length >= nz(b.t).length ? a : b;
 };
@@ -148,9 +151,14 @@ export function dedupeEvents(events: any[]): any[] {
       const prev = seen.get(key);
       if (!prev) { seen.set(key, e); continue; }
       const oa = orgsOf(body(prev.t)), ob = orgsOf(t);
-      if (oa.size && ob.size && ![...oa].some((o) => ob.has(o))) continue;
+      // 제출처가 달라도 AI가 짐작한 곳(추정·불명)이거나 한쪽이 '예정'이면 같은 제출로 본다 (2026-11-19 재정신청서 세 줄)
+      const loose = GUESS.test(body(prev.t)) || GUESS.test(t) || prev.k === "due" || e.k === "due";
+      if (!loose && oa.size && ob.size && ![...oa].some((o) => ob.has(o))) continue;
       const keep = better(prev, e), gone = keep === prev ? e : prev;
       merge(keep, gone); seen.set(key, keep);
+      // 남긴 줄의 제출처가 짐작이면, 짐작 아닌 줄의 내용으로
+      const sure = [keep, gone].find((x) => !GUESS.test(body(x.t)));
+      if (GUESS.test(body(keep.t)) && sure) keep.t = (nz(keep.t).match(TIME)?.[0] || "") + body(sure.t);
       if (act === "선임") { keep.t = "사건 선임"; keep.g = "accept"; }
     }
     // 그날 실행된 일의 지시는 숨김
