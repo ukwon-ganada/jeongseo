@@ -711,7 +711,9 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       const myHearings = mine.filter((m: any) => isDate(m.next_date) && m.next_date.slice(0, 10) >= today && m.next_date.slice(0, 10) <= end)
         .map((m: any) => ({ c: m.l_code, d: m.next_date.slice(0, 10), tm: nz(m.next_time), t: nz(m.next_contents) || "기일", p: nz(m.court) }));
       const others: OtherCase[] = (relCases || []).filter((x: any) => x.l_code).map((x: any) => ({ code: nz(x.l_code), evs: (relEvs || []).filter((e: any) => String(e.l_num) === String(x.l_num)) }));
-      const shaped = shapeCase(c, evs || [], { today, linked, myHearings, status, saved, others });
+      // 병합 이유서 규칙(R21~R23)은 같은 심급 사건끼리만: 2심 사건이 1심 병합결정을 보고 "병합됨"이 되지 않게 (박큰별 2026-11-19)
+      const sameLv = others.filter((o) => levelOf(o.code) === levelOf(nz(c.l_code)));
+      const shaped = shapeCase(c, evs || [], { today, linked, myHearings, status, saved, others: sameLv });
       shaped.progress.checked = checked;
       const titles = (titleRows || []) as any[];
       const roomTitle = nz(titles[0]?.room_title);
@@ -735,6 +737,8 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
         // 이 심급 기록이 시작되기 전 날짜의 선임 줄은 아랫심급 선임이므로 이 심급 줄로 두지 않는다
         if (acc && levels[0].lv < curLv && curL?.start && acc.d < curL.start) shaped.events = shaped.events.filter((e: any) => e !== acc);
         else if (acc && levels[0].lv < curLv) acc.t = (curL?.label || "") + " 선임";
+        // 로웨어가 윗심급 사건에 옮겨 적은 아랫심급 선고일(l_judgment_date) 같은 줄: 이 심급 시작 전 날짜면 그날의 심급으로
+        if (curL?.start) for (const e of shaped.events) if (e.lv === curLv && e.d && e.d < curL.start) e.lv = lvByDate(levels, e.d);
         for (const x of relList) {
           const lv = levelOf(nz(x.rc.l_code));
           if (lv >= curLv) continue;
