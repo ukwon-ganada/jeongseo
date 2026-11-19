@@ -70,3 +70,16 @@ Deno.test("괄호 속 메모의 '재정신청'은 처분 종류로 보지 않는
   ], "(형/고소)이강효", "2026-11-16");
   assertEquals(l.map((x) => [x.t, x.d]), [["재정신청 마감", "2026-11-23"], ["재항고 마감 (재정신청 못 하는 경우)", "2026-12-14"]]);
 });
+
+Deno.test("약식명령 → 정식재판청구 7일 (피고인 쪽만), 청구서 제출하면 끝", () => {
+  const r = [
+    { kind: "처분", ev_date: "2026-09-09", summary: "약식명령 결정 (청구마감 9.16.)", source: "chat-export" },
+    { kind: "기타", ev_date: "2026-08-20", summary: "벌금 50만원 약식기소 확인", source: "chat-export" },
+  ];
+  const l = computeInvDeadlines(r, "(형/피의)이름_사기", "2026-09-10");
+  assertEquals(l.map((x) => [x.kind, x.d, x.st]), [["정식재판청구", "2026-09-16", "open"]]);
+  assertEquals(computeInvDeadlines(r, "(형/고소)이름_사기", "2026-09-10").length, 0);
+  const done = computeInvDeadlines([...r, { kind: "서면제출", ev_date: "2026-09-14", summary: "정식재판청구서 제출" }], "(형/피의)", "2026-09-15");
+  assertEquals(done[0].st, "done");
+  assertEquals(/피고인 여부/.test(computeInvDeadlines(r, "이름 사건", "2026-09-10")[0].why), true);
+});

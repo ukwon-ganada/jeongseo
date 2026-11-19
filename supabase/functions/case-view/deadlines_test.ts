@@ -89,3 +89,24 @@ Deno.test("병합 본 사건 가리기", () => {
   assertEquals(mergeRoles([{ code: "2026노1", evs: [] }, { code: "2026노2", evs: [] }]), null);
   assertEquals(mergeRoles([a]), null);
 });
+
+Deno.test("공소장 부본 도달 + 7일 → 공소사실 의견서, 합의부면 국민참여재판 의사확인서도", () => {
+  const evs = [
+    { lp_set: "송달", lp_appoint_date: "2026-06-11", lp_contents: "피고인1  강OO 공소장부본/의견서/국민참여재판의사확인서/안내서 발송", delivered_date: "2026-06-17" },
+    { lp_set: "송달", lp_appoint_date: "2026-06-11", lp_contents: "검사 김OO 공소장변경허가신청서부본 발송", delivered_date: "2026-06-12" },
+    { lp_set: "송달", lp_appoint_date: "2026-06-20", lp_contents: "피고인2  이OO 공소장부본/의견서 발송", delivered_date: "2026-06-12" },
+    { lp_set: "송달", lp_appoint_date: "2026-06-20", lp_contents: "피고인1 변호인  법무법인 정서 공소장부본/공판기일통지서 발송", delivered_date: "2026-06-22" },
+  ];
+  const ours = [...evs, { lp_set: "서면", lp_appoint_date: "2026-06-25", lp_contents: "피고인1 변호인 법무법인 정서 의견서 제출" }];
+  const l = computeDeadlines("2026고합100", evs, "2026-06-18");
+  assertEquals(l.map((x) => [x.t, x.d, x.st]), [["공소사실 의견서·국민참여재판 의사확인서 마감", "2026-06-24", "open"]]);
+  assertEquals(computeDeadlines("2026고합100", ours, "2026-06-30")[0].st, "done");
+  assertEquals(computeDeadlines("2026노100", evs, "2026-06-18").some((x) => x.kind === "의견서"), false);
+  const notYet = computeDeadlines("2026고단5", [{ lp_set: "송달", lp_appoint_date: "2026-06-11", lp_contents: "피고인1  김OO 공소장부본/국선변호인선정을위한고지/의견서 발송", delivery_status: "폐문부재" }], "2026-06-18");
+  assertEquals(notYet.map((x) => [x.t, x.st]), [["공소사실 의견서 마감", "expected"]]);
+});
+
+Deno.test("공소장 의견서 기한이 내지 않은 채 지났으면 빼기", () => {
+  const evs = [{ lp_set: "송달", lp_appoint_date: "2025-06-11", lp_contents: "피고인1  강OO 공소장부본/의견서 발송", delivered_date: "2025-06-17" }];
+  assertEquals(computeDeadlines("2025고단100", evs, "2026-06-18").length, 0);
+});

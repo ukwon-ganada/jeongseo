@@ -266,6 +266,9 @@ html.fv-on,html.fv-on body{overflow:hidden}
 .stg span{font-size:12px;padding:4px 10px;border-radius:999px;background:var(--line2);color:var(--muted)}
 .stg span.done{color:var(--ink2)}
 .stg span.now{background:var(--g-hearing);color:#fff;font-weight:700}
+.disp{display:flex;gap:6px;flex-wrap:wrap}
+.disp b{font-size:13px;font-weight:800;border-radius:6px;padding:3px 9px;background:var(--g-hearing-t);color:var(--g-hearing)}
+.disp b.neg{background:var(--line2);color:var(--ink2);font-weight:700}
 .now-pill{font-size:11px;font-weight:700;color:#fff;background:var(--g-hearing);border-radius:999px;padding:3px 8px;margin-left:4px;vertical-align:1px}
 .card.cur{}
 .card.past .card-h{padding-bottom:14px}
@@ -568,19 +571,22 @@ var VIEWS = {
         b+='<div class="fr"><span class="l">선임 단계</span><div style="grid-column:2/4"><select id="st-start">'+opt(S.start)+'</select></div></div>'
           +'<div class="fr"><span class="l">지금 단계</span><div style="grid-column:2/4"><select id="st-cur">'+opt(S.cur)+'</select></div></div>';
       } else {
+        var act=S.act||[];
         b+='<div class="fr"><span class="l">진행 단계</span><div class="stg">'+SK.map(function(k,i){
           if(i<si) return '';
-          return '<span class="'+(i<ci?'done':i===ci?'now':'')+'">'+SL[k]+(i<ci?' ✓':'')+'</span>';
+          var now=i===ci||act.indexOf(k)>=0, done=i<ci&&!now;
+          return '<span class="'+(done?'done':now?'now':'')+'">'+SL[k]+(done?' ✓':'')+'</span>';
         }).join('')+'</div></div>';
       }
     }
     out+=b+close();
     // 단계 칸: 지금 단계 먼저, 지난 단계는 접힌 줄로 아래에
     if(S){
-      var ci2=SK.indexOf(S.cur), si2=SK.indexOf(S.start), nowCard='', pastCards='';
+      var ci2=SK.indexOf(S.cur), si2=SK.indexOf(S.start), nowCard='', pastCards='', act2=S.act||[];
       S.list.forEach(function(x,i){
-        if(i<si2||i>ci2) return;
-        var defs=SF[x.key]||SF.court, past=i<ci2;
+        var inAct=act2.indexOf(x.key)>=0;
+        if(i<si2||(i>ci2&&!inAct)) return;
+        var defs=SF[x.key]||SF.court, past=i<ci2&&!inAct;
         cur='st:'+x.key;
         var isOpen=!past||stOpen[x.key]||ed();
         var h=open('stc'+(past?' past':' cur'));
@@ -591,6 +597,10 @@ var VIEWS = {
           h+='<div class="card-h"><span>'+title+(sum?'<span class="sum">'+esc(sum)+'</span>':'')+'</span><span class="hb">'+fold+'</span></div>';
         } else {
           h+=head(title, fold);
+          if(x.key==='police'||x.key==='pros'){
+            if(ed()) h+='<div class="fr"><span class="l">처분</span><div style="grid-column:2/4"><input data-sk="'+x.key+'.disp" data-auto="'+esc(x.dispAuto||'')+'" value="'+esc(x.disp||'')+'"></div></div>';
+            else if(x.disp) h+='<div class="fr"><span class="l">처분</span><span class="v disp">'+x.disp.split(/\s*·\s*/).map(function(t){ return '<b'+(/불송치|불기소|각하|기소유예|수사중지/.test(t)?' class="neg"':'')+'>'+esc(t)+'</b>'; }).join('')+'</span><span></span></div>';
+          }
           h+=defs.map(function(d){
             var v=x[d[0]]||'', o=d[2]||{};
             if(ed()) return '<div class="fr"><span class="l">'+d[1]+'</span><div style="grid-column:2/4"><input data-sk="'+x.key+'.'+d[0]+'" value="'+esc(v)+'"'+(o.tel?' inputmode="tel"':'')+'></div></div>';
@@ -601,7 +611,7 @@ var VIEWS = {
           h+=prevRows(x, defs);
         }
         h+=close();
-        if(past) pastCards=h+pastCards; else nowCard=h;
+        if(past) pastCards=h+pastCards; else nowCard+=h;
       });
       out+='<div class="a-s">'+nowCard+pastCards+'</div>';
     } else {
@@ -932,7 +942,7 @@ function saveInfo(btn){
   }
   var body={action:'save_info', lNum:data.lNum, fields:fields};
   if(data.stages){
-    var st={}; box.querySelectorAll('[data-sk]').forEach(function(el){ var p=el.dataset.sk.split('.'); (st[p[0]]=st[p[0]]||{})[p[1]]=el.value.trim(); });
+    var st={}; box.querySelectorAll('[data-sk]').forEach(function(el){ var p=el.dataset.sk.split('.'), v=el.value.trim(); if(el.dataset.auto!=null&&v===el.dataset.auto) v=''; (st[p[0]]=st[p[0]]||{})[p[1]]=v; });
     box.querySelectorAll('.pvbox').forEach(function(pb){ var k=pb.dataset.st, list=[];
       pb.querySelectorAll('.pv').forEach(function(r){ var o={}, any=false; r.querySelectorAll('[data-pf]').forEach(function(el){ o[el.dataset.pf]=el.value.trim(); if(o[el.dataset.pf]) any=true; }); if(any) list.push(o); });
       (st[k]=st[k]||{}).prev=list; });

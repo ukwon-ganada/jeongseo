@@ -46,6 +46,8 @@ import { computeDeadlines, deadlineEvents, mergeRoles, type OtherCase } from "./
 import { findPick, normTitle } from "./title_match.ts";
 import { dropKnown, extractFromExport, msgsToExport, toRows } from "./chat_import.ts";
 import { shapeStages, diffStages, personChangeLine, isStage } from "./stages.ts";
+// 방 제목 형제번호로 공소청 칸 채우기(2026-11-19): 바뀌는 방 목록을 석원님이 확인한 뒤 켠다
+const TITLE_PROS = false;
 import { applyInvDeadlines } from "./inv_deadlines.ts";
 import { buildLevels, levelOf, lvByDate, shortNo } from "./levels.ts";
 import { applyMatches, askMatch, buildPrompt, candidateLines, fileSig, pendingFiles, type MatchRow } from "./file_ai.ts";
@@ -762,7 +764,7 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       }
       // 직원이 줄마다 파일을 바꿀 때 고를 목록 (화면에 따로 나열하지 않음)
       const fileChoices = files.filter((f: any) => f.lp != null || !CONTRACT_RE.test(f.n)).map((f: any) => ({ id: f.id, n: f.n, d: f.d, tm: f.tm, by: f.by }));
-      const stages = shapeStages(c, saved, stageLogs || []);
+      const stages = shapeStages(c, saved, stageLogs || [], TITLE_PROS ? roomTitle : "", chat || []);
       return out({ ...shaped, fileChoices, stages, dispNo: stages.dispNo });
     }
 
@@ -878,8 +880,12 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       const row: Record<string, unknown> = { l_num: lNum, case_no: c.l_code, ...next, updated_by: who.name, updated_by_id: who.userId, updated_at: now };
       const logRows: any[] = changed.map((k) => ({ l_num: lNum, field: k, old_value: prev[k] ?? null, new_value: next[k], editor: who.name, editor_id: who.userId }));
       let stageChanges: any[] = [];
+      // 공소청 칸(방 제목)·처분(사건방 처분 줄)을 화면과 같게 계산하려고
+      const myRooms = await rest(env, `works_room_case?select=channel_id,room_title&l_num=eq.${lNum}&order=is_primary.desc`, {}, fetcher).catch(() => []) || [];
+      const roomTitle = nz(myRooms.find((r: any) => nz(r.room_title))?.room_title);
+      const stageRows = await roomEvents(env, String(lNum), [...new Set(myRooms.map((r: any) => nz(r.channel_id)).filter(Boolean))] as string[], fetcher).catch(() => []);
       if (body.stages && typeof body.stages === "object") {
-        const d = diffStages(c, prevRow, body.stages);
+        const d = diffStages(c, prevRow, body.stages, TITLE_PROS ? roomTitle : "");
         row.stages = d.stages;
         row.cur_stage = isStage(body.cur) ? body.cur : null;
         row.start_stage = isStage(body.start) ? body.start : null;
@@ -904,7 +910,7 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       await logView(env, who, "save_info", "", c, fetcher);
       const logs = await rest(env, `case_info_log?select=field,old_value,new_value,editor,edited_at&l_num=eq.${lNum}&field=like.stage.*&order=edited_at.desc&limit=300`, {}, fetcher).catch(() => []);
       const savedNow = { ...prev, ...row };
-      const stages = shapeStages(c, savedNow, logs || []);
+      const stages = shapeStages(c, savedNow, logs || [], TITLE_PROS ? roomTitle : "", stageRows || []);
       return json({ ok: true, changed: changed.length + stageChanges.length, ...infoFields(c, { ...next, updated_by: who.name, updated_at: now }), stages, dispNo: stages.dispNo });
     }
     if (body?.action === "chat_import_preview" || body?.action === "chat_import_save") {
