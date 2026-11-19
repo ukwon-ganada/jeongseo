@@ -69,6 +69,8 @@ export function rankEvents(events: any[]) {
     if (ones.some((x) => x >= d - 30 * 864e5 && x <= d + 3 * 864e5)) continue;
     e.w = 1; ones.push(d);
   }
+  const kept = dedupeEvents(events);
+  events.length = 0; events.push(...kept);
   events.sort((a, b) => {
     const d = nz(a.d).localeCompare(nz(b.d));
     if (d) return d;
@@ -77,4 +79,114 @@ export function rankEvents(events: any[]) {
     return sameDayStep(a) - sameDayStep(b) || (idx.get(a)! - idx.get(b)!);
   });
   return events;
+}
+
+// ── 같은 일 여러 줄 합치기 (2026-11-19 석원 "중복 이벤트는 알아서", "선고·선고기일·선고 모두 선고 하나")
+//   화면에서만 합친다. 저장된 줄은 그대로라 [수정]에서 다시 볼 수 있다.
+const DOCS: [string, RegExp][] = [
+  ["선임계", /선임계|선임\s*신고|선임서|변호인\s*선임/], ["고소장", /고소장/], ["고발장", /고발장/],
+  ["의견서", /의견서/], ["이의신청서", /이의\s*신청서?/], ["항고장", /항고장/], ["항소장", /항소장/], ["상고장", /상고장/],
+  ["항소이유서", /항소\s*(보충\s*)?이유서/], ["상고이유서", /상고\s*이유서/], ["참고자료", /참고\s*자료/], ["탄원서", /탄원서/],
+  ["합의서", /합의서/], ["변론요지서", /변론\s*요지서/], ["정식재판청구", /정식\s*재판\s*청구/], ["취하서", /취하서/],
+  ["판결문", /판결\s*(문|등본|정본)/], ["정보공개", /정보\s*공개/], ["열람복사", /열람|복사|등사/],
+];
+const ORG_RE = /[가-힣]+(경찰서|경찰청|공소청|지검|지청|검찰청|지방법원|법원|지원|수사센터)/g;
+const orgsOf = (t: string) => new Set((t.match(ORG_RE) || []).map((x) => x.replace(/^(서울|인천|경기|광주|대전|부산|대구|울산)?/, "")));
+function actOf(e: any, t: string): string {
+  if (/^지시/.test(t)) return "지시";
+  if (/도착|송달\s*완료/.test(t)) return "도착";
+  if (/결과\s*(수령|받)|수령|받음/.test(t)) return "수령";
+  if (/정보\s*공개|열람|복사|등사/.test(t)) return "신청";
+  if (/조사/.test(t) && !/제출|송부/.test(t)) return "조사:" + ((t.match(/피의자|고소인|참고인|대질/) || [""])[0]);
+  if (/접견|면회/.test(t) || e.g === "meet") return "접견";
+  if (e.g === "hearing" && /선고/.test(t)) return "선고";
+  if (e.g === "hearing" && /기일/.test(t)) return "기일";
+  if (/제출|송부|우편|팩스|접수|재제출/.test(t) || e.g === "ours") return "제출";
+  if (/사건\s*선임|수임|신건/.test(t) || e.g === "accept") return "선임";
+  return "";
+}
+const docsOf = (t: string) => DOCS.filter(([, re]) => re.test(t)).map(([k]) => k).sort().join("+");
+const DEC_WORDS: [string, RegExp][] = [["불송치", /불송치/], ["송치", /(^|[^불])송치/], ["불기소", /불기소|혐의\s*없음|기소\s*유예/], ["기소", /(^|[^불])기소|구공판|구약식|공소\s*제기/],
+  ["약식명령", /약식\s*명령/], ["선고", /선고/], ["보완수사", /보완\s*수사/], ["기각", /기각/], ["각하", /각하/], ["확정", /확정/]];
+const decOf = (t: string) => DEC_WORDS.filter(([, re]) => re.test(t)).map(([k]) => k).sort().join("+");
+const dayDiff = (a: string, b: string) => (Date.parse(b) - Date.parse(a)) / 864e5;
+const better = (a: any, b: any) => {
+  const sa = (a.src === "chat" ? 0 : 2) + (a.f ? 1 : 0), sb = (b.src === "chat" ? 0 : 2) + (b.f ? 1 : 0);
+  if (sa !== sb) return sa > sb ? a : b;
+  return nz(a.t).length >= nz(b.t).length ? a : b;
+};
+const extraOf = (t: string) => ((t.match(/\(([^()]*)\)\s*$/) || [])[1] || "").trim();
+
+export function dedupeEvents(events: any[]): any[] {
+  const drop = new Set<any>();
+  const live = () => events.filter((e) => !drop.has(e) && e?.g !== "limit");
+  const merge = (keep: any, gone: any) => {
+    drop.add(gone);
+    if (!keep.f && gone.f) keep.f = gone.f;
+    if (keep.w != null && gone.w != null && gone.w < keep.w) keep.w = gone.w;
+    const x = extraOf(body(gone.t));
+    if (x && !nz(keep.t).includes(x) && !/경찰서|공소청|지청|지검|법원|변호사/.test(x) && keep.g === "hearing") keep.t = nz(keep.t) + " · " + x;
+  };
+  // 1) 같은 날 같은 일: 선고·처분·기일·조사·접견·같은 서류 제출
+  const byDay = new Map<string, any[]>();
+  for (const e of live()) (byDay.get(nz(e.d)) || byDay.set(nz(e.d), []).get(nz(e.d))!).push(e);
+  for (const list of byDay.values()) {
+    const seen = new Map<string, any>();
+    for (const e of list) {
+      const t = body(e.t), act = actOf(e, t);
+      if (!act || act === "지시") continue;
+      let key = "";
+      if (e.w === 1) key = "결과:" + (act === "선고" || /선고/.test(t) ? "선고" : decOf(t));
+      else if (act === "선고" || act === "기일" || act.startsWith("조사") || act === "접견" || act === "선임") key = act;
+      else if (docsOf(t)) key = act + ":" + docsOf(t);
+      if (!key || key === "결과:") continue;
+      if (e.w !== 1) key += "#" + (e.w ?? "");
+      const prev = seen.get(key);
+      if (!prev) { seen.set(key, e); continue; }
+      const oa = orgsOf(body(prev.t)), ob = orgsOf(t);
+      if (oa.size && ob.size && ![...oa].some((o) => ob.has(o))) continue;
+      const keep = better(prev, e), gone = keep === prev ? e : prev;
+      merge(keep, gone); seen.set(key, keep);
+      if (act === "선임") { keep.t = "사건 선임"; keep.g = "accept"; }
+    }
+    // 그날 실행된 일의 지시는 숨김
+    const done = list.filter((e) => !drop.has(e) && !/^지시/.test(body(e.t))).map((e) => docsOf(body(e.t))).filter(Boolean);
+    for (const e of list) {
+      const t = body(e.t);
+      if (!/^지시/.test(t)) continue;
+      const k = docsOf(t);
+      if (k && done.some((d) => d === k || d.split("+").some((x) => k.split("+").includes(x)))) drop.add(e);
+    }
+  }
+  // 2) 처분 통지·결정서 수령: 앞 30일 안에 같은 처분 줄이 있으면 숨김
+  const results = live().filter((e) => e.w === 1);
+  for (const e of live()) {
+    if (e.w === 1) continue;
+    const t = body(e.t);
+    if (/^지시|이유서|정보\s*공개|열람/.test(t) || !/통지|결정서|정본|수령/.test(t)) continue;
+    const k = decOf(t);
+    if (!k) continue;
+    if (results.some((r) => decOf(body(r.t)).split("+").some((x) => k.split("+").includes(x)) && dayDiff(nz(r.d), nz(e.d)) >= 0 && dayDiff(nz(r.d), nz(e.d)) <= 30)) drop.add(e);
+  }
+  // 3) 우편 도착 확인: 앞 21일 안에 같은 서류 제출 줄이 있으면 숨김
+  const subs = live().filter((e) => actOf(e, body(e.t)) === "제출");
+  for (const e of live()) {
+    const t = body(e.t);
+    if (actOf(e, t) !== "도착") continue;
+    const k = docsOf(t).split("+").filter(Boolean);
+    if (!k.length) continue;
+    if (subs.some((s) => dayDiff(nz(s.d), nz(e.d)) >= 0 && dayDiff(nz(s.d), nz(e.d)) <= 21 && docsOf(body(s.t)).split("+").some((x) => k.includes(x)))) drop.add(e);
+  }
+  // 4) 선고 뒤 판결등본·판결정본 → "판결문". 파일은 선고 줄에 붙이고 줄은 합침
+  const verdicts = live().filter((e) => e.w === 1 && /선고/.test(body(e.t)));
+  for (const e of live()) {
+    const t = body(e.t);
+    if (e.w === 1 || !/판결\s*(문|등본|정본)|판결등본/.test(t) || /의뢰인|송부|발송/.test(t)) continue;
+    const v = verdicts.filter((x) => dayDiff(nz(x.d), nz(e.d)) >= 0 && dayDiff(nz(x.d), nz(e.d)) <= 30).pop();
+    if (!v) continue;
+    if (e.f && !v.f) { v.f = e.f; drop.add(e); continue; }
+    if (!e.f) { drop.add(e); continue; }
+    e.t = nz(e.t).replace(/판결\s*(등본|정본)|판결등본/, "판결문");
+  }
+  return events.filter((e) => !drop.has(e));
 }
