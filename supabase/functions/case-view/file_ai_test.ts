@@ -1,5 +1,5 @@
 // 실행: deno test supabase/functions/case-view/file_ai_test.ts
-import { attachByAI, attachFinalFiles } from "./handler.ts";
+import { attachByAI, attachFinalFiles, handle } from "./handler.ts";
 import { applyMatches, buildPrompt, candidateLines, fileSig, lineKey } from "./file_ai.ts";
 function assert(c: unknown, m: string) { if (!c) throw new Error(m); }
 const env = { sbUrl: "https://x.supabase.co", sbKey: "k", anthropicKey: "a" };
@@ -80,6 +80,19 @@ Deno.test("AI를 못 쓰면 false(예전 규칙으로)", async () => {
   try { ok = await attachByAI(env, ev(), files, [], "사건", fetcher); } catch { ok = false; }
   assert(!ok, "표 없으면 실패로");
   assert(!(await attachByAI({ ...env, anthropicKey: undefined }, ev(), files, [], "사건")), "열쇠 없으면 false");
+});
+
+Deno.test("파일 다시 맞추기는 예약 작업 열쇠가 있어야", async () => {
+  const fetcher = (async (url: any) => {
+    const u = String(url);
+    if (u.includes("lw_settings")) return Response.json([{ value: "s3cret" }]);
+    if (u.includes("case_file?select=channel_id")) return Response.json([]);
+    return Response.json([]);
+  }) as typeof fetch;
+  const call = (h: Record<string, string>) => handle(new Request("http://x/", { method: "POST", headers: h, body: JSON.stringify({ action: "file_backfill" }) }), env as any, fetcher);
+  assert((await call({})).status === 403, "열쇠 없이 됨");
+  const r = await call({ "x-cron-secret": "s3cret" });
+  assert(r.status === 200 && (await r.json()).rooms === 0, "열쇠 있으면 실행");
 });
 
 Deno.test("한글 파일은 초안: AI 후보에서 빼고 참고로만 보여 줌, 예전 규칙도 PDF만 붙임 (2026-11-19 석원)", async () => {
