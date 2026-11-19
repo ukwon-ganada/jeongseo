@@ -232,7 +232,7 @@ function indictDeadline(code: string, copies: any[], filings: any[]): Deadline {
 // 타임라인 줄로: 이미 낸 기한은 '제출' 줄이 따로 있으니 빼고, 남은 것만 기한 줄로.
 export function deadlineEvents(dls: Deadline[], today: string) {
   return dls.filter((x) => x.d && x.st !== "done").map((x) => ({
-    d: x.d, k: x.d >= today ? "due" : "done", g: "limit", lim: x.d >= today ? 1 : 0,
+    d: x.d, k: x.d >= today ? "due" : "done", g: "limit", lim: x.d >= today ? 1 : 0, dk: x.kind,
     t: x.t + (x.st === "expected" ? " (선고되면)" : "") + " · " + x.why, f: null,
   }));
 }
@@ -260,4 +260,21 @@ export function mergeRoles(cases: { code: string; evs: any[] }[], title = ""): {
   }
   if (!main) return null;
   return { main: main.code, merged: list.filter((x) => x !== main).map((x) => x.code) };
+}
+
+// 기한 사람 확정 (규칙서 R17, 2026-11-19 석원): 웍스 알림 카드 버튼이나 기한 탭 [수정]에서 누른 기록(deadline_confirm)
+export const DL_ACTS: Record<string, string> = { f: "제출함", n: "상소 안 함", c: "종결·사임" };
+export function applyConfirms(shaped: any, rows: any[]) {
+  const key = (kind: unknown, d: unknown) => nz(kind) + "|" + nz(d).slice(0, 10);
+  const m = new Map<string, any>();
+  for (const r of rows || []) if (!r.undone_at && !m.has(key(r.kind, r.due))) m.set(key(r.kind, r.due), r);
+  for (const x of shaped.deadlines || []) {
+    const r = x.d ? m.get(key(x.kind, x.d)) : null;
+    if (r) x.cf = { a: nz(r.action), id: r.id };
+  }
+  for (const e of shaped.events || []) {
+    if (e.g !== "limit" || !e.dk) continue;
+    const r = m.get(key(e.dk, e.d));
+    if (r) { e.cfa = nz(r.action); e.k = "done"; e.lim = 0; }
+  }
 }
