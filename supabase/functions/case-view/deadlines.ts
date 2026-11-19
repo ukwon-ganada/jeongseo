@@ -231,10 +231,14 @@ function indictDeadline(code: string, copies: any[], filings: any[]): Deadline {
 
 // 타임라인 줄로: 이미 낸 기한은 '제출' 줄이 따로 있으니 빼고, 남은 것만 기한 줄로.
 export function deadlineEvents(dls: Deadline[], today: string) {
-  return dls.filter((x) => x.d && x.st !== "done").map((x) => ({
+  // 제출이 끝난 기한도 지우지 않고 회색 "제출 m.d"로 남긴다 (2026-11-19 석원, 이강효 사건)
+  return dls.filter((x) => x.d).map((x) => x.st === "done" ? {
+    d: x.d, k: "done", g: "limit", lim: 0, dk: x.kind, cfa: "제출" + (x.doneOn ? " " + md(x.doneOn) : ""),
+    t: x.t + " · " + x.why, f: null,
+  } : {
     d: x.d, k: x.d >= today ? "due" : "done", g: "limit", lim: x.d >= today ? 1 : 0, dk: x.kind,
     t: x.t + (x.st === "expected" ? " (선고되면)" : "") + " · " + x.why, f: null,
-  }));
+  });
 }
 
 // 한 방에 사건이 둘 이상일 때 본 사건·병합된 사건 가리기 (2026-11-17 석원 요청)

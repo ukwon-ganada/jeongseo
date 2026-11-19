@@ -50,7 +50,7 @@ import { shapeStages, diffStages, personChangeLine, isStage, noLines, type NoHis
 // 방 제목 형제번호로 공소청 칸 채우기(2026-11-19): 바뀌는 방 목록을 석원님이 확인한 뒤 켠다
 const TITLE_PROS = true;
 import { applyInvDeadlines } from "./inv_deadlines.ts";
-import { buildLevels, levelOf, lvByDate, shortNo } from "./levels.ts";
+import { buildLevels, levelOf, LV_LABEL, lvByDate, shortNo } from "./levels.ts";
 import { applyMatches, askMatch, buildPrompt, candidateLines, fileSig, pendingFiles, type MatchRow } from "./file_ai.ts";
 export const DEADLINE_NOTE = "잠정 계산입니다. 재판 단계(항소·상고·이유서)는 선고일·기록접수통지 도달일로, 수사 단계(항고·재정신청·이의신청)는 사건방 줄의 처분·통지 날짜로 계산했습니다. 알림은 보내지 않습니다. 꼭 기록으로 한 번 더 확인해 주세요.";
 export type Env = { sbUrl: string; sbKey: string; anthropicKey?: string; chatModel?: string; refreshModel?: string; fileModel?: string };
@@ -116,6 +116,14 @@ const OUR_FIRM = /법무법인\s*정서/;
 // 맡은 자리를 모르면(선임계에 "변호인 법무법인 정서"만 있음) 선임 이후 가려진 자리가 한 곳뿐일 때만 그 자리로 본다.
 const MASKED = /^(\S*?)\s*(변호인|소송대리인)\s+법O{6}(?!O)/;
 const OUR_ROLE = /^(\S*?)\s*(변호인|소송대리인)\s+법무법인\s*정서/;
+const APPEAL_BRIEF = /(항소|상고)\s*(보충\s*)?이유서/;
+// 받는 사람·낸 사람: 로웨어 줄 앞머리("피고인1 변호인  문OO …", "피고인1  인OOO …")만 본다 (뒤의 '국선변호인선정결정' 같은 서류 이름에 속지 않게)
+function whoOf(c: string): string {
+  const head = c.split(/\s{2,}/)[0];
+  if (/변호인/.test(head)) return "변호인";
+  if (/피고인/.test(head)) return "피고인";
+  return "";
+}
 export function ourFilingTest(list: any[]): (e: any) => boolean {
   const day = (e: any) => nz(e.lp_appoint_date).slice(0, 10);
   const firm = list.filter((e) => OUR_FIRM.test(nz(e.lp_contents)));
@@ -210,8 +218,21 @@ export function shapeCase(c: any, evs: any[], opts: { today: string; linked: str
       events.push({ d, k: future ? "due" : verdict ? "ours" : "done", g: "hearing", t: (future ? "" : verdict ? "" : "출석 ") + t, f: null });
     } else if (ours(e)) {
       events.push({ d, k: "ours", g: "ours", t: nz(e.lp_contents).replace(/^.*?(법무법인\s*정서|법O{6}(?!O))\s*/, "") || nz(e.lp_contents), f: null, lp: e.lp_num });
+    } else if (e.lp_set === "서면" && APPEAL_BRIEF.test(nz(e.lp_contents)) && !/^\s*검사/.test(nz(e.lp_contents))) {
+      // 불변기한 서면(항소·상고이유서)은 국선·피고인이 낸 것도 남긴다 (2026-11-19 석원, 이강효 사건)
+      events.push({ d, k: "done", g: "filing", w: 2, t: (nz(e.lp_contents).match(APPEAL_BRIEF) || [""])[0].replace(/\s+/g, "") + " 제출 (" + whoOf(nz(e.lp_contents)) + ")", f: null });
     }
   }
+  // 소송기록접수통지 도달: 이유서 기한의 기산점이라 누구에게 도달했든 남긴다 (검사 제외, 같은 날은 한 줄)
+  const notice = new Map<string, Set<string>>();
+  for (const e of list) {
+    const c = nz(e.lp_contents);
+    if (e.lp_set !== "송달" || !/소송기록접수통지/.test(c) || /^\s*검사/.test(c)) continue;
+    const dd = isDate(e.delivered_date) ? nz(e.delivered_date).slice(0, 10) : ((nz(e.lp_remark).match(/(\d{4})\.(\d{2})\.(\d{2})\s*송달됨/) || []).slice(1, 4).join("-"));
+    if (!isDate(dd)) continue;
+    (notice.get(dd) || notice.set(dd, new Set()).get(dd)!).add(OUR_FIRM.test(c) ? "우리" : whoOf(c) || "피고인");
+  }
+  for (const [d, who] of notice) events.push({ d, k: "done", g: "notice", w: 2, t: "소송기록접수통지 도달 (" + [...who].join("·") + ")", f: null });
   // 의뢰인에게 안내 문자를 보냈는지만 (석원 2026-11-16: 내용은 불필요). 같은 날 여러 통이어도 한 줄.
   const smsDays = new Set<string>();
   for (const e of evs) {
@@ -789,6 +810,20 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       for (const x of noLines(hist || [])) shaped.events.push({ d: x.d, k: "room", g: "chat", t: x.t, f: null });
       shaped.events.sort(byDay);
       if (multi) for (const e of shaped.events) if (e.lv == null) e.lv = lvByDate(levels, e.d);
+      // 아랫심급 사건이 로웨어에 없을 때(이강효 2026노100136, 2026-11-19 석원): 이 사건 기록의 첫날(사건접수)이 심급 경계.
+      // 그 앞의 줄(로웨어가 옮겨 적은 선임일·원심 선고일 등)은 아랫심급 구간으로. 타임라인 띠만 쓰고 탭·나의사건은 그대로
+      if (!multi && !c.is_inv && curLv >= 2) {
+        const own = (evs || []).map((e: any) => nz(e.lp_appoint_date).slice(0, 10)).filter(isDate).sort()[0];
+        if (own && shaped.events.some((e: any) => e.d && e.d < own)) {
+          const prev = curLv - 1;
+          for (const e of shaped.events) e.lv = e.d && e.d < own ? prev : curLv;
+          shaped.events.push({ d: own, k: "done", g: "court", w: 2, lv: curLv, t: LV_LABEL[curLv] + " 사건접수", f: null });
+          (shaped as any).tlLevels = [
+            { lv: prev, label: LV_LABEL[prev], main: "", cases: [], merged: [] },
+            { lv: curLv, label: LV_LABEL[curLv], main: nz(c.l_code), cases: [nz(c.l_code)], merged: [] },
+          ];
+        }
+      }
       if (levels.length > 1 || levels.some((L) => L.cases.length > 1)) {
         (shaped as any).levels = levels.map(({ start: _s, ...L }) => L);
         (shaped as any).lv = curLv;
