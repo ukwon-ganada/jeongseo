@@ -72,6 +72,9 @@ export function rankEvents(events: any[]) {
   const kept = dedupeEvents(events);
   events.length = 0; events.push(...kept);
   events.sort((a, b) => {
+    // 심급(lv)이 다르면 심급 순서가 먼저: 화면의 심급 띠가 한 번씩만 나오게
+    const l = (a?.lv ?? 0) - (b?.lv ?? 0);
+    if (l) return l;
     const d = nz(a.d).localeCompare(nz(b.d));
     if (d) return d;
     const ta = timeOf(a), tb = timeOf(b);
@@ -141,6 +144,7 @@ export function dedupeEvents(events: any[]): any[] {
       else if (docsOf(t)) key = act + ":" + docsOf(t);
       if (!key || key === "결과:") continue;
       if (e.w !== 1) key += "#" + (e.w ?? "");
+      key += "@" + (e.lv ?? "");
       const prev = seen.get(key);
       if (!prev) { seen.set(key, e); continue; }
       const oa = orgsOf(body(prev.t)), ob = orgsOf(t);

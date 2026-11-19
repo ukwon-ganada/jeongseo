@@ -730,12 +730,20 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       if (multi) {
         for (const e of shaped.events) e.lv = curLv;
         const acc = shaped.events.find((e: any) => e.g === "accept");
-        if (acc && levels[0].lv < curLv) acc.t = (levels.find((L) => L.lv === curLv)?.label || "") + " 선임";
+        const curL = levels.find((L) => L.lv === curLv);
+        // 로웨어는 윗심급 사건에 아랫심급 선임일을 그대로 옮겨 적는다(박큰별 2026노101087 = 1심 선임일 2026-06-16).
+        // 이 심급 기록이 시작되기 전 날짜의 선임 줄은 아랫심급 선임이므로 이 심급 줄로 두지 않는다
+        if (acc && levels[0].lv < curLv && curL?.start && acc.d < curL.start) shaped.events = shaped.events.filter((e: any) => e !== acc);
+        else if (acc && levels[0].lv < curLv) acc.t = (curL?.label || "") + " 선임";
         for (const x of relList) {
           const lv = levelOf(nz(x.rc.l_code));
           if (lv >= curLv) continue;
           for (const e of shapeOf(x).events) shaped.events.push({ ...e, lv });
         }
+        // 지난 심급의 선임 줄은 그 심급에서 가장 이른 하나만 (병합된 사건의 선임일은 따로 보이지 않게)
+        const firstAcc = new Map<number, any>();
+        for (const e of shaped.events) if (e.g === "accept" && e.lv < curLv && (!firstAcc.has(e.lv) || e.d < firstAcc.get(e.lv).d)) firstAcc.set(e.lv, e);
+        shaped.events = shaped.events.filter((e: any) => !(e.g === "accept" && e.lv < curLv && firstAcc.get(e.lv) !== e));
         shaped.events.sort(byDay);
       }
       const lvRows: Record<string, any[]> = {};
