@@ -1,5 +1,5 @@
 import { assertEquals } from "jsr:@std/assert@1";
-import { autoStage, diffStages, shapeStages, stageOfNo , prosFromTitle, dispFromEvents } from "./stages.ts";
+import { autoStage, diffStages, shapeStages, stageOfNo , prosFromTitle, dispFromEvents, noLines } from "./stages.ts";
 
 Deno.test("사건번호 모양으로 단계", () => {
   assertEquals(stageOfNo("2026형제70122"), "pros");
@@ -116,4 +116,27 @@ Deno.test("처분 줄 → 죄명별 처분, 일부 송치면 경찰·공소청 �
   assertEquals(s.dispNo, "2026형제29256");
   const s2 = shapeStages(c, { ...saved, stages: { police: { org: "파주경찰서", disp: "사기 송치" } } }, [], "", [{ kind: "처분", ev_date: "2026-08-20", summary: "사기 송치, 모욕 불송치 확인" }]);
   assertEquals([s2.list[0].disp, s2.act], ["사기 송치", []]);
+});
+
+Deno.test("번호 이력: 이전 줄에 옛 번호, 재배당으로 새 번호가 생기면 현재로, 타임라인 줄", () => {
+  const c = { l_num: 1, l_code: "2025형제100", raw: { l_prosecute: "인천지방검찰청", l_police_code: "2025-555", l_police_station: "부평경찰서" } };
+  const hist = [
+    { id: 1, stage: "police", org: "부평경찰서", no: "2025-555", seen_on: null },
+    { id: 2, stage: "pros", org: "인천지방검찰청", no: "2025형제100", seen_on: null },
+    { id: 3, stage: "pros", org: "인천지방검찰청", no: "2026형제7", seen_on: "2026-11-20" },
+  ];
+  const s = shapeStages(c, null, [], "", [], hist);
+  const police = s.list.find((x: any) => x.key === "police");
+  assertEquals(police.no, "2025-555");
+  const pros = s.list.find((x: any) => x.key === "pros");
+  assertEquals(pros.no, "2025형제100");
+  assertEquals(pros.prev.map((p: any) => p.no), ["2026형제7"]);
+  const saved = { updated_at: "2026-11-19T01:00:00Z", stages: { pros: { org: "인천지방검찰청", no: "2025형제100", person: "김검사" } } };
+  const s2 = shapeStages(c, saved, [], "", [], hist);
+  const p2 = s2.list.find((x: any) => x.key === "pros");
+  assertEquals([p2.no, p2.person], ["2026형제7", ""]);
+  assertEquals(p2.prev[0].no, "2025형제100");
+  assertEquals(p2.prev[0].person, "김검사");
+  assertEquals(noLines(hist), [{ d: "2026-11-20", t: "형제번호 변경 · 2025형제100 → 2026형제7" }]);
+  assertEquals(noLines([{ id: 9, stage: "police", org: "부평경찰서", no: "2026-1", seen_on: "2026-11-20" }]), [{ d: "2026-11-20", t: "경찰 사건번호 부여 · 2026-1 (부평경찰서)" }]);
 });

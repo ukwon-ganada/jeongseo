@@ -45,7 +45,7 @@ const json = (b: unknown, status = 200) =>
 import { computeDeadlines, deadlineEvents, mergeRoles, type OtherCase } from "./deadlines.ts";
 import { findPick, normTitle } from "./title_match.ts";
 import { dropKnown, extractFromExport, msgsToExport, toRows } from "./chat_import.ts";
-import { shapeStages, diffStages, personChangeLine, isStage } from "./stages.ts";
+import { shapeStages, diffStages, personChangeLine, isStage, noLines, type NoHist } from "./stages.ts";
 // 방 제목 형제번호로 공소청 칸 채우기(2026-11-19): 바뀌는 방 목록을 석원님이 확인한 뒤 켠다
 const TITLE_PROS = true;
 import { applyInvDeadlines } from "./inv_deadlines.ts";
@@ -325,6 +325,21 @@ export async function relatedNums(env: Env, lNum: number, channels: string[], fe
   return [...new Set(rows.map((r: any) => Number(r.l_num)).filter((n: number) => Number.isFinite(n) && n !== 0 && n !== lNum))] as number[];
 }
 // 이 사건에 아직 직접 저장한 사건정보가 없으면, 같은 방 이전 사건에 적어 둔 사건정보를 이어 받는다("지금 단계"는 새로 정함)
+export async function noHist(env: Env, nums: number[], fetcher: typeof fetch = fetch): Promise<NoHist[]> {
+  const ok = nums.filter((n) => Number.isFinite(n) && n !== 0);
+  if (!ok.length) return [];
+  return await rest(env, `case_no_hist?select=id,stage,org,no,seen_on,hidden&l_num=in.(${ok.join(",")})&order=id.asc&limit=200`, {}, fetcher).catch(() => []) || [];
+}
+export function hideRemovedNos(hist: NoHist[], body: any): number[] {
+  const out: number[] = [];
+  for (const s of ["police", "pros"]) {
+    const b = body?.[s];
+    if (!b || !Array.isArray(b.prev)) continue;
+    const keep = new Set([nz(b.no), ...b.prev.map((p: any) => nz(p?.no))].filter(Boolean));
+    for (const h of hist) if (h.stage === s && !h.hidden && h.id != null && !keep.has(nz(h.no))) out.push(h.id);
+  }
+  return out;
+}
 export async function inheritedInfo(env: Env, rel: number[], fetcher: typeof fetch = fetch): Promise<any | null> {
   if (!rel.length) return null;
   const r = await rest(env, `case_info?select=*&l_num=in.(${rel.join(",")})&order=updated_at.desc&limit=1`, {}, fetcher).catch(() => []);
@@ -673,7 +688,7 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       const chans = [...new Set([room, ...roomRows.map((r: any) => nz(r.channel_id))].filter(Boolean))] as string[];
       const rel = await relatedNums(env, Number(c.l_num), chans, fetcher);
       const allNums = [Number(c.l_num), ...rel].join(",");
-      const [evs, mine, savedOwn, files, chat, checked, meets, stageLogs, relCases, titleRows, _logged, relEvs] = await Promise.all([
+      const [evs, mine, savedOwn, files, chat, checked, meets, stageLogs, relCases, titleRows, _logged, relEvs, hist] = await Promise.all([
         rest(env, `lw_process_events?select=lp_num,lp_set,lp_appoint_date,lp_appoint_time,lp_contents,lp_remark,delivered_date,court,last_seen_at,lp_append_udate&l_num=eq.${c.l_num}&order=lp_appoint_date.asc&limit=2000`, {}, fetcher),
         myCases(env, who.name || "", fetcher),
         rest(env, `case_info?select=*&l_num=eq.${c.l_num}`, {}, fetcher).then((r: any[]) => r?.[0] ?? null).catch(() => null),
@@ -687,6 +702,7 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
         logView(env, who, "case", room, c, fetcher),
         // 같은 방 다른 사건 기록 전체: 병합 이유서 기한(R21~R23), 지난 심급 타임라인·나의사건(심급 구분)
         rel.length ? rest(env, `lw_process_events?select=l_num,lp_num,lp_set,lp_appoint_date,lp_appoint_time,lp_contents,lp_remark,delivered_date,court,last_seen_at,lp_append_udate&l_num=in.(${rel.join(",")})&order=lp_appoint_date.asc&limit=6000`, {}, fetcher).catch(() => []) : Promise.resolve([]),
+        noHist(env, [Number(c.l_num), ...rel], fetcher),
       ]);
       const saved = savedOwn ?? await inheritedInfo(env, rel, fetcher);
       const end = new Date(Date.parse(today) + 28 * 864e5).toISOString().slice(0, 10);
@@ -756,6 +772,8 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       fixAccept(shaped, !!c.is_inv);
       earliestAccept(shaped, (relCases || []).filter((x: any) => levelOf(nz(x.l_code)) === curLv));
       mergeMeets(shaped, meets || []);
+      for (const x of noLines(hist || [])) shaped.events.push({ d: x.d, k: "room", g: "chat", t: x.t, f: null });
+      shaped.events.sort(byDay);
       if (multi) for (const e of shaped.events) if (e.lv == null) e.lv = lvByDate(levels, e.d);
       if (levels.length > 1 || levels.some((L) => L.cases.length > 1)) {
         (shaped as any).levels = levels.map(({ start: _s, ...L }) => L);
@@ -764,7 +782,7 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       }
       // 직원이 줄마다 파일을 바꿀 때 고를 목록 (화면에 따로 나열하지 않음)
       const fileChoices = files.filter((f: any) => f.lp != null || !CONTRACT_RE.test(f.n)).map((f: any) => ({ id: f.id, n: f.n, d: f.d, tm: f.tm, by: f.by }));
-      const stages = shapeStages(c, saved, stageLogs || [], TITLE_PROS ? roomTitle : "", chat || []);
+      const stages = shapeStages(c, saved, stageLogs || [], TITLE_PROS ? roomTitle : "", chat || [], hist || []);
       return out({ ...shaped, fileChoices, stages, dispNo: stages.dispNo });
     }
 
@@ -883,9 +901,11 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       // 공소청 칸(방 제목)·처분(사건방 처분 줄)을 화면과 같게 계산하려고
       const myRooms = await rest(env, `works_room_case?select=channel_id,room_title&l_num=eq.${lNum}&order=is_primary.desc`, {}, fetcher).catch(() => []) || [];
       const roomTitle = nz(myRooms.find((r: any) => nz(r.room_title))?.room_title);
-      const stageRows = await roomEvents(env, String(lNum), [...new Set(myRooms.map((r: any) => nz(r.channel_id)).filter(Boolean))] as string[], fetcher).catch(() => []);
+      const myChans = [...new Set(myRooms.map((r: any) => nz(r.channel_id)).filter(Boolean))] as string[];
+      const stageRows = await roomEvents(env, String(lNum), myChans, fetcher).catch(() => []);
+      let hist = await noHist(env, [lNum, ...(await relatedNums(env, lNum, myChans, fetcher))], fetcher);
       if (body.stages && typeof body.stages === "object") {
-        const d = diffStages(c, prevRow, body.stages, TITLE_PROS ? roomTitle : "");
+        const d = diffStages(c, prevRow, body.stages, TITLE_PROS ? roomTitle : "", hist);
         row.stages = d.stages;
         row.cur_stage = isStage(body.cur) ? body.cur : null;
         row.start_stage = isStage(body.start) ? body.start : null;
@@ -907,10 +927,19 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
           body: JSON.stringify(lines.map((x, i) => ({ channel_id: `stage:${lNum}:${x.stage}:${Date.now()}${i}`, l_num: lNum, kind: "기타", ev_date: today, ev_time: "",
             summary: personChangeLine(x.stage, x.old, x.new), state: "완료", source: "stage-change" }))) }, fetcher).catch((e) => console.log("stage line fail", String(e).slice(0, 120)));
       }
+      const gone = body.stages && typeof body.stages === "object" ? hideRemovedNos(hist, body.stages) : [];
+      if (gone.length) await rest(env, `case_no_hist?id=in.(${gone.join(",")})`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ hidden: true }) }, fetcher).catch(() => null);
+      const newNos = stageChanges.filter((x) => x.key === "no" && x.new && (x.stage === "police" || x.stage === "pros"));
+      for (const x of newNos) {
+        const org = nz(body.stages?.[x.stage]?.org);
+        await rest(env, "case_no_hist?on_conflict=l_num,stage,no", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+          body: JSON.stringify({ l_num: lNum, stage: x.stage, org, no: x.new, source: "manual", seen_on: today, hidden: false }) }, fetcher).catch(() => null);
+      }
+      if (gone.length || newNos.length) hist = await noHist(env, [lNum, ...(await relatedNums(env, lNum, myChans, fetcher))], fetcher);
       await logView(env, who, "save_info", "", c, fetcher);
       const logs = await rest(env, `case_info_log?select=field,old_value,new_value,editor,edited_at&l_num=eq.${lNum}&field=like.stage.*&order=edited_at.desc&limit=300`, {}, fetcher).catch(() => []);
       const savedNow = { ...prev, ...row };
-      const stages = shapeStages(c, savedNow, logs || [], TITLE_PROS ? roomTitle : "", stageRows || []);
+      const stages = shapeStages(c, savedNow, logs || [], TITLE_PROS ? roomTitle : "", stageRows || [], hist);
       return json({ ok: true, changed: changed.length + stageChanges.length, ...infoFields(c, { ...next, updated_by: who.name, updated_at: now }), stages, dispNo: stages.dispNo });
     }
     if (body?.action === "chat_import_preview" || body?.action === "chat_import_save") {
