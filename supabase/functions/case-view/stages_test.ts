@@ -1,5 +1,5 @@
 import { assertEquals } from "jsr:@std/assert@1";
-import { autoStage, diffStages, shapeStages, stageOfNo , prosFromTitle, dispFromEvents, noLines } from "./stages.ts";
+import { autoStage, diffStages, shapeStages, stageOfNo , prosFromTitle, dispFromEvents, noLines, chatNos, withChatNos } from "./stages.ts";
 
 Deno.test("사건번호 모양으로 단계", () => {
   assertEquals(stageOfNo("2026형제70122"), "pros");
@@ -139,4 +139,25 @@ Deno.test("번호 이력: 이전 줄에 옛 번호, 재배당으로 새 번호�
   assertEquals(p2.prev[0].person, "김검사");
   assertEquals(noLines(hist), [{ d: "2026-11-20", t: "형제번호 변경 · 2025형제100 → 2026형제7" }]);
   assertEquals(noLines([{ id: 9, stage: "police", org: "부평경찰서", no: "2026-1", seen_on: "2026-11-20" }]), [{ d: "2026-11-20", t: "경찰 사건번호 부여 · 2026-1 (부평경찰서)" }]);
+});
+
+Deno.test("사건방 글의 형제번호·검사로 공소청 칸 채우기 (최희준)", () => {
+  const msgs = [
+    { sent_at: "2026-11-18T00:29:30Z", text: "서울마포경찰서 2026-14130 /  정상학 경감님 [번호]" },
+    { sent_at: "2026-11-19T07:13:49Z", text: "11/18접수 서울서부지방청 2026형제 32914 /  김유나 검사님 [번호]" },
+  ];
+  const nos = chatNos(msgs);
+  assertEquals(nos.map((h) => [h.stage, h.org, h.no, h.seen_on, h.person]), [
+    ["police", "서울마포경찰서", "2026-14130", "2026-11-18", "정상학 경감"],
+    ["pros", "서울서부지방청", "2026형제32914", "2026-11-18", "김유나 검사"],
+  ]);
+  const c = { l_num: -1, l_code: "수사-1", is_inv: true, raw: { l_police_station: "서울중부경찰서", agency_no: "2026-4695" } };
+  const saved = { updated_at: "2026-11-19T06:38:55Z", cur_stage: "police", stages: { police: { org: "서울중부경찰서", no: "2026-4695", person: "정상학 경감" } } };
+  const s = shapeStages(c, saved, [], "", [], withChatNos([], nos));
+  const pros = s.list.find((x: any) => x.key === "pros");
+  assertEquals([pros.org, pros.no, pros.person], ["서울서부지방청", "2026형제32914", "김유나 검사"]);
+  assertEquals(s.cur, "pros");
+  const police = s.list.find((x: any) => x.key === "police");
+  assertEquals(police.no, "2026-4695"); // 저장(06:38)보다 앞선 글(11.18)은 덮지 않음
+  assertEquals(noLines(withChatNos([], nos)), []);
 });

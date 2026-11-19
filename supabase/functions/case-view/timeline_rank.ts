@@ -29,7 +29,7 @@ export function lineTier(e: any): 1 | 2 | 3 {
   if (MOVE.test(t) && !/예정|요청|신청|후\s*사건\s*번호|통지\s*수령/.test(t)) return 2;
   if (MEMO.test(t) && !(KEEP2.test(t) && !HARD3.test(t))) return 3;
   if (["ours", "hearing", "meet", "accept"].includes(g)) return 2;
-  if (KEEP2.test(t) || /수임|신건|사건\s*선임|조사|기일|접견|면담|선고|검사\s*항소|제출|송부/.test(t)) return 2;
+  if (KEEP2.test(t) || /수임|신건|사건\s*선임|조사|기일|접견|면담|선고|검사\s*항소|제출|송부|\d{4}\s*형제\s*\d/.test(t)) return 2;
   return 3;
 }
 
