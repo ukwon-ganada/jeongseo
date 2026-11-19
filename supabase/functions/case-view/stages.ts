@@ -67,7 +67,9 @@ export function prefillStages(c: any, saved: any | null, title = ""): Record<Sta
     out.police.org = nz(raw.l_police_station);
     out.police.person = nz(raw.l_police_detective);
     out.police.phone = nz(raw.l_police_tel);
-    if (/^\d{4}-\d+$/.test(code)) out.police.no = code;
+    const pc = nz(raw.l_police_code);
+    if (/^\d{4}-\d+$/.test(pc) && !/^\d{4}-0*$/.test(pc)) out.police.no = pc;
+    else if (/^\d{4}-\d+$/.test(code)) out.police.no = code;
     if (PROS_RE.test(nz(raw.l_prosecute))) out.pros.org = nz(raw.l_prosecute);
     out.pros.person = nz(raw.l_prosecutor);
     out.pros.phone = nz(raw.l_prosecutor_tel);
@@ -153,6 +155,16 @@ export function titlePrev(c: any, title: string): StageVal[] {
   return [{ ...empty(), org: PROS_RE.test(lp) ? lp : "", no: code }];
 }
 
+function prevList(s: StageKey, cur: StageVal, moved: StageVal | undefined, base: StageVal[], hist: NoHist[]): StageVal[] {
+  const out: StageVal[] = moved && hasAny(moved) ? [{ ...moved, disp: "" }, ...base] : [...base];
+  const seen = new Set([cur.no, ...out.map((p) => p.no)].filter(Boolean));
+  for (const h of histOf(hist, s)) {
+    if (seen.has(h.no)) continue;
+    seen.add(h.no);
+    out.push({ ...empty(), org: nz(h.org), no: h.no });
+  }
+  return out.slice(0, 30);
+}
 export function cleanStage(v: any): StageVal {
   const o = empty();
   for (const k of STAGE_FIELDS) o[k] = nz(v?.[k]).slice(0, 120);
@@ -171,10 +183,44 @@ const isStage = (s: unknown): s is StageKey => (STAGES as readonly string[]).inc
 function hasAny(v: StageVal) { return STAGE_FIELDS.some((k) => !!v[k]); }
 
 // 화면에 줄 모양 만들기
-export function shapeStages(c: any, saved: any | null, logs: any[], title = "", rows: any[] = []) {
+export type NoHist = { stage: string; org: string; no: string; seen_on: string | null; hidden?: boolean; id?: number };
+const histOf = (hist: NoHist[], s: string) => (hist || []).filter((h) => h.stage === s && !h.hidden && nz(h.no))
+  .sort((a, b) => nz(b.seen_on || "0000").localeCompare(nz(a.seen_on || "0000")) || (b.id || 0) - (a.id || 0));
+export function newerNo(saved: any | null, s: StageKey, hist: NoHist[]): NoHist | null {
+  const st = saved?.stages?.[s];
+  if (!st) return null;
+  const since = nz(saved.updated_at).slice(0, 10);
+  const top = histOf(hist, s).find((h) => h.seen_on);
+  if (!top || !top.seen_on || top.seen_on < since || top.no === nz(st.no)) return null;
+  if (cleanPrev(st.prev).some((p) => p.no === top.no)) return null;
+  return top;
+}
+export function noLines(hist: NoHist[]): { d: string; t: string }[] {
+  const out: { d: string; t: string }[] = [];
+  for (const s of ["police", "pros"]) {
+    const list = (hist || []).filter((h) => h.stage === s && nz(h.no))
+      .sort((a, b) => nz(a.seen_on || "0000").localeCompare(nz(b.seen_on || "0000")) || (a.id || 0) - (b.id || 0));
+    const name = s === "police" ? "경찰 사건번호" : "형제번호";
+    list.forEach((h, i) => {
+      if (!h.seen_on || h.hidden) return;
+      const before = list.slice(0, i).filter((x) => !x.hidden).pop();
+      const org = nz(h.org) && (!before || nz(before.org) !== nz(h.org)) ? " (" + nz(h.org) + ")" : "";
+      out.push({ d: h.seen_on, t: before ? `${name} 변경 · ${before.no} → ${h.no}${org}` : `${name} 부여 · ${h.no}${org}` });
+    });
+  }
+  return out;
+}
+export function shapeStages(c: any, saved: any | null, logs: any[], title = "", rows: any[] = [], nos: NoHist[] = []) {
   const pre = prefillStages(c, saved, title);
   const st = saved?.stages && typeof saved.stages === "object" ? saved.stages : {};
   const vals = Object.fromEntries(STAGES.map((s) => [s, st[s] ? cleanStage(st[s]) : pre[s]])) as Record<StageKey, StageVal>;
+  const moved: Record<string, StageVal> = {};
+  for (const s of ["police", "pros"] as const) {
+    const n = newerNo(saved, s, nos);
+    if (!n) continue;
+    moved[s] = vals[s];
+    vals[s] = { ...empty(), org: nz(n.org) || vals[s].org, no: n.no, disp: vals[s].disp };
+  }
   // 처분: 직원이 [수정]에서 적은 값이 없으면 사건방 처분 줄에서 뽑은 값
   const auto = dispFromEvents(rows);
   for (const s of ["police", "pros"] as const) if (!vals[s].disp) vals[s].disp = auto[s];
@@ -205,14 +251,14 @@ export function shapeStages(c: any, saved: any | null, logs: any[], title = "", 
   }
   return {
     cur, start: STAGES[si], dispNo, prevNos, act,
-    list: STAGES.map((s, i) => ({ key: s, label: STAGE_LABEL[s], ...vals[s], dispAuto: (auto as any)[s] || "", idx: i, prev: st[s] ? cleanPrev(st[s].prev) : s === "pros" ? titlePrev(c, title) : [] })),
+    list: STAGES.map((s, i) => ({ key: s, label: STAGE_LABEL[s], ...vals[s], dispAuto: (auto as any)[s] || "", idx: i, prev: prevList(s, vals[s], moved[s], st[s] ? cleanPrev(st[s].prev) : s === "pros" ? titlePrev(c, title) : [], nos) })),
     hist,
   };
 }
 
 // 저장 준비: 새 값과 바뀐 칸(이력용) 계산
-export function diffStages(c: any, saved: any | null, body: any, title = "") {
-  const before = shapeStages(c, saved, [], title);
+export function diffStages(c: any, saved: any | null, body: any, title = "", hist: NoHist[] = []) {
+  const before = shapeStages(c, saved, [], title, [], hist);
   const prevVals = Object.fromEntries(before.list.map((x: any) => [x.key, cleanStage(x)])) as Record<StageKey, StageVal>;
   const next: Record<string, any> = { ...(saved?.stages && typeof saved.stages === "object" ? saved.stages : {}) };
   const changes: { field: string; old: string; new: string; stage: StageKey; key: string }[] = [];
