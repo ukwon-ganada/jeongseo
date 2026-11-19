@@ -119,6 +119,7 @@ main{max-width:880px;margin:0 auto;padding:12px 16px 32px}
 .ev.g-accept{--gc:var(--ink)}
 .ev.g-hearing{--gc:var(--g-hearing)}
 .ev.g-ours{--gc:var(--g-ours)}
+.ev.g-filing{--gc:var(--g-ours)}
 .ev.g-meet{--gc:var(--g-meet)}
 /* 핵심 줄(조사·송치·기소): 글자 크게·굵게, 점 크게, 옅은 바탕 */
 .ev.key{--gc:var(--g-key)}
@@ -148,6 +149,9 @@ main{max-width:880px;margin:0 auto;padding:12px 16px 32px}
 .ev.g-limit.done .tt{color:var(--muted);font-weight:500}
 .ev.g-limit.done .pill{background:var(--line2);color:var(--muted)}
 .ev.g-limit.cf{--gc:var(--line)}
+.ev.g-limit.cf.sub{--gc:var(--g-ours)}
+.ev.g-limit.cf.sub .tt{color:var(--ink);font-weight:600}
+.ev.g-limit.cf.sub .pill{background:var(--g-ours);color:#fff}
 /* 오늘 */
 .today{display:grid;grid-template-columns:44px 20px 1fr;gap:0 10px;padding:4px 20px;align-items:center}
 .today b{font-size:11px;font-weight:700;color:var(--accent-ink);text-align:right}
@@ -464,7 +468,7 @@ var VIEWS = {
       if(g==='limit'){ var n=dd(e.d); pill='<span class="pill">'+(e.cfa?esc(e.cfa):n<0?'지남':n===0?'오늘까지':'D-'+n)+'</span>'; p.ts=(p.ts?p.ts+' · ':'')+(e.src==='chat'?'대화 기준':'잠정'); }
       else if(e.k==='due') pill='<span class="pill">예정</span>';
       var moved=g==='hearing' && MOVED_RE.test(p.ts); if(moved){ pill='<span class="pill">'+(p.ts.match(MOVED_RE)[0])+'</span>'; p.ts=p.ts.replace(/\s*·\s*(기일변경|기일연기|연기|추정|취소)\s*$/,''); }
-      body+='<div class="ev '+e.k+(e.cfa?' cf':'')+(g?' g-'+g:'')+(minor?' minor':'')+(key&&!moved?' key':'')+(moved?' moved':'')+'"><div class="d"><b>'+md(e.d)+'</b><small>'+wk(e.d)+'</small></div><div class="rail"></div><div class="t">'
+      body+='<div class="ev '+e.k+(e.cfa?' cf'+(/^제출/.test(e.cfa)?' sub':''):'')+(g?' g-'+g:'')+(minor?' minor':'')+(key&&!moved?' key':'')+(moved?' moved':'')+'"><div class="d"><b>'+md(e.d)+'</b><small>'+wk(e.d)+'</small></div><div class="rail"></div><div class="t">'
         +'<div class="tt">'+esc(p.tt)+pill+(e.cf?fileChip(e.cf,'계약서'):'')+(e.f&&!e.minor?fileChip(e.f,'열기'):'')+'</div>'+(p.ts?'<div class="ts">'+esc(p.ts)+'</div>':'')+'</div></div>';
     });
     return h+'<div class="card tl">'+body+'</div>';
