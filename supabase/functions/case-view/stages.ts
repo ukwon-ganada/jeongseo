@@ -183,17 +183,51 @@ const isStage = (s: unknown): s is StageKey => (STAGES as readonly string[]).inc
 function hasAny(v: StageVal) { return STAGE_FIELDS.some((k) => !!v[k]); }
 
 // 화면에 줄 모양 만들기
-export type NoHist = { stage: string; org: string; no: string; seen_on: string | null; hidden?: boolean; id?: number };
+export type NoHist = { stage: string; org: string; no: string; seen_on: string | null; hidden?: boolean; id?: number; src?: string; person?: string; at?: string };
 const histOf = (hist: NoHist[], s: string) => (hist || []).filter((h) => h.stage === s && !h.hidden && nz(h.no))
   .sort((a, b) => nz(b.seen_on || "0000").localeCompare(nz(a.seen_on || "0000")) || (b.id || 0) - (a.id || 0));
-export function newerNo(saved: any | null, s: StageKey, hist: NoHist[]): NoHist | null {
+export function newerNo(saved: any | null, s: StageKey, hist: NoHist[], cur: StageVal | null = null): NoHist | null {
   const st = saved?.stages?.[s];
-  if (!st) return null;
-  const since = nz(saved.updated_at).slice(0, 10);
   const top = histOf(hist, s).find((h) => h.seen_on);
-  if (!top || !top.seen_on || top.seen_on < since || top.no === nz(st.no)) return null;
-  if (cleanPrev(st.prev).some((p) => p.no === top.no)) return null;
+  if (!top || !top.seen_on) return null;
+  if (!st) {
+    // 저장된 단계 칸이 없으면 로웨어 값이 지금 값. 대화에서 읽은 더 새 번호만 쓴다
+    const tc = histOf(hist, s).find((h) => h.src === "chat" && h.seen_on);
+    return cur && tc && tc.no !== cur.no && nz(tc.seen_on) >= nz(top.seen_on) ? tc : null;
+  }
+  const since = nz(saved.updated_at);
+  if (top.no === nz(st.no) || cleanPrev(st.prev).some((p) => p.no === top.no)) return null;
+  // 대화에서 읽은 번호는 글 올린 시각으로, 나머지는 날짜로 마지막 저장보다 새것인지 본다
+  if (top.at ? top.at < since : top.seen_on < since.slice(0, 10)) return null;
   return top;
+}
+
+// 사건방 글에서 번호 읽기 (2026-11-19 석원, 최희준: "11/18접수 서울서부지방청 2026형제 32914 / 김유나 검사님")
+const PROS_MSG = /(?:(\d{1,2})\s*\/\s*(\d{1,2})\s*접수\s*)?([가-힣]+(?:검찰청|공소청|지청|지방청|지검))\s*(\d{4})\s*형제\s*(\d+)(?:[^가-힣\n]{0,12}([가-힣]{2,4})\s*검사)?/g;
+const POL_MSG = /([가-힣]+경찰서)\s*(\d{4}-\d{3,})(?:[^가-힣\n]{0,12}([가-힣]{2,4})\s*(경감|경위|경사|경장|순경|경정|수사관|팀장))?/g;
+export function chatNos(msgs: { sent_at: string; text: string }[]): NoHist[] {
+  const out: NoHist[] = [];
+  for (const m of msgs || []) {
+    const t = Date.parse(m.sent_at);
+    if (isNaN(t)) continue;
+    const k = new Date(t + 9 * 3600e3), day = k.toISOString().slice(0, 10), y = k.getUTCFullYear();
+    const text = String(m.text || "");
+    for (const x of text.matchAll(PROS_MSG)) {
+      let d = day;
+      if (x[1] && x[2]) { const dd = `${y}-${x[1].padStart(2, "0")}-${x[2].padStart(2, "0")}`; if (!isNaN(Date.parse(dd)) && dd <= day) d = dd; }
+      out.push({ stage: "pros", org: x[3], no: x[4] + "형제" + x[5], seen_on: d, src: "chat", person: x[6] ? x[6] + " 검사" : "", at: new Date(t).toISOString() });
+    }
+    for (const x of text.matchAll(POL_MSG)) {
+      out.push({ stage: "police", org: x[1], no: x[2], seen_on: day, src: "chat", person: x[3] ? x[3] + " " + x[4] : "", at: new Date(t).toISOString() });
+    }
+  }
+  return out;
+}
+export function withChatNos(hist: NoHist[], chat: NoHist[]): NoHist[] {
+  const have = new Set((hist || []).map((h) => h.stage + "|" + h.no));
+  const add: NoHist[] = [];
+  for (const h of chat) { const k = h.stage + "|" + h.no; if (have.has(k)) continue; have.add(k); add.push(h); }
+  return [...(hist || []), ...add];
 }
 export function noLines(hist: NoHist[]): { d: string; t: string }[] {
   const out: { d: string; t: string }[] = [];
@@ -202,7 +236,7 @@ export function noLines(hist: NoHist[]): { d: string; t: string }[] {
       .sort((a, b) => nz(a.seen_on || "0000").localeCompare(nz(b.seen_on || "0000")) || (a.id || 0) - (b.id || 0));
     const name = s === "police" ? "경찰 사건번호" : "형제번호";
     list.forEach((h, i) => {
-      if (!h.seen_on || h.hidden) return;
+      if (!h.seen_on || h.hidden || h.src === "chat") return;
       const before = list.slice(0, i).filter((x) => !x.hidden).pop();
       const org = nz(h.org) && (!before || nz(before.org) !== nz(h.org)) ? " (" + nz(h.org) + ")" : "";
       out.push({ d: h.seen_on, t: before ? `${name} 변경 · ${before.no} → ${h.no}${org}` : `${name} 부여 · ${h.no}${org}` });
@@ -215,18 +249,22 @@ export function shapeStages(c: any, saved: any | null, logs: any[], title = "", 
   const st = saved?.stages && typeof saved.stages === "object" ? saved.stages : {};
   const vals = Object.fromEntries(STAGES.map((s) => [s, st[s] ? cleanStage(st[s]) : pre[s]])) as Record<StageKey, StageVal>;
   const moved: Record<string, StageVal> = {};
+  let fresh = "";
   for (const s of ["police", "pros"] as const) {
-    const n = newerNo(saved, s, nos);
+    const n = newerNo(saved, s, nos, vals[s]);
     if (!n) continue;
     moved[s] = vals[s];
-    vals[s] = { ...empty(), org: nz(n.org) || vals[s].org, no: n.no, disp: vals[s].disp };
+    vals[s] = { ...empty(), org: nz(n.org) || vals[s].org, no: n.no, person: nz(n.person), disp: vals[s].disp };
+    if (s === "pros" && (!saved?.updated_at || !n.at || n.at > nz(saved.updated_at))) fresh = "pros";
   }
   // 처분: 직원이 [수정]에서 적은 값이 없으면 사건방 처분 줄에서 뽑은 값
   const auto = dispFromEvents(rows);
   for (const s of ["police", "pros"] as const) if (!vals[s].disp) vals[s].disp = auto[s];
   // 일부 송치(송치와 불송치가 함께): 경찰·공소청 둘 다 진행 중 (2026-11-19 석원, 이재욱 사건)
   const act: StageKey[] = mixedDisp(vals.police.disp) ? ["police", "pros"] : [];
-  const cur: StageKey = isStage(saved?.cur_stage) ? saved.cur_stage : autoStage(c, title);
+  let cur: StageKey = isStage(saved?.cur_stage) ? saved.cur_stage : autoStage(c, title);
+  // 송치돼 공소청 번호가 새로 들어오면 지금 단계를 공소청으로 (저장 뒤에 들어온 번호일 때만)
+  if (fresh === "pros" && cur === "police") cur = "pros";
   const ci = STAGES.indexOf(cur);
   let si: number;
   if (isStage(saved?.start_stage)) si = STAGES.indexOf(saved.start_stage);
