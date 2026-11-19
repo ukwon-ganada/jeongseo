@@ -245,7 +245,9 @@ export function shapeCase(c: any, evs: any[], opts: { today: string; linked: str
   const jd = isDate(raw.l_judgment_date) ? raw.l_judgment_date.slice(0, 10) : "";
   if (jd && !verdictSeen) events.push({ d: jd, k: jd >= today ? "due" : "ours", g: "hearing", t: "선고", f: null });
   const nextDate = isDate(c.next_date) ? c.next_date.slice(0, 10) : "";
-  const hasNext = nextDate && list.some((e) => e.lp_set === "기일" && e.lp_appoint_date.slice(0, 10) === nextDate);
+  // 로웨어 '다음 기일' 칸은 기일이 아니면 마지막 진행 날짜만 들어온다(박큰별 2심 11.19 = 의견서 송달일). 기일 내용·시각이 있을 때만 기일로 본다
+  const nextReal = !!(nz(c.next_contents) || nz(c.next_time));
+  const hasNext = !nextReal || (nextDate && list.some((e) => e.lp_set === "기일" && e.lp_appoint_date.slice(0, 10) === nextDate));
   if (nextDate >= today && !hasNext) {
     events.push({ d: nextDate, k: "due", g: "hearing", t: "다음 기일 " + [nz(c.next_time), nz(c.next_contents)].filter(Boolean).join(" ") });
   }
@@ -799,7 +801,9 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
         for (const x of relList) {
           const lv = levelOf(nz(x.rc.l_code));
           if (lv >= curLv) continue;
-          for (const e of shapeOf(x).events) shaped.events.push({ ...e, lv });
+          // 병합된 사건의 기한 줄은 빼고 본 사건 것만 (박큰별: 항소 마감이 두 줄로 겹침, 2026-11-19)
+          const isMerged = levels.some((L) => L.merged.includes(nz(x.rc.l_code)));
+          for (const e of shapeOf(x).events) if (!(isMerged && e.g === "limit")) shaped.events.push({ ...e, lv });
         }
         // 지난 심급의 선임 줄은 그 심급에서 가장 이른 하나만 (병합된 사건의 선임일은 따로 보이지 않게)
         const firstAcc = new Map<number, any>();

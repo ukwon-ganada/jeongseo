@@ -126,3 +126,12 @@ Deno.test("사람 확정(R17): 같은 종류·만료일 기한과 타임라인 �
   assertEquals([shaped.events[0].cfa, shaped.events[0].k], ["제출함", "done"]);
   assertEquals(shaped.events[1].cfa, undefined);
 });
+
+Deno.test("검사 항소장은 우리 항소 제출로 보지 않는다 (박큰별 2026-11-19)", () => {
+  const evs = [
+    { lp_set: "기일", lp_appoint_date: "2026-10-28", lp_contents: "선고기일(제452호 법정 14:00)", lp_remark: "판결선고" },
+    { lp_set: "서면", lp_appoint_date: "2026-11-04", lp_contents: "검사  윤OO 항소장 제출" },
+  ];
+  const d = computeDeadlines("2025고단1888", evs, "2026-11-19").find((x) => x.kind === "항소")!;
+  assertEquals([d.st, d.doneOn], ["open", undefined]);
+});
