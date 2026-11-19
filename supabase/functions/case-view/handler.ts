@@ -42,6 +42,7 @@ const CORS = {
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 
+import { rankEvents } from "./timeline_rank.ts";
 import { computeDeadlines, deadlineEvents, mergeRoles, type OtherCase } from "./deadlines.ts";
 import { findPick, normTitle } from "./title_match.ts";
 import { dropKnown, extractFromExport, msgsToExport, toRows } from "./chat_import.ts";
@@ -353,8 +354,9 @@ const MEET = new Set(["조사", "출석요구", "기일"]);
 export function roomGroup(kind: string, summary: string): string {
   const s = nz(summary);
   if (kind === "접견" || /접견/.test(s)) return "meet";
+  if (["서면제출", "고소장제출"].includes(kind)) return "ours";
   if (["송치", "처분", "기소"].includes(kind) || /송치|불송치|기소|불기소|기소유예|약식|처분/.test(s)) return "decision";
-  if (["서면제출", "고소장제출"].includes(kind) || /선임계|선임신고서|선임서|의견서|고소장|고발장|이의신청|탄원서|서면\s*제출/.test(s)) return "ours";
+  if (/선임계|선임신고서|선임서|의견서|고소장|고발장|이의신청|탄원서|서면\s*제출/.test(s)) return "ours";
   if (MEET.has(kind) || /조사|출석/.test(s)) return "hearing";
   if (kind === "사건접수" || s === "사건 선임") return "accept";
   return "chat";
@@ -650,7 +652,7 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
 
 
     if (body?.action === "case") {
-      const out = (o: any, st?: number) => json(located ? { ...o, located } : o, st);
+      const out = (o: any, st?: number) => { if (Array.isArray(o?.events)) rankEvents(o.events); return json(located ? { ...o, located } : o, st); };
       const room = nz(body.room), caseParam = nz(body.case);
       let c: any = null, status: string | undefined, linked: string[] = [];
       if (room) {
