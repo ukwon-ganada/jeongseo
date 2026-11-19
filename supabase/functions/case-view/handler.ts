@@ -47,7 +47,7 @@ import { findPick, normTitle } from "./title_match.ts";
 import { dropKnown, extractFromExport, msgsToExport, toRows } from "./chat_import.ts";
 import { shapeStages, diffStages, personChangeLine, isStage } from "./stages.ts";
 // 방 제목 형제번호로 공소청 칸 채우기(2026-11-19): 바뀌는 방 목록을 석원님이 확인한 뒤 켠다
-const TITLE_PROS = false;
+const TITLE_PROS = true;
 import { applyInvDeadlines } from "./inv_deadlines.ts";
 import { buildLevels, levelOf, lvByDate, shortNo } from "./levels.ts";
 import { applyMatches, askMatch, buildPrompt, candidateLines, fileSig, pendingFiles, type MatchRow } from "./file_ai.ts";
