@@ -36,7 +36,7 @@ const isDoc = (f: any) => !!(f.pdf || DOC_RE.test(nz(f.n)));
 // 자동으로 붙일 수 있는 파일: PDF만 (한글·워드는 초안). 직원이 [수정]에서 고른 파일은 형식과 관계없이 그대로
 export const isPdf = (f: any) => !!(f.pdf || /\.pdf$/i.test(nz(f.n)));
 // 판단 기준이 바뀌면 올린다: 예전 판단을 모두 다시 묻게 된다
-const RULE_VER = "v2-pdf";
+const RULE_VER = "v3-answer";
 
 // AI에게 보여 줄 줄: 지난 일(예정 아님)의 우리 제출·기일/선고·처분 줄. 사소한 제출, 직원이 뺀 줄, 직원이 파일을 고른 줄은 뺀다
 export function candidateLines(events: any[], minor: RegExp): any[] {
@@ -73,8 +73,15 @@ const SYSTEM = [
   "- 한 줄에 맞는 파일이 여럿이면 최종본(가장 늦게 올라온 것)만 고르고 나머지는 붙이지 않는다.",
   "- 확신이 없으면 붙이지 않는다(line=null). 엉뚱한 줄에 붙는 것보다 안 붙는 것이 낫다.",
   "- '(이미 붙음: …)' 줄은 다른 파일이 붙어 있는 줄이다. 새 파일이 같은 서류의 더 나중 최종본일 때만 그 줄을 고른다.",
-  "모든 파일에 대해 답한다. why는 한국어 한 문장으로 짧게.",
+  "모든 파일(F1, F2 …)에 대해 답한다. line에는 줄 번호(L1, L2 …)만 적고, 붙이지 않으면 '없음'. why는 한국어 한 문장으로 짧게.",
 ].join("\n");
+// 파일마다 답을 꼭 받도록(2026-11-19: 답이 비거나 파일 번호를 다르게 적어 "답 없음"이 쌓임) 파일 번호를 칸 이름으로,
+// 줄은 정해진 번호 중에서만 고르게 한다
+export function answerSchema(fileIds: string[], lineIds: string[]) {
+  const one = { type: "object", additionalProperties: false, required: ["line", "why"],
+    properties: { line: { type: "string", enum: [...lineIds, "없음"] }, why: { type: "string" } } };
+  return { type: "object", additionalProperties: false, required: fileIds, properties: Object.fromEntries(fileIds.map((f) => [f, one])) };
+}
 const SCHEMA = {
   type: "object", additionalProperties: false, required: ["picks"],
   properties: { picks: { type: "array", items: { type: "object", additionalProperties: false, required: ["file", "line", "why"],
@@ -105,7 +112,7 @@ export function buildPrompt(caseTitle: string, lines: any[], files: any[], msgs:
   return { user, lineIds, fileIds };
 }
 
-export async function askMatch(ai: AiEnv, user: string, fetcher: typeof fetch = fetch, timeoutMs = 9000): Promise<{ file: string; line: string | null; why: string }[]> {
+export async function askMatch(ai: AiEnv, user: string, fetcher: typeof fetch = fetch, timeoutMs = 9000, ids?: { files: string[]; lines: string[] }): Promise<{ file: string; line: string | null; why: string }[]> {
   if (!ai.key) throw new Error("ANTHROPIC_API_KEY 없음");
   const model = ai.model || "claude-haiku-5-5";
   const haiku = model.includes("haiku");
@@ -120,7 +127,7 @@ export async function askMatch(ai: AiEnv, user: string, fetcher: typeof fetch = 
       },
       body: JSON.stringify({
         model, max_tokens: 3000, system: SYSTEM,
-        output_config: { effort: "low", format: { type: "json_schema", schema: SCHEMA } },
+        output_config: { effort: "low", format: { type: "json_schema", schema: ids ? answerSchema(ids.files, ids.lines) : SCHEMA } },
         ...(haiku ? {} : { fallbacks: "default" }),
         messages: [{ role: "user", content: user }],
       }),
@@ -129,8 +136,10 @@ export async function askMatch(ai: AiEnv, user: string, fetcher: typeof fetch = 
     const data = await res.json();
     if (data?.stop_reason === "refusal") throw new Error("refusal");
     const out = (Array.isArray(data?.content) ? data.content : []).filter((b: any) => b?.type === "text").map((b: any) => b.text || "").join("").trim();
-    const picks = JSON.parse(out || "{}")?.picks;
-    return Array.isArray(picks) ? picks : [];
+    const j = JSON.parse(out || "{}");
+    if (Array.isArray(j?.picks)) return j.picks;
+    // 파일 번호를 칸 이름으로 받은 답 → [{file, line, why}]
+    return Object.entries(j || {}).map(([file, v]: [string, any]) => ({ file, line: !v?.line || v.line === "없음" ? null : String(v.line), why: nz(v?.why) }));
   } finally { clearTimeout(timer); }
 }
 

@@ -562,7 +562,12 @@ export async function attachByAI(env: Env, events: any[], files: any[], chans: s
   const hi = new Date(Math.max(...pend.map((f) => f.at)) + 6 * 3600e3).toISOString();
   const msgs = chans.length ? await rest(env, `room_msg?select=sent_at,text&channel_id=in.${enc(inList(chans))}&sent_at=gte.${enc(lo)}&sent_at=lte.${enc(hi)}&order=sent_at.asc&limit=200`, {}, fetcher).catch(() => []) : [];
   const { user, lineIds, fileIds } = buildPrompt(title, lines, pend, (msgs || []).map((m: any) => ({ at: Date.parse(m.sent_at), text: nz(m.text) })), all.filter((f) => !isPdf(f)));
-  const picks = await askMatch({ key: env.anthropicKey, model: env.fileModel }, user, fetcher);
+  const picks = await askMatch({ key: env.anthropicKey, model: env.fileModel }, user, fetcher, 9000, { files: [...fileIds.keys()], lines: [...lineIds.keys()] });
+  // 답과 파일 번호가 어긋나면(번호 앞뒤 공백·이름을 적은 경우 등) 번호만 떼어 맞춘다. 그래도 못 맞추면 기록에 남긴다
+  const norm = (x: unknown) => (nz(x).match(/[FL]\d+/) || [""])[0];
+  for (const p of picks) { p.file = norm(p.file) || p.file; if (p.line) p.line = norm(p.line) || null; }
+  const miss = [...fileIds.keys()].filter((k) => !picks.some((p) => p.file === k));
+  if (miss.length) console.log("file ai no answer", miss.length, "of", fileIds.size, JSON.stringify(picks).slice(0, 300));
   const save: any[] = [];
   for (const [fid, f] of fileIds) {
     const p = picks.find((x) => x.file === fid);
