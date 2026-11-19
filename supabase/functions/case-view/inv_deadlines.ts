@@ -9,6 +9,7 @@
 //        / 불송치 이의신청 3개월(2026.10.2 이후 통지분만)
 //  말일이 토·일·공휴일이면 다음 평일(R20). 미뤄졌으면 원래 말일도 적는다.
 //  대상(R18): 우리 의뢰인이 고소인·피해자. 방 제목 괄호가 피의자·피고인 쪽이면 계산하지 않는다.
+//  예외: 약식명령 → 정식재판청구 7일(형소법 453조)은 피의자·피고인 쪽 기한이라 고소인 방에서는 계산하지 않는다.
 // ============================================================================
 import { dueDate, type Deadline } from "./deadlines.ts";
 
@@ -25,7 +26,7 @@ export function clientRole(title: string): "victim" | "suspect" | "" {
   return "";
 }
 
-type Rule = { key: string; t: string; days?: number; months?: number; from?: string; strip: RegExp; done: RegExp };
+type Rule = { side?: "suspect"; key: string; t: string; days?: number; months?: number; from?: string; strip: RegExp; done: RegExp };
 type Ev = { key: string; d: string; manual: boolean; notice: boolean; label: string };
 
 // 처분 줄 → 생기는 기한들
@@ -35,6 +36,7 @@ function eventOf(r: any): { key: string; label: string } | null {
   if (r.kind === "지시" || /예정|지시|이유서|신청서|항고장|제출|작성/.test(s)) return null;
   if (/재정신청\s*(이|은|에\s*대한)?\s*기각/.test(s)) return { key: "jaejeong_reject", label: "재정신청 기각" };
   if (/항고\s*(이|은|에\s*대한)?\s*기각/.test(s)) return { key: "hanggo_reject", label: "항고 기각" };
+  if (/약식\s*명령/.test(s) && !/청구|기소|정식/.test(s)) return { key: "yaksik", label: "약식명령" };
   if (/불기소/.test(s)) return { key: "nopros", label: "불기소" };
   if (/불송치/.test(s) && !/이의/.test(s)) return { key: "nosend", label: "불송치" };
   return null;
@@ -47,6 +49,7 @@ const RULES: Record<string, Rule[]> = {
     { key: "재항고", t: "재항고 마감 (재정신청 못 하는 경우)", days: 30, strip: /재항고/, done: /재항고(장|서)?\s*(우편\s*)?제출/ },
   ],
   jaejeong_reject: [{ key: "즉시항고", t: "재정신청 기각 즉시항고 마감", days: 7, strip: /즉시항고/, done: /즉시항고(장|서)?\s*(우편\s*)?제출/ }],
+  yaksik: [{ side: "suspect", key: "정식재판청구", t: "정식재판청구 마감", days: 7, strip: /정식재판/, done: /정식\s*재판\s*청구(서)?\s*(우편\s*)?(제출|접수|완료)/ }],
   nosend: [{ key: "이의신청", t: "불송치 이의신청 마감", months: 3, from: "2026-10-02", strip: /이의/, done: /이의신청서?\s*(우편\s*)?제출/ }],
 };
 
@@ -66,7 +69,6 @@ export type InvDeadline = Deadline & { strip: RegExp };
 
 export function computeInvDeadlines(rows: any[], title: string, today: string): InvDeadline[] {
   const role = clientRole(title);
-  if (role === "suspect") return [];
   const evs: Ev[] = [];
   for (const r of rows || []) {
     const e = eventOf(r);
@@ -84,6 +86,7 @@ export function computeInvDeadlines(rows: any[], title: string, today: string): 
     const lo = new Date(Date.parse(latest) - 30 * 864e5).toISOString().slice(0, 10);
     const base = pool.filter((e) => e.d >= lo).sort((a, b) => a.d.localeCompare(b.d) || Number(b.notice) - Number(a.notice))[0];
     for (const rule of RULES[key]) {
+      if (rule.side === "suspect" ? role === "victim" : role === "suspect") continue;
       if (rule.from && base.d < rule.from) continue;
       let due: string, moved: boolean, raw: string;
       if (rule.months) ({ due, moved, raw } = dueMonths(base.d, rule.months));
@@ -93,7 +96,7 @@ export function computeInvDeadlines(rows: any[], title: string, today: string): 
       const why = conf + " · " + base.label + (base.notice ? " 통지 " : " 처분 ") + md(base.d) + (base.notice ? "" : "(처분일을 통지일로 봄)") +
         " + " + (rule.months ? rule.months + "개월" : rule.days + "일") +
         (moved ? " · 원래 말일 " + md(raw) + "(" + wk(raw) + ")이 쉬는 날이라 다음 평일" : "") +
-        (role ? "" : " · 의뢰인 지위(고소인 여부) 확인 필요");
+        (role ? "" : rule.side ? " · 의뢰인 지위(피고인 여부) 확인 필요" : " · 의뢰인 지위(고소인 여부) 확인 필요");
       out.push({ t: rule.t, d: due, kind: rule.key, st: done ? "done" : "open", doneOn: done ? nz(done.ev_date).slice(0, 10) : undefined, why, strip: rule.strip });
     }
   }
