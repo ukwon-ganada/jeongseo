@@ -110,3 +110,19 @@ Deno.test("공소장 의견서 기한이 내지 않은 채 지났으면 빼기",
   const evs = [{ lp_set: "송달", lp_appoint_date: "2025-06-11", lp_contents: "피고인1  강OO 공소장부본/의견서 발송", delivered_date: "2025-06-17" }];
   assertEquals(computeDeadlines("2025고단100", evs, "2026-06-18").length, 0);
 });
+
+Deno.test("사람 확정(R17): 같은 종류·만료일 기한과 타임라인 기한 줄에 붙고, 되돌린 기록은 무시", async () => {
+  const { applyConfirms } = await import("./deadlines.ts");
+  const shaped: any = {
+    deadlines: [{ t: "항소이유서 마감", d: "2026-12-08", kind: "항소이유서", st: "open" }, { t: "상고 마감", d: "2026-12-20", kind: "상고", st: "open" }],
+    events: [{ g: "limit", d: "2026-12-08", dk: "항소이유서", k: "due", lim: 1 }, { g: "limit", d: "2026-12-20", dk: "상고", k: "due", lim: 1 }],
+  };
+  applyConfirms(shaped, [
+    { id: 1, kind: "항소이유서", due: "2026-12-08", action: "제출함", undone_at: null },
+    { id: 2, kind: "상고", due: "2026-12-20", action: "상소 안 함", undone_at: "2026-11-19T00:00:00Z" },
+  ]);
+  assertEquals(shaped.deadlines[0].cf, { a: "제출함", id: 1 });
+  assertEquals(shaped.deadlines[1].cf, undefined);
+  assertEquals([shaped.events[0].cfa, shaped.events[0].k], ["제출함", "done"]);
+  assertEquals(shaped.events[1].cfa, undefined);
+});

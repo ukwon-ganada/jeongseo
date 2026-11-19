@@ -43,7 +43,7 @@ const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 
 import { rankEvents } from "./timeline_rank.ts";
-import { computeDeadlines, deadlineEvents, mergeRoles, type OtherCase } from "./deadlines.ts";
+import { applyConfirms, computeDeadlines, deadlineEvents, DL_ACTS, mergeRoles, type OtherCase } from "./deadlines.ts";
 import { findPick, normTitle } from "./title_match.ts";
 import { dropKnown, extractFromExport, msgsToExport, toRows } from "./chat_import.ts";
 import { shapeStages, diffStages, personChangeLine, isStage, noLines, type NoHist } from "./stages.ts";
@@ -794,6 +794,9 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
         (shaped as any).lv = curLv;
         if (multi) (shaped as any).lvRows = lvRows;
       }
+      // 사람이 확정한 기한(R17)은 회색으로
+      const dlc = c.l_code ? await rest(env, `deadline_confirm?select=id,kind,due,action,undone_at&undone_at=is.null&l_code=eq.${enc(nz(c.l_code))}&order=created_at.desc&limit=100`, {}, fetcher).catch(() => []) : [];
+      applyConfirms(shaped, dlc || []);
       // 직원이 줄마다 파일을 바꿀 때 고를 목록 (화면에 따로 나열하지 않음)
       const fileChoices = files.filter((f: any) => f.lp != null || !CONTRACT_RE.test(f.n)).map((f: any) => ({ id: f.id, n: f.n, d: f.d, tm: f.tm, by: f.by }));
       const stages = shapeStages(c, saved, stageLogs || [], TITLE_PROS ? roomTitle : "", chat || [], hist || []);
@@ -891,6 +894,25 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       return json({ token, label });
     }
 
+    // 기한 사람 확정·되돌리기 (규칙서 R17, 2026-11-19 석원): 웍스 알림 카드 버튼과 같은 기록
+    if (body?.action === "dl_confirm" || body?.action === "dl_undo") {
+      const lNum = Number(body.lNum);
+      const kind = nz(body.kind).slice(0, 20), due = nz(body.due).slice(0, 10);
+      if (!Number.isFinite(lNum) || !kind || !isDate(due)) return json({ error: "기한이 없습니다" }, 400);
+      const c = (await rest(env, `case_all?select=l_code&l_num=eq.${lNum}`, {}, fetcher))[0];
+      const code = nz(c?.l_code);
+      if (!code) return json({ error: "사건이 없습니다" }, 404);
+      const q = `deadline_confirm?undone_at=is.null&l_code=eq.${enc(code)}&kind=eq.${enc(kind)}&due=eq.${due}`;
+      // 하나의 기한에는 확정 하나: 다른 버튼을 누르면 앞의 것을 되돌리고 새로 남긴다
+      await rest(env, q, { method: "PATCH", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ undone_at: new Date().toISOString(), undone_by: who.name || who.userId || null }) }, fetcher);
+      if (body.action === "dl_undo") return json({ ok: true, cf: null });
+      const act = DL_ACTS[nz(body.act)];
+      if (!act) return json({ error: "버튼이 없습니다" }, 400);
+      const ins = await rest(env, "deadline_confirm?select=id", { method: "POST", headers: { Prefer: "return=representation" },
+        body: JSON.stringify({ l_code: code, kind, due, action: act, works_user_id: who.userId || null, channel_id: nz(body.room) || null }) }, fetcher);
+      return json({ ok: true, cf: { a: act, id: ins?.[0]?.id ?? null } });
+    }
     if (body?.action === "save_info") {
       const lNum = Number(body.lNum);
       if (!Number.isFinite(lNum) || lNum === 0) return json({ error: "사건이 없습니다" }, 400); // 수사 사건은 음수 번호

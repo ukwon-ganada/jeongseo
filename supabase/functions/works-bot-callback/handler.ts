@@ -2,6 +2,8 @@
 //  works-bot-callback — 네이버웍스 봇 콜백 받기 (Supabase Edge Function, Deno)
 //
 //  지금 하는 일:
+//    · 기한 알림 카드의 버튼 [제출함] [상소 안 함] [종결·사임](postback "dl|f|사건번호|종류|만료일")을 누르면
+//      deadline_confirm 에 기록한다 → 알림 프로그램이 그 기한을 더 알리지 않는다 (규칙서 R17).
 //    · 사건방 리치 메뉴 "이 방 사건 보기"(postback, data="room-case")를 받으면
 //      누가(userId)·어느 방(channelId)에서 눌렀는지 pc_open_request 에 기록한다.
 //      → 그 사람 PC의 "정서 사건 도우미"가 받아서 사건 화면을 연다.
@@ -36,6 +38,18 @@ import { backfillHold, recheckAll, recheckLinked, recheckRoom, refreshRoomTitles
 export const BOT_IDS = ["12905890", "13580302"];
 
 export const POSTBACK_ROOM_CASE = "room-case";
+
+// 기한 알림 버튼 (규칙서 R17 사람 확정). 웍스 버튼 템플릿은 누르면 방에 글이 남으므로
+// 글이 안 남는 postback 이 되는 캐러셀 카드를 쓴다(카드당 버튼 최대 3개).
+export const DL_ACTIONS: Record<string, string> = { f: "제출함", n: "상소 안 함", c: "종결·사임" };
+
+export function parseDeadlinePostback(data: unknown) {
+  if (typeof data !== "string" || !data.startsWith("dl|")) return null;
+  const [, a, code, kind, due] = data.split("|");
+  const action = DL_ACTIONS[a || ""];
+  if (!action || !code || !kind || !/^\d{4}-\d{2}-\d{2}$/.test(due || "")) return null;
+  return { action, l_code: code.slice(0, 40), kind: kind.slice(0, 20), due };
+}
 
 export async function hmacBase64(body: string, secret: string): Promise<string> {
   const key = await crypto.subtle.importKey(
@@ -160,6 +174,22 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
     });
     if (!ins.ok) console.error("insert failed", ins.status, await ins.text());
     else await ins.body?.cancel();
+  }
+  const dl = ev?.type === "postback" ? parseDeadlinePostback(data) : null;
+  if (dl && userId) {
+    // 같은 사람이 같은 기한에 같은 버튼을 또 누르면 한 번만 남긴다
+    const q = `deadline_confirm?select=id&undone_at=is.null&l_code=eq.${encodeURIComponent(dl.l_code)}` +
+      `&kind=eq.${encodeURIComponent(dl.kind)}&due=eq.${dl.due}&action=eq.${encodeURIComponent(dl.action)}&limit=1`;
+    const ex = await rest(env, q).then((r) => r.ok ? r.json() : []).catch(() => []);
+    if (!ex?.length) {
+      const ins = await rest(env, "deadline_confirm", {
+        method: "POST",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ ...dl, works_user_id: userId, channel_id: channelId || null }),
+      });
+      if (!ins.ok) console.error("deadline_confirm insert failed", ins.status, await ins.text());
+      else { await ins.body?.cancel(); console.log("deadline_confirm", dl.action); }
+    }
   }
   // 사건방에 올라온 파일 → 내려받아 보관 (오래 걸릴 수 있어 응답 뒤에)
   const content = ev?.content;
