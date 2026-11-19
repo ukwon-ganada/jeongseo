@@ -1,5 +1,5 @@
 // 실행: deno test supabase/functions/case-view/file_ai_test.ts
-import { attachByAI, handle } from "./handler.ts";
+import { attachByAI, attachFinalFiles, handle } from "./handler.ts";
 import { applyMatches, buildPrompt, candidateLines, fileSig, lineKey } from "./file_ai.ts";
 function assert(c: unknown, m: string) { if (!c) throw new Error(m); }
 const env = { sbUrl: "https://x.supabase.co", sbKey: "k", anthropicKey: "a" };
@@ -93,4 +93,60 @@ Deno.test("파일 다시 맞추기는 예약 작업 열쇠가 있어야", async 
   assert((await call({})).status === 403, "열쇠 없이 됨");
   const r = await call({ "x-cron-secret": "s3cret" });
   assert(r.status === 200 && (await r.json()).rooms === 0, "열쇠 있으면 실행");
+});
+
+Deno.test("한글 파일은 초안: AI 후보에서 빼고 참고로만 보여 줌, 예전 규칙도 PDF만 붙임 (2026-11-19 석원)", async () => {
+  const fs = [
+    { id: 61, n: "항소이유서_이향원.hwp", d: "2026-11-10", tm: "10:00", at: Date.parse("2026-11-10T01:00:00Z"), pdf: 0, lp: null },
+    { id: 62, n: "항소이유서_이향원.pdf", d: "2026-11-11", tm: "15:00", at: Date.parse("2026-11-11T06:00:00Z"), pdf: 1, lp: null },
+    { id: 63, n: "참고자료1_진단서.pdf", d: "2026-11-11", tm: "15:01", at: Date.parse("2026-11-11T06:01:00Z"), pdf: 1, lp: null },
+  ];
+  const e = () => [{ d: "2026-11-11", k: "ours", g: "ours", t: "변호인 법무법인 정서 항소이유서 제출", lp: 900 }];
+  let body = "";
+  const fetcher = (async (url: any, init?: any) => {
+    const u = String(url);
+    if (u.includes("case_file_match") && (!init || !init.method || init.method === "GET")) return Response.json([]);
+    if (u.includes("case_file_match")) return new Response(null, { status: 201 });
+    if (u.includes("room_msg")) return Response.json([{ sent_at: "2026-11-11T06:05:00Z", text: "ㄱㄱ" }]);
+    if (u.includes("api.anthropic.com")) {
+      body = JSON.parse(init.body).messages[0].content;
+      const id = (name: string) => (body.match(new RegExp("(F\\d+) [^\\n]*" + name)) || [])[1];
+      const picks = [{ file: id("항소이유서_이향원.pdf"), line: "L1", why: "항소이유서 본문" }, { file: id("진단서"), line: null, why: "첨부" }];
+      return Response.json({ content: [{ type: "text", text: JSON.stringify({ picks }) }], stop_reason: "end_turn" });
+    }
+    throw new Error("예상 못한 요청 " + u);
+  }) as typeof fetch;
+  const e1 = e();
+  assert(await attachByAI(env, e1, fs, ["ch"], "사건", fetcher), "실패");
+  const files = body.split("올라온 파일:")[1].split("\n\n")[0];
+  assert(!files.includes(".hwp") && files.includes("항소이유서_이향원.pdf"), files);
+  assert(body.includes("같은 무렵 한글 파일") && body.includes("항소이유서_이향원.hwp") && body.includes("ㄱㄱ"), body);
+  assert((e1[0] as any).f?.id === 62, JSON.stringify(e1));
+  // 예전 이름 규칙(AI 못 쓸 때)도 한글 파일은 붙이지 않는다
+  const e2 = e();
+  attachFinalFiles(e2, [fs[0]]);
+  assert(!(e2[0] as any).f, "hwp가 붙음");
+  const e3 = e();
+  attachFinalFiles(e3, fs);
+  assert((e3[0] as any).f?.id === 62, JSON.stringify(e3));
+});
+
+Deno.test("파일마다 답을 받는 모양: 파일 번호가 칸 이름, 줄은 정해진 번호 중에서 (이강효 재정신청서 2026-11-19)", async () => {
+  const fs = [{ id: 136, n: "이강효_재정신청서_261119.pdf", d: "2026-11-19", tm: "16:08", at: Date.parse("2026-11-19T07:08:00Z"), pdf: 1, lp: null }];
+  const e = [{ d: "2026-11-19", k: "ours", g: "ours", t: "재정신청서 제출 15:10 · 인천지방공소청", src: "chat", rid: 900 }];
+  let schema: any = null;
+  const fetcher = (async (url: any, init?: any) => {
+    const u = String(url);
+    if (u.includes("case_file_match") && (!init || !init.method || init.method === "GET")) return Response.json([]);
+    if (u.includes("case_file_match")) return new Response(null, { status: 201 });
+    if (u.includes("room_msg")) return Response.json([]);
+    if (u.includes("api.anthropic.com")) {
+      schema = JSON.parse(init.body).output_config.format.schema;
+      return Response.json({ content: [{ type: "text", text: JSON.stringify({ F1: { line: "L1", why: "재정신청서 최종본" } }) }], stop_reason: "end_turn" });
+    }
+    throw new Error("예상 못한 요청 " + u);
+  }) as typeof fetch;
+  assert(await attachByAI(env, e, fs, ["ch"], "사건", fetcher), "실패");
+  assert(JSON.stringify(schema.required) === '["F1"]' && schema.properties.F1.properties.line.enum.includes("L1"), JSON.stringify(schema));
+  assert((e[0] as any).f?.id === 136, JSON.stringify(e));
 });

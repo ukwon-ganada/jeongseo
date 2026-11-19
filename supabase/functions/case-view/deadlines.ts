@@ -7,6 +7,8 @@
 //    선고           → 7일 안에 항소장(1심) / 상고장(항소심)      (형소법 358·374조)
 //    소송기록접수통지 → 도달 후 20일 안에 항소이유서 / 상고이유서 (형소법 361조의3·379조)
 //                     피고인·우리 법인 중 먼저 받은 날 기준 (규칙서 E2, 석원 확정)
+//    공소장 부본   → 도달 후 7일 안에 공소사실 의견서 (형소법 266조의2), 합의부면 국민참여재판 의사확인서도
+//                     (국민참여재판법 8조②, 안 내면 원하지 않는 것으로 봄). 1심 사건만, 첫 도달 기준
 //    날 세기: 첫날 빼고(형소법 66조①), 마지막 날이 토·일·공휴일이면 다음 평일(66조③)
 //
 //  로웨어 진행내역에는 하급심 기록이 같이 들어 있어서, 사건번호(고/노/도)와
@@ -79,10 +81,22 @@ export function ourDefendants(evs: any[]): Set<string> | null {
 export function isNotice(e: any, ours: Set<string> | null = null): boolean {
   const c = nz(e.lp_contents);
   if (e.lp_set !== "송달" || !/소송기록접수통지/.test(c)) return false;
+  return toUs(c, ours); // 받는 사람이 피고인 본인일 때만 (문서 이름의 '국선변호인'은 상관없음)
+}
+
+// 송달 줄이 우리 의뢰인(피고인) 본인 또는 우리 법인에게 간 것인지 (검사·다른 변호인·다른 피고인 제외)
+function toUs(c: string, ours: Set<string> | null): boolean {
   if (OUR_FIRM.test(c)) return true;
   const m = c.match(/^피고인(\d*)\s+(\S+)/);
-  if (!m || /변호인/.test(m[2])) return false; // 받는 사람이 피고인 본인일 때만 (문서 이름의 '국선변호인'은 상관없음)
+  if (!m || /변호인/.test(m[2])) return false;
   return !ours || ours.has(m[1] || "1");
+}
+
+// 공소장 부본 송달(공소장 변경·병합 사건 공소장은 뺀다)
+export function isIndictCopy(e: any, ours: Set<string> | null = null): boolean {
+  const c = nz(e.lp_contents);
+  if (e.lp_set !== "송달" || !/공소장\s*부본/.test(c) || /변경|병합/.test(c)) return false;
+  return toUs(c, ours);
 }
 
 export type Deadline = { t: string; d: string; why: string; st: "open" | "done" | "expected"; kind: string; doneOn?: string };
@@ -154,6 +168,12 @@ export function computeDeadlines(code: string, evs: any[], today: string, others
   rounds.forEach((r, i) => stageOfRound.set(r, Math.max(2, top - (rounds.length - 1 - i))));
 
   const out: Deadline[] = [];
+  if (top === 1) {
+    const copies = list.filter((e) => isIndictCopy(e, ours));
+    // 지난 의견서 기한은 훈시 기간이고 선임 전 일이 많아(1심 211건 중 131건) 내지 않은 채 지났으면 보여 주지 않는다
+    const x = copies.length ? indictDeadline(code, copies, filings) : null;
+    if (x && !(x.st === "open" && x.d < today)) out.push(x);
+  }
   items.forEach((it, i) => {
     if (it.kind === "v") {
       const next = items.slice(i + 1).find((x) => x.kind === "n");
@@ -191,12 +211,34 @@ export function computeDeadlines(code: string, evs: any[], today: string, others
   return out;
 }
 
+// 공소장 부본 첫 도달 + 7일. 우리가 낸 의견서·의사확인서가 있으면 제출로 본다.
+function indictDeadline(code: string, copies: any[], filings: any[]): Deadline {
+  const sent = copies[0]._d;
+  const jury = /고합/.test(nz(code)) || copies.some((e) => /국민참여재판/.test(nz(e.lp_contents)));
+  const t = (jury ? "공소사실 의견서·국민참여재판 의사확인서" : "공소사실 의견서") + " 마감";
+  const got = copies.filter((e) => isDate(e.delivered_date))
+    .map((e) => ({ d: nz(e.delivered_date).slice(0, 10), who: OUR_FIRM.test(nz(e.lp_contents)) ? "우리" : "피고인" }))
+    .sort((a, b) => a.d.localeCompare(b.d))[0];
+  if (!got) return { t, d: "", kind: "의견서", st: "expected", why: "공소장 부본 발송 " + md(sent) + " · 아직 도달 전" };
+  const { due, moved } = dueDate(got.d, 7);
+  const done = filings.find((f) => f._d >= sent && f._d <= addDays(due, 14) && OURS_RE.test(nz(f.lp_contents)) &&
+    /의견서|의사확인서/.test(nz(f.lp_contents)) && !/배상|절차|소송진행|피해자|양형/.test(nz(f.lp_contents)));
+  return {
+    t, d: due, kind: "의견서", doneOn: done?._d, st: done ? "done" : "open",
+    why: "공소장 부본 도달 " + md(got.d) + "(" + got.who + ") + 7일" + (moved ? " (쉬는 날이라 다음 평일)" : ""),
+  };
+}
+
 // 타임라인 줄로: 이미 낸 기한은 '제출' 줄이 따로 있으니 빼고, 남은 것만 기한 줄로.
 export function deadlineEvents(dls: Deadline[], today: string) {
-  return dls.filter((x) => x.d && x.st !== "done").map((x) => ({
-    d: x.d, k: x.d >= today ? "due" : "done", g: "limit", lim: x.d >= today ? 1 : 0,
+  // 제출이 끝난 기한도 지우지 않고 회색 "제출 m.d"로 남긴다 (2026-11-19 석원, 이강효 사건)
+  return dls.filter((x) => x.d).map((x) => x.st === "done" ? {
+    d: x.d, k: "done", g: "limit", lim: 0, dk: x.kind, cfa: "제출" + (x.doneOn ? " " + md(x.doneOn) : ""),
+    t: x.t + " · " + x.why, f: null,
+  } : {
+    d: x.d, k: x.d >= today ? "due" : "done", g: "limit", lim: x.d >= today ? 1 : 0, dk: x.kind,
     t: x.t + (x.st === "expected" ? " (선고되면)" : "") + " · " + x.why, f: null,
-  }));
+  });
 }
 
 // 한 방에 사건이 둘 이상일 때 본 사건·병합된 사건 가리기 (2026-11-17 석원 요청)
@@ -222,4 +264,21 @@ export function mergeRoles(cases: { code: string; evs: any[] }[], title = ""): {
   }
   if (!main) return null;
   return { main: main.code, merged: list.filter((x) => x !== main).map((x) => x.code) };
+}
+
+// 기한 사람 확정 (규칙서 R17, 2026-11-19 석원): 웍스 알림 카드 버튼이나 기한 탭 [수정]에서 누른 기록(deadline_confirm)
+export const DL_ACTS: Record<string, string> = { f: "제출함", n: "상소 안 함", c: "종결·사임" };
+export function applyConfirms(shaped: any, rows: any[]) {
+  const key = (kind: unknown, d: unknown) => nz(kind) + "|" + nz(d).slice(0, 10);
+  const m = new Map<string, any>();
+  for (const r of rows || []) if (!r.undone_at && !m.has(key(r.kind, r.due))) m.set(key(r.kind, r.due), r);
+  for (const x of shaped.deadlines || []) {
+    const r = x.d ? m.get(key(x.kind, x.d)) : null;
+    if (r) x.cf = { a: nz(r.action), id: r.id };
+  }
+  for (const e of shaped.events || []) {
+    if (e.g !== "limit" || !e.dk) continue;
+    const r = m.get(key(e.dk, e.d));
+    if (r) { e.cfa = nz(r.action); e.k = "done"; e.lim = 0; }
+  }
 }

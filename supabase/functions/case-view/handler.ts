@@ -42,13 +42,16 @@ const CORS = {
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 
-import { computeDeadlines, deadlineEvents, mergeRoles, type OtherCase } from "./deadlines.ts";
+import { rankEvents } from "./timeline_rank.ts";
+import { applyConfirms, computeDeadlines, deadlineEvents, DL_ACTS, mergeRoles, type OtherCase } from "./deadlines.ts";
 import { findPick, normTitle } from "./title_match.ts";
 import { dropKnown, extractFromExport, msgsToExport, toRows } from "./chat_import.ts";
-import { shapeStages, diffStages, personChangeLine, isStage } from "./stages.ts";
+import { shapeStages, diffStages, personChangeLine, isStage, noLines, chatNos, withChatNos, type NoHist } from "./stages.ts";
+// 방 제목 형제번호로 공소청 칸 채우기(2026-11-19): 바뀌는 방 목록을 석원님이 확인한 뒤 켠다
+const TITLE_PROS = true;
 import { applyInvDeadlines } from "./inv_deadlines.ts";
-import { buildLevels, levelOf, lvByDate, shortNo } from "./levels.ts";
-import { applyMatches, askMatch, buildPrompt, candidateLines, fileSig, pendingFiles, type MatchRow } from "./file_ai.ts";
+import { buildLevels, levelOf, LV_LABEL, lvByDate, shortNo } from "./levels.ts";
+import { applyMatches, askMatch, buildPrompt, candidateLines, fileSig, isPdf, pendingFiles, type MatchRow } from "./file_ai.ts";
 export const DEADLINE_NOTE = "잠정 계산입니다. 재판 단계(항소·상고·이유서)는 선고일·기록접수통지 도달일로, 수사 단계(항고·재정신청·이의신청)는 사건방 줄의 처분·통지 날짜로 계산했습니다. 알림은 보내지 않습니다. 꼭 기록으로 한 번 더 확인해 주세요.";
 export type Env = { sbUrl: string; sbKey: string; anthropicKey?: string; chatModel?: string; refreshModel?: string; fileModel?: string };
 export type WhoAmI = { ok: boolean; status: number; userId?: string; domainId?: number | string; name?: string; error?: string };
@@ -113,6 +116,14 @@ const OUR_FIRM = /법무법인\s*정서/;
 // 맡은 자리를 모르면(선임계에 "변호인 법무법인 정서"만 있음) 선임 이후 가려진 자리가 한 곳뿐일 때만 그 자리로 본다.
 const MASKED = /^(\S*?)\s*(변호인|소송대리인)\s+법O{6}(?!O)/;
 const OUR_ROLE = /^(\S*?)\s*(변호인|소송대리인)\s+법무법인\s*정서/;
+const APPEAL_BRIEF = /(항소|상고)\s*(보충\s*)?이유서/;
+// 받는 사람·낸 사람: 로웨어 줄 앞머리("피고인1 변호인  문OO …", "피고인1  인OOO …")만 본다 (뒤의 '국선변호인선정결정' 같은 서류 이름에 속지 않게)
+function whoOf(c: string): string {
+  const head = c.split(/\s{2,}/)[0];
+  if (/변호인/.test(head)) return "변호인";
+  if (/피고인/.test(head)) return "피고인";
+  return "";
+}
 export function ourFilingTest(list: any[]): (e: any) => boolean {
   const day = (e: any) => nz(e.lp_appoint_date).slice(0, 10);
   const firm = list.filter((e) => OUR_FIRM.test(nz(e.lp_contents)));
@@ -207,8 +218,21 @@ export function shapeCase(c: any, evs: any[], opts: { today: string; linked: str
       events.push({ d, k: future ? "due" : verdict ? "ours" : "done", g: "hearing", t: (future ? "" : verdict ? "" : "출석 ") + t, f: null });
     } else if (ours(e)) {
       events.push({ d, k: "ours", g: "ours", t: nz(e.lp_contents).replace(/^.*?(법무법인\s*정서|법O{6}(?!O))\s*/, "") || nz(e.lp_contents), f: null, lp: e.lp_num });
+    } else if (e.lp_set === "서면" && APPEAL_BRIEF.test(nz(e.lp_contents)) && !/^\s*검사/.test(nz(e.lp_contents))) {
+      // 불변기한 서면(항소·상고이유서)은 국선·피고인이 낸 것도 남긴다 (2026-11-19 석원, 이강효 사건)
+      events.push({ d, k: "done", g: "filing", w: 2, t: (nz(e.lp_contents).match(APPEAL_BRIEF) || [""])[0].replace(/\s+/g, "") + " 제출 (" + whoOf(nz(e.lp_contents)) + ")", f: null });
     }
   }
+  // 소송기록접수통지 도달: 이유서 기한의 기산점이라 누구에게 도달했든 남긴다 (검사 제외, 같은 날은 한 줄)
+  const notice = new Map<string, Set<string>>();
+  for (const e of list) {
+    const c = nz(e.lp_contents);
+    if (e.lp_set !== "송달" || !/소송기록접수통지/.test(c) || /^\s*검사/.test(c)) continue;
+    const dd = isDate(e.delivered_date) ? nz(e.delivered_date).slice(0, 10) : ((nz(e.lp_remark).match(/(\d{4})\.(\d{2})\.(\d{2})\s*송달됨/) || []).slice(1, 4).join("-"));
+    if (!isDate(dd)) continue;
+    (notice.get(dd) || notice.set(dd, new Set()).get(dd)!).add(OUR_FIRM.test(c) ? "우리" : whoOf(c) || "피고인");
+  }
+  for (const [d, who] of notice) events.push({ d, k: "done", g: "notice", w: 2, t: "소송기록접수통지 도달 (" + [...who].join("·") + ")", f: null });
   // 의뢰인에게 안내 문자를 보냈는지만 (석원 2026-11-16: 내용은 불필요). 같은 날 여러 통이어도 한 줄.
   const smsDays = new Set<string>();
   for (const e of evs) {
@@ -323,6 +347,27 @@ export async function relatedNums(env: Env, lNum: number, channels: string[], fe
   return [...new Set(rows.map((r: any) => Number(r.l_num)).filter((n: number) => Number.isFinite(n) && n !== 0 && n !== lNum))] as number[];
 }
 // 이 사건에 아직 직접 저장한 사건정보가 없으면, 같은 방 이전 사건에 적어 둔 사건정보를 이어 받는다("지금 단계"는 새로 정함)
+export async function noHist(env: Env, nums: number[], fetcher: typeof fetch = fetch): Promise<NoHist[]> {
+  const ok = nums.filter((n) => Number.isFinite(n) && n !== 0);
+  if (!ok.length) return [];
+  return await rest(env, `case_no_hist?select=id,stage,org,no,seen_on,hidden&l_num=in.(${ok.join(",")})&order=id.asc&limit=200`, {}, fetcher).catch(() => []) || [];
+}
+// 사건방 글(30일 보관)에 적힌 형제번호·경찰 접수번호 (2026-11-19 석원: 송치 뒤 공소청·공소관·형제번호가 안 들어옴)
+export async function chatNoHist(env: Env, chans: string[], fetcher: typeof fetch = fetch): Promise<NoHist[]> {
+  if (!chans.length) return [];
+  const rows = await rest(env, `room_msg?select=sent_at,text&channel_id=in.${enc(inList(chans))}&or=${enc("(text.like.*형제*,text.like.*경찰서*)")}&order=sent_at.asc&limit=200`, {}, fetcher).catch(() => []) || [];
+  return chatNos(rows);
+}
+export function hideRemovedNos(hist: NoHist[], body: any): number[] {
+  const out: number[] = [];
+  for (const s of ["police", "pros"]) {
+    const b = body?.[s];
+    if (!b || !Array.isArray(b.prev)) continue;
+    const keep = new Set([nz(b.no), ...b.prev.map((p: any) => nz(p?.no))].filter(Boolean));
+    for (const h of hist) if (h.stage === s && !h.hidden && h.id != null && !keep.has(nz(h.no))) out.push(h.id);
+  }
+  return out;
+}
 export async function inheritedInfo(env: Env, rel: number[], fetcher: typeof fetch = fetch): Promise<any | null> {
   if (!rel.length) return null;
   const r = await rest(env, `case_info?select=*&l_num=in.(${rel.join(",")})&order=updated_at.desc&limit=1`, {}, fetcher).catch(() => []);
@@ -336,10 +381,11 @@ const MEET = new Set(["조사", "출석요구", "기일"]);
 export function roomGroup(kind: string, summary: string): string {
   const s = nz(summary);
   if (kind === "접견" || /접견/.test(s)) return "meet";
+  if (["서면제출", "고소장제출"].includes(kind)) return "ours";
   if (["송치", "처분", "기소"].includes(kind) || /송치|불송치|기소|불기소|기소유예|약식|처분/.test(s)) return "decision";
-  if (["서면제출", "고소장제출"].includes(kind) || /선임계|선임신고서|선임서|의견서|고소장|고발장|이의신청|탄원서|서면\s*제출/.test(s)) return "ours";
+  if (/선임계|선임신고서|선임서|의견서|고소장|고발장|이의신청|탄원서|서면\s*제출/.test(s)) return "ours";
   if (MEET.has(kind) || /조사|출석/.test(s)) return "hearing";
-  if (kind === "사건접수" || s === "사건 선임") return "accept";
+  if ((kind === "사건접수" && !/형제|\d{4}-\d{3,}|사건\s*번호|배당|이송|송치/.test(s)) || s === "사건 선임") return "accept";
   return "chat";
 }
 export const isChatDeadline = (r: any) => r.kind !== "지시" && /(마감|기한)(일)?\s*$|마감일|기한\s*:/.test(nz(r.summary));
@@ -469,7 +515,7 @@ export function attachFinalFiles(events: any[], files: any[], none: Set<string> 
     if (none.has(String(e.lp))) { e.none = 1; continue; }
     if (!auto) continue;
     const title = docTitle(e.t), lo = addDays(e.d, -TITLE_WINDOW_DAYS);
-    const pool = docs.filter((f) => !used.has(f.id) && f.lp == null && f.d <= e.d && f.d >= lo && titleMatch(f.n, title))
+    const pool = docs.filter((f) => !used.has(f.id) && f.lp == null && isPdf(f) && f.d <= e.d && f.d >= lo && titleMatch(f.n, title))
       .sort((a, b) => b.at - a.at);
     if (pool[0]) { used.add(pool[0].id); e.f = { id: pool[0].id, n: pool[0].n, pick: 0 }; }
   }
@@ -482,7 +528,7 @@ const isVerdictLine = (e: any) => e.g === "hearing" && e.k !== "due" && /선고/
 export function attachJudgment(events: any[], files: any[]) {
   const used = new Set(events.flatMap((e) => [e.f?.id, e.cf?.id]).filter((x) => x != null));
   const lines = events.filter(isVerdictLine).sort((a, b) => b.d.localeCompare(a.d));
-  for (const f of files.filter((x) => JUDG_RE.test(x.n) && x.lp == null && !used.has(x.id)).sort((a, b) => b.at - a.at)) {
+  for (const f of files.filter((x) => JUDG_RE.test(x.n) && isPdf(x) && x.lp == null && !used.has(x.id)).sort((a, b) => b.at - a.at)) {
     const e = lines.find((l) => l.d <= f.d && f.d <= addDays(l.d, 60));
     if (e && !e.f) { e.f = { id: f.id, n: f.n, pick: 0 }; used.add(f.id); }
   }
@@ -492,7 +538,7 @@ export function attachJudgment(events: any[], files: any[]) {
 //   선임계·선임신고서는 "선임"만 겹쳐도 짝으로 본다. 열람복사·정보공개청구 같은 줄은 붙이지 않는다.
 export function attachChatFiles(events: any[], files: any[]) {
   const used = new Set(events.flatMap((e) => [e.f?.id, e.cf?.id]).filter((x) => x != null));
-  const docs = files.filter((f) => (f.pdf || DOC_RE.test(f.n)) && f.lp == null && !CONTRACT_RE.test(f.n) && !JUDG_RE.test(f.n));
+  const docs = files.filter((f) => isPdf(f) && f.lp == null && !CONTRACT_RE.test(f.n) && !JUDG_RE.test(f.n));
   const lines = events.filter((e) => e.src === "chat" && e.g === "ours" && !e.f).sort((a, b) => a.d.localeCompare(b.d));
   for (const e of lines) {
     const t = nz(e.t);
@@ -508,7 +554,9 @@ export function attachChatFiles(events: any[], files: any[]) {
 // AI로 파일 붙이기: 기억된 판단을 먼저 붙이고, 새 파일·줄 목록이 바뀐 파일만 한 번에 묻는다. 결과는 case_file_match에
 export async function attachByAI(env: Env, events: any[], files: any[], chans: string[], title: string, fetcher: typeof fetch = fetch): Promise<boolean> {
   if (!env.anthropicKey) return false;
-  const docs = files.filter((f) => (f.pdf || DOC_RE.test(f.n)) && f.lp == null && !CONTRACT_RE.test(f.n));
+  // 자동 후보는 PDF만(2026-11-19 석원: 한글 파일은 초안, 최종 제출본은 PDF). 한글·워드는 AI에 참고로만
+  const all = files.filter((f) => DOC_RE.test(nz(f.n)) || f.pdf);
+  const docs = all.filter((f) => isPdf(f) && f.lp == null && !CONTRACT_RE.test(f.n));
   if (!docs.length) return true;
   const lines = candidateLines(events, MINOR_RE);
   const rows = await rest(env, `case_file_match?select=file_id,line_key,sig&file_id=in.(${docs.map((f) => Number(f.id)).join(",")})`, {}, fetcher);
@@ -519,8 +567,13 @@ export async function attachByAI(env: Env, events: any[], files: any[], chans: s
   const lo = new Date(Math.min(...pend.map((f) => f.at)) - 6 * 3600e3).toISOString();
   const hi = new Date(Math.max(...pend.map((f) => f.at)) + 6 * 3600e3).toISOString();
   const msgs = chans.length ? await rest(env, `room_msg?select=sent_at,text&channel_id=in.${enc(inList(chans))}&sent_at=gte.${enc(lo)}&sent_at=lte.${enc(hi)}&order=sent_at.asc&limit=200`, {}, fetcher).catch(() => []) : [];
-  const { user, lineIds, fileIds } = buildPrompt(title, lines, pend, (msgs || []).map((m: any) => ({ at: Date.parse(m.sent_at), text: nz(m.text) })));
-  const picks = await askMatch({ key: env.anthropicKey, model: env.fileModel }, user, fetcher);
+  const { user, lineIds, fileIds } = buildPrompt(title, lines, pend, (msgs || []).map((m: any) => ({ at: Date.parse(m.sent_at), text: nz(m.text) })), all.filter((f) => !isPdf(f)));
+  const picks = await askMatch({ key: env.anthropicKey, model: env.fileModel }, user, fetcher, 9000, { files: [...fileIds.keys()], lines: [...lineIds.keys()] });
+  // 답과 파일 번호가 어긋나면(번호 앞뒤 공백·이름을 적은 경우 등) 번호만 떼어 맞춘다. 그래도 못 맞추면 기록에 남긴다
+  const norm = (x: unknown) => (nz(x).match(/[FL]\d+/) || [""])[0];
+  for (const p of picks) { p.file = norm(p.file) || p.file; if (p.line) p.line = norm(p.line) || null; }
+  const miss = [...fileIds.keys()].filter((k) => !picks.some((p) => p.file === k));
+  if (miss.length) console.log("file ai no answer", miss.length, "of", fileIds.size, JSON.stringify(picks).slice(0, 300));
   const save: any[] = [];
   for (const [fid, f] of fileIds) {
     const p = picks.find((x) => x.file === fid);
@@ -656,7 +709,7 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
 
 
     if (body?.action === "case") {
-      const out = (o: any, st?: number) => json(located ? { ...o, located } : o, st);
+      const out = (o: any, st?: number) => { if (Array.isArray(o?.events)) rankEvents(o.events); return json(located ? { ...o, located } : o, st); };
       const room = nz(body.room), caseParam = nz(body.case);
       let c: any = null, status: string | undefined, linked: string[] = [];
       if (room) {
@@ -694,7 +747,7 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       const chans = [...new Set([room, ...roomRows.map((r: any) => nz(r.channel_id))].filter(Boolean))] as string[];
       const rel = await relatedNums(env, Number(c.l_num), chans, fetcher);
       const allNums = [Number(c.l_num), ...rel].join(",");
-      const [evs, mine, savedOwn, files, chat, checked, meets, stageLogs, relCases, titleRows, _logged, relEvs] = await Promise.all([
+      const [evs, mine, savedOwn, files, chat, checked, meets, stageLogs, relCases, titleRows, _logged, relEvs, hist] = await Promise.all([
         rest(env, `lw_process_events?select=lp_num,lp_set,lp_appoint_date,lp_appoint_time,lp_contents,lp_remark,delivered_date,court,last_seen_at,lp_append_udate&l_num=eq.${c.l_num}&order=lp_appoint_date.asc&limit=2000`, {}, fetcher),
         myCases(env, who.name || "", fetcher),
         rest(env, `case_info?select=*&l_num=eq.${c.l_num}`, {}, fetcher).then((r: any[]) => r?.[0] ?? null).catch(() => null),
@@ -708,13 +761,16 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
         logView(env, who, "case", room, c, fetcher),
         // 같은 방 다른 사건 기록 전체: 병합 이유서 기한(R21~R23), 지난 심급 타임라인·나의사건(심급 구분)
         rel.length ? rest(env, `lw_process_events?select=l_num,lp_num,lp_set,lp_appoint_date,lp_appoint_time,lp_contents,lp_remark,delivered_date,court,last_seen_at,lp_append_udate&l_num=in.(${rel.join(",")})&order=lp_appoint_date.asc&limit=6000`, {}, fetcher).catch(() => []) : Promise.resolve([]),
+        noHist(env, [Number(c.l_num), ...rel], fetcher).then(async (h: NoHist[]) => withChatNos(h, await chatNoHist(env, chans, fetcher).catch(() => []))),
       ]);
       const saved = savedOwn ?? await inheritedInfo(env, rel, fetcher);
       const end = new Date(Date.parse(today) + 28 * 864e5).toISOString().slice(0, 10);
       const myHearings = mine.filter((m: any) => isDate(m.next_date) && m.next_date.slice(0, 10) >= today && m.next_date.slice(0, 10) <= end)
         .map((m: any) => ({ c: m.l_code, d: m.next_date.slice(0, 10), tm: nz(m.next_time), t: nz(m.next_contents) || "기일", p: nz(m.court) }));
       const others: OtherCase[] = (relCases || []).filter((x: any) => x.l_code).map((x: any) => ({ code: nz(x.l_code), evs: (relEvs || []).filter((e: any) => String(e.l_num) === String(x.l_num)) }));
-      const shaped = shapeCase(c, evs || [], { today, linked, myHearings, status, saved, others });
+      // 병합 이유서 규칙(R21~R23)은 같은 심급 사건끼리만: 2심 사건이 1심 병합결정을 보고 "병합됨"이 되지 않게 (박큰별 2026-11-19)
+      const sameLv = others.filter((o) => levelOf(o.code) === levelOf(nz(c.l_code)));
+      const shaped = shapeCase(c, evs || [], { today, linked, myHearings, status, saved, others: sameLv });
       shaped.progress.checked = checked;
       const titles = (titleRows || []) as any[];
       const roomTitle = nz(titles[0]?.room_title);
@@ -733,12 +789,22 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       if (multi) {
         for (const e of shaped.events) e.lv = curLv;
         const acc = shaped.events.find((e: any) => e.g === "accept");
-        if (acc && levels[0].lv < curLv) acc.t = (levels.find((L) => L.lv === curLv)?.label || "") + " 선임";
+        const curL = levels.find((L) => L.lv === curLv);
+        // 로웨어는 윗심급 사건에 아랫심급 선임일을 그대로 옮겨 적는다(박큰별 2026노101087 = 1심 선임일 2026-06-16).
+        // 이 심급 기록이 시작되기 전 날짜의 선임 줄은 아랫심급 선임이므로 이 심급 줄로 두지 않는다
+        if (acc && levels[0].lv < curLv && curL?.start && acc.d < curL.start) shaped.events = shaped.events.filter((e: any) => e !== acc);
+        else if (acc && levels[0].lv < curLv) acc.t = (curL?.label || "") + " 선임";
+        // 로웨어가 윗심급 사건에 옮겨 적은 아랫심급 선고일(l_judgment_date) 같은 줄: 이 심급 시작 전 날짜면 그날의 심급으로
+        if (curL?.start) for (const e of shaped.events) if (e.lv === curLv && e.d && e.d < curL.start) e.lv = lvByDate(levels, e.d);
         for (const x of relList) {
           const lv = levelOf(nz(x.rc.l_code));
           if (lv >= curLv) continue;
           for (const e of shapeOf(x).events) shaped.events.push({ ...e, lv });
         }
+        // 지난 심급의 선임 줄은 그 심급에서 가장 이른 하나만 (병합된 사건의 선임일은 따로 보이지 않게)
+        const firstAcc = new Map<number, any>();
+        for (const e of shaped.events) if (e.g === "accept" && e.lv < curLv && (!firstAcc.has(e.lv) || e.d < firstAcc.get(e.lv).d)) firstAcc.set(e.lv, e);
+        shaped.events = shaped.events.filter((e: any) => !(e.g === "accept" && e.lv < curLv && firstAcc.get(e.lv) !== e));
         shaped.events.sort(byDay);
       }
       const lvRows: Record<string, any[]> = {};
@@ -777,15 +843,34 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       fixAccept(shaped, !!c.is_inv);
       earliestAccept(shaped, (relCases || []).filter((x: any) => levelOf(nz(x.l_code)) === curLv));
       mergeMeets(shaped, meets || []);
+      for (const x of noLines(hist || [])) shaped.events.push({ d: x.d, k: "room", g: "chat", t: x.t, f: null });
+      shaped.events.sort(byDay);
       if (multi) for (const e of shaped.events) if (e.lv == null) e.lv = lvByDate(levels, e.d);
+      // 아랫심급 사건이 로웨어에 없을 때(이강효 2026노100136, 2026-11-19 석원): 이 사건 기록의 첫날(사건접수)이 심급 경계.
+      // 그 앞의 줄(로웨어가 옮겨 적은 선임일·원심 선고일 등)은 아랫심급 구간으로. 타임라인 띠만 쓰고 탭·나의사건은 그대로
+      if (!multi && !c.is_inv && curLv >= 2) {
+        const own = (evs || []).map((e: any) => nz(e.lp_appoint_date).slice(0, 10)).filter(isDate).sort()[0];
+        if (own && shaped.events.some((e: any) => e.d && e.d < own)) {
+          const prev = curLv - 1;
+          for (const e of shaped.events) e.lv = e.d && e.d < own ? prev : curLv;
+          shaped.events.push({ d: own, k: "done", g: "court", w: 2, lv: curLv, t: LV_LABEL[curLv] + " 사건접수", f: null });
+          (shaped as any).tlLevels = [
+            { lv: prev, label: LV_LABEL[prev], main: "", cases: [], merged: [] },
+            { lv: curLv, label: LV_LABEL[curLv], main: nz(c.l_code), cases: [nz(c.l_code)], merged: [] },
+          ];
+        }
+      }
       if (levels.length > 1 || levels.some((L) => L.cases.length > 1)) {
         (shaped as any).levels = levels.map(({ start: _s, ...L }) => L);
         (shaped as any).lv = curLv;
         if (multi) (shaped as any).lvRows = lvRows;
       }
+      // 사람이 확정한 기한(R17)은 회색으로
+      const dlc = c.l_code ? await rest(env, `deadline_confirm?select=id,kind,due,action,undone_at&undone_at=is.null&l_code=eq.${enc(nz(c.l_code))}&order=created_at.desc&limit=100`, {}, fetcher).catch(() => []) : [];
+      applyConfirms(shaped, dlc || []);
       // 직원이 줄마다 파일을 바꿀 때 고를 목록 (화면에 따로 나열하지 않음)
       const fileChoices = files.filter((f: any) => f.lp != null || !CONTRACT_RE.test(f.n)).map((f: any) => ({ id: f.id, n: f.n, d: f.d, tm: f.tm, by: f.by }));
-      const stages = shapeStages(c, saved, stageLogs || []);
+      const stages = shapeStages(c, saved, stageLogs || [], TITLE_PROS ? roomTitle : "", chat || [], hist || []);
       return out({ ...shaped, fileChoices, stages, dispNo: stages.dispNo });
     }
 
@@ -880,6 +965,25 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       return json({ token, label });
     }
 
+    // 기한 사람 확정·되돌리기 (규칙서 R17, 2026-11-19 석원): 웍스 알림 카드 버튼과 같은 기록
+    if (body?.action === "dl_confirm" || body?.action === "dl_undo") {
+      const lNum = Number(body.lNum);
+      const kind = nz(body.kind).slice(0, 20), due = nz(body.due).slice(0, 10);
+      if (!Number.isFinite(lNum) || !kind || !isDate(due)) return json({ error: "기한이 없습니다" }, 400);
+      const c = (await rest(env, `case_all?select=l_code&l_num=eq.${lNum}`, {}, fetcher))[0];
+      const code = nz(c?.l_code);
+      if (!code) return json({ error: "사건이 없습니다" }, 404);
+      const q = `deadline_confirm?undone_at=is.null&l_code=eq.${enc(code)}&kind=eq.${enc(kind)}&due=eq.${due}`;
+      // 하나의 기한에는 확정 하나: 다른 버튼을 누르면 앞의 것을 되돌리고 새로 남긴다
+      await rest(env, q, { method: "PATCH", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ undone_at: new Date().toISOString(), undone_by: who.name || who.userId || null }) }, fetcher);
+      if (body.action === "dl_undo") return json({ ok: true, cf: null });
+      const act = DL_ACTS[nz(body.act)];
+      if (!act) return json({ error: "버튼이 없습니다" }, 400);
+      const ins = await rest(env, "deadline_confirm?select=id", { method: "POST", headers: { Prefer: "return=representation" },
+        body: JSON.stringify({ l_code: code, kind, due, action: act, works_user_id: who.userId || null, channel_id: nz(body.room) || null }) }, fetcher);
+      return json({ ok: true, cf: { a: act, id: ins?.[0]?.id ?? null } });
+    }
     if (body?.action === "save_info") {
       const lNum = Number(body.lNum);
       if (!Number.isFinite(lNum) || lNum === 0) return json({ error: "사건이 없습니다" }, 400); // 수사 사건은 음수 번호
@@ -892,17 +996,26 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
         prevRow = await inheritedInfo(env, await relatedNums(env, lNum, ch, fetcher), fetcher);
       }
       const prev = prevRow || {};
+      // 저장된 사건정보가 없으면 화면에 보이던 로웨어 처음 값이 기준 (2026-11-19 석원: 단계 칸만 고쳤는데 인적사항이 지워짐)
+      const base: Record<string, any> = prevRow || infoFields(c, null).fields;
       const next: Record<string, string> = {};
       const sent = body.fields && typeof body.fields === "object" ? body.fields : {};
       // 화면에서 보내지 않은 예전 칸(법원·재판부, 수사기관 등)은 그대로 둔다
-      for (const k of INFO_FIELDS) next[k] = !(k in sent) ? nz(prev[k]) : k === "extra_phones" ? cleanPhones(sent[k]) : nz(sent[k]).slice(0, k === "memo" ? 2000 : 200);
-      const changed = INFO_FIELDS.filter((k) => nz(prev[k]) !== next[k]);
+      for (const k of INFO_FIELDS) next[k] = !(k in sent) ? nz(base[k]) : k === "extra_phones" ? cleanPhones(sent[k]) : nz(sent[k]).slice(0, k === "memo" ? 2000 : 200);
+      const changed = INFO_FIELDS.filter((k) => nz(base[k]) !== next[k]);
       const now = new Date().toISOString();
       const row: Record<string, unknown> = { l_num: lNum, case_no: c.l_code, ...next, updated_by: who.name, updated_by_id: who.userId, updated_at: now };
-      const logRows: any[] = changed.map((k) => ({ l_num: lNum, field: k, old_value: prev[k] ?? null, new_value: next[k], editor: who.name, editor_id: who.userId }));
+      const logRows: any[] = changed.map((k) => ({ l_num: lNum, field: k, old_value: base[k] ?? null, new_value: next[k], editor: who.name, editor_id: who.userId }));
       let stageChanges: any[] = [];
+      // 공소청 칸(방 제목)·처분(사건방 처분 줄)을 화면과 같게 계산하려고
+      const myRooms = await rest(env, `works_room_case?select=channel_id,room_title&l_num=eq.${lNum}&order=is_primary.desc`, {}, fetcher).catch(() => []) || [];
+      const roomTitle = nz(myRooms.find((r: any) => nz(r.room_title))?.room_title);
+      const myChans = [...new Set(myRooms.map((r: any) => nz(r.channel_id)).filter(Boolean))] as string[];
+      const stageRows = await roomEvents(env, String(lNum), myChans, fetcher).catch(() => []);
+      const chatH = await chatNoHist(env, myChans, fetcher).catch(() => []);
+      let hist = withChatNos(await noHist(env, [lNum, ...(await relatedNums(env, lNum, myChans, fetcher))], fetcher), chatH);
       if (body.stages && typeof body.stages === "object") {
-        const d = diffStages(c, prevRow, body.stages);
+        const d = diffStages(c, prevRow, body.stages, TITLE_PROS ? roomTitle : "", hist);
         row.stages = d.stages;
         row.cur_stage = isStage(body.cur) ? body.cur : null;
         row.start_stage = isStage(body.start) ? body.start : null;
@@ -924,10 +1037,19 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
           body: JSON.stringify(lines.map((x, i) => ({ channel_id: `stage:${lNum}:${x.stage}:${Date.now()}${i}`, l_num: lNum, kind: "기타", ev_date: today, ev_time: "",
             summary: personChangeLine(x.stage, x.old, x.new), state: "완료", source: "stage-change" }))) }, fetcher).catch((e) => console.log("stage line fail", String(e).slice(0, 120)));
       }
+      const gone = body.stages && typeof body.stages === "object" ? hideRemovedNos(hist, body.stages) : [];
+      if (gone.length) await rest(env, `case_no_hist?id=in.(${gone.join(",")})`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ hidden: true }) }, fetcher).catch(() => null);
+      const newNos = stageChanges.filter((x) => x.key === "no" && x.new && (x.stage === "police" || x.stage === "pros"));
+      for (const x of newNos) {
+        const org = nz(body.stages?.[x.stage]?.org);
+        await rest(env, "case_no_hist?on_conflict=l_num,stage,no", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+          body: JSON.stringify({ l_num: lNum, stage: x.stage, org, no: x.new, source: "manual", seen_on: today, hidden: false }) }, fetcher).catch(() => null);
+      }
+      if (gone.length || newNos.length) hist = withChatNos(await noHist(env, [lNum, ...(await relatedNums(env, lNum, myChans, fetcher))], fetcher), chatH);
       await logView(env, who, "save_info", "", c, fetcher);
       const logs = await rest(env, `case_info_log?select=field,old_value,new_value,editor,edited_at&l_num=eq.${lNum}&field=like.stage.*&order=edited_at.desc&limit=300`, {}, fetcher).catch(() => []);
       const savedNow = { ...prev, ...row };
-      const stages = shapeStages(c, savedNow, logs || []);
+      const stages = shapeStages(c, savedNow, logs || [], TITLE_PROS ? roomTitle : "", stageRows || [], hist);
       return json({ ok: true, changed: changed.length + stageChanges.length, ...infoFields(c, { ...next, updated_by: who.name, updated_at: now }), stages, dispNo: stages.dispNo });
     }
     if (body?.action === "chat_import_preview" || body?.action === "chat_import_save") {
