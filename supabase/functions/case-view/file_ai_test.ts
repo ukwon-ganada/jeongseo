@@ -117,3 +117,23 @@ Deno.test("한글 파일은 초안: AI 후보에서 빼고 참고로만 보여 �
   attachFinalFiles(e3, fs);
   assert((e3[0] as any).f?.id === 62, JSON.stringify(e3));
 });
+
+Deno.test("파일마다 답을 받는 모양: 파일 번호가 칸 이름, 줄은 정해진 번호 중에서 (이강효 재정신청서 2026-11-19)", async () => {
+  const fs = [{ id: 136, n: "이강효_재정신청서_261119.pdf", d: "2026-11-19", tm: "16:08", at: Date.parse("2026-11-19T07:08:00Z"), pdf: 1, lp: null }];
+  const e = [{ d: "2026-11-19", k: "ours", g: "ours", t: "재정신청서 제출 15:10 · 인천지방공소청", src: "chat", rid: 900 }];
+  let schema: any = null;
+  const fetcher = (async (url: any, init?: any) => {
+    const u = String(url);
+    if (u.includes("case_file_match") && (!init || !init.method || init.method === "GET")) return Response.json([]);
+    if (u.includes("case_file_match")) return new Response(null, { status: 201 });
+    if (u.includes("room_msg")) return Response.json([]);
+    if (u.includes("api.anthropic.com")) {
+      schema = JSON.parse(init.body).output_config.format.schema;
+      return Response.json({ content: [{ type: "text", text: JSON.stringify({ F1: { line: "L1", why: "재정신청서 최종본" } }) }], stop_reason: "end_turn" });
+    }
+    throw new Error("예상 못한 요청 " + u);
+  }) as typeof fetch;
+  assert(await attachByAI(env, e, fs, ["ch"], "사건", fetcher), "실패");
+  assert(JSON.stringify(schema.required) === '["F1"]' && schema.properties.F1.properties.line.enum.includes("L1"), JSON.stringify(schema));
+  assert((e[0] as any).f?.id === 136, JSON.stringify(e));
+});

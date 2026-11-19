@@ -64,7 +64,7 @@ Deno.test("계약서는 선임 줄에, 서면 후보에서는 빠짐", () => {
   const ev = [{ d: "2026-10-01", k: "ours", g: "accept", t: "사건 선임" }, { d: "2026-10-01", k: "ours", g: "ours", t: "의견서 제출", lp: 7 }];
   const files = [
     { id: 1, n: "위임계약서_홍길동.pdf", d: "2026-10-01", at: 3, pdf: 1, lp: null },
-    { id: 2, n: "의견서.hwp", d: "2026-10-01", at: 2, pdf: 0, lp: null },
+    { id: 2, n: "의견서.pdf", d: "2026-10-01", at: 2, pdf: 1, lp: null },
   ];
   attachFinalFiles(ev, files);
   attachContract(ev, files);
