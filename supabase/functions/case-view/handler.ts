@@ -891,14 +891,16 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
         prevRow = await inheritedInfo(env, await relatedNums(env, lNum, ch, fetcher), fetcher);
       }
       const prev = prevRow || {};
+      // 저장된 사건정보가 없으면 화면에 보이던 로웨어 처음 값이 기준 (2026-11-19 석원: 단계 칸만 고쳤는데 인적사항이 지워짐)
+      const base: Record<string, any> = prevRow || infoFields(c, null).fields;
       const next: Record<string, string> = {};
       const sent = body.fields && typeof body.fields === "object" ? body.fields : {};
       // 화면에서 보내지 않은 예전 칸(법원·재판부, 수사기관 등)은 그대로 둔다
-      for (const k of INFO_FIELDS) next[k] = !(k in sent) ? nz(prev[k]) : k === "extra_phones" ? cleanPhones(sent[k]) : nz(sent[k]).slice(0, k === "memo" ? 2000 : 200);
-      const changed = INFO_FIELDS.filter((k) => nz(prev[k]) !== next[k]);
+      for (const k of INFO_FIELDS) next[k] = !(k in sent) ? nz(base[k]) : k === "extra_phones" ? cleanPhones(sent[k]) : nz(sent[k]).slice(0, k === "memo" ? 2000 : 200);
+      const changed = INFO_FIELDS.filter((k) => nz(base[k]) !== next[k]);
       const now = new Date().toISOString();
       const row: Record<string, unknown> = { l_num: lNum, case_no: c.l_code, ...next, updated_by: who.name, updated_by_id: who.userId, updated_at: now };
-      const logRows: any[] = changed.map((k) => ({ l_num: lNum, field: k, old_value: prev[k] ?? null, new_value: next[k], editor: who.name, editor_id: who.userId }));
+      const logRows: any[] = changed.map((k) => ({ l_num: lNum, field: k, old_value: base[k] ?? null, new_value: next[k], editor: who.name, editor_id: who.userId }));
       let stageChanges: any[] = [];
       // 공소청 칸(방 제목)·처분(사건방 처분 줄)을 화면과 같게 계산하려고
       const myRooms = await rest(env, `works_room_case?select=channel_id,room_title&l_num=eq.${lNum}&order=is_primary.desc`, {}, fetcher).catch(() => []) || [];
