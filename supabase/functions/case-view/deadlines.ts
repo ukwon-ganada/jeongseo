@@ -139,7 +139,8 @@ export function computeDeadlines(code: string, evs: any[], today: string, others
   const list = (evs || []).filter((e) => isDate(e.lp_appoint_date))
     .map((e) => ({ ...e, _d: nz(e.lp_appoint_date).slice(0, 10) }))
     .sort((a, b) => a._d.localeCompare(b._d) || (a.lp_num || 0) - (b.lp_num || 0));
-  const filings = list.filter((e) => e.lp_set === "서면");
+  // 검사가 낸 항소장·이유서는 우리 제출이 아니다 (박큰별 1심: 검사 항소 11.04를 '제출'로 봄, 2026-11-19)
+  const filings = list.filter((e) => e.lp_set === "서면" && !/^\s*검사/.test(nz(e.lp_contents)));
   const ours = ourDefendants(list);
 
   // 1) 선고(날짜별 하나)와 통지 묶음(선고 사이마다 한 묶음)을 시간 순서로

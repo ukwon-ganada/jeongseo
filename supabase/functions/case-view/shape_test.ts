@@ -233,3 +233,10 @@ Deno.test("불변기한 줄(이강효 2026-11-19): 접수통지 도달·국선 �
   assertEquals(t.some((x: string) => x.startsWith("2026-09-01 소송기록")), false);
   assertEquals(s.events.find((e: any) => e.g === "limit")?.cfa, "제출 9.22");
 });
+
+Deno.test("로웨어 다음 기일 칸에 날짜만 있으면 기일로 보지 않는다 (박큰별 2026-11-19)", () => {
+  const s: any = shapeCase({ l_num: 1, l_code: "2026노1", l_name: "x", raw: {}, next_date: "2026-11-19" }, [], { today: "2026-11-19", linked: [], myHearings: [], others: [] });
+  assertEquals(s.events.some((e: any) => /다음 기일/.test(e.t)), false);
+  const s2: any = shapeCase({ l_num: 1, l_code: "2026노1", l_name: "x", raw: {}, next_date: "2026-12-01", next_time: "10:00", next_contents: "공판기일" }, [], { today: "2026-11-19", linked: [], myHearings: [], others: [] });
+  assertEquals(s2.events.some((e: any) => /다음 기일/.test(e.t)), true);
+});
