@@ -9,6 +9,11 @@
 //    · 애매하면 안 붙음. 안 붙은 파일도 이유와 함께 표(case_file_match)에 남는다
 //  한 번 판단한 파일은 표에 기억하고, 그 파일 무렵의 줄 목록이 바뀔 때만 다시 묻는다(비용·속도).
 //  AI를 못 쓰면(열쇠 없음·오류·시간 초과) 부른 쪽이 예전 이름 규칙으로 붙인다.
+//
+//  사무실 업무 방식(2026-11-19 석원): 방에 한글(hwp) 파일로 올라오는 서면은 최종 제출본이 아니다.
+//  최종본은 PDF로 올라오고, 서고은 변호사가 "ㄱㄱ" 등으로 제출을 지시하면 낸다(분명한 지시가 없는 예외도 있음).
+//  그래서 자동으로 붙이는 후보는 PDF만. 한글·워드 파일은 AI에 "참고(초안)"로만 보여 준다.
+//  단, 서면의 첨부서류(증거·참고자료 등)도 PDF로 올라오니 서면 본문과 구분해야 한다.
 // ============================================================================
 
 export type MatchRow = { file_id: number; line_key: string | null; sig: string; reason?: string };
@@ -28,6 +33,10 @@ export function lineKey(e: any): string {
   return "d:" + e.d + ":" + nz(e.t).slice(0, 40);
 }
 const isDoc = (f: any) => !!(f.pdf || DOC_RE.test(nz(f.n)));
+// 자동으로 붙일 수 있는 파일: PDF만 (한글·워드는 초안). 직원이 [수정]에서 고른 파일은 형식과 관계없이 그대로
+export const isPdf = (f: any) => !!(f.pdf || /\.pdf$/i.test(nz(f.n)));
+// 판단 기준이 바뀌면 올린다: 예전 판단을 모두 다시 묻게 된다
+const RULE_VER = "v2-pdf";
 
 // AI에게 보여 줄 줄: 지난 일(예정 아님)의 우리 제출·기일/선고·처분 줄. 사소한 제출, 직원이 뺀 줄, 직원이 파일을 고른 줄은 뺀다
 export function candidateLines(events: any[], minor: RegExp): any[] {
@@ -42,11 +51,11 @@ function hash(s: string): string {
 // 이 파일 무렵 줄 목록의 지문: 바뀌면(새 줄이 생기면) 다시 묻는다
 export function fileSig(f: any, lines: any[]): string {
   const lo = addDays(f.d, -BEFORE_DAYS), hi = addDays(f.d, AFTER_DAYS);
-  return hash(lines.filter((e) => e.d >= lo && e.d <= hi).map(lineKey).sort().join("|"));
+  return hash(RULE_VER + "#" + lines.filter((e) => e.d >= lo && e.d <= hi).map(lineKey).sort().join("|"));
 }
 // 아직 판단이 없거나, 판단한 뒤 줄 목록이 바뀐 파일
 export function pendingFiles(files: any[], lines: any[], cache: Map<number, MatchRow>, skip: (f: any) => boolean): any[] {
-  return files.filter((f) => isDoc(f) && f.lp == null && !skip(f))
+  return files.filter((f) => isDoc(f) && isPdf(f) && f.lp == null && !skip(f))
     .filter((f) => { const c = cache.get(Number(f.id)); return !c || c.sig !== fileSig(f, lines); })
     .sort((a, b) => b.at - a.at).slice(0, MAX_FILES);
 }
@@ -54,6 +63,9 @@ export function pendingFiles(files: any[], lines: any[], cache: Map<number, Matc
 const SYSTEM = [
   "법무법인 사건 화면의 타임라인에 서면 파일을 붙이는 일을 한다.",
   "직원이 사건 메신저 방에 올린 파일마다, 그 파일이 '실제로 낸(또는 받은) 그 서류'인 타임라인 줄을 하나 고른다.",
+  "- 이 사무실은 서면을 한글(hwp) 파일로 방에 올려 검토하고, 최종 제출본은 PDF로 올린 뒤 변호사가 'ㄱㄱ', '제출하세요' 같은 말로 제출을 지시하면 낸다. 지시가 분명하지 않은 때도 있다.",
+  "- 그래서 고를 파일(올라온 파일)은 모두 PDF다. '같은 무렵 한글 파일'은 초안이라 고르지 않고, 어떤 서면을 쓰고 있었는지 아는 참고로만 쓴다.",
+  "- PDF에는 서면 본문뿐 아니라 그 서면의 첨부서류(증거, 참고자료, 별지, 진단서, 합의서, 영수증, 판결 사본 등)도 섞여 있다. 첨부서류는 붙이지 않는다. 같은 이름의 한글 초안이 있었거나, 제출 지시 바로 앞뒤에 올라온 PDF가 서면 본문일 가능성이 높다.",
   "- 우리가 낸 서면(의견서, 변론요지서, 항소이유서, 선임계·선임신고서, 탄원서, 고소장 등)은 그 제출 줄에 붙인다. 파일은 보통 제출일 당일이나 며칠 전에 올라온다.",
   "- 판결문·결정문처럼 법원에서 받은 문서는 그 선고·결정 줄에 붙인다. 보통 선고 뒤에 올라온다.",
   "- 줄 제목이 서류 이름 대신 '우편 제출', '서면 제출'처럼 뭉뚱그려져 있으면 그 무렵 방 대화를 보고 어떤 서류인지 판단한다.",
@@ -71,7 +83,7 @@ const SCHEMA = {
 
 const KST = (ms: number) => new Date(ms + 9 * 3600e3).toISOString().slice(0, 16).replace("T", " ");
 // AI에게 보낼 글: 줄(L1..), 파일(F1..), 파일 무렵 방 대화
-export function buildPrompt(caseTitle: string, lines: any[], files: any[], msgs: { at: number; text: string }[]) {
+export function buildPrompt(caseTitle: string, lines: any[], files: any[], msgs: { at: number; text: string }[], drafts: any[] = []) {
   const lo = addDays(files.reduce((m, f) => (f.d < m ? f.d : m), files[0].d), -BEFORE_DAYS);
   const hi = addDays(files.reduce((m, f) => (f.d > m ? f.d : m), files[0].d), AFTER_DAYS);
   const ls = lines.filter((e) => e.d >= lo && e.d <= hi).sort((a, b) => a.d.localeCompare(b.d));
@@ -82,9 +94,13 @@ export function buildPrompt(caseTitle: string, lines: any[], files: any[], msgs:
     return `${id} ${e.d} [${kind}] ${nz(e.t).split(" · ")[0]}${e.f ? ` (이미 붙음: ${e.f.n})` : ""}`;
   });
   const fileTxt = files.map((f, i) => { const id = "F" + (i + 1); fileIds.set(id, f); return `${id} ${f.d} ${nz(f.tm)} ${nz(f.n)}`; });
+  // 같은 무렵(파일 앞 14일~뒤 1일) 올라온 한글·워드 초안 이름: 고르지 않고 참고만
+  const dr = drafts.filter((d) => !isPdf(d) && files.some((f) => d.at <= f.at + 864e5 && d.at >= f.at - 14 * 864e5))
+    .sort((a, b) => a.at - b.at).slice(-15).map((d) => `${d.d} ${nz(d.tm)} ${nz(d.n)}`);
   const near = msgs.filter((m) => files.some((f) => Math.abs(m.at - f.at) <= 6 * 3600e3)).slice(-12)
     .map((m) => `${KST(m.at)} ${nz(m.text).replace(/\s+/g, " ").slice(0, 200)}`);
   const user = `사건: ${caseTitle || "(모름)"}\n\n타임라인 줄:\n${lineTxt.join("\n") || "(없음)"}\n\n올라온 파일:\n${fileTxt.join("\n")}` +
+    (dr.length ? `\n\n같은 무렵 한글 파일(초안, 고르지 않음):\n${dr.join("\n")}` : "") +
     (near.length ? `\n\n파일 무렵 방 대화:\n${near.join("\n")}` : "");
   return { user, lineIds, fileIds };
 }

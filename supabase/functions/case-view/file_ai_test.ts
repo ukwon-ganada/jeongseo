@@ -1,5 +1,5 @@
 // 실행: deno test supabase/functions/case-view/file_ai_test.ts
-import { attachByAI } from "./handler.ts";
+import { attachByAI, attachFinalFiles } from "./handler.ts";
 import { applyMatches, buildPrompt, candidateLines, fileSig, lineKey } from "./file_ai.ts";
 function assert(c: unknown, m: string) { if (!c) throw new Error(m); }
 const env = { sbUrl: "https://x.supabase.co", sbKey: "k", anthropicKey: "a" };
@@ -80,4 +80,40 @@ Deno.test("AI를 못 쓰면 false(예전 규칙으로)", async () => {
   try { ok = await attachByAI(env, ev(), files, [], "사건", fetcher); } catch { ok = false; }
   assert(!ok, "표 없으면 실패로");
   assert(!(await attachByAI({ ...env, anthropicKey: undefined }, ev(), files, [], "사건")), "열쇠 없으면 false");
+});
+
+Deno.test("한글 파일은 초안: AI 후보에서 빼고 참고로만 보여 줌, 예전 규칙도 PDF만 붙임 (2026-11-19 석원)", async () => {
+  const fs = [
+    { id: 61, n: "항소이유서_이향원.hwp", d: "2026-11-10", tm: "10:00", at: Date.parse("2026-11-10T01:00:00Z"), pdf: 0, lp: null },
+    { id: 62, n: "항소이유서_이향원.pdf", d: "2026-11-11", tm: "15:00", at: Date.parse("2026-11-11T06:00:00Z"), pdf: 1, lp: null },
+    { id: 63, n: "참고자료1_진단서.pdf", d: "2026-11-11", tm: "15:01", at: Date.parse("2026-11-11T06:01:00Z"), pdf: 1, lp: null },
+  ];
+  const e = () => [{ d: "2026-11-11", k: "ours", g: "ours", t: "변호인 법무법인 정서 항소이유서 제출", lp: 900 }];
+  let body = "";
+  const fetcher = (async (url: any, init?: any) => {
+    const u = String(url);
+    if (u.includes("case_file_match") && (!init || !init.method || init.method === "GET")) return Response.json([]);
+    if (u.includes("case_file_match")) return new Response(null, { status: 201 });
+    if (u.includes("room_msg")) return Response.json([{ sent_at: "2026-11-11T06:05:00Z", text: "ㄱㄱ" }]);
+    if (u.includes("api.anthropic.com")) {
+      body = JSON.parse(init.body).messages[0].content;
+      const id = (name: string) => (body.match(new RegExp("(F\\d+) [^\\n]*" + name)) || [])[1];
+      const picks = [{ file: id("항소이유서_이향원.pdf"), line: "L1", why: "항소이유서 본문" }, { file: id("진단서"), line: null, why: "첨부" }];
+      return Response.json({ content: [{ type: "text", text: JSON.stringify({ picks }) }], stop_reason: "end_turn" });
+    }
+    throw new Error("예상 못한 요청 " + u);
+  }) as typeof fetch;
+  const e1 = e();
+  assert(await attachByAI(env, e1, fs, ["ch"], "사건", fetcher), "실패");
+  const files = body.split("올라온 파일:")[1].split("\n\n")[0];
+  assert(!files.includes(".hwp") && files.includes("항소이유서_이향원.pdf"), files);
+  assert(body.includes("같은 무렵 한글 파일") && body.includes("항소이유서_이향원.hwp") && body.includes("ㄱㄱ"), body);
+  assert((e1[0] as any).f?.id === 62, JSON.stringify(e1));
+  // 예전 이름 규칙(AI 못 쓸 때)도 한글 파일은 붙이지 않는다
+  const e2 = e();
+  attachFinalFiles(e2, [fs[0]]);
+  assert(!(e2[0] as any).f, "hwp가 붙음");
+  const e3 = e();
+  attachFinalFiles(e3, fs);
+  assert((e3[0] as any).f?.id === 62, JSON.stringify(e3));
 });
