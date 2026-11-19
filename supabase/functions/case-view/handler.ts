@@ -51,7 +51,7 @@ import { shapeStages, diffStages, personChangeLine, isStage, noLines, type NoHis
 const TITLE_PROS = true;
 import { applyInvDeadlines } from "./inv_deadlines.ts";
 import { buildLevels, levelOf, LV_LABEL, lvByDate, shortNo } from "./levels.ts";
-import { applyMatches, askMatch, buildPrompt, candidateLines, fileSig, pendingFiles, type MatchRow } from "./file_ai.ts";
+import { applyMatches, askMatch, buildPrompt, candidateLines, fileSig, isPdf, pendingFiles, type MatchRow } from "./file_ai.ts";
 export const DEADLINE_NOTE = "잠정 계산입니다. 재판 단계(항소·상고·이유서)는 선고일·기록접수통지 도달일로, 수사 단계(항고·재정신청·이의신청)는 사건방 줄의 처분·통지 날짜로 계산했습니다. 알림은 보내지 않습니다. 꼭 기록으로 한 번 더 확인해 주세요.";
 export type Env = { sbUrl: string; sbKey: string; anthropicKey?: string; chatModel?: string; refreshModel?: string; fileModel?: string };
 export type WhoAmI = { ok: boolean; status: number; userId?: string; domainId?: number | string; name?: string; error?: string };
@@ -509,7 +509,7 @@ export function attachFinalFiles(events: any[], files: any[], none: Set<string> 
     if (none.has(String(e.lp))) { e.none = 1; continue; }
     if (!auto) continue;
     const title = docTitle(e.t), lo = addDays(e.d, -TITLE_WINDOW_DAYS);
-    const pool = docs.filter((f) => !used.has(f.id) && f.lp == null && f.d <= e.d && f.d >= lo && titleMatch(f.n, title))
+    const pool = docs.filter((f) => !used.has(f.id) && f.lp == null && isPdf(f) && f.d <= e.d && f.d >= lo && titleMatch(f.n, title))
       .sort((a, b) => b.at - a.at);
     if (pool[0]) { used.add(pool[0].id); e.f = { id: pool[0].id, n: pool[0].n, pick: 0 }; }
   }
@@ -522,7 +522,7 @@ const isVerdictLine = (e: any) => e.g === "hearing" && e.k !== "due" && /선고/
 export function attachJudgment(events: any[], files: any[]) {
   const used = new Set(events.flatMap((e) => [e.f?.id, e.cf?.id]).filter((x) => x != null));
   const lines = events.filter(isVerdictLine).sort((a, b) => b.d.localeCompare(a.d));
-  for (const f of files.filter((x) => JUDG_RE.test(x.n) && x.lp == null && !used.has(x.id)).sort((a, b) => b.at - a.at)) {
+  for (const f of files.filter((x) => JUDG_RE.test(x.n) && isPdf(x) && x.lp == null && !used.has(x.id)).sort((a, b) => b.at - a.at)) {
     const e = lines.find((l) => l.d <= f.d && f.d <= addDays(l.d, 60));
     if (e && !e.f) { e.f = { id: f.id, n: f.n, pick: 0 }; used.add(f.id); }
   }
@@ -532,7 +532,7 @@ export function attachJudgment(events: any[], files: any[]) {
 //   선임계·선임신고서는 "선임"만 겹쳐도 짝으로 본다. 열람복사·정보공개청구 같은 줄은 붙이지 않는다.
 export function attachChatFiles(events: any[], files: any[]) {
   const used = new Set(events.flatMap((e) => [e.f?.id, e.cf?.id]).filter((x) => x != null));
-  const docs = files.filter((f) => (f.pdf || DOC_RE.test(f.n)) && f.lp == null && !CONTRACT_RE.test(f.n) && !JUDG_RE.test(f.n));
+  const docs = files.filter((f) => isPdf(f) && f.lp == null && !CONTRACT_RE.test(f.n) && !JUDG_RE.test(f.n));
   const lines = events.filter((e) => e.src === "chat" && e.g === "ours" && !e.f).sort((a, b) => a.d.localeCompare(b.d));
   for (const e of lines) {
     const t = nz(e.t);
@@ -548,7 +548,9 @@ export function attachChatFiles(events: any[], files: any[]) {
 // AI로 파일 붙이기: 기억된 판단을 먼저 붙이고, 새 파일·줄 목록이 바뀐 파일만 한 번에 묻는다. 결과는 case_file_match에
 export async function attachByAI(env: Env, events: any[], files: any[], chans: string[], title: string, fetcher: typeof fetch = fetch): Promise<boolean> {
   if (!env.anthropicKey) return false;
-  const docs = files.filter((f) => (f.pdf || DOC_RE.test(f.n)) && f.lp == null && !CONTRACT_RE.test(f.n));
+  // 자동 후보는 PDF만(2026-11-19 석원: 한글 파일은 초안, 최종 제출본은 PDF). 한글·워드는 AI에 참고로만
+  const all = files.filter((f) => DOC_RE.test(nz(f.n)) || f.pdf);
+  const docs = all.filter((f) => isPdf(f) && f.lp == null && !CONTRACT_RE.test(f.n));
   if (!docs.length) return true;
   const lines = candidateLines(events, MINOR_RE);
   const rows = await rest(env, `case_file_match?select=file_id,line_key,sig&file_id=in.(${docs.map((f) => Number(f.id)).join(",")})`, {}, fetcher);
@@ -559,7 +561,7 @@ export async function attachByAI(env: Env, events: any[], files: any[], chans: s
   const lo = new Date(Math.min(...pend.map((f) => f.at)) - 6 * 3600e3).toISOString();
   const hi = new Date(Math.max(...pend.map((f) => f.at)) + 6 * 3600e3).toISOString();
   const msgs = chans.length ? await rest(env, `room_msg?select=sent_at,text&channel_id=in.${enc(inList(chans))}&sent_at=gte.${enc(lo)}&sent_at=lte.${enc(hi)}&order=sent_at.asc&limit=200`, {}, fetcher).catch(() => []) : [];
-  const { user, lineIds, fileIds } = buildPrompt(title, lines, pend, (msgs || []).map((m: any) => ({ at: Date.parse(m.sent_at), text: nz(m.text) })));
+  const { user, lineIds, fileIds } = buildPrompt(title, lines, pend, (msgs || []).map((m: any) => ({ at: Date.parse(m.sent_at), text: nz(m.text) })), all.filter((f) => !isPdf(f)));
   const picks = await askMatch({ key: env.anthropicKey, model: env.fileModel }, user, fetcher);
   const save: any[] = [];
   for (const [fid, f] of fileIds) {
