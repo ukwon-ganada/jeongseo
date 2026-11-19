@@ -9,14 +9,14 @@
   --bg:#f5f6f8;--surface:#fff;--ink:#222;--ink2:#555;--muted:#8a8f98;--line:#ebedf0;--line2:#f2f3f5;
   --accent:#00c73c;--accent-ink:#00a83a;--accent-tint:#e8f9ee;
   --due:#ff6b00;--due-tint:#fff1e6;--danger:#f04452;
-  --g-accept:#7c5cd6;--g-accept-t:#f1edfc;--g-hearing:#2f6fe4;--g-hearing-t:#e9f0fd;--g-ours:#00a83a;--g-ours-t:#e8f9ee;
+  --g-accept:#7c5cd6;--g-accept-t:#f1edfc;--g-hearing:#2f6fe4;--g-key:#e4572e;--g-hearing-t:#e9f0fd;--g-ours:#00a83a;--g-ours-t:#e8f9ee;
   --g-meet:#0f9d9a;--g-meet-t:#e5f6f6;--g-msg:#d98a00;--g-msg-t:#fdf3e1;--g-chat:#8a8f98;--g-chat-t:#f2f3f5;
   --radius:12px;--shadow:0 1px 2px rgba(0,0,0,.04),0 4px 16px rgba(0,0,0,.04);
 }
 @media (prefers-color-scheme:dark){:root{
   --bg:#141518;--surface:#1e1f23;--ink:#ececee;--ink2:#c2c5cb;--muted:#8b9099;--line:#2c2e33;--line2:#26282c;
   --accent:#16d158;--accent-ink:#3ddc78;--accent-tint:#173323;--due:#ff8a3d;--due-tint:#3a2614;--shadow:none;
-  --g-accept:#a68cf0;--g-accept-t:#2a2440;--g-hearing:#6d9cf2;--g-hearing-t:#1c2840;--g-ours:#3ddc78;--g-ours-t:#173323;
+  --g-accept:#a68cf0;--g-accept-t:#2a2440;--g-hearing:#6d9cf2;--g-key:#ff7a50;--g-hearing-t:#1c2840;--g-ours:#3ddc78;--g-ours-t:#173323;
   --g-meet:#3cc9c5;--g-meet-t:#163231;--g-msg:#f0b03c;--g-msg-t:#382a12;--g-chat:#8b9099;--g-chat-t:#26282c}}
 *{box-sizing:border-box}[hidden]{display:none!important}
 html{-webkit-text-size-adjust:100%}
@@ -121,6 +121,7 @@ main{max-width:880px;margin:0 auto;padding:12px 16px 32px}
 .ev.g-ours{--gc:var(--g-ours)}
 .ev.g-meet{--gc:var(--g-meet)}
 /* 핵심 줄(조사·송치·기소): 글자 크게·굵게, 점 크게, 옅은 바탕 */
+.ev.key{--gc:var(--g-key)}
 .ev.key .t{padding:11px 0}
 .ev.key .tt{font-size:17px;font-weight:700;letter-spacing:-.2px}
 .ev.key .d b{font-size:14px;font-weight:700;color:var(--ink)}
@@ -423,7 +424,7 @@ var VIEWS = {
     // 제목과 보조줄 나누기: "공판기일(327호 법정 11:00) · 속행" → 공판기일 / 11:00 · 327호 법정 · 속행
     var split=function(e){
       var t=String(e.t||''), sub=[], m;
-      if(e.g==='msg'||e.g==='chat') return {tt:t, ts:''};
+      if(e.g==='msg'||e.g==='chat'||e.w===3) return {tt:t, ts:''};
       t=t.replace(/^출석\s+/,'');
       if((m=t.match(/^(\d{1,2}:\d{2})\s+(.*)$/))){ sub.push(m[1]); t=m[2]; }
       var parts=t.split(' · '); t=parts.shift();
@@ -445,9 +446,10 @@ var VIEWS = {
     list.forEach(function(e){
       var y=e.d.slice(0,4); if(y!==yr){ yr=y; body+='<div class="yr">'+y+'</div>'; }
       if(!todayDone && today && e.d>=today && prevD && prevD<today){ body+='<div class="today"><b>오늘</b><span class="rail"></span><i></i></div>'; todayDone=true; prevD=''; }
-      var g=e.g||(e.src==='chat'?'chat':''), minor=(g==='msg'||g==='chat');
-      // 송치·기소·조사(수사 단계 핵심 일): 글자를 키워 따로 강조 (2026-11-16 석원 요청)
-      var key=!minor && g!=='limit' && /조사|송치|기소|처분/.test(e.t||'');
+      var g=e.g||(e.src==='chat'?'chat':''), w=e.w;
+      // 중요도 3단계(2026-11-19 석원): 1 처분·결과 크게·따로 색 / 2 보통 / 3 작고 흐리게
+      var minor=w!=null ? (w===3 && g!=='limit') : (g==='msg'||g==='chat');
+      var key=w!=null ? w===1 : (!minor && g!=='limit' && /조사|송치|기소|처분/.test(e.t||''));
       if(prevD && y===prevY) body+=gapDiv(prevD, e.d);
       if(lvs && e.lv!=null && e.lv>shownLv){ shownLv=e.lv; body+=bandHtml(e.lv); }
       prevD=e.d; prevY=y;
