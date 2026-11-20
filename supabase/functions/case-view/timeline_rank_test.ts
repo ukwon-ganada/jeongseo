@@ -84,3 +84,28 @@ Deno.test("중복 합치기: AI가 제출처를 짐작한 같은 날 제출 줄�
   assertEquals(ev[0].k, "ours");
   assertEquals(ev[0].t, "15:10 재정신청서 제출(인천지방공소청)");
 });
+
+// 2026-11-20 석원 (2026노364): 대화파일에서 뽑은 줄이 법원 기록과 겹쳐 같은 날 두 줄. 법원 전산에 실제로 두 줄이면 그대로
+Deno.test("같은 일 겹침 막기: 법원 줄+대화 줄은 하나, 법원 전산의 실제 두 줄은 그대로", () => {
+  const ev = [
+    { d: "2026-10-08", k: "ours", g: "ours", t: "변론병합신청서 제출", f: null, lp: 1, row: 1, lc: 9 },
+    { d: "2026-10-08", k: "ours", g: "ours", t: "변론병합신청서 제출", f: null, src: "chat" },
+    { d: "2026-10-27", k: "ours", g: "ours", t: "사실조회신청서 제출", f: null, lp: 2, row: 2, lc: 9 },
+    { d: "2026-10-27", k: "ours", g: "ours", t: "사실조회신청서 제출", f: null, src: "chat" },
+    { d: "2026-10-27", k: "ours", g: "ours", t: "사실조회신청서 제출", f: null, src: "chat" },
+    { d: "2026-10-30", k: "ours", g: "ours", t: "증인신청서 제출", f: null, lp: 3, row: 3, lc: 9 },
+    { d: "2026-10-30", k: "ours", g: "ours", t: "증인신청서 제출", f: null, lp: 4, row: 4, lc: 9 },
+    { d: "2026-10-31", k: "room", g: "chat", t: "지시 · 사실조회신청 지시 (서변호사)", f: null, src: "chat" },
+    { d: "2026-10-31", k: "room", g: "chat", t: "지시 · 사실조회신청 지시 (서변호사)", f: null, src: "chat" },
+    { d: "2026-11-02", k: "ours", g: "ours", t: "사실조회신청서 고양경찰서 제출", f: null, src: "chat" },
+    { d: "2026-11-02", k: "ours", g: "ours", t: "증인신청서 고양경찰서 제출", f: null, src: "chat" },
+  ];
+  rankEvents(ev);
+  const by = (d: string) => ev.filter((e) => e.d === d).map((e) => e.t);
+  assertEquals(by("2026-10-08"), ["변론병합신청서 제출"]);
+  assertEquals(ev.find((e) => e.d === "2026-10-08")!.src, undefined);
+  assertEquals(by("2026-10-27"), ["사실조회신청서 제출"]);
+  assertEquals(by("2026-10-30").length, 2);
+  assertEquals(by("2026-10-31").length, 1);
+  assertEquals(by("2026-11-02").length, 2);
+});

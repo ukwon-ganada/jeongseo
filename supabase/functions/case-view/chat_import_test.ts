@@ -73,3 +73,13 @@ Deno.test("갱신: 보관 글을 내보내기 모양으로, 이미 있는 줄은
   assertEquals(left.map((e) => e.kind), ["서면제출", "지시"]);
   assertEquals(toRows(-5, left, "refresh:", "chat-refresh")[0].channel_id, "refresh:-5");
 });
+
+Deno.test("대화파일 다시 올려도 같은 날·같은 내용 줄은 다시 넣지 않는다", async () => {
+  const { dropSame } = await import("./chat_import.ts");
+  const evs: any[] = [
+    { date: "2026-10-08", kind: "서면제출", summary: "변론병합신청서 제출" },
+    { date: "2026-10-08", kind: "서면제출", summary: "참고자료 제출" },
+  ];
+  const out = dropSame(evs, [{ ev_date: "2026-10-08", kind: "서면제출", summary: "변론병합 신청서 제출" }]);
+  if (out.length !== 1 || out[0].summary !== "참고자료 제출") throw new Error(JSON.stringify(out));
+});
