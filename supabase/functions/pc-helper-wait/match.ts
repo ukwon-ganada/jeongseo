@@ -9,6 +9,9 @@
 //   1) 제목 안 사건번호(2026고정100189 등)가 정확히 한 방의 제목에만 있으면 그 방
 //   2) 아니면 글자 두 개씩 묶어 비교(Dice)해서 가장 닮은 방(의뢰인 이름이 다른 방은 제외). 충분히 닮고(0.6↑)
 //      두 번째와 차이가 나야(0.08↑) 인정 — 애매하면 고르지 않는다(엉뚱한 사건을 띄우지 않게)
+//      창이 좁아 제목 뒤가 잘려도 되게(석원 2026-11-16): 저장된 제목의 "앞부분"(읽은 길이만큼)과도
+//      비교하고, OCR이 앞에 붙인 잡글자("80t", "*" 등)는 몇 글자까지 떼어 보고 가장 높은 점수를 쓴다.
+//      → 방을 찾으면 봇이 저장해 둔 전체 제목(사건번호 포함)·연결된 로웨어 사건으로 연다.
 // ============================================================================
 
 export type OcrLine = { x: number; y: number; t: string };
@@ -53,6 +56,19 @@ export function dice(a: string, b: string): number {
   return (2 * inter) / (a.length - 1 + b.length - 1);
 }
 
+// 읽은 제목 h 와 저장된 제목 t 가 얼마나 닮았나. 뒤가 잘렸으면 t 의 앞부분과 비교.
+//   너무 짧은 앞부분(8글자 미만)으로는 판단하지 않는다.
+export function titleScore(h: string, t: string): number {
+  let best = dice(h, t);
+  for (let skip = 0; skip <= Math.min(12, h.length - 8); skip++) {
+    const hh = h.slice(skip);
+    if (hh.length < 8 || hh.length >= t.length) continue;
+    const s = dice(hh, t.slice(0, hh.length));
+    if (s > best) best = s;
+  }
+  return best;
+}
+
 // 방 제목의 의뢰인 이름: "(형/피의)최병환_..." 처럼 괄호 바로 뒤 한글 이름
 export function clientName(s: string): string {
   let name = "";
@@ -89,12 +105,12 @@ export function matchRoom(lines: OcrLine[], rooms: Room[]): MatchResult {
     if (hit.size === 1) return { channelId: [...hit][0], how: "case-no", score: 1, header };
   }
 
-  // 2) 제목 닮은 정도 (의뢰인 이름이 다른 방은 아무리 닮아도 제외)
+  // 2) 제목 닮은 정도 (잘린 제목·앞 잡글자 고려, 의뢰인 이름이 다른 방은 아무리 닮아도 제외)
   const hName = clientName(header);
   let best = { ch: "", s: 0 }, second = 0;
   for (const [ch, t] of titles) {
     if (!sameClient(hName, clientName(t))) continue;
-    const s = dice(h, norm(t));
+    const s = titleScore(h, norm(t));
     if (s > best.s) { second = best.s; best = { ch, s }; } else if (s > second) second = s;
   }
   if (best.s >= 0.6 && best.s - second >= 0.08) return { channelId: best.ch, how: "title", score: best.s, header };
@@ -111,7 +127,7 @@ export function nearRooms(lines: OcrLine[], rooms: Room[], n = 4): string[] {
   for (const r of rooms) {
     if (!r.room_title || seen.has(r.channel_id)) continue;
     if (hName && !sameClient(hName, clientName(r.room_title))) continue;
-    seen.set(r.channel_id, dice(h, norm(r.room_title)));
+    seen.set(r.channel_id, titleScore(h, norm(r.room_title)));
   }
   return [...seen].filter(([, s]) => s >= 0.3).sort((a, b) => b[1] - a[1]).slice(0, n).map(([ch]) => ch);
 }

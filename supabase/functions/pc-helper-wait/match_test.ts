@@ -46,6 +46,27 @@ Deno.test("OCR이 0을 O로 읽어도 사건번호 인식", () => {
   assertEquals(caseNos("2026고정1OO189"), ["2026고정100189"]);
 });
 
+// 2026-11-16 석원: 창이 좁아 제목 뒤(사건번호)가 잘려도 앞부분으로 방을 찾아야 한다 (이름은 가짜)
+Deno.test("뒤가 잘린 제목도 앞부분으로 찾는다(앞 잡글자 무시)", () => {
+  const rooms = [
+    { channel_id: "P", room_title: "서)신)★(형/항/피)홍길동_특가법위반(향정)_서울고등법원(인천) 2026노100072" },
+    { channel_id: "Q", room_title: "서)최)★(형/피고인)김철수_사기_인천지방법원 2026고단1234" },
+    { channel_id: "R", room_title: "서)신)★(형/피의)이영희_사기_인천지방검찰청 2026형제1" },
+  ];
+  for (const t of ["80t 서)신)*(형/항/피)홍길둥-특가법위반(항정)-서물고등법원(.", "장 69b 80t * 서)신)*(형/항/피)홍길동-특가법위반(항정)"]) {
+    const m = matchRoom([{ x: 30, y: 6, t }], rooms);
+    assertEquals([m.channelId, m.how], ["P", "title"]);
+  }
+});
+
+Deno.test("앞부분이 같은 방이 둘 이상이면 고르지 않는다", () => {
+  const rooms = [
+    { channel_id: "A", room_title: "신)△(형/피의)홍길동_사기_경기남부경찰청" },
+    { channel_id: "B", room_title: "신)△(형/피의)홍길동_사기_안양지청 2026형제12815" },
+  ];
+  assertEquals(matchRoom([{ x: 30, y: 6, t: "신)△(형/피의)홍길동-사기-" }], rooms).channelId, null);
+});
+
 Deno.test("의뢰인 이름이 다른 방은 제목이 닮아도 열지 않는다", () => {
   const rooms = [
     { channel_id: "kim", room_title: "박)신)★(형/고소)김가나_사기_인천연수경찰서_2026-8730" },
