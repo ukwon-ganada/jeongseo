@@ -40,8 +40,8 @@ Deno.test("글 → AI → room_event 저장(원문은 보내지 않음)", async 
   assertEquals(Object.values(sent[0]).some((v) => String(v).includes("잡혔습니다")), false);
 });
 
-Deno.test("운영 봇: 수사 사건 방(자체 사건)만 AI로 읽음", async () => {
-  let lNum = 3018; const calls: any[] = [];
+Deno.test("운영 봇: 수사 단계 방(자체 사건, 법원 없는 로웨어 사건)만 AI로 읽음", async () => {
+  let lNum = 3018, court = "서울중앙지방법원"; const calls: any[] = []; const kept: string[] = [];
   const f: typeof fetch = async (input, init) => {
     const u = String(input);
     if (u.includes("api.anthropic.com")) {
@@ -49,6 +49,8 @@ Deno.test("운영 봇: 수사 사건 방(자체 사건)만 AI로 읽음", async 
       return Response.json({ stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ events: [] }) }] });
     }
     if (u.includes("/works_room_case")) return Response.json([{ l_num: lNum, room_title: "시험", status: "대상" }]);
+    if (u.includes("/cases?")) return Response.json([{ court }]);
+    if (u.includes("/room_msg?on_conflict")) kept.push(u);
     return new Response(null, { status: 201 });
   };
   const env = { sbUrl: "http://db", sbKey: "k", anthropicKey: "a", model: "claude-sonnet-5-5" };
@@ -58,6 +60,9 @@ Deno.test("운영 봇: 수사 사건 방(자체 사건)만 AI로 읽음", async 
   lNum = -100061;
   assertEquals((await handleRoomText(env, { channelId: "c1", text, invOnly: true }, f)).how, "none");
   assertEquals([calls[0].body.model, calls[0].body.fallbacks, calls[0].beta], ["claude-sonnet-5-5", "default", "server-side-fallback-2026-07-01"]);
+  lNum = 2241; court = "";
+  assertEquals((await handleRoomText(env, { channelId: "c1", text, invOnly: true }, f)).how, "none");
+  assertEquals([calls.length, kept.length], [2, 2]);
 });
 
 Deno.test("수사 사건방 글은 번호를 지우고 보관, 다른 방은 보관 안 함", async () => {

@@ -145,13 +145,21 @@ export async function recentContext(env: ChatEnv, channelId: string, sentAt: str
   return [prev.length ? "앞 글:\n" + prev.join("\n") : "", names.length ? "최근 올라온 파일:\n" + names.join("\n") : ""].filter(Boolean).join("\n\n");
 }
 
+async function noCourt(env: ChatEnv, lNum: number, fetcher: typeof fetch): Promise<boolean> {
+  const r = await rest(env, `cases?select=court&l_num=eq.${lNum}`, {}, fetcher);
+  if (!r.ok) { await r.body?.cancel(); return false; }
+  const row = (await r.json().catch(() => []))?.[0];
+  return !!row && !String(row.court || "").trim();
+}
+
 // 방에 올라온 글 하나 처리: 수사 사건방이면 글 보관 → 낌새 확인 → AI → room_event 저장
 export async function handleRoomText(env: ChatEnv, a: { channelId: string; text: string; sentAt?: string; invOnly?: boolean; userId?: string }, fetcher: typeof fetch = fetch): Promise<{ saved: number; how: string }> {
   if (String(a.text || "").trim().length < 2) return { saved: 0, how: "no-cue" };
   const sentAt = a.sentAt && !isNaN(Date.parse(a.sentAt)) ? new Date(a.sentAt).toISOString() : new Date().toISOString();
   const m = await rest(env, `works_room_case?select=l_num,room_title,status&channel_id=eq.${encodeURIComponent(a.channelId)}&order=is_primary.desc&limit=1`, {}, fetcher);
   const room = m.ok ? (await m.json())[0] : (await m.body?.cancel(), null);
-  const inv = Number(room?.l_num) < 0;
+  // 수사 단계 방: 자체 사건(l_num<0)이거나, 로웨어 사건이라도 아직 법원(재판번호)이 없는 사건(2026-11-20, 이종수·김한곤 방 사례)
+  const inv = Number(room?.l_num) < 0 || (Number(room?.l_num) > 0 && await noCourt(env, Number(room.l_num), fetcher));
   if (a.invOnly && !inv) return { saved: 0, how: "not-inv" };
   if (inv) await keepText(env, a, sentAt, fetcher);
   if (!looksLikeEvent(a.text)) return { saved: 0, how: "no-cue" };
