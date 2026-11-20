@@ -201,3 +201,14 @@ Deno.test("계약서도 AI가: 사건 선임 줄을 고르면 계약서 자리(c
   assert(e[0].cf?.id === 5 && !e[0].f, JSON.stringify(e[0]));
   assert(buildPrompt("사건", lines, fs, []).user.includes("[사건 선임]"), "선임 줄 이름");
 });
+
+Deno.test("예정인 우리 제출 줄(방 대화)은 후보, 기한·앞으로의 기일은 아님 / 사건번호를 프롬프트에", () => {
+  const lines = candidateLines([
+    { d: "2026-11-20", k: "due", g: "ours", t: "선임계 제출(○○경찰서)", src: "chat", rid: 1 },
+    { d: "2026-11-30", k: "due", g: "hearing", t: "다음 기일" },
+    { d: "2026-11-25", k: "due", g: "limit", t: "항소이유서 마감", src: "chat", rid: 2 },
+  ], /열람/);
+  assert(lines.length === 1 && lines[0].rid === 1, "예정 제출 줄만: " + JSON.stringify(lines));
+  const { user } = buildPrompt("2025노1234 홍길동외1", lines, [{ id: 9, d: "2026-11-20", n: "홍길동_선임계.pdf", at: Date.parse("2026-11-20T00:45:00Z") }], []);
+  assert(user.includes("사건: 2025노1234") && user.includes("선임계 제출"), user);
+});

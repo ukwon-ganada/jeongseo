@@ -959,7 +959,7 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       // 파일을 붙일 줄은 AI가 고른다(2026-11-18 석원). AI를 못 쓰면 예전 이름 규칙으로
       //   화면을 연 사람은 AI를 기다리지 않는다(2026-11-20): 기억된 판단만 붙이고, 새로 물을 것은 응답 뒤에 묻는다.
       //   자동 정리(file_backfill)만 끝까지 기다린다
-      const aiOk = await attachByAI(env, shaped.events, files, chans, nz(c.l_name), fetcher, who.userId === "system-backfill" ? undefined : bg, fast ? (B.matches || []) : undefined)
+      const aiOk = await attachByAI(env, shaped.events, files, chans, [nz(c.l_code), nz(c.l_name)].filter(Boolean).join(" "), fetcher, who.userId === "system-backfill" ? undefined : bg, fast ? (B.matches || []) : undefined)
         .catch((e) => { console.log("file ai fail", String(e).slice(0, 160)); return false; });
       if (!aiOk) {
         for (const e of shaped.events) if (e.f?.ai) e.f = null;
