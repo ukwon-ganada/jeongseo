@@ -29,6 +29,7 @@
 //         (Callback 이벤트: postback + 파일 + 텍스트(시험봇만))
 // ============================================================================
 
+import { withUsage } from "../_shared/ai_usage.ts";
 import { saveRoomFile } from "./room_file.ts";
 import { linkPicked, linkRoomAnyBot, relinkRoom } from "./room_link.ts";
 import { handleRoomText } from "./room_chat.ts";
@@ -92,6 +93,7 @@ async function rest(env: Env, path: string, init: RequestInit = {}) {
 }
 
 export async function handle(req: Request, env: Env, fetcher: typeof fetch = fetch): Promise<Response> {
+  fetcher = withUsage(fetcher, env, "works-bot-callback"); // AI 사용량 기록(_shared/ai_usage.ts)
   if (req.method !== "POST") return new Response("ok");
   // 우리 서버 함수(case-view)끼리 부르는 길: 서비스 키로만. 아직 연결 안 된 방을 그 자리에서 연결
   const internal = req.headers.get("x-internal-key");

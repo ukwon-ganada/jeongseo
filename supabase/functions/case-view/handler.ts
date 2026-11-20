@@ -42,6 +42,7 @@ const CORS = {
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 
+import { withUsage } from "../_shared/ai_usage.ts";
 import { rankEvents } from "./timeline_rank.ts";
 import { applyConfirms, computeDeadlines, deadlineEvents, DL_ACTS, isNotice, mergeRoles, ourDefendants, type OtherCase } from "./deadlines.ts";
 import { findPick, normTitle } from "./title_match.ts";
@@ -738,6 +739,7 @@ async function bundleCheck(req: Request, env: Env, fetcher: typeof fetch, body: 
 }
 
 export async function handle(req: Request, env: Env, fetcher: typeof fetch = fetch, bg: (p: Promise<unknown>) => void = runInBackground): Promise<Response> {
+  fetcher = withUsage(fetcher, env, "case-view"); // AI 사용량 기록(_shared/ai_usage.ts)
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
   let body: any = {};
