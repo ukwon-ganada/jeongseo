@@ -38,6 +38,8 @@ const CORS = {
   "Access-Control-Allow-Origin": ALLOW_ORIGIN,
   "Access-Control-Allow-Headers": "content-type, x-works-token, apikey, authorization",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
+  // 사전 확인(OPTIONS)을 브라우저가 2시간 기억: 화면을 열 때마다 한 번씩 더 오가던 것을 줄임 (2026-11-20)
+  "Access-Control-Max-Age": "7200",
 };
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...CORS, "Content-Type": "application/json" } });
@@ -53,7 +55,10 @@ import { applyInvDeadlines } from "./inv_deadlines.ts";
 import { buildLevels, levelOf, LV_LABEL, lvByDate, shortNo } from "./levels.ts";
 import { MANUAL, applyMatches, askMatch, buildPrompt, candidateLines, fileSig, isPdf, pendingFiles, type MatchRow } from "./file_ai.ts";
 export const DEADLINE_NOTE = "잠정 계산입니다. 재판 단계(항소·상고·이유서)는 선고일·기록접수통지 도달일로, 수사 단계(항고·재정신청·이의신청)는 사건방 줄의 처분·통지 날짜로 계산했습니다. 알림은 보내지 않습니다. 꼭 기록으로 한 번 더 확인해 주세요.";
-export type Env = { sbUrl: string; sbKey: string; anthropicKey?: string; chatModel?: string; refreshModel?: string; fileModel?: string };
+// db: DB에 직접 붙은 연결(index.ts가 만듦). 있으면 사건 자료 묶음을 PostgREST 대신 이 연결로 받는다.
+//   PostgREST는 DB 연결을 자주 새로 열어, 새 연결의 첫 묶음 호출이 0.5~0.7초 걸림(같은 연결 두 번째부터 0.01초). 2026-11-20
+export type DbLink = { bundle(room: string, name: string): Promise<any>; warm(): Promise<void> };
+export type Env = { sbUrl: string; sbKey: string; anthropicKey?: string; chatModel?: string; refreshModel?: string; fileModel?: string; db?: DbLink };
 export type WhoAmI = { ok: boolean; status: number; userId?: string; domainId?: number | string; name?: string; error?: string };
 
 // 같은 토큰이면 30분 동안 웍스에 다시 묻지 않는다. 확인된 것만 기억.
@@ -747,12 +752,21 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
   // 깨워 두기(1분마다 cron): 서버가 75초 쉬면 꺼져 다음 사람이 1~3초를 기다린다. DB도 한 번 불러 연결을 데워 둔다.
   //   아무 자료도 돌려주지 않으므로 직원 확인 없이 받는다 (2026-11-20)
   if (body?.action === "warm") {
-    await rest(env, "lw_feed_runs?select=id&limit=1", {}, fetcher).catch(() => null);
+    await Promise.all([
+      rest(env, "lw_feed_runs?select=id&limit=1", {}, fetcher).catch(() => null),
+      env.db?.warm().catch((e) => console.log("db warm fail", String(e).slice(0, 120))),
+    ]);
     return json({ ok: true });
   }
   const token = req.headers.get("x-works-token") || "";
   const who = await worksWhoAmI(token, fetcher, env, bg);
   console.log("whoami", body?.action, who.ok, who.status, who.error ? who.error.slice(0, 80) : "");
+  // 화면 쪽 시간(ms, 숫자만): 페이지 시작→SDK 받음→웍스 준비→요청 보냄. 어디서 기다리는지 재기 위함 (2026-11-20)
+  if (body?.perf && typeof body.perf === "object") {
+    const p: Record<string, number> = {};
+    for (const [k, v] of Object.entries(body.perf).slice(0, 8)) if (/^[a-z]{1,8}$/.test(k) && Number.isFinite(Number(v))) p[k] = Math.round(Number(v));
+    console.log("perf", body.action, JSON.stringify(p));
+  }
   if (body?.action === "whoami") return json(who, who.ok ? 200 : 401);
   if (!who.ok) return json({ error: "직원 확인이 안 됐습니다. 웍스에서 다시 열어 주세요.", status: who.status }, 401);
 
@@ -779,10 +793,10 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       if (!id) return json({ error: "요청을 만들지 못했습니다" }, 500);
       const until = Date.now() + (body.waitMs ?? 8000);
       while (Date.now() < until && !located) {
-        await new Promise((r) => setTimeout(r, 100));
+        await new Promise((r) => setTimeout(r, 50));
         const row = (await rest(env, `pc_locate?select=taken_at,done_at,channel_id,how,header_text&id=eq.${id}`, {}, fetcher))?.[0];
         if (row?.done_at) {
-          await logView(env, who, "locate:" + nz(row.how), nz(row.channel_id), null, fetcher);
+          bg(logView(env, who, "locate:" + nz(row.how), nz(row.channel_id), null, fetcher));
           if (row.channel_id) { located = { room: row.channel_id }; break; }
           // 방 표에 없는 새 방이라도 제목에 사건번호가 있고 로웨어에 딱 하나 있으면 그 사건을 연다
           const nos = row.how === "error" ? [] : caseNosIn(nz(row.header_text));
@@ -822,7 +836,15 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       //   연결 없는 방·보류 방·사건번호만 있는 방은 fallback → 아래 예전 방식 그대로
       // bundle_check(내부 비교)에서는 bundle 값으로 직접 고른다
       const useB = who.userId === "system-backfill" && typeof body.bundle === "boolean" ? body.bundle : BUNDLE_ON;
-      const B: any = room && useB ? await rest(env, "rpc/case_view_bundle", { method: "POST", body: JSON.stringify({ p_room: room, p_name: who.name || "" }) }, fetcher)
+      const viaRest = () => rest(env, "rpc/case_view_bundle", { method: "POST", body: JSON.stringify({ p_room: room, p_name: who.name || "" }) }, fetcher);
+      // DB 직접 연결이 1.5초 안에 답하지 않으면(연결 끊김 등) PostgREST로 다시 묻는다
+      const viaDb = (db: DbLink) => {
+        let timer: number | undefined;
+        return Promise.race([db.bundle(room, who.name || ""), new Promise((_, no) => { timer = setTimeout(() => no(new Error("db timeout")), 1500); })])
+          .finally(() => clearTimeout(timer))
+          .catch((e) => { console.log("db bundle fail", String(e).slice(0, 160)); return viaRest(); });
+      };
+      const B: any = room && useB ? await (env.db ? viaDb(env.db) : viaRest())
         .catch((e) => { console.log("bundle fail", String(e).slice(0, 160)); return null; }) : null;
       const fast = !!(B && !B.fallback && B.c && Array.isArray(B.maps));
       if (fast) {

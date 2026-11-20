@@ -5,6 +5,8 @@
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>사건 정보</title>
+<link rel="preconnect" href="https://nyjyemjsperpakrrgzcc.supabase.co" crossorigin>
+<link rel="preload" as="script" href="https://static.worksmobile.net/static/wm/woff/edge/3.7.1/sdk.js">
 <style>
 :root{
   --bg:#f5f6f8;--surface:#fff;--ink:#222;--ink2:#555;--muted:#8a8f98;--line:#ebedf0;--line2:#f2f3f5;
@@ -370,7 +372,11 @@ var SDK = 'https://static.worksmobile.net/static/wm/woff/edge/3.7.1/sdk.js';
 var CASE_API = 'https://nyjyemjsperpakrrgzcc.supabase.co/functions/v1/case-view';
 
 // ── 서버(case-view): 직원 확인 뒤에만 자료를 줌 ─────────
+// 화면이 열리기까지 어디서 기다리는지 첫 요청에 숫자만 실어 보낸다(페이지 시작부터 ms): SDK 받음·웍스 준비·요청 보냄
+var PERF={}, perfSent=false;
+function perfMark(k){ try{ PERF[k]=Math.round(performance.now()); }catch(e){} }
 function api(body){
+  if(!perfSent){ perfSent=true; perfMark('req'); body=Object.assign({}, body, {perf:PERF}); }
   return fetch(CASE_API, {method:'POST', headers:{'Content-Type':'application/json','X-Works-Token':ctx.tok||''}, body:JSON.stringify(body)})
     .then(function(r){ return r.json().then(function(j){
       if(r.status===401) return relogin(j);
@@ -1177,7 +1183,9 @@ document.addEventListener('click', function(e){
 
 // ── WOFF 시작 ─────────────────────────────────────────
 function start(){
+  perfMark('sdk');
   woff.init({woffId: WOFF_ID}).then(function(){
+    perfMark('init');
     // ?relogin=1: 권한이 바뀌었을 때 새 토큰을 받도록 로그아웃 후 다시 로그인
     if(q.get('relogin') && woff.isLoggedIn()){ try{ woff.logout(); }catch(e){} }
     if(!woff.isLoggedIn()){

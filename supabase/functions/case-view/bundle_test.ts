@@ -79,3 +79,28 @@ Deno.test("자료가 다르면 bundle_check가 차이를 찾아낸다", async ()
     assert(j.same === 0 && j.details.some((d: any) => d.diff), JSON.stringify(j).slice(0, 300));
   } finally { delete (globalThis as any).BREAK; }
 });
+
+Deno.test("DB 직접 연결이 있으면 묶음을 그 연결로 받고 PostgREST rpc는 부르지 않는다", async () => {
+  const { f, seen } = fake();
+  let asked = 0;
+  const db = { bundle: async () => { asked++; return { ...F, chans: [ROOM] }; }, warm: async () => {} };
+  const r = await handle(new Request("https://x/", { method: "POST", headers: { "x-works-token": "t".repeat(30) }, body: JSON.stringify({ action: "case", room: ROOM }) }), { ...env, db }, f);
+  const j = await r.json();
+  assert(asked === 1 && j.caseNo === "2026노100", "DB 연결로 " + JSON.stringify(j).slice(0, 120));
+  assert(!seen.some((s) => s.includes("rpc/case_view_bundle")), "rpc 안 부름");
+});
+
+Deno.test("DB 직접 연결이 실패하면 PostgREST rpc로 다시 묻는다", async () => {
+  const { f, seen } = fake();
+  const db = { bundle: async () => { throw new Error("conn reset"); }, warm: async () => {} };
+  const j = await (await handle(new Request("https://x/", { method: "POST", headers: { "x-works-token": "t".repeat(30) }, body: JSON.stringify({ action: "case", room: ROOM }) }), { ...env, db }, f)).json();
+  assert(j.caseNo === "2026노100" && seen.some((s) => s.includes("rpc/case_view_bundle")), "rpc로 대신");
+});
+
+Deno.test("warm은 DB 직접 연결도 데운다", async () => {
+  const { f } = fake();
+  let warmed = 0;
+  const db = { bundle: async () => null, warm: async () => { warmed++; } };
+  const r = await handle(new Request("https://x/", { method: "POST", body: JSON.stringify({ action: "warm" }) }), { ...env, db }, f);
+  assert(r.status === 200 && warmed === 1, "warm");
+});
