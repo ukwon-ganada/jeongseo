@@ -31,7 +31,7 @@
 
 import { saveRoomFile } from "./room_file.ts";
 import { linkPicked, linkRoomAnyBot, relinkRoom } from "./room_link.ts";
-import { handleRoomText } from "./room_chat.ts";
+import { handleRoomFile, handleRoomText } from "./room_chat.ts";
 import { backfillHold, recheckAll, recheckLinked, recheckRoom, refreshRoomTitles } from "./inv_case.ts";
 
 // 우리 봇: 운영 봇(사건관리 도우미), 시험봇(정서 시험봇)
@@ -197,8 +197,18 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
     const botId = req.headers.get("x-works-botid") || String(ev?.botId || "");
     if (!botId) console.error("file: no bot id");
     else {
+      const invOnly = (env.invChatBots || ["12905890"]).includes(botId);
+      const readChat = invOnly || (env.chatBots || ["13580302"]).includes(botId);
       background(saveRoomFile(env, { botId, fileId: String(content.fileId), channelId, userId, fileName: content.fileName || undefined }, fetcher)
-        .then((r) => console.log("file", r))
+        .then(async (r) => {
+          console.log("file", r);
+          if (r !== "saved" || !readChat) return;
+          const q = await fetcher(`${env.sbUrl}/rest/v1/case_file?select=file_name&file_id=eq.${encodeURIComponent(String(content.fileId))}`, { headers: { apikey: env.sbKey, Authorization: "Bearer " + env.sbKey } });
+          const name = q.ok ? String((await q.json())[0]?.file_name || "") : (await q.body?.cancel(), "");
+          const c = await handleRoomFile({ sbUrl: env.sbUrl, sbKey: env.sbKey, anthropicKey: env.anthropicKey, model: invOnly ? (env.invChatModel || "claude-sonnet-5-5") : env.chatModel },
+            { channelId, fileName: name, sentAt: ev?.issuedTime || ev?.createdTime, invOnly, userId }, fetcher);
+          console.log("file-notice", c.how, c.saved);
+        })
         .catch((e) => console.error("file fail", String(e?.message || e).slice(0, 200))));
     }
   }
