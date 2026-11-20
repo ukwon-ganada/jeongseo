@@ -95,3 +95,14 @@ Deno.test("마감일 메모·예정·미래 날짜 줄은 제출로 보지 않�
   const l2 = computeInvDeadlines(rows, "(형/고소)", "2026-11-26");
   assertEquals([l2[0].st, l2[0].doneOn], ["done", "2026-11-25"]);
 });
+
+Deno.test("AI가 판단한 제출 서류(filed)가 있으면 낱말 대신 그것으로", () => {
+  const base = { kind: "처분", ev_date: "2026-11-06", summary: "불기소 처분", source: "chat-ai", filed: "" };
+  const t = (extra: any) => computeInvDeadlines([base, extra], "(형/고소)", "2026-11-26")[0];
+  // 낱말엔 '항고장'이 있지만 AI는 제출 아님으로 판단
+  assertEquals(t({ kind: "서면제출", ev_date: "2026-11-20", state: "완료", summary: "항고장 초안 검토 완료", filed: "" }).st, "open");
+  // 낱말엔 없지만 AI가 항고장 제출로 판단(앞 글 맥락)
+  assertEquals(t({ kind: "서면제출", ev_date: "2026-11-21", state: "완료", summary: "우편 제출 완료", filed: "항고장" }).doneOn, "2026-11-21");
+  // 다른 서류
+  assertEquals(t({ kind: "서면제출", ev_date: "2026-11-21", state: "완료", summary: "이의신청서 제출", filed: "이의신청서" }).st, "open");
+});

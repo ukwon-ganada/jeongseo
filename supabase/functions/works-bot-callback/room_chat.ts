@@ -11,7 +11,11 @@
 // ============================================================================
 
 export type ChatEnv = { sbUrl: string; sbKey: string; anthropicKey?: string; model?: string };
-export type RoomEvent = { kind: string; date: string; time: string | null; summary: string; state: "예정" | "완료" };
+export type RoomEvent = { kind: string; date: string; time: string | null; summary: string; state: "예정" | "완료"; filed: string };
+
+// 기한을 끝내는 서류(2026-11-20 석원 결정: 제출 여부는 낱말이 아니라 AI가 맥락으로 판단).
+// AI가 "이 글이 이 서류를 실제로 냈다는 뜻"이라고 할 때만 채운다. 할 일·마감 메모·초안이면 "".
+export const FILED = ["", "항고장", "재항고장", "재정신청서", "즉시항고장", "이의신청서", "정식재판청구서", "항소장", "상고장", "항소이유서", "상고이유서"] as const;
 
 // 시각을 남기는 종류(약속 시각이 있는 일). 나머지는 같은 날 같은 종류면 한 줄 (2026-11-19 재정신청서 세 줄)
 const APPT = new Set(["조사", "출석요구", "기일"]);
@@ -34,13 +38,14 @@ const SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["kind", "date", "time", "summary", "state"],
+        required: ["kind", "date", "time", "summary", "state", "filed"],
         properties: {
           kind: { type: "string", enum: [...KINDS] },
           date: { type: "string", description: "YYYY-MM-DD" },
           time: { type: ["string", "null"], description: "HH:MM (24시간), 모르면 null" },
           summary: { type: "string", description: "40자 이내. 사람 이름·전화번호·주민번호는 빼고 기관·절차만" },
           state: { type: "string", enum: ["예정", "완료"] },
+          filed: { type: "string", enum: [...FILED], description: "이 글이 그 서류를 실제로 법원·검찰·경찰에 냈다는 뜻일 때만 그 서류. 아니면 빈 문자열" },
         },
       },
     },
@@ -59,6 +64,7 @@ const SYSTEM = [
   "time은 조사·출석·재판 기일처럼 약속된 시각이 있을 때만 쓴다. 서면 제출·처분·접수 같은 일은 글을 보낸 시각을 쓰지 말고 null로 한다.",
   "제출처(경찰서·공소청·법원 등)는 대화나 앞 글에 분명히 나올 때만 적는다. 짐작해서 '추정'·'불명'으로 적지 말고, 모르면 제출처 없이 '재정신청서 제출'처럼 쓴다.",
   "'보내겠습니다'처럼 할 일이면 예정, '제출했습니다'·'발송 완료'처럼 끝난 일이면 완료로 한다. 같은 제출을 두고 여러 글이 오가도 한 일이다.",
+  "filed는 기한 관리에 쓰인다. 이번 글(앞 글 맥락 포함)이 항고장·재정신청서·이의신청서·항소이유서 같은 서류를 실제로 냈다(접수·발송 완료)는 뜻일 때만 그 서류를 적는다. 낼 예정, 작성 중, 초안 공유, 마감일 안내, '아직 안 냈다', 제출 지시, 다른 사람(상대방·검사)이 낸 것, 열람복사 신청처럼 기한과 무관한 서류면 빈 문자열로 한다. 애매하면 빈 문자열.",
   "골라낼 것이 없으면 events를 빈 배열로 한다. 확실하지 않으면 넣지 않는다.",
 ].join("\n");
 
@@ -76,7 +82,9 @@ export function cleanEvents(raw: unknown): RoomEvent[] {
     // 혹시 들어온 전화번호·주민번호 모양은 지운다
     const summary = String(e?.summary || "").replace(/\d{6}-?\d{7}|01\d-?\d{3,4}-?\d{4}/g, "").trim().slice(0, 60);
     if (!summary) continue;
-    out.push({ kind, date, time, summary, state: e?.state === "완료" ? "완료" : "예정" });
+    const state = e?.state === "완료" ? "완료" : "예정";
+    const filed = state === "완료" && (FILED as readonly string[]).includes(e?.filed) ? String(e.filed) : "";
+    out.push({ kind, date, time, summary, state, filed });
   }
   return out;
 }
@@ -168,7 +176,7 @@ export async function handleRoomText(env: ChatEnv, a: { channelId: string; text:
   if (!evs.length) return { saved: 0, how: "none" };
   const rows = evs.map((e) => ({
     channel_id: a.channelId, l_num: room?.status === "보류" ? null : room?.l_num ?? null,
-    kind: e.kind, ev_date: e.date, ev_time: APPT.has(e.kind) ? e.time ?? "" : "", summary: e.summary, state: e.state, msg_at: sentAt, source: "chat-ai",
+    kind: e.kind, ev_date: e.date, ev_time: APPT.has(e.kind) ? e.time ?? "" : "", summary: e.summary, state: e.state, filed: e.filed, msg_at: sentAt, source: "chat-ai",
   }));
   const ins = await rest(env, "room_event?on_conflict=channel_id,kind,ev_date,ev_time", {
     method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=minimal" }, body: JSON.stringify(rows),
@@ -178,7 +186,7 @@ export async function handleRoomText(env: ChatEnv, a: { channelId: string; text:
   // 같은 날 같은 일이 '예정'으로 먼저 들어와 있으면, 끝났다는 글이 왔을 때 그 줄을 '완료'로 바꾼다
   for (const r of rows.filter((x) => x.state === "완료")) {
     const q = `room_event?channel_id=eq.${encodeURIComponent(r.channel_id)}&kind=eq.${encodeURIComponent(r.kind)}&ev_date=eq.${r.ev_date}&ev_time=eq.${encodeURIComponent(r.ev_time)}&state=eq.${encodeURIComponent("예정")}&source=eq.chat-ai`;
-    const up = await rest(env, q, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ state: "완료", summary: r.summary, msg_at: sentAt }) }, fetcher);
+    const up = await rest(env, q, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ state: "완료", summary: r.summary, filed: r.filed, msg_at: sentAt }) }, fetcher);
     await up.body?.cancel();
   }
   return { saved: rows.length, how: "ai" };
