@@ -58,10 +58,12 @@ const b64url = (b: Uint8Array | string) =>
   btoa(typeof b === "string" ? unescape(encodeURIComponent(b)) : String.fromCharCode(...b))
     .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
-let cached: { token: string; until: number } | null = null;
+// scope 마다 따로 보관(bot: 파일 받기, user.read: 지시 변호사 이름 확인)
+const cached = new Map<string, { token: string; until: number }>();
 
-export async function botToken(env: FileEnv, fetcher: typeof fetch = fetch): Promise<string> {
-  if (cached && cached.until > Date.now()) return cached.token;
+export async function botToken(env: FileEnv, fetcher: typeof fetch = fetch, scope = "bot"): Promise<string> {
+  const hit = cached.get(scope);
+  if (hit && hit.until > Date.now()) return hit.token;
   const { clientId, clientSecret, serviceAccount, privateKey } = env;
   if (!clientId || !clientSecret || !serviceAccount || !privateKey) throw new Error("웍스 열쇠 시크릿 없음");
   const key = await crypto.subtle.importKey("pkcs8", pemToPkcs8(privateKey) as BufferSource, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
@@ -75,14 +77,15 @@ export async function botToken(env: FileEnv, fetcher: typeof fetch = fetch): Pro
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       assertion, grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-      client_id: clientId, client_secret: clientSecret, scope: "bot",
+      client_id: clientId, client_secret: clientSecret, scope,
     }),
   });
   const t = await r.text();
   if (!r.ok) throw new Error("토큰 실패 " + r.status + " " + t.slice(0, 120));
   const j = JSON.parse(t);
-  cached = { token: j.access_token, until: Date.now() + Math.max(60, (Number(j.expires_in) || 3600) - 300) * 1000 };
-  return cached.token;
+  const tok = { token: j.access_token, until: Date.now() + Math.max(60, (Number(j.expires_in) || 3600) - 300) * 1000 };
+  cached.set(scope, tok);
+  return tok.token;
 }
 
 // Content-Disposition 에서 원래 파일 이름 꺼내기 (filename*=UTF-8''… 우선)
