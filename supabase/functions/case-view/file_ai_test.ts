@@ -178,3 +178,16 @@ Deno.test("화면을 연 사람은 AI를 기다리지 않는다: 뒤에서 묻�
   await attachByAI(env, e2, files, ["ch"], "사건", fetcher, (p) => jobs.push(p));
   assert(e2[0].f?.id === 89 && asked === 1 && jobs.length === 1, "다음 열 때 붙고 다시 안 물음");
 });
+
+Deno.test("받은 중요 문서(2026-11-20 석원): 공소장 줄, 처분 통지 줄도 후보, 오래된 판결문도 찾음", () => {
+  const lines = candidateLines([
+    { d: "2026-03-02", k: "done", g: "notice", t: "공소장 부본 도달" },
+    { d: "2026-11-18", k: "room", g: "chat", src: "chat", rid: 7, t: "고소·고발사건 결정결과 통지 수령" },
+    { d: "2026-11-18", k: "room", g: "chat", src: "chat", rid: 8, t: "의뢰인과 통화" },
+    { d: "2025-06-10", k: "ours", g: "hearing", t: "선고기일" },
+  ], /열람/);
+  assert(lines.length === 3 && !lines.some((e) => e.rid === 8), JSON.stringify(lines));
+  const old = { id: 1, n: "문승현_2025노1790_판결문.pdf", d: "2026-11-18", tm: "10:00", at: 1, pdf: 1 };
+  const p = buildPrompt("사건", lines, [old], []);
+  assert(p.user.includes("2025-06-10") && p.user.includes("받은 문서"), p.user);
+});
