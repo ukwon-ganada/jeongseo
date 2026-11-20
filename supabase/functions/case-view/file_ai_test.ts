@@ -212,3 +212,13 @@ Deno.test("예정인 우리 제출 줄(방 대화)은 후보, 기한·앞으로�
   const { user } = buildPrompt("2025노1234 홍길동외1", lines, [{ id: 9, d: "2026-11-20", n: "홍길동_선임계.pdf", at: Date.parse("2026-11-20T00:45:00Z") }], []);
   assert(user.includes("사건: 2025노1234") && user.includes("선임계 제출"), user);
 });
+
+Deno.test("다시 묻는 파일이 예전 판단으로 붙어 있어도 '이미 붙음'으로 보이지 않음", () => {
+  const lines = [
+    { d: "2026-11-19", k: "done", g: "notice", t: "공소장 부본 도달", f: { id: 7, n: "홍길동_공소장.pdf", ai: 1 } },
+    { d: "2026-11-19", k: "ours", g: "ours", t: "의견서 제출", f: { id: 8, n: "홍길동_의견서.pdf", pick: 0 } },
+  ];
+  const { user } = buildPrompt("2026고단1 홍길동", lines, [{ id: 7, d: "2026-11-19", n: "홍길동_공소장.pdf", at: Date.parse("2026-11-19T01:00:00Z") }], []);
+  assert(!user.includes("이미 붙음: 홍길동_공소장"), user);
+  assert(user.includes("이미 붙음: 홍길동_의견서"), "다른 파일은 그대로: " + user);
+});
