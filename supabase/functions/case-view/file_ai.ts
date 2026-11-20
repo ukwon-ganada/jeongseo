@@ -23,6 +23,9 @@ const nz = (v: unknown) => (v == null ? "" : String(v).trim());
 const DOC_RE = /\.(pdf|hwp|hwpx|doc|docx)$/i;
 const addDays = (d: string, n: number) => new Date(Date.parse(d) + n * 864e5).toISOString().slice(0, 10);
 export const BEFORE_DAYS = 60;   // 파일보다 앞선 줄(판결문은 선고 뒤에 올라옴)
+// 파일 이름 규칙으로 가르지 않는다(2026-11-20 석원 "서면 이름이 딱 맞게 올라오지 않으니 AI로"):
+// 받은 문서는 한참 뒤에 올라오기도 하니, 모든 파일에 약 2년 앞의 줄까지 보여 주고 AI가 날짜를 보고 고른다
+const beforeDays = (_f: any) => 730;
 export const AFTER_DAYS = 10;    // 파일보다 뒤의 줄(서면을 먼저 올리고 며칠 뒤 제출·기록)
 export const MAX_FILES = 20;
 
@@ -36,11 +39,11 @@ const isDoc = (f: any) => !!(f.pdf || DOC_RE.test(nz(f.n)));
 // 자동으로 붙일 수 있는 파일: PDF만 (한글·워드는 초안). 직원이 [수정]에서 고른 파일은 형식과 관계없이 그대로
 export const isPdf = (f: any) => !!(f.pdf || /\.pdf$/i.test(nz(f.n)));
 // 판단 기준이 바뀌면 올린다: 예전 판단을 모두 다시 묻게 된다
-const RULE_VER = "v3-answer";
+const RULE_VER = "v4-received";
 
 // AI에게 보여 줄 줄: 지난 일(예정 아님)의 우리 제출·기일/선고·처분 줄. 사소한 제출, 직원이 뺀 줄, 직원이 파일을 고른 줄은 뺀다
 export function candidateLines(events: any[], minor: RegExp): any[] {
-  return events.filter((e) => e.k !== "due" && (e.g === "ours" || e.g === "hearing") && !e.none && !e.minor && !(e.f && e.f.pick === 1)
+  return events.filter((e) => e.k !== "due" && (e.g === "accept" || e.g === "ours" || e.g === "hearing" || e.g === "notice" || (e.src === "chat" && /통지|결정서|결과\s*(수령|받)/.test(nz(e.t)))) && !e.none && !e.minor && !(e.f && e.f.pick === 1)
     && !minor.test(nz(e.t)));
 }
 function hash(s: string): string {
@@ -50,7 +53,7 @@ function hash(s: string): string {
 }
 // 이 파일 무렵 줄 목록의 지문: 바뀌면(새 줄이 생기면) 다시 묻는다
 export function fileSig(f: any, lines: any[]): string {
-  const lo = addDays(f.d, -BEFORE_DAYS), hi = addDays(f.d, AFTER_DAYS);
+  const lo = addDays(f.d, -beforeDays(f)), hi = addDays(f.d, AFTER_DAYS);
   return hash(RULE_VER + "#" + lines.filter((e) => e.d >= lo && e.d <= hi).map(lineKey).sort().join("|"));
 }
 // 아직 판단이 없거나, 판단한 뒤 줄 목록이 바뀐 파일
@@ -66,8 +69,10 @@ const SYSTEM = [
   "- 이 사무실은 서면을 한글(hwp) 파일로 방에 올려 검토하고, 최종 제출본은 PDF로 올린 뒤 변호사가 'ㄱㄱ', '제출하세요' 같은 말로 제출을 지시하면 낸다. 지시가 분명하지 않은 때도 있다.",
   "- 그래서 고를 파일(올라온 파일)은 모두 PDF다. '같은 무렵 한글 파일'은 초안이라 고르지 않고, 어떤 서면을 쓰고 있었는지 아는 참고로만 쓴다.",
   "- PDF에는 서면 본문뿐 아니라 그 서면의 첨부서류(증거, 참고자료, 별지, 진단서, 합의서, 영수증, 판결 사본 등)도 섞여 있다. 첨부서류는 붙이지 않는다. 같은 이름의 한글 초안이 있었거나, 제출 지시 바로 앞뒤에 올라온 PDF가 서면 본문일 가능성이 높다.",
+  "- 우리와 의뢰인이 맺은 위임계약서·약정서(수임 계약)는 '사건 선임' 줄에 붙인다. 증거로 낸 다른 사람들 사이의 계약서·약정서는 붙이지 않는다.",
   "- 우리가 낸 서면(의견서, 변론요지서, 항소이유서, 선임계·선임신고서, 탄원서, 고소장 등)은 그 제출 줄에 붙인다. 파일은 보통 제출일 당일이나 며칠 전에 올라온다.",
-  "- 판결문·결정문처럼 법원에서 받은 문서는 그 선고·결정 줄에 붙인다. 보통 선고 뒤에 올라온다.",
+  "- 기관에서 받은 중요한 문서도 붙인다. 판결문·결정문은 선고·결정 줄에, 공소장은 '공소장 부본 도달' 줄(없으면 기소 줄)에, 불송치·송치 결정서, 불기소 결정서·이유서, 고소·고발사건 결정결과 통지서, 수사결과 통지서는 그 처분(송치·불송치·불기소·기소) 줄에, 수사진행상황 통지서는 그 통지 줄에 붙인다. 받은 문서는 처분보다 며칠~몇 달 뒤에 올라오기도 한다.",
+  "- 단, 우리 서면에 첨부한 사본('첨부서류 1. 수사결과 통지서 사본', '증 제○호증' 등)은 받은 문서 줄에 붙이지 않는다.",
   "- 줄 제목이 서류 이름 대신 '우편 제출', '서면 제출'처럼 뭉뚱그려져 있으면 그 무렵 방 대화를 보고 어떤 서류인지 판단한다.",
   "- 초안·검토용·수정 중 파일, 편지·사진·참고자료·증거자료처럼 그 줄의 서류 자체가 아닌 파일은 붙이지 않는다.",
   "- 한 줄에 맞는 파일이 여럿이면 최종본(가장 늦게 올라온 것)만 고르고 나머지는 붙이지 않는다.",
@@ -91,13 +96,13 @@ const SCHEMA = {
 const KST = (ms: number) => new Date(ms + 9 * 3600e3).toISOString().slice(0, 16).replace("T", " ");
 // AI에게 보낼 글: 줄(L1..), 파일(F1..), 파일 무렵 방 대화
 export function buildPrompt(caseTitle: string, lines: any[], files: any[], msgs: { at: number; text: string }[], drafts: any[] = []) {
-  const lo = addDays(files.reduce((m, f) => (f.d < m ? f.d : m), files[0].d), -BEFORE_DAYS);
+  const lo = files.map((f) => addDays(f.d, -beforeDays(f))).sort()[0];
   const hi = addDays(files.reduce((m, f) => (f.d > m ? f.d : m), files[0].d), AFTER_DAYS);
   const ls = lines.filter((e) => e.d >= lo && e.d <= hi).sort((a, b) => a.d.localeCompare(b.d));
   const lineIds = new Map<string, string>(), fileIds = new Map<string, any>();
   const lineTxt = ls.map((e, i) => {
     const id = "L" + (i + 1); lineIds.set(id, lineKey(e));
-    const kind = e.g === "hearing" ? "기일·선고" : e.src === "chat" ? "우리 업무(방 대화)" : "우리 제출";
+    const kind = e.g === "accept" ? "사건 선임" : e.g === "hearing" ? (e.src === "chat" ? "처분·일정(방 대화)" : "기일·선고") : e.g === "notice" ? "받은 문서" : e.src === "chat" ? "우리 업무(방 대화)" : "우리 제출";
     return `${id} ${e.d} [${kind}] ${nz(e.t).split(" · ")[0]}${e.f ? ` (이미 붙음: ${e.f.n})` : ""}`;
   });
   const fileTxt = files.map((f, i) => { const id = "F" + (i + 1); fileIds.set(id, f); return `${id} ${f.d} ${nz(f.tm)} ${nz(f.n)}`; });
@@ -145,7 +150,7 @@ export async function askMatch(ai: AiEnv, user: string, fetcher: typeof fetch = 
 
 // 기억된 판단을 타임라인에 붙인다: 줄마다 가장 늦게 올라온 파일 하나, 직원이 고른 줄·뺀 줄·사소한 줄은 손대지 않음
 export function applyMatches(events: any[], files: any[], cache: Map<number, MatchRow>, lines: any[]) {
-  for (const e of events) if (e.f?.ai) e.f = null;
+  for (const e of events) { if (e.f?.ai) e.f = null; if (e.cf?.ai) e.cf = null; }
   const byKey = new Map<string, any>();
   for (const e of lines) byKey.set(lineKey(e), e);
   const used = new Set(events.flatMap((e) => [e.f?.pick === 1 ? e.f.id : null, e.cf?.id]).filter((x) => x != null));
@@ -157,6 +162,7 @@ export function applyMatches(events: any[], files: any[], cache: Map<number, Mat
     const cur = best.get(m.line_key);
     if (!cur || f.at > cur.at) best.set(m.line_key, f);
   }
-  for (const [k, f] of best) { const e = byKey.get(k); e.f = { id: f.id, n: f.n, pick: 0, ai: 1 }; }
+  // 사건 선임 줄에 고른 파일은 계약서 자리(cf)에
+  for (const [k, f] of best) { const e = byKey.get(k); if (e.g === "accept") e.cf = { id: f.id, n: f.n, ai: 1 }; else e.f = { id: f.id, n: f.n, pick: 0, ai: 1 }; }
   return events;
 }

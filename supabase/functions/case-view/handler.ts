@@ -261,6 +261,13 @@ export function shapeCase(c: any, evs: any[], opts: { today: string; linked: str
     (notice.get(dd) || notice.set(dd, new Set()).get(dd)!).add(OUR_FIRM.test(c) ? "우리" : (c.match(/^피고인\d*/) || ["피고인"])[0]);
   }
   for (const [d, who] of notice) events.push({ d, k: "done", g: "notice", w: 2, t: "소송기록접수통지 도달 (" + [...who].join("·") + ")", f: null });
+  // 공소장 부본 도달(받은 중요 문서, 2026-11-20 석원): 방에 올린 공소장 파일을 붙일 줄. 첫 도달 하루만(변경·병합 공소장, 검사 줄 제외)
+  const indict = list.map((e) => {
+    const c = nz(e.lp_contents);
+    if (e.lp_set !== "송달" || !/공소장\s*부본/.test(c) || /변경|병합/.test(c) || /^\s*검사/.test(c)) return "";
+    return isDate(e.delivered_date) ? nz(e.delivered_date).slice(0, 10) : ((nz(e.lp_remark).match(/(\d{4})\.(\d{2})\.(\d{2})\s*송달됨/) || []).slice(1, 4).join("-")) || e.lp_appoint_date.slice(0, 10);
+  }).filter(isDate).sort()[0];
+  if (indict) events.push({ d: indict, k: "done", g: "notice", w: 2, t: "공소장 부본 도달", f: null });
   // 의뢰인에게 안내 문자를 보냈는지만 (석원 2026-11-16: 내용은 불필요). 같은 날 여러 통이어도 한 줄.
   const smsDays = new Set<string>();
   for (const e of evs) {
@@ -505,7 +512,8 @@ export function roomOnlyShape(title: string, rows: any[], today: string, myHeari
 const DOC_RE = /\.(pdf|hwp|hwpx|doc|docx)$/i;
 // 계약서(석원 2026-11-13): 방에 올라온 파일 이름에 "계약"·"약정서"가 들어가면 서면 후보에서 빼고
 //   "사건 선임" 줄에 가장 최근 것 하나를 붙인다.
-export const CONTRACT_RE = /계약|약정서/;
+// 2026-11-20: 증거·첨부 파일("증 제6호증 … 매매약정서")이 계약서로 붙던 문제 → 증거·첨부·사본 이름은 빼고, 계약서·약정서만
+export const CONTRACT_RE = /^(?!.*(호증|증\s*제?\s*\d|첨부|사본|증거)).*(계약서|위임계약|선임계약|수임계약|약정서)/;
 export function attachContract(events: any[], files: any[]) {
   const acc = events.find((e) => e.g === "accept");
   const c = files.filter((f) => CONTRACT_RE.test(f.n) && f.lp == null).sort((a, b) => b.at - a.at)[0];
@@ -594,7 +602,8 @@ export async function attachByAI(env: Env, events: any[], files: any[], chans: s
   if (!env.anthropicKey) return false;
   // 자동 후보는 PDF만(2026-11-19 석원: 한글 파일은 초안, 최종 제출본은 PDF). 한글·워드는 AI에 참고로만
   const all = files.filter((f) => DOC_RE.test(nz(f.n)) || f.pdf);
-  const docs = all.filter((f) => isPdf(f) && f.lp == null && !CONTRACT_RE.test(f.n));
+  // 계약서도 AI가 사건 선임 줄에 붙일지 고른다(2026-11-20 석원: 이름 규칙으론 예외를 못 잡음)
+  const docs = all.filter((f) => isPdf(f) && f.lp == null);
   if (!docs.length) return true;
   const lines = candidateLines(events, MINOR_RE);
   const rows = known ?? await rest(env, `case_file_match?select=file_id,line_key,sig&file_id=in.(${docs.map((f) => Number(f.id)).join(",")})`, {}, fetcher);
@@ -946,7 +955,6 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       const noneRows = fast ? (B.none || []).map((n: any) => ({ lp_num: n })) : ourLps.length ? await rest(env, `case_file_none?select=lp_num&lp_num=in.(${ourLps.join(",")})`, {}, fetcher).catch(() => []) : [];
       const noneSet = new Set<string>((noneRows || []).map((r: any) => String(r.lp_num)));
       attachFinalFiles(shaped.events, files, noneSet, false);
-      attachContract(shaped.events, files);
       mergeRoomEvents(shaped, chat, c.l_code);
       // 파일을 붙일 줄은 AI가 고른다(2026-11-18 석원). AI를 못 쓰면 예전 이름 규칙으로
       //   화면을 연 사람은 AI를 기다리지 않는다(2026-11-20): 기억된 판단만 붙이고, 새로 물을 것은 응답 뒤에 묻는다.
@@ -956,6 +964,7 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       if (!aiOk) {
         for (const e of shaped.events) if (e.f?.ai) e.f = null;
         attachFinalFiles(shaped.events, files, noneSet, true);
+        attachContract(shaped.events, files);
         attachJudgment(shaped.events, files);
         attachChatFiles(shaped.events, files);
       }

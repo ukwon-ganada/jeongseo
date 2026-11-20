@@ -1,5 +1,5 @@
 // 실행: deno test supabase/functions/case-view/shape_test.ts
-import { attachChatFiles, attachJudgment, attachContract, byDay, earliestAccept, attachFinalFiles, caseNoVariants, caseNosIn, cleanPhones, infoFields, mergeMeets, ourFilingTest, shapeCase, smsGist } from "./handler.ts";
+import { CONTRACT_RE, attachChatFiles, attachJudgment, attachContract, byDay, earliestAccept, attachFinalFiles, caseNoVariants, caseNosIn, cleanPhones, infoFields, mergeMeets, ourFilingTest, shapeCase, smsGist } from "./handler.ts";
 function assert(c: unknown, m: string) { if (!c) throw new Error(m); }
 
 Deno.test("사건번호 후보", () => {
@@ -253,4 +253,16 @@ Deno.test("공동피고인: 우리 피고인 번호의 통지·이유서만, 이
   const s: any = shapeCase({ l_num: 1, l_code: "2026노1", l_name: "x", raw: {} }, evs, { today: "2026-11-20", linked: [], myHearings: [], others: [] });
   const t = s.events.filter((e: any) => e.g === "notice" || e.g === "filing").map((e: any) => e.d + " " + e.t);
   assertEquals(t, ["2026-09-05 소송기록접수통지 도달 (피고인2·우리)"]);
+});
+
+Deno.test("계약서: 증거·첨부 파일은 계약서로 보지 않음, 공소장 부본 도달 줄 (2026-11-20 석원)", () => {
+  const ok = ["(형사)송무위임계약서_김재학.pdf", "위임계약서.pdf", "약정서_홍길동.pdf"].every((n) => CONTRACT_RE.test(n));
+  const no = ["증 제6호증. 최승한의 가처분 이의신청서, 부동산 매매약정서 및 매매예약증서.pdf", "첨부서류 2. 매매계약서 사본.pdf"].some((n) => CONTRACT_RE.test(n));
+  if (!ok || no) throw new Error("계약서 규칙 " + ok + " " + no);
+  const s = shapeCase({ l_code: "2026고단100", l_num: 1, raw: {} }, [
+    { lp_set: "송달", lp_appoint_date: "2026-03-01", lp_contents: "피고인 홍OO 공소장부본 송달", delivered_date: "2026-03-04", lp_num: 1 },
+    { lp_set: "송달", lp_appoint_date: "2026-05-01", lp_contents: "피고인 홍OO 공소장변경허가신청서부본 송달", delivered_date: "2026-05-03", lp_num: 2 },
+  ], { today: "2026-11-20", linked: [], myHearings: [] });
+  const g = s.events.filter((e: any) => /공소장/.test(e.t));
+  if (g.length !== 1 || g[0].d !== "2026-03-04" || g[0].g !== "notice") throw new Error(JSON.stringify(g));
 });
