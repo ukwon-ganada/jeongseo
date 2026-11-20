@@ -150,3 +150,31 @@ Deno.test("파일마다 답을 받는 모양: 파일 번호가 칸 이름, 줄�
   assert(JSON.stringify(schema.required) === '["F1"]' && schema.properties.F1.properties.line.enum.includes("L1"), JSON.stringify(schema));
   assert((e[0] as any).f?.id === 136, JSON.stringify(e));
 });
+
+Deno.test("화면을 연 사람은 AI를 기다리지 않는다: 뒤에서 묻고 저장, 다음 열 때 붙음", async () => {
+  let saved: any[] = [], asked = 0;
+  let release!: () => void;
+  const gate = new Promise<void>((r) => { release = r; });
+  const fetcher = (async (url: any, init?: any) => {
+    const u = String(url);
+    if (u.includes("/case_file_match?select")) return Response.json(saved);
+    if (u.includes("/case_file_match?on_conflict")) { saved = JSON.parse(init.body); return new Response(null, { status: 201 }); }
+    if (u.includes("/room_msg")) return Response.json([]);
+    if (u.includes("anthropic.com")) {
+      asked++; await gate;
+      const picks = [{ file: "F1", line: "L1", why: "판결문" }, { file: "F2", line: null, why: "" }, { file: "F3", line: null, why: "" }];
+      return Response.json({ content: [{ type: "text", text: JSON.stringify({ picks }) }], stop_reason: "end_turn" });
+    }
+    throw new Error("예상 못한 요청 " + u);
+  }) as typeof fetch;
+  const jobs: Promise<unknown>[] = [];
+  const e1 = ev();
+  assert(await attachByAI(env, e1, files, ["ch"], "사건", fetcher, (p) => jobs.push(p)), "실패");
+  assert(!e1[0].f, "AI 답 전에는 안 붙음");
+  assert(jobs.length === 1 && saved.length === 0, "뒤에서 할 일 하나, 아직 저장 전");
+  release(); await Promise.all(jobs);
+  assert(asked === 1 && saved.length === 3, "뒤에서 물어 저장");
+  const e2 = ev();
+  await attachByAI(env, e2, files, ["ch"], "사건", fetcher, (p) => jobs.push(p));
+  assert(e2[0].f?.id === 89 && asked === 1 && jobs.length === 1, "다음 열 때 붙고 다시 안 물음");
+});
