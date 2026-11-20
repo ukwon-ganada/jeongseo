@@ -56,17 +56,42 @@ export const DEADLINE_NOTE = "잠정 계산입니다. 재판 단계(항소·상�
 export type Env = { sbUrl: string; sbKey: string; anthropicKey?: string; chatModel?: string; refreshModel?: string; fileModel?: string };
 export type WhoAmI = { ok: boolean; status: number; userId?: string; domainId?: number | string; name?: string; error?: string };
 
-// 같은 토큰이면 5분 동안 웍스에 다시 묻지 않는다(화면을 열 때마다 0.1~0.3초 아낌). 확인된 것만 기억
+// 같은 토큰이면 30분 동안 웍스에 다시 묻지 않는다. 확인된 것만 기억.
+//   서버(인스턴스)가 75초 쉬면 꺼져 메모리 기억이 사라지므로, DB(works_who_cache, 토큰은 해시만)에도 기억해
+//   새로 깨어난 서버도 웍스에 다시 묻지 않게 한다(새로 깨울 때마다 약 0.6초 아낌, 2026-11-20)
 const WHO_CACHE = new Map<string, { who: WhoAmI; until: number }>();
-const WHO_TTL = 5 * 60_000;
-export async function worksWhoAmI(token: string, fetcher: typeof fetch = fetch): Promise<WhoAmI> {
+const WHO_TTL = 30 * 60_000;
+export async function tokenHash(token: string): Promise<string> {
+  const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+  return [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
+}
+export async function worksWhoAmI(token: string, fetcher: typeof fetch = fetch, env?: Env, bg?: (p: Promise<unknown>) => void): Promise<WhoAmI> {
   if (!token || token.length < 20) return { ok: false, status: 0, error: "토큰 없음" };
   const hit = WHO_CACHE.get(token);
   if (hit && hit.until > Date.now()) return hit.who;
+  const remember = (who: WhoAmI, until: number) => {
+    if (WHO_CACHE.size > 500) WHO_CACHE.clear();
+    WHO_CACHE.set(token, { who, until });
+  };
+  const h = env ? await tokenHash(token) : "";
+  if (env) {
+    const row = (await rest(env, `works_who_cache?select=user_id,domain_id,name,until&token_hash=eq.${h}&until=gt.${enc(new Date().toISOString())}&limit=1`, {}, fetcher).catch(() => []))?.[0];
+    if (row?.user_id) {
+      const who: WhoAmI = { ok: true, status: 200, userId: row.user_id, domainId: row.domain_id ?? undefined, name: row.name ?? undefined };
+      remember(who, Math.min(Date.parse(row.until), Date.now() + WHO_TTL));
+      return who;
+    }
+  }
   const who = await askWorksWho(token, fetcher);
   if (who.ok) {
-    if (WHO_CACHE.size > 500) WHO_CACHE.clear();
-    WHO_CACHE.set(token, { who, until: Date.now() + WHO_TTL });
+    const until = Date.now() + WHO_TTL;
+    remember(who, until);
+    if (env && who.userId) {
+      const save = rest(env, "works_who_cache?on_conflict=token_hash", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+        body: JSON.stringify({ token_hash: h, user_id: who.userId, domain_id: who.domainId == null ? null : String(who.domainId), name: who.name ?? null, until: new Date(until).toISOString() }) }, fetcher)
+        .catch((e) => console.log("who save fail", String(e).slice(0, 120)));
+      if (bg) bg(save); else await save;
+    }
   }
   return who;
 }
@@ -557,7 +582,7 @@ export function attachChatFiles(events: any[], files: any[]) {
 }
 
 // AI로 파일 붙이기: 기억된 판단을 먼저 붙이고, 새 파일·줄 목록이 바뀐 파일만 한 번에 묻는다. 결과는 case_file_match에
-export async function attachByAI(env: Env, events: any[], files: any[], chans: string[], title: string, fetcher: typeof fetch = fetch): Promise<boolean> {
+export async function attachByAI(env: Env, events: any[], files: any[], chans: string[], title: string, fetcher: typeof fetch = fetch, bg?: (p: Promise<unknown>) => void): Promise<boolean> {
   if (!env.anthropicKey) return false;
   // 자동 후보는 PDF만(2026-11-19 석원: 한글 파일은 초안, 최종 제출본은 PDF). 한글·워드는 AI에 참고로만
   const all = files.filter((f) => DOC_RE.test(nz(f.n)) || f.pdf);
@@ -569,6 +594,14 @@ export async function attachByAI(env: Env, events: any[], files: any[], chans: s
   applyMatches(events, docs, cache, lines);
   const pend = pendingFiles(docs, lines, cache, () => false);
   if (!pend.length) return true;
+  // bg가 있으면: 지금 화면은 기억된 판단으로 보여 주고, AI에는 응답 뒤에 물어 결과를 저장만 한다(다음 열 때 반영)
+  if (bg) { bg(askAndSave(env, docs, pend, lines, cache, all, chans, title, fetcher)); return true; }
+  await askAndSave(env, docs, pend, lines, cache, all, chans, title, fetcher);
+  applyMatches(events, docs, cache, lines);
+  return true;
+}
+async function askAndSave(env: Env, docs: any[], pend: any[], lines: any[], cache: Map<number, MatchRow>, all: any[], chans: string[], title: string, fetcher: typeof fetch) {
+  if (!env.anthropicKey) return;
   const lo = new Date(Math.min(...pend.map((f) => f.at)) - 6 * 3600e3).toISOString();
   const hi = new Date(Math.max(...pend.map((f) => f.at)) + 6 * 3600e3).toISOString();
   const msgs = chans.length ? await rest(env, `room_msg?select=sent_at,text&channel_id=in.${enc(inList(chans))}&sent_at=gte.${enc(lo)}&sent_at=lte.${enc(hi)}&order=sent_at.asc&limit=200`, {}, fetcher).catch(() => []) : [];
@@ -588,8 +621,6 @@ export async function attachByAI(env: Env, events: any[], files: any[], chans: s
   }
   await rest(env, "case_file_match?on_conflict=file_id", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify(save) }, fetcher)
     .catch((e) => console.log("file ai save fail", String(e).slice(0, 120)));
-  applyMatches(events, docs, cache, lines);
-  return true;
 }
 
 // 방 제목에서 사건번호 꺼내기 (OCR이 0을 O로 읽는 것까지)
@@ -623,10 +654,13 @@ async function logView(env: Env, who: WhoAmI, action: string, room: string, c: a
 
 // 이미 올라온 파일 전부 다시 맞추기(2026-11-18 석원 요청): 파일이 있는 방마다 사건 화면을 한 번씩 만들어 AI 판단을 채운다.
 //   예약 작업과 같은 열쇠(lw_settings.cron_secret)로만 부른다. 열람 기록에는 "자동 정리"로 남는다.
-async function fileBackfill(req: Request, env: Env, fetcher: typeof fetch): Promise<Response> {
+// sinceHours를 주면 그 시간 안에 파일이 올라온 방만 (15분마다 cron: 화면을 열기 전에 AI 판단을 미리 해 둔다, 2026-11-20)
+async function fileBackfill(req: Request, env: Env, fetcher: typeof fetch, body: any = {}): Promise<Response> {
   const sec = (await rest(env, "lw_settings?select=value&key=eq.cron_secret", {}, fetcher).catch(() => []))?.[0]?.value;
   if (!sec || req.headers.get("x-cron-secret") !== sec) return json({ error: "forbidden" }, 403);
-  const rows = await rest(env, "case_file?select=channel_id&status=eq.보관&channel_id=not.is.null&limit=2000", {}, fetcher) || [];
+  const h = Number(body?.sinceHours);
+  const since = Number.isFinite(h) && h > 0 ? `&posted_at=gte.${enc(new Date(Date.now() - h * 3600e3).toISOString())}` : "";
+  const rows = await rest(env, `case_file?select=channel_id&status=eq.보관&channel_id=not.is.null${since}&limit=2000`, {}, fetcher) || [];
   const rooms = [...new Set(rows.map((r: any) => nz(r.channel_id)).filter(Boolean))] as string[];
   const token = "backfill-" + crypto.randomUUID();
   WHO_CACHE.set(token, { who: { ok: true, status: 200, userId: "system-backfill", name: "자동 정리" }, until: Date.now() + 10 * 60_000 });
@@ -643,14 +677,28 @@ async function fileBackfill(req: Request, env: Env, fetcher: typeof fetch): Prom
   return json({ rooms: rooms.length, ok, fail });
 }
 
-export async function handle(req: Request, env: Env, fetcher: typeof fetch = fetch): Promise<Response> {
+// 응답을 보낸 뒤에도 끝까지 돌릴 일(AI 파일 판단 등). Supabase 런타임이면 EdgeRuntime.waitUntil, 아니면(시험) 그냥 돌림
+export function runInBackground(p: Promise<unknown>) {
+  const safe = p.catch((e) => console.log("bg fail", String(e).slice(0, 160)));
+  // deno-lint-ignore no-explicit-any
+  const rt = (globalThis as any).EdgeRuntime;
+  if (rt?.waitUntil) rt.waitUntil(safe);
+}
+
+export async function handle(req: Request, env: Env, fetcher: typeof fetch = fetch, bg: (p: Promise<unknown>) => void = runInBackground): Promise<Response> {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
   let body: any = {};
   try { body = await req.json(); } catch { /* 빈 몸 허용 */ }
-  if (body?.action === "file_backfill") return await fileBackfill(req, env, fetcher);
+  if (body?.action === "file_backfill") return await fileBackfill(req, env, fetcher, body);
+  // 깨워 두기(1분마다 cron): 서버가 75초 쉬면 꺼져 다음 사람이 1~3초를 기다린다. DB도 한 번 불러 연결을 데워 둔다.
+  //   아무 자료도 돌려주지 않으므로 직원 확인 없이 받는다 (2026-11-20)
+  if (body?.action === "warm") {
+    await rest(env, "lw_feed_runs?select=id&limit=1", {}, fetcher).catch(() => null);
+    return json({ ok: true });
+  }
   const token = req.headers.get("x-works-token") || "";
-  const who = await worksWhoAmI(token, fetcher);
+  const who = await worksWhoAmI(token, fetcher, env, bg);
   console.log("whoami", body?.action, who.ok, who.status, who.error ? who.error.slice(0, 80) : "");
   if (body?.action === "whoami") return json(who, who.ok ? 200 : 401);
   if (!who.ok) return json({ error: "직원 확인이 안 됐습니다. 웍스에서 다시 열어 주세요.", status: who.status }, 401);
@@ -836,7 +884,9 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       attachContract(shaped.events, files);
       mergeRoomEvents(shaped, chat, c.l_code);
       // 파일을 붙일 줄은 AI가 고른다(2026-11-18 석원). AI를 못 쓰면 예전 이름 규칙으로
-      const aiOk = await attachByAI(env, shaped.events, files, chans, nz(c.l_name), fetcher)
+      //   화면을 연 사람은 AI를 기다리지 않는다(2026-11-20): 기억된 판단만 붙이고, 새로 물을 것은 응답 뒤에 묻는다.
+      //   자동 정리(file_backfill)만 끝까지 기다린다
+      const aiOk = await attachByAI(env, shaped.events, files, chans, nz(c.l_name), fetcher, who.userId === "system-backfill" ? undefined : bg)
         .catch((e) => { console.log("file ai fail", String(e).slice(0, 160)); return false; });
       if (!aiOk) {
         for (const e of shaped.events) if (e.f?.ai) e.f = null;

@@ -46,3 +46,33 @@ Deno.test("open 없이 부르면 예전처럼 방만 준다", async () => {
   const j = await (await handle(req({ action: "locate" }), env, f)).json();
   assert(j.room === "room-1" && !j.events, "방만");
 });
+
+Deno.test("깨워 두기(warm)는 직원 확인 없이 DB만 한 번 부르고 끝낸다", async () => {
+  const { f, calls } = fake();
+  const r = await handle(new Request("https://x/case-view", { method: "POST", body: JSON.stringify({ action: "warm" }) }), env, f);
+  assert(r.status === 200, "200");
+  assert(!calls.some((c) => c.includes("worksapis")), "웍스에 묻지 않음");
+  assert(calls.filter((c) => c.includes("/rest/v1/")).length === 1, "DB 한 번");
+});
+
+Deno.test("새로 깨어난 서버도 DB에 기억된 직원 확인을 쓴다(웍스에 다시 안 물음)", async () => {
+  clearWhoCache();
+  const calls: string[] = [];
+  const f = (async (input: RequestInfo | URL) => {
+    const u = String(input); calls.push(u);
+    if (u.includes("works_who_cache?select")) return new Response(JSON.stringify([{ user_id: "u9", domain_id: "1", name: "박직원", until: new Date(Date.now() + 600_000).toISOString() }]), { status: 200 });
+    return new Response("[]", { status: 200 });
+  }) as typeof fetch;
+  const w = await worksWhoAmI(TOK, f, env);
+  assert(w.ok && w.userId === "u9" && w.name === "박직원", "DB 기억 " + JSON.stringify(w));
+  assert(!calls.some((c) => c.includes("worksapis")), "웍스 안 물음");
+  assert(!calls.some((c) => c.includes(TOK)), "토큰 원문은 DB로 보내지 않음");
+});
+
+Deno.test("DB에 없으면 웍스에 묻고 해시로 기억해 둔다", async () => {
+  clearWhoCache();
+  const { f, calls } = fake();
+  const w = await worksWhoAmI(TOK, f, env);
+  assert(w.ok && w.userId === "u1", "확인");
+  assert(calls.some((c) => c.startsWith("POST") && c.includes("works_who_cache")), "기억 저장");
+});
