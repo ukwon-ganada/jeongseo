@@ -183,3 +183,9 @@ export function dropKnown(evs: ImportEvent[], known: { ev_date: string; kind: st
   const have = new Set(known.map((r) => keyOf(String(r.ev_date).slice(0, 10), r.kind, String(r.summary || ""))));
   return evs.filter((e) => !have.has(keyOf(e.date, e.kind, e.summary)));
 }
+// 대화파일 저장 때: 같은 날·같은 종류·같은 내용(띄어쓰기·기호 무시)이 이미 있으면 다시 넣지 않는다 (2026-11-20 석원)
+export function dropSame(evs: ImportEvent[], known: { ev_date: string; kind: string; summary?: string }[]): ImportEvent[] {
+  const k = (d: string, kind: string, s: string) => d + "|" + kind + "|" + String(s || "").replace(/[^0-9A-Za-z가-힣]/g, "");
+  const have = new Set(known.map((r) => k(String(r.ev_date).slice(0, 10), r.kind, String(r.summary || ""))));
+  return evs.filter((e) => !have.has(k(e.date, e.kind, e.summary)));
+}
