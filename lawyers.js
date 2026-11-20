@@ -16,9 +16,9 @@
   var KEY = 'jeongseo_lawyers_v1';
   var SHELL_ID = 'lawyerAdminShell';
   var STYLE_ID = 'lawyer-admin-style';
-  // 시드: 기존 명단(우숭민 제외) + 서고은 주민번호
+  // 시드: 기존 명단(우숭민 제외). 주민번호는 코드에 두지 않고 로그인 뒤 DB(firm_people)에서 채운다.
   var SEED = [
-    { name: '서고은', jumin: '840219-2079920' },
+    { name: '서고은', jumin: '' },
     { name: '정필성', jumin: '' }, { name: '김홍일', jumin: '' },
     { name: '양선화', jumin: '' }, { name: '이예나', jumin: '' }, { name: '손영우', jumin: '' }
   ];
@@ -75,8 +75,48 @@
   // 기존 서면들이 참조하는 window.ALL_ATTORNEYS 를 저장소 활성명단으로 동기화(코어 통합점)
   function syncGlobal() { try { if (typeof window !== 'undefined') window.ALL_ATTORNEYS = load().filter(function (x) { return x.active; }).map(function (x) { return x.name; }); } catch (e) {} }
 
+  // 주민번호·사무원 생년월일은 공개 리포에 두지 않는다. 로그인한 직원에게만 보이는 DB 표(firm_people)에서
+  // 비어 있는 칸만 채워 이 브라우저에 기억한다(이미 입력해 둔 값은 건드리지 않음).
+  var CLERKS_KEY = 'jeongseo_yeollam_clerks2';
+  var _filled = false;
+  function fillFromDb() {
+    if (_filled) return;
+    var sb = (typeof getSB === 'function') ? getSB() : null;
+    if (!sb || !sb.from) return;
+    sb.from('firm_people').select('kind,name,private_no,sort').order('sort').then(function (res) {
+      var rows = (res && res.data) || [];
+      if (res && res.error) return;
+      _filled = true;
+      var l = load(), changed = false;
+      rows.filter(function (r) { return r.kind === 'lawyer' && r.private_no; }).forEach(function (r) {
+        var hit = l.filter(function (x) { return x.name === r.name; })[0];
+        if (!hit) { l.push({ id: uid(), name: r.name, jumin: r.private_no, teams: [], active: true }); changed = true; }
+        else if (!hit.jumin) { hit.jumin = r.private_no; changed = true; }
+      });
+      if (changed) save(l);
+      var clerks = rows.filter(function (r) { return r.kind === 'clerk'; });
+      if (!clerks.length) return;
+      try {
+        var raw = localStorage.getItem(CLERKS_KEY), cl = raw ? JSON.parse(raw) : null, cc = false;
+        if (!cl || !cl.length) { cl = clerks.map(function (r) { return { name: r.name, birth: r.private_no || '' }; }); cc = true; }
+        else clerks.forEach(function (r) {
+          var h = cl.filter(function (x) { return x && x.name === r.name; })[0];
+          if (h && !h.birth && r.private_no) { h.birth = r.private_no; cc = true; }
+        });
+        if (cc) localStorage.setItem(CLERKS_KEY, JSON.stringify(cl));
+      } catch (e) {}
+    }, function () {});
+  }
+  function hookAuth() {
+    var sb = (typeof getSB === 'function') ? getSB() : null;
+    if (!sb || !sb.auth) return;
+    sb.auth.getSession().then(function (r) { if (r && r.data && r.data.session) fillFromDb(); });
+    sb.auth.onAuthStateChange(function (_e, s) { if (s) fillFromDb(); });
+  }
+
   if (typeof window !== 'undefined') {
-    window.LawyerStore = { load: load, save: save, activeNames: activeNames, juminOf: juminOf, setJumin: setJumin, allTeams: allTeams };
+    window.LawyerStore = { load: load, save: save, activeNames: activeNames, juminOf: juminOf, setJumin: setJumin, allTeams: allTeams, fillFromDb: fillFromDb };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', hookAuth); else hookAuth();
   }
 
   /* ══════════ 관리 콘솔 (PC: 디렉터리 표 + 우측 편집 드로어) ══════════ */
@@ -212,7 +252,7 @@
               '<div class="la-field"><label class="la-label" for="la-f-name">이름</label>' +
                 '<input class="fs-input" id="la-f-name" placeholder="예: 서고은" autocomplete="off"></div>' +
               '<div class="la-field"><label class="la-label" for="la-f-jumin">주민등록번호 <span class="la-opt">(위임장용·선택)</span></label>' +
-                '<input class="fs-input" id="la-f-jumin" placeholder="840219-2079920" autocomplete="off" style="font-family:\'IBM Plex Mono\',monospace">' +
+                '<input class="fs-input" id="la-f-jumin" placeholder="000000-0000000" autocomplete="off" style="font-family:\'IBM Plex Mono\',monospace">' +
                 '<div class="la-hint">표에서는 뒷자리가 가려지고(●●●●●●), 이 편집창에서만 전체가 보입니다.</div></div>' +
               '<div class="la-field"><label class="la-label" for="la-f-teams">팀</label>' +
                 '<input class="fs-input" id="la-f-teams" placeholder="예: 형사팀, 파트너 (쉼표로 구분)" autocomplete="off">' +

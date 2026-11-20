@@ -48,11 +48,11 @@ Deno.test("피고인 목록·사건번호", () => {
 
 Deno.test("같은 사람 1심·항소심", () => {
   const cases = [
-    { l_num: 1, client: "박명근", lawyer: "서고은", accept: "2026-03-01" },
-    { l_num: 2, client: "박명근", lawyer: "서고은", accept: "2026-09-10" },
+    { l_num: 1, client: "박가나", lawyer: "서고은", accept: "2026-03-01" },
+    { l_num: 2, client: "박가나", lawyer: "서고은", accept: "2026-09-10" },
   ];
   const ix = buildIndex(cases);
-  assert(matchCase("박명근", "서고은", cases, ix, "2026-11-10") === 2, "접견일 전 가장 최근 선임 사건");
-  assert(matchCase("박명근", "서고은", cases, ix, "2026-05-01") === 1, "그 전이면 1심");
-  assert(matchCase("박명근", "서고은", cases, ix, "2026-01-01") === null, "선임 전이면 안 붙임");
+  assert(matchCase("박가나", "서고은", cases, ix, "2026-11-10") === 2, "접견일 전 가장 최근 선임 사건");
+  assert(matchCase("박가나", "서고은", cases, ix, "2026-05-01") === 1, "그 전이면 1심");
+  assert(matchCase("박가나", "서고은", cases, ix, "2026-01-01") === null, "선임 전이면 안 붙임");
 });

@@ -133,7 +133,7 @@
     if (d.length <= 10) return d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6);      // 10자리
     return d.slice(0, 3) + '-' + d.slice(3, 7) + '-' + d.slice(7, 11);                       // 11자리
   }
-  // 생년월일 자동 포맷: 19891123 → 1989. 11. 23. (문서 표기와 동일)
+  // 생년월일 자동 포맷: 19900101 → 1990. 1. 1. (문서 표기와 동일)
   function fmtBirth(v) {
     var d = String(v == null ? '' : v).replace(/[^0-9]/g, '').slice(0, 8);
     if (d.length <= 4) return d;
@@ -485,7 +485,7 @@
               '<div class="fs-field"><label class="fs-label">당사자 성명</label><input type="text" class="fs-input" id="sj-party" placeholder="홍길동"></div>' +
             '</div>' +
             '<datalist id="sj-jiwi-list"><option value="피고인"><option value="피의자"><option value="원고"><option value="피고"><option value="신청인"><option value="채권자"></datalist>' +
-            '<div class="fs-field"><label class="fs-label">사건</label><input type="text" class="fs-input" id="sj-caseline" placeholder="2025고합1772 마약류관리에관한법률위반(향정)"></div>' +
+            '<div class="fs-field"><label class="fs-label">사건</label><input type="text" class="fs-input" id="sj-caseline" placeholder="2025고합9004 마약류관리에관한법률위반(향정)"></div>' +
             '<div class="sj-row2">' +
               '<div class="fs-field"><label class="fs-label">대리인 표시</label><input type="text" class="fs-input" id="sj-agent" placeholder="변호인" list="sj-agent-list"></div>' +
               '<div class="fs-field"><label class="fs-label">담당변호사</label><input type="text" class="fs-input" id="sj-lawyer" placeholder="서고은"></div>' +
@@ -494,8 +494,8 @@
 
             '<div class="fs-section">조회할 사람의 인적사항</div>' +
             '<div class="sj-row2">' +
-              '<div class="fs-field"><label class="fs-label">성명</label><input type="text" class="fs-input" id="sj-name" placeholder="신나리"></div>' +
-              '<div class="fs-field"><label class="fs-label">생년월일</label><input type="text" class="fs-input" id="sj-birth" inputmode="numeric" placeholder="19891123 → 1989. 11. 23." oninput="sjBirthInput(this)"></div>' +
+              '<div class="fs-field"><label class="fs-label">성명</label><input type="text" class="fs-input" id="sj-name" placeholder="정증인"></div>' +
+              '<div class="fs-field"><label class="fs-label">생년월일</label><input type="text" class="fs-input" id="sj-birth" inputmode="numeric" placeholder="19891123 → 1990. 1. 1." oninput="sjBirthInput(this)"></div>' +
             '</div>' +
             '<div class="fs-field"><label class="fs-label">연락처</label><input type="text" class="fs-input" id="sj-phone" placeholder="010-0000-0000" inputmode="numeric" oninput="sjPhoneInput(this)"></div>' +
             '<label class="sj-chk" id="sj-pastwrap" onclick="sjTogglePast()" style="margin-top:2px;"><span class="sj-box"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2"><path d="M4 12l5 5L20 6"/></svg></span>과거(해지) 연락처로 표기</label>' +

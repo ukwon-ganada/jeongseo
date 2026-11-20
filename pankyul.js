@@ -38,14 +38,14 @@
   function splitCourt(v) { v = String(v || '').trim(); var i = v.lastIndexOf(' '); return i < 0 ? { court: v, courtDiv: '' } : { court: v.slice(0, i).trim(), courtDiv: v.slice(i + 1).trim() }; }
 
   /* ══════════ HWPX 채우기 — 템플릿 샘플값을 사용자 값으로 앵커 치환 ══════════
-     templates/pankyul.hwpx 샘플: 재판부 형사7단독 / 사건번호 2026고단850 /
+     templates/pankyul.hwpx 샘플: 재판부 형사7단독 / 사건번호 2026고단9002 /
        사건명 도박장소개설방조 / 피고인 강세희 / 선고일 2026.06.25. /
        작성일 2026. 7. 11. / 법원 인천지방법원 / 변호사 서 고 은 / (국선변호인)  */
   function fillPankyul(ctx, c) {
     ctx.replace('형사7단독', c.courtDiv || '')
-       .replace('2026고단485', c.casenum || '')
+       .replace('2026고단9002', c.casenum || '')
        .replace('마약류관리에관한법률위반(향정)', c.casename || '')
-       .replace('채윤휘빈센트 (국선 채윤휘빈센트)', c.defendant || '')
+       .replace('이을동 (국선 이을동)', c.defendant || '')
        .replace('2026.06.26.', c.sentDate || '')
        .replace('2026. 7. 12.', c.writeDate || '')
        // 마무리줄: 법원과 재판부 사이 한 칸(예: 인천지방법원 제7형사부 귀중)

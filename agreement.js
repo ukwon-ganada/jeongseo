@@ -301,8 +301,8 @@
 
             '<div class="fs-section">사건 정보</div>' +
             '<div class="ag-row2">' +
-              '<div class="fs-field"><label class="fs-label" id="ag-defendant-label">피고인</label><input type="text" class="fs-input" id="ag-defendant" placeholder="윤한덕"></div>' +
-              '<div class="fs-field"><label class="fs-label">사건</label><input type="text" class="fs-input" id="ag-caseline" placeholder="2026고합69 사기 등"></div>' +
+              '<div class="fs-field"><label class="fs-label" id="ag-defendant-label">피고인</label><input type="text" class="fs-input" id="ag-defendant" placeholder="홍길동"></div>' +
+              '<div class="fs-field"><label class="fs-label">사건</label><input type="text" class="fs-input" id="ag-caseline" placeholder="2026고합9000 사기 등"></div>' +
             '</div>' +
 
             '<div class="fs-section">피해자</div>' +

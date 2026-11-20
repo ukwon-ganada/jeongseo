@@ -21,7 +21,7 @@
 
   var TPL = { 법원: './templates/yeollam_court.hwpx', 검찰: './templates/yeollam_prosecution.hwpx' };
   var CLERKS_KEY = 'jeongseo_yeollam_clerks2';   // [{name,birth}]
-  var CLERKS_SEED = [{ name: '원가을', birth: '94.11.03' }, { name: '신주연', birth: '' }, { name: '최인혜', birth: '' }, { name: '강민지', birth: '' }];
+  var CLERKS_SEED = [{ name: '원가을', birth: '' }, { name: '신주연', birth: '' }, { name: '최인혜', birth: '' }, { name: '강민지', birth: '' }];
   var USE_PRESETS = [
     { key: '재판', text: '재판준비를 위하여' },
     { key: '합의', text: '합의를 위하여' },
@@ -92,7 +92,7 @@
 
   /* ── 담당변호사 명단(이름+주민번호) — 검찰 위임장용, 열람등사 전용 ── */
   var ATTS_KEY = 'jeongseo_yeollam_atts';   // [{name, jumin}]
-  var ATTS_SEED = [{ name: '서고은', jumin: '840219-2079920' }];
+  var ATTS_SEED = [{ name: '서고은', jumin: '' }];
   function loadAtts() {
     try { var raw = localStorage.getItem(ATTS_KEY); var arr = raw ? JSON.parse(raw) : null; if (arr && arr.length) return arr; } catch (e) {}
     return ATTS_SEED.slice();
@@ -119,13 +119,13 @@
 
   /* ══════════ 법원 채우기 ══════════
      yeollam_court.hwpx 샘플: 담당변호사 서고은 / 담당사무원 신주연 /
-       자격 '피고인 채윤휘빈센트 (국선 채윤휘빈센트)의 변호인' / 재판준비를 위하여 /
-       사건 2026고단485 / 마약류…(향정) / 형사7단독 / 증거기록,… / 2026년 7월 12일 */
+       자격 '피고인 이을동 (국선 이을동)의 변호인' / 재판준비를 위하여 /
+       사건 2026고단9002 / 마약류…(향정) / 형사7단독 / 증거기록,… / 2026년 7월 12일 */
   function fillCourt(ctx, c) {
     ctx.replace('신주연', c.clerk || '')
-       .replace('피고인 채윤휘빈센트 (국선 채윤휘빈센트)의', (c.jiwi || '피고인') + ' ' + (c.defendant || '') + '의')
+       .replace('피고인 이을동 (국선 이을동)의', (c.jiwi || '피고인') + ' ' + (c.defendant || '') + '의')
        .replace('재판준비를 위하여', c.use || '')
-       .replace('2026고단485', c.casenum || '')
+       .replace('2026고단9002', c.casenum || '')
        .replace('마약류관리에관한법률위반(향정)', c.casename || '')
        .replace('형사7단독', c.courtDiv || '')
        .replace('증거기록, 소송기록일체, 미디어파일 일체(CD 등)', c.target || '')
@@ -143,20 +143,20 @@
   }
 
   /* ══════════ 검찰 채우기 ══════════
-     yeollam_prosecution.hwpx 샘플: 담당변호사 서고은 / 생년월일 840219-2079920 /
-       사건 2026고단485 / 피고인 채윤휘빈센트 (국선 채윤휘빈센트) / 죄명 마약류…(향정) /
+     yeollam_prosecution.hwpx 샘플: 담당변호사 서고은 / 생년월일 000000-0000000 /
+       사건 2026고단9002 / 피고인 이을동 (국선 이을동) / 죄명 마약류…(향정) /
        작성일 2026. 7. 12. / 검찰청 '인천지방검찰청 홍길동 검사실' /
        서류 기록일체·미디어파일일체(CD 등) /
-       [서약서·위임장] <2026년 7월 11일>·<원가을>·<94.11.03>·<별지> */
+       [서약서·위임장] <2026년 7월 11일>·<원가을>·<00.00.00>·<별지> */
   function fillProsecution(ctx, c) {
-    ctx.replace('840219-2079920', c.birth || '')
-       .replace('2026고단485', c.casenum || '')
-       .replace('채윤휘빈센트', c.defendant || '')
+    ctx.replace('000000-0000000', c.birth || '')
+       .replace('2026고단9002', c.casenum || '')
+       .replace('이을동', c.defendant || '')
        .replace('마약류관리에관한법률위반(향정)', c.casename || '')
        .replace('2026. 7. 12.', c.writeDot || '')          // 1페이지·수수료 날짜
        .replace('2026년 7월 12일', c.writeKo || '')          // 서약서·위임장 날짜
        .replace('원가을', c.clerk || '')                     // 담당사무원(서약서·위임장)
-       .replace('94.11.03', c.clerkBirth || '');            // 사무원 생년월일
+       .replace('00.00.00', c.clerkBirth || '');            // 사무원 생년월일
     // 신청 서류: 콤마 목록을 '서류 등의 표목' 표 각 행에 순서대로
     fillDocTable(ctx, c.docs || []);
     // 검찰청(검사 이름 없이 검찰청만) — 4개 서식의 '인천지방검찰청'을 모두 치환
@@ -255,7 +255,7 @@
             '<div class="fs-section">담당사무원 <span class="fs-hint">(검찰 위임장·서약서에 이름·생년월일 사용)</span></div>' +
             '<div class="fs-field"><label class="fs-label">사무원 선택</label>' +
               '<div class="fs-chips att-chips" id="yl-clerk-chips" onclick="ylClerkClick(event)"></div>' +
-              '<div class="yl-clerk-add"><input type="text" class="att-add-input" id="yl-clerk-new" placeholder="사무원 이름"><input type="text" class="att-add-input" id="yl-clerk-birth" placeholder="생년월일 예:94.11.03"><button type="button" class="att-add-btn" onclick="ylAddClerk()">＋ 추가</button></div>' +
+              '<div class="yl-clerk-add"><input type="text" class="att-add-input" id="yl-clerk-new" placeholder="사무원 이름"><input type="text" class="att-add-input" id="yl-clerk-birth" placeholder="생년월일 예:00.00.00"><button type="button" class="att-add-btn" onclick="ylAddClerk()">＋ 추가</button></div>' +
               '<div class="fs-hint" id="yl-clerk-info" style="margin-top:4px"></div></div>' +
 
             '<div class="fs-section">서명 · 날인</div>' +
