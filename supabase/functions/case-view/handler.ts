@@ -51,7 +51,7 @@ import { shapeStages, diffStages, personChangeLine, isStage, noLines, chatNos, w
 const TITLE_PROS = true;
 import { applyInvDeadlines } from "./inv_deadlines.ts";
 import { buildLevels, levelOf, LV_LABEL, lvByDate, shortNo } from "./levels.ts";
-import { applyMatches, askMatch, buildPrompt, candidateLines, fileSig, isPdf, pendingFiles, type MatchRow } from "./file_ai.ts";
+import { MANUAL, applyMatches, askMatch, buildPrompt, candidateLines, fileSig, isPdf, pendingFiles, type MatchRow } from "./file_ai.ts";
 export const DEADLINE_NOTE = "잠정 계산입니다. 재판 단계(항소·상고·이유서)는 선고일·기록접수통지 도달일로, 수사 단계(항고·재정신청·이의신청)는 사건방 줄의 처분·통지 날짜로 계산했습니다. 알림은 보내지 않습니다. 꼭 기록으로 한 번 더 확인해 주세요.";
 export type Env = { sbUrl: string; sbKey: string; anthropicKey?: string; chatModel?: string; refreshModel?: string; fileModel?: string };
 export type WhoAmI = { ok: boolean; status: number; userId?: string; domainId?: number | string; name?: string; error?: string };
@@ -1000,7 +1000,8 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       const dlc = fast ? (B.dlc || []) : c.l_code ? await rest(env, `deadline_confirm?select=id,kind,due,action,undone_at&undone_at=is.null&l_code=eq.${enc(nz(c.l_code))}&order=created_at.desc&limit=100`, {}, fetcher).catch(() => []) : [];
       applyConfirms(shaped, dlc || []);
       // 직원이 줄마다 파일을 바꿀 때 고를 목록 (화면에 따로 나열하지 않음)
-      const fileChoices = files.filter((f: any) => f.lp != null || !CONTRACT_RE.test(f.n)).map((f: any) => ({ id: f.id, n: f.n, d: f.d, tm: f.tm, by: f.by }));
+      // 계약서는 표시(c)만 해 두고 화면이 사건 선임 줄에서만 보여 준다
+      const fileChoices = files.map((f: any) => ({ id: f.id, n: f.n, d: f.d, tm: f.tm, by: f.by, ...(f.lp == null && CONTRACT_RE.test(f.n) ? { c: 1 } : {}) }));
       const stages = shapeStages(c, saved, stageLogs || [], TITLE_PROS ? roomTitle : "", chat || [], hist || []);
       return out({ ...shaped, fileChoices, stages, dispNo: stages.dispNo });
     }
@@ -1042,6 +1043,21 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
         body: JSON.stringify({ lp_num: lp, pick_by: by, pick_at: new Date().toISOString() }) }, fetcher);
       await rest(env, `case_file_none?lp_num=eq.${lp}`, { method: "DELETE", headers: { Prefer: "return=minimal" } }, fetcher).catch(() => null);
       await logView(env, who, "set_file:" + id, "", { l_num: lNum, l_code: null }, fetcher);
+      return json({ ok: true });
+    }
+
+    // 로웨어 제출 줄이 아닌 줄(방 대화·받은 문서·선고·사건 선임)의 파일을 직원이 직접 고르거나 뺀다(2026-11-20).
+    //   판단 기억(case_file_match)에 sig=manual로 남겨 AI가 다시 묻거나 덮어쓰지 않는다. old = 그 줄에 붙어 있던 파일
+    if (body?.action === "set_file_line") {
+      const lNum = String(body.lNum ?? ""), lk = nz(body.lk), id = Number(body.id), old = Number(body.old || 0);
+      if (!lNum || !lk || lk.length > 120 || lk.startsWith("lp:") || !Number.isFinite(id) || id < 0 || !Number.isFinite(old)) return json({ error: "고를 파일이 없습니다" }, 400);
+      const mine = await caseFiles(env, lNum, fetcher);
+      for (const x of [id, old]) if (x > 0 && !mine.some((f: any) => f.id === x)) return json({ error: "이 사건 파일이 아닙니다" }, 404);
+      const by = who.name || who.userId, now = new Date().toISOString(), rows: any[] = [];
+      if (old > 0 && old !== id) rows.push({ file_id: old, line_key: null, sig: MANUAL, reason: "직원이 뺌: " + by, model: MANUAL, decided_at: now });
+      if (id > 0) rows.push({ file_id: id, line_key: lk, sig: MANUAL, reason: "직원이 고름: " + by, model: MANUAL, decided_at: now });
+      if (rows.length) await rest(env, "case_file_match?on_conflict=file_id", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify(rows) }, fetcher);
+      await logView(env, who, (id > 0 ? "set_file_line:" + id : "unset_file_line:" + old) + ":" + lk.slice(0, 60), "", { l_num: lNum, l_code: null }, fetcher);
       return json({ ok: true });
     }
 

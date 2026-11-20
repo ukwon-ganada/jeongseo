@@ -39,7 +39,7 @@ const isDoc = (f: any) => !!(f.pdf || DOC_RE.test(nz(f.n)));
 // 자동으로 붙일 수 있는 파일: PDF만 (한글·워드는 초안). 직원이 [수정]에서 고른 파일은 형식과 관계없이 그대로
 export const isPdf = (f: any) => !!(f.pdf || /\.pdf$/i.test(nz(f.n)));
 // 판단 기준이 바뀌면 올린다: 예전 판단을 모두 다시 묻게 된다
-const RULE_VER = "v6-noself";
+const RULE_VER = "v7-onedecision";
 
 // AI에게 보여 줄 줄: 지난 일(예정 아님)의 우리 제출·기일/선고·처분 줄. 사소한 제출, 직원이 뺀 줄, 직원이 파일을 고른 줄은 뺀다
 // 앞으로의 줄(due)은 빼되, 방 대화에서 뽑은 '우리 제출 예정' 줄은 넣는다(2026-11-20: 선임계 제출 '예정' 줄에 오늘 올린 선임계 PDF)
@@ -58,9 +58,11 @@ export function fileSig(f: any, lines: any[]): string {
   return hash(RULE_VER + "#" + lines.filter((e) => e.d >= lo && e.d <= hi).map(lineKey).sort().join("|"));
 }
 // 아직 판단이 없거나, 판단한 뒤 줄 목록이 바뀐 파일
+// 직원이 [수정]에서 직접 고르거나 뺀 판단(sig = MANUAL): AI가 다시 묻지 않고, 같은 줄에선 AI 판단보다 먼저
+export const MANUAL = "manual";
 export function pendingFiles(files: any[], lines: any[], cache: Map<number, MatchRow>, skip: (f: any) => boolean): any[] {
   return files.filter((f) => isDoc(f) && isPdf(f) && f.lp == null && !skip(f))
-    .filter((f) => { const c = cache.get(Number(f.id)); return !c || c.sig !== fileSig(f, lines); })
+    .filter((f) => { const c = cache.get(Number(f.id)); return !c || (c.sig !== MANUAL && c.sig !== fileSig(f, lines)); })
     .sort((a, b) => b.at - a.at).slice(0, MAX_FILES);
 }
 
@@ -72,7 +74,7 @@ const SYSTEM = [
   "- PDF에는 서면 본문뿐 아니라 그 서면의 첨부서류(증거, 참고자료, 별지, 진단서, 합의서, 영수증, 판결 사본 등)도 섞여 있다. 첨부서류는 붙이지 않는다. 같은 이름의 한글 초안이 있었거나, 제출 지시 바로 앞뒤에 올라온 PDF가 서면 본문일 가능성이 높다.",
   "- 우리와 의뢰인이 맺은 위임계약서·약정서(수임 계약)는 '사건 선임' 줄에 붙인다. 증거로 낸 다른 사람들 사이의 계약서·약정서는 붙이지 않는다.",
   "- 우리가 낸 서면(의견서, 변론요지서, 항소이유서, 선임계·선임신고서, 탄원서, 고소장 등)은 그 제출 줄에 붙인다. 파일은 보통 제출일 당일이나 며칠 전에 올라온다.",
-  "- 기관에서 받은 중요한 문서도 붙인다. 판결문·결정문은 선고·결정 줄에, 공소장은 '공소장 부본 도달' 줄(없으면 기소 줄)에, 불송치·송치 결정서, 불기소 결정서·이유서, 고소·고발사건 결정결과 통지서, 수사결과 통지서는 그 처분(송치·불송치·불기소·기소) 줄에, 수사진행상황 통지서는 그 통지 줄에 붙인다. 통지 줄이 따로 없고 수사진행상황 통지서가 알리는 일이 송치·불송치 같은 처분이면(같은 무렵 그 처분 줄이 있으면) 그 처분 줄에 붙인다. 받은 문서는 처분보다 며칠~몇 달 뒤에 올라오기도 한다.",
+  "- 기관에서 받은 중요한 문서도 붙인다. 판결문·결정문은 선고·결정 줄에, 공소장은 '공소장 부본 도달' 줄(없으면 기소 줄)에, 불송치·송치 결정서, 불기소 결정서·이유서, 고소·고발사건 결정결과 통지서, 수사결과 통지서는 그 처분(송치·불송치·불기소·기소) 줄에, 수사진행상황 통지서는 그 통지 줄에 붙인다. 통지 줄이 따로 없고 수사진행상황 통지서가 알리는 일이 송치·불송치 같은 처분이면(같은 무렵 그 처분 줄이 있으면) 그 처분 줄에 붙인다. 고소·고발사건 결정결과 통지서·수사결과 통지서는 무렵의 처분 줄이 하나뿐이면, 그 줄에 '일부 송치·일부 불송치'처럼 여러 처분이 섞여 있어도 그 줄에 붙인다. 받은 문서는 처분보다 며칠~몇 달 뒤에 올라오기도 한다.",
   "- 판결문·결정문은 사건번호를 본다. '사건:'에 적힌 이 사건 번호와 같은 판결문을 이 사건 선고 줄에 붙인다. 원심(1심) 판결문처럼 다른 사건번호의 판결문은 이 사건 선고 줄에 붙이지 않는다. 판결문은 선고 뒤 몇 달 지나 올라오기도 한다.",
   "- 단, 우리 서면에 첨부한 사본('첨부서류 1. 수사결과 통지서 사본', '증 제○호증' 등)은 받은 문서 줄에 붙이지 않는다.",
   "- 줄 제목이 서류 이름 대신 '우편 제출', '서면 제출'처럼 뭉뚱그려져 있으면 그 무렵 방 대화를 보고 어떤 서류인지 판단한다.",
@@ -163,10 +165,12 @@ export function applyMatches(events: any[], files: any[], cache: Map<number, Mat
     const m = cache.get(Number(f.id));
     if (!m || !m.line_key || used.has(f.id) || f.lp != null) continue;
     if (!byKey.has(m.line_key)) continue;
-    const cur = best.get(m.line_key);
-    if (!cur || f.at > cur.at) best.set(m.line_key, f);
+    const cur = best.get(m.line_key), man = m.sig === MANUAL, curMan = cur && cache.get(Number(cur.id))?.sig === MANUAL;
+    if (!cur || (man && !curMan) || (man === !!curMan && f.at > cur.at)) best.set(m.line_key, f);
   }
   // 사건 선임 줄에 고른 파일은 계약서 자리(cf)에
   for (const [k, f] of best) { const e = byKey.get(k); if (e.g === "accept") e.cf = { id: f.id, n: f.n, ai: 1 }; else e.f = { id: f.id, n: f.n, pick: 0, ai: 1 }; }
+  // [수정]에서 직접 고를 수 있게 로웨어 제출 줄(lp)이 아닌 후보 줄에 열쇠를 붙여 둔다
+  for (const e of lines) if (e.lp == null) e.lk = lineKey(e);
   return events;
 }
