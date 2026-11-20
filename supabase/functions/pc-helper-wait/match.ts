@@ -18,7 +18,9 @@ export type OcrLine = { x: number; y: number; t: string };
 export type Room = { channel_id: string; room_title: string | null };
 export type MatchResult = { channelId: string | null; how: string; score: number; header: string };
 
-export const HEADER_ZONE = { xMin: 22, xMax: 88, yMax: 11 };
+// xMin 20(2026-11-20 원가을 PC): 창이 넓으면(1936px) 제목 앞 프로필 그림이 x=21%에서 잡글자("* 」1")로 읽혀
+// 줄 전체가 22% 밖으로 빠졌다. 도우미도 20% 이후만 보내므로 같은 기준. 2글자 이하 잡줄("˝9 8")은 뺀다.
+export const HEADER_ZONE = { xMin: 20, xMax: 88, yMax: 11 };
 
 export const norm = (s: string) => String(s || "").replace(/[^0-9A-Za-z가-힣]/g, "");
 
@@ -37,7 +39,7 @@ export function caseNos(s: string): string[] {
 
 export function headerText(lines: OcrLine[]): string {
   return lines
-    .filter((l) => l.x >= HEADER_ZONE.xMin && l.x <= HEADER_ZONE.xMax && l.y <= HEADER_ZONE.yMax && norm(l.t).length >= 2)
+    .filter((l) => l.x >= HEADER_ZONE.xMin && l.x <= HEADER_ZONE.xMax && l.y <= HEADER_ZONE.yMax && norm(l.t).length >= 3)
     .sort((a, b) => a.y - b.y || a.x - b.x)
     .map((l) => l.t.trim())
     .join(" ");

@@ -95,3 +95,20 @@ Deno.test("nearRooms: 제목이 바뀐 방(옛 제목 저장)도 후보 맨 앞�
   const m2 = matchRoom(lines, [{ channel_id: "A", room_title: "서)신)★(형/피)박큰별_사기_인천지방법원2026노101087" }, rooms[1], rooms[2]]);
   if (m2.channelId !== "A") throw new Error("새 제목으로는 찾아야 함 " + m2.how);
 });
+
+// 2026-11-20 원가을 PC(창 1936px): 제목 앞 프로필 그림이 잡글자로 붙어 줄이 x=21%에서 시작 (이름은 가짜)
+const WIDE = [
+  { x: 92, y: 4, t: "0" }, { x: 92, y: 9, t: "Q" }, { x: 94, y: 4, t: "69b" }, { x: 94, y: 9, t: "㉠" },
+  { x: 21, y: 8, t: "* 」1 서)을)*(형/고소)갑순이-사기 등-부천지원-2026형제26619" },
+  { x: 21, y: 10, t: "` ˝9 8" },
+];
+Deno.test("넓은 창: x=21% 제목 줄도 읽고 짧은 잡줄은 뺀다", () => {
+  const h = headerText(WIDE);
+  assertEquals(h.includes("갑순이"), true);
+  assertEquals(h.includes("9 8"), false);
+  const rooms = [...ROOMS, { channel_id: "D", room_title: "서)을)*(형/고소)갑순이-사기 등-부천지원-2026형제26619" }];
+  assertEquals(matchRoom(WIDE, rooms).channelId, "D");
+  // 사건번호가 저장 제목에 없어도(잘린 제목) 앞부분 닮음으로
+  const cut = [...ROOMS, { channel_id: "E", room_title: "서)을)*(형/고소)갑순이-사기 등-부천지원" }];
+  assertEquals(matchRoom(WIDE, cut).channelId, "E");
+});
