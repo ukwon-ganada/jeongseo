@@ -140,7 +140,7 @@ main{max-width:880px;margin:0 auto;padding:12px 16px 32px}
 .ev.moved{--gc:#c4c8ce}
 .ev.moved .rail::after{background:var(--surface)}
 .ev.moved .tt{color:var(--muted);font-weight:500;text-decoration:line-through;text-decoration-color:var(--muted)}
-.ev.moved .pill,.li .mv{background:var(--line2);color:var(--ink2);text-decoration:none}
+.ev.moved .pill,.li .mv{background:var(--due);color:#fff;font-weight:700;text-decoration:none}
 .li .mv{display:inline-block;font-size:11px;font-weight:600;line-height:1;padding:3px 6px;border-radius:999px;margin-left:6px;vertical-align:2px}
 .li.moved .t>span.x{text-decoration:line-through;color:var(--muted)}
 /* 법정기한(잠정): 빨간 점 + 남은 날 */
@@ -410,7 +410,8 @@ function copyText(t){
 }
 function fallbackCopy(t){ var a=document.createElement('textarea'); a.value=t; a.setAttribute('readonly',''); a.style.position='fixed'; a.style.opacity='0'; document.body.appendChild(a); a.select(); try{ document.execCommand('copy'); }catch(e){} a.remove(); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
-var MOVED_RE=/기일변경|기일연기|연기|추정|취소/;
+// 열리지 않은 기일: 변경·연기·추정·취소, 선고기일의 변론재개·선고연기 (2026-11-20 석원)
+var MOVED_RE=/변론재개|선고연기|재판연기|기일변경|기일연기|연기|추정|취소/;
 function cnk(c){ var m=String(c||'').replace(/\s/g,'').match(/^(\d{2}|\d{4})([가-힣]+)0*(\d+)$/); return m?m[1].slice(-2)+m[2]+m[3]:String(c||''); }
 function md(d){ return Number(d.slice(5,7)) + '.' + d.slice(8,10); }
 function dd(d){ return Math.round((Date.parse(d) - Date.parse(data.today)) / 864e5); }
@@ -470,7 +471,7 @@ var VIEWS = {
       var p=split(e), pill='';
       if(g==='limit'){ var n=dd(e.d); pill='<span class="pill">'+(e.cfa?esc(e.cfa):n<0?'지남':n===0?'오늘까지':'D-'+n)+'</span>'; p.ts=(p.ts?p.ts+' · ':'')+(e.src==='chat'?'대화 기준':'잠정'); }
       else if(e.k==='due') pill='<span class="pill">예정</span>';
-      var moved=g==='hearing' && MOVED_RE.test(p.ts); if(moved){ pill='<span class="pill">'+(p.ts.match(MOVED_RE)[0])+'</span>'; p.ts=p.ts.replace(/\s*·\s*(기일변경|기일연기|연기|추정|취소)\s*$/,''); }
+      var moved=g==='hearing' && MOVED_RE.test(p.ts); if(moved){ pill='<span class="pill">'+(p.ts.match(MOVED_RE)[0])+'</span>'; p.ts=p.ts.replace(/\s*·\s*[^·]*(변론재개|선고연기|재판연기|기일변경|기일연기|연기|추정|취소)[^·]*$/,''); }
       body+='<div class="ev '+e.k+(e.cfa?' cf'+(/^제출/.test(e.cfa)?' sub':''):'')+(g?' g-'+g:'')+(minor?' minor':'')+(key&&!moved?' key':'')+(moved?' moved':'')+'"><div class="d"><b>'+md(e.d)+'</b><small>'+wk(e.d)+'</small></div><div class="rail"></div><div class="t">'
         +'<div class="tt">'+esc(p.tt)+pill+(e.cf?fileChip(e.cf,'계약서'):'')+(e.f&&!e.minor?fileChip(e.f,'열기'):'')+'</div>'+(p.ts?'<div class="ts">'+esc(p.ts)+'</div>':'')+'</div></div>';
     });
@@ -505,7 +506,7 @@ var VIEWS = {
     var pick=data.hearings.filter(function(x){ return all ? dd(x.d)>=0 && dd(x.d)<=28 : x.c===data.caseNo; });
     var up=pick.filter(function(x){return dd(x.d)>=0;}).sort(function(a,b){return (a.d+a.tm).localeCompare(b.d+b.tm);});
     var past=all?[]:pick.filter(function(x){return dd(x.d)<0;}).sort(function(a,b){return b.d.localeCompare(a.d);});
-    var row=function(x, isPast){ var t=String(x.t||''), mv=t.match(MOVED_RE); if(mv) t=t.replace(/\s*\((기일변경|기일연기|연기|추정|취소)\)\s*$/,''); return '<div class="li'+(isPast?' past':'')+(mv?' moved':'')+'"><span class="tm">'+esc(x.tm||'')+'</span><div class="main"><div class="t">'+(all?'<span class="casechip">'+esc(x.c)+'</span>':'')+(mv?'<span class="x">'+esc(t)+'</span><span class="mv">'+mv[0]+'</span>':esc(t))+'</div>'+(x.p?'<div class="s">'+esc(x.p)+'</div>':'')+'</div></div>'; };
+    var row=function(x, isPast){ var t=String(x.t||''), mv=t.match(MOVED_RE); if(mv) t=t.replace(/\s+\(.*$/,''); return '<div class="li'+(isPast?' past':'')+(mv?' moved':'')+'"><span class="tm">'+esc(x.tm||'')+'</span><div class="main"><div class="t">'+(all?'<span class="casechip">'+esc(x.c)+'</span>':'')+(mv?'<span class="x">'+esc(t)+'</span><span class="mv">'+mv[0]+'</span>':esc(t))+'</div>'+(x.p?'<div class="s">'+esc(x.p)+'</div>':'')+'</div></div>'; };
     var h=chips('scope', [['case','이 사건'],['all','내 사건 전체 · 4주']]), last='', card='';
     up.forEach(function(x){
       if(x.d!==last){ if(card) h+=card+'</div>'; last=x.d; var n=dd(x.d); card='<div class="card"><div class="card-h"><span style="color:var(--ink)">'+md(x.d)+' ('+wk(x.d)+')</span><span class="dday">'+(n===0?'오늘':'D-'+n)+'</span></div>'; }
