@@ -33,6 +33,7 @@ import { saveRoomFile } from "./room_file.ts";
 import { linkPicked, linkRoomAnyBot, relinkRoom } from "./room_link.ts";
 import { handleRoomText } from "./room_chat.ts";
 import { backfillHold, recheckAll, recheckLinked, recheckRoom, refreshRoomTitles } from "./inv_case.ts";
+import { alertTarget, logOpsError, sendAlert } from "./ops_alert.ts";
 
 // 우리 봇: 운영 봇(사건관리 도우미), 시험봇(정서 시험봇)
 export const BOT_IDS = ["12905890", "13580302"];
@@ -129,6 +130,12 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
     let b: any = {};
     try { b = await req.json(); } catch { /* */ }
     try {
+      // DB ops_health_check()가 모은 문제를 웍스로 한 줄 알림
+      if (b?.action === "alert") {
+        const to = alertTarget((await rest(env, "lw_settings?select=value&key=eq.alert_to").then((r) => r.ok ? r.json() : []).catch(() => []))?.[0]?.value);
+        if (!to) return Response.json({ sent: false, error: "alert_to 설정 없음" }, { status: 400 });
+        return Response.json(await sendAlert(env, to, String(b?.text || "").trim() || "(내용 없음)", fetcher));
+      }
       if (b?.action === "inv-backfill") return Response.json(await backfillHold(env, BOT_IDS, b?.dryRun !== false, fetcher));
       if (b?.action === "linked-recheck") return Response.json(await recheckLinked(env, BOT_IDS, fetcher, typeof b?.part === "number" ? b.part : undefined));
       const r = await recheckAll(env, BOT_IDS, fetcher);
@@ -199,7 +206,7 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
     else {
       background(saveRoomFile(env, { botId, fileId: String(content.fileId), channelId, userId, fileName: content.fileName || undefined }, fetcher)
         .then((r) => console.log("file", r))
-        .catch((e) => console.error("file fail", String(e?.message || e).slice(0, 200))));
+        .catch((e) => { console.error("file fail", String(e?.message || e).slice(0, 200)); return logOpsError(env, "works-bot-callback", "파일 보관", e, fetcher); }));
     }
   }
 
@@ -211,7 +218,7 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       background(handleRoomText({ sbUrl: env.sbUrl, sbKey: env.sbKey, anthropicKey: env.anthropicKey, model: invOnly ? (env.invChatModel || "claude-sonnet-5-5") : env.chatModel },
         { channelId, text: String(content.text), sentAt: ev?.issuedTime || ev?.createdTime, invOnly, userId }, fetcher)
         .then((r) => console.log("chat", r.how, r.saved))
-        .catch((e) => console.error("chat fail", String(e?.message || e).slice(0, 200))));
+        .catch((e) => { console.error("chat fail", String(e?.message || e).slice(0, 200)); return logOpsError(env, "works-bot-callback", "대화 일정 뽑기(AI)", e, fetcher); }));
     }
   }
 
@@ -222,14 +229,14 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
     const bots = [...new Set([botId, ...BOT_IDS].filter(Boolean))];
     background(linkRoomAnyBot(env, bots, channelId, fetcher)
       .then((r) => { if (r.how !== "already") console.log("link", ev?.type, r.how, r.linked); })
-      .catch((e) => console.error("link fail", String(e?.message || e).slice(0, 200))));
+      .catch((e) => { console.error("link fail", String(e?.message || e).slice(0, 200)); return logOpsError(env, "works-bot-callback", "방 사건 연결", e, fetcher); }));
   }
 
   // 수사 사건 방에서 메뉴·파일이 오면 방 제목을 다시 읽어, 재판부 사건번호로 바뀌었으면 합친다
   if (channelId && (ev?.type === "postback" || (ev?.type === "message" && content?.type === "file"))) {
     background(recheckRoom(env, BOT_IDS, channelId, fetcher)
       .then((r) => { if (r.length) console.log("inv-room", r.map((x) => x.how).join(",")); })
-      .catch((e) => console.error("inv-room fail", String(e?.message || e).slice(0, 200))));
+      .catch((e) => { console.error("inv-room fail", String(e?.message || e).slice(0, 200)); return logOpsError(env, "works-bot-callback", "수사 방 제목 다시 읽기", e, fetcher); }));
   }
 
   // 웍스는 빨리 200을 받아야 다시 보내지 않음
