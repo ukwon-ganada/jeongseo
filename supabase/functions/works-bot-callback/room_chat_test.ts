@@ -1,6 +1,6 @@
 // 실행: deno test supabase/functions/works-bot-callback/room_chat_test.ts
 import { assertEquals } from "jsr:@std/assert@1";
-import { cleanEvents, handleRoomText, looksLikeEvent } from "./room_chat.ts";
+import { cleanEvents, handleRoomFile, handleRoomText, looksLikeEvent } from "./room_chat.ts";
 
 Deno.test("일정 낌새 없는 글은 AI에 안 보냄", () => {
   assertEquals(looksLikeEvent("네 알겠습니다"), false);
@@ -102,4 +102,24 @@ Deno.test("짧은 답글도 앞 글·파일 이름을 함께 AI에 보냄(정상
   };
   await handleRoomText({ sbUrl: "http://db", sbKey: "k", anthropicKey: "a" }, { channelId: "c1", text: "우편제출완료하였습니다", sentAt: "2026-11-18T07:55:00Z", invOnly: true }, f);
   assertEquals([prompt.includes("선임신고서 우편제출하겠습니다"), prompt.includes("변호인선임신고서_홍길동.pdf"), prompt.split("우편제출완료하였습니다").length - 1], [true, true, 1]);
+});
+
+Deno.test("통지서 파일만 올라와도 일정으로 (박유정 수사결과 통지서)", async () => {
+  const asked: string[] = []; const saved: any[] = [];
+  const f: typeof fetch = async (input, init) => {
+    const u = String(input);
+    if (u.includes("api.anthropic.com")) {
+      asked.push(JSON.parse(String(init!.body)).messages[0].content);
+      return Response.json({ stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ events: [{ kind: "송치", date: "2026-11-20", time: null, summary: "송치 (수사결과 통지서 수령)", state: "완료", filed: "" }] }) }] });
+    }
+    if (u.includes("/works_room_case")) return Response.json([{ l_num: 2266, room_title: "(형/고소)박유정", status: "대상" }]);
+    if (u.includes("/cases?")) return Response.json([{ court: "" }]);
+    if (u.includes("/room_event?on_conflict")) { saved.push(...JSON.parse(String(init!.body))); return new Response(null, { status: 201 }); }
+    return Response.json([]);
+  };
+  const env = { sbUrl: "http://db", sbKey: "k", anthropicKey: "a" };
+  assertEquals((await handleRoomFile(env, { channelId: "c1", fileName: "고소대리인의견서_최종.pdf", invOnly: true }, f)).how, "not-notice");
+  const r = await handleRoomFile(env, { channelId: "c1", fileName: "박유정_수사 결과 통지서(고소인등.송치등)_261120.pdf", sentAt: "2026-11-20T08:14:59Z", invOnly: true }, f);
+  assertEquals([r.how, saved[0].kind, saved[0].summary], ["ai", "송치", "송치 (수사결과 통지서 수령)"]);
+  assertEquals(asked[0].includes("[파일 올림] 박유정_수사 결과 통지서"), true);
 });
