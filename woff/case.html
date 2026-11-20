@@ -410,6 +410,10 @@ function loadMyCases(){ return api({action:'mycases'}).then(function(j){ return 
 // ── 공통 ──────────────────────────────────────────────
 var $ = function(s){ return document.querySelector(s); };
 var q = new URLSearchParams(location.search);
+// PC 브라우저: 사건 화면을 새로 열면 먼저 열려 있던 사건 화면 탭은 스스로 닫는다(탭이 쌓이지 않게)
+(function(){ try{ var id=Math.random().toString(36).slice(2), bc=new BroadcastChannel('jeongseo-case');
+  bc.onmessage=function(ev){ if(ev.data && ev.data.t==='open' && ev.data.id!==id && !(typeof editing!=='undefined' && editing)){ try{ window.close(); }catch(e){} } };
+  bc.postMessage({t:'open', id:id}); }catch(e){} })();
 var view = q.get('view') || 'timeline';
 var ctx = {room:'', caseParam:q.get('case')||'', tok:''};
 var data = null, sub = {f:'all', scope:'case', p:'all'}, editing = false;
@@ -931,6 +935,7 @@ document.addEventListener('change', function(e){
 });
 
 function render(){
+  if(data && data.caseNo) document.title=data.caseNo;
   document.querySelectorAll('#nav button').forEach(function(b){ b.setAttribute('aria-current', b.dataset.v===view?'page':'false'); });
   $('#nav').hidden=false;
   // 로웨어에 없는 자체 사건 중 수사기관 표시도 없는 방(민사·제목 못 읽음 등)은 '로웨어 미등록'으로
