@@ -693,8 +693,8 @@ export function runInBackground(p: Promise<unknown>) {
   if (rt?.waitUntil) rt.waitUntil(safe);
 }
 
-// 방으로 열 때 DB 함수 하나로 받기(속도 개선 4번). bundle_check로 예전 방식과 결과가 같은지 확인한 뒤 켠다
-const BUNDLE_ON = false;
+// 방으로 열 때 DB 함수 하나로 받기(속도 개선 4번). 2026-11-20 bundle_check 29방: 25방 같음, 4방은 파일 올린 사람 이름만 다름(예전 방식이 열람 기록 500줄 제한에 걸려 이름을 못 찾던 것)
+const BUNDLE_ON = true;
 // 운영 확인용(cron 비밀값 필요): 방마다 DB 함수 한 번(case_view_bundle)과 예전 방식으로 만든 화면 자료가 같은지 비교
 export function firstDiff(a: any, b: any, path = ""): string | null {
   if (a === b) return null;
