@@ -68,9 +68,14 @@ function dueMonths(d: string, n: number) {
 // 제출로 보는 줄: 지시·기일(마감일 메모) 아님, '예정' 아님, 오늘 이후 날짜 아님, "미제출·마감·예정" 같은 말 없음
 // (2026-11-20 석원: 2026형제42256 "항고 마감일(항고장 미제출)" 12.06 예정 줄을 제출로 봐서 회색 "제출 12.06"이 뜸)
 const NOT_DONE = /미\s*제출|마감|예정|안\s*(냄|함)|못\s*(냄|함)|준비|작성/;
+// 2026-11-20 석원 결정: 방 대화 AI가 맥락으로 "이 서류를 실제로 냈다"고 판단한 줄(filed)이 있으면 그 판단만 쓴다.
+// filed 칸이 없는 줄(직원 입력, 예전 줄, 대화 가져오기)은 낱말 규칙으로 본다.
+const FILED_KEY: Record<string, string> = { 항고장: "항고", 재항고장: "재항고", 재정신청서: "재정신청", 즉시항고장: "즉시항고", 이의신청서: "이의신청", 정식재판청구서: "정식재판청구" };
 function isDone(r: any, from: string, today: string): boolean {
   const d = nz(r.ev_date).slice(0, 10);
-  return r.kind !== "지시" && r.kind !== "기일" && nz(r.state) !== "예정" && d >= from && (!today || d <= today) && !NOT_DONE.test(nz(r.summary));
+  if (r.kind === "지시" || nz(r.state) === "예정" || d < from || (today && d > today)) return false;
+  if (r.filed != null) return true;
+  return r.kind !== "기일" && !NOT_DONE.test(nz(r.summary));
 }
 
 export type InvDeadline = Deadline & { strip: RegExp };
@@ -99,7 +104,8 @@ export function computeInvDeadlines(rows: any[], title: string, today: string): 
       let due: string, moved: boolean, raw: string;
       if (rule.months) ({ due, moved, raw } = dueMonths(base.d, rule.months));
       else { const r = dueDate(base.d, rule.days!); due = r.due; moved = r.moved; raw = new Date(Date.parse(base.d) + rule.days! * 864e5).toISOString().slice(0, 10); }
-      const done = (rows || []).find((r) => isDone(r, base.d, today) && rule.done.test(nz(r.summary)));
+      const done = (rows || []).find((r) => isDone(r, base.d, today) &&
+        (r.filed == null ? rule.done.test(nz(r.summary)) : FILED_KEY[nz(r.filed)] === rule.key));
       const conf = base.manual ? "확정" : "미확정(대화 기준)";
       const why = conf + " · " + base.label + (base.notice ? " 통지 " : " 처분 ") + md(base.d) + (base.notice ? "" : "(처분일을 통지일로 봄)") +
         " + " + (rule.months ? rule.months + "개월" : rule.days + "일") +

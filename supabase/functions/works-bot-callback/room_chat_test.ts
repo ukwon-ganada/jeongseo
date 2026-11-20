@@ -19,6 +19,15 @@ Deno.test("AI 결과 다듬기: 틀린 날짜·전화번호 걸러냄", () => {
   assertEquals([r[1].kind, r[1].time, r[1].state], ["기타", null, "완료"]);
 });
 
+Deno.test("제출 서류(filed)는 '완료'이고 목록에 있을 때만", () => {
+  const r = cleanEvents({ events: [
+    { kind: "서면제출", date: "2026-11-20", time: null, summary: "항고장 우편 제출", state: "완료", filed: "항고장" },
+    { kind: "기일", date: "2026-12-06", time: null, summary: "항고 마감일(항고장 미제출)", state: "예정", filed: "항고장" },
+    { kind: "서면제출", date: "2026-11-20", time: null, summary: "열람복사 신청", state: "완료", filed: "열람복사신청서" },
+  ] });
+  assertEquals(r.map((x) => x.filed), ["항고장", "", ""]);
+});
+
 Deno.test("글 → AI → room_event 저장(원문은 보내지 않음)", async () => {
   const sent: any[] = [];
   const f: typeof fetch = async (input, init) => {
@@ -36,7 +45,7 @@ Deno.test("글 → AI → room_event 저장(원문은 보내지 않음)", async 
   assertEquals((await handleRoomText(env, { channelId: "c1", text: "ㅇㅋ" }, f)).how, "no-cue");
   const r = await handleRoomText(env, { channelId: "c1", text: "다음 주 월요일 14시 논현서 조사 잡혔습니다", sentAt: "2026-11-13T04:00:00Z" }, f);
   assertEquals([r.how, r.saved], ["ai", 1]);
-  assertEquals(sent[0], { channel_id: "c1", l_num: 3018, kind: "조사", ev_date: "2026-11-17", ev_time: "14:00", summary: "논현서 피의자 조사", state: "예정", msg_at: "2026-11-13T04:00:00.000Z", source: "chat-ai" });
+  assertEquals(sent[0], { channel_id: "c1", l_num: 3018, kind: "조사", ev_date: "2026-11-17", ev_time: "14:00", summary: "논현서 피의자 조사", state: "예정", filed: "", msg_at: "2026-11-13T04:00:00.000Z", source: "chat-ai" });
   assertEquals(Object.values(sent[0]).some((v) => String(v).includes("잡혔습니다")), false);
 });
 

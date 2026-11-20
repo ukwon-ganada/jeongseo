@@ -377,7 +377,7 @@ export async function roomEvents(env: Env, lNum: string | null, channels: string
   if (nums.length) ors.push(`l_num.in.(${nums.join(",")})`);
   if (channels.length) ors.push(`channel_id.in.${enc(inList(channels))}`);
   if (!ors.length) return [];
-  return await rest(env, `room_event?select=id,kind,ev_date,ev_time,summary,state,source&hidden=eq.false&or=(${ors.join(",")})&order=ev_date.asc&limit=500`, {}, fetcher) || [];
+  return await rest(env, `room_event?select=id,kind,ev_date,ev_time,summary,state,source,filed&hidden=eq.false&or=(${ors.join(",")})&order=ev_date.asc&limit=500`, {}, fetcher) || [];
 }
 // 같은 방에 함께 연결된 다른 사건(예: 형제번호 사건 → 재판 사건, 1심 → 항소심). 석원 2026-11-16:
 // 재판번호가 붙으면 그 사건이 주 사건이 되고, 이전 사건 기록(타임라인·접견·사건정보)은 이어서 보여 준다.
