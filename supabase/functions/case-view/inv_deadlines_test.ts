@@ -83,3 +83,15 @@ Deno.test("약식명령 → 정식재판청구 7일 (피고인 쪽만), 청구�
   assertEquals(done[0].st, "done");
   assertEquals(/피고인 여부/.test(computeInvDeadlines(r, "이름 사건", "2026-09-10")[0].why), true);
 });
+
+Deno.test("마감일 메모·예정·미래 날짜 줄은 제출로 보지 않음 (2026형제42256)", () => {
+  const rows = [
+    { kind: "처분", ev_date: "2026-11-06", summary: "불기소 처분", source: "chat-ai" },
+    { kind: "기일", ev_date: "2026-12-06", state: "예정", summary: "항고 마감일(항고장 미제출)", source: "chat-ai" },
+    { kind: "서면제출", ev_date: "2026-11-25", state: "완료", summary: "항고장 제출", source: "chat-ai" },
+  ];
+  const l = computeInvDeadlines(rows, "(형/고소)", "2026-11-20");
+  assertEquals([l[0].kind, l[0].d, l[0].st, l[0].doneOn], ["항고", "2026-12-07", "open", undefined]);
+  const l2 = computeInvDeadlines(rows, "(형/고소)", "2026-11-26");
+  assertEquals([l2[0].st, l2[0].doneOn], ["done", "2026-11-25"]);
+});
