@@ -228,8 +228,8 @@ Deno.test("불변기한 줄(이강효 2026-11-19): 접수통지 도달·국선 �
   ];
   const s: any = shapeCase({ l_num: 1, l_code: "2026노1", l_name: "x", raw: {} }, evs, { today: "2026-11-19", linked: [], myHearings: [], others: [] });
   const t = s.events.map((e: any) => e.d + " " + e.t);
-  assertEquals(t.includes("2026-09-03 소송기록접수통지 도달 (변호인·피고인)"), true);
-  assertEquals(t.includes("2026-09-22 항소이유서 제출 (변호인)"), true);
+  assertEquals(t.includes("2026-09-03 소송기록접수통지 도달 (피고인1)"), true);
+  assertEquals(t.includes("2026-09-22 항소이유서 제출 (피고인 변호인)"), true);
   assertEquals(t.some((x: string) => x.startsWith("2026-09-01 소송기록")), false);
   assertEquals(s.events.find((e: any) => e.g === "limit")?.cfa, "제출 9.22");
 });
@@ -239,4 +239,18 @@ Deno.test("로웨어 다음 기일 칸에 날짜만 있으면 기일로 보지 �
   assertEquals(s.events.some((e: any) => /다음 기일/.test(e.t)), false);
   const s2: any = shapeCase({ l_num: 1, l_code: "2026노1", l_name: "x", raw: {}, next_date: "2026-12-01", next_time: "10:00", next_contents: "공판기일" }, [], { today: "2026-11-19", linked: [], myHearings: [], others: [] });
   assertEquals(s2.events.some((e: any) => /다음 기일/.test(e.t)), true);
+});
+
+Deno.test("공동피고인: 우리 피고인 번호의 통지·이유서만, 이름표는 전자소송 번호 그대로 (2026-11-20 석원)", () => {
+  const evs = [
+    { lp_set: "서면", lp_appoint_date: "2026-09-01", lp_contents: "피고인2 변호인  법무법인 정서 변호인선임계 제출" },
+    { lp_set: "송달", lp_appoint_date: "2026-09-02", lp_contents: "피고인1  인OOOO 소송기록접수통지서 발송", delivered_date: "2026-09-04" },
+    { lp_set: "송달", lp_appoint_date: "2026-09-02", lp_contents: "피고인1 변호인  김OO 소송기록접수통지서 발송", delivered_date: "2026-09-04" },
+    { lp_set: "송달", lp_appoint_date: "2026-09-02", lp_contents: "피고인2  인OOOO 소송기록접수통지서 발송", delivered_date: "2026-09-05" },
+    { lp_set: "송달", lp_appoint_date: "2026-09-02", lp_contents: "피고인2 변호인  법무법인 정서 소송기록접수통지서 발송", delivered_date: "2026-09-05" },
+    { lp_set: "서면", lp_appoint_date: "2026-09-20", lp_contents: "피고인1 변호인  김OO 항소이유서 제출" },
+  ];
+  const s: any = shapeCase({ l_num: 1, l_code: "2026노1", l_name: "x", raw: {} }, evs, { today: "2026-11-20", linked: [], myHearings: [], others: [] });
+  const t = s.events.filter((e: any) => e.g === "notice" || e.g === "filing").map((e: any) => e.d + " " + e.t);
+  assertEquals(t, ["2026-09-05 소송기록접수통지 도달 (피고인2·우리)"]);
 });
