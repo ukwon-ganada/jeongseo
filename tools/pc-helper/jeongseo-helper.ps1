@@ -1,10 +1,13 @@
 ﻿# 정서 사건 도우미 — 사건방 "이 방 사건 보기"를 누르면 이 PC 브라우저에 사건 화면을 연다.
+# v2.3: 스스로 업데이트(6시간마다 GitHub의 version.txt 확인, 지문(SHA-256)이 맞을 때만 바꿔 끼움)
+# v2.2: 절전·네트워크 끊김·서버 오류가 있어도 꺼지지 않고 계속 다시 연결(401이어도 5분 뒤 다시 시도)
 # v2.1: 따로 띄운 대화방 창도 찾음(창 제목=방 이름), 메인 창이 숨어 있어도 찾음
 # v2: 사건 화면이 "지금 어느 방?"을 물으면 웍스 창 위쪽 방 제목을 윈도우 글자 인식으로 읽어 서버에 알려 준다.
 #     (방 제목 줄만 보냄: 왼쪽 방 목록·대화 내용은 보내지 않음)
 # 화면 없이 뒤에서 돈다. 설정: %APPDATA%\JeongseoHelper\config.json (설치 때 만들어짐)
 # 끄기: 작업 관리자 > powershell(정서 사건 도우미) 끝내기, 또는 uninstall.cmd
 $ErrorActionPreference = 'Stop'
+$HelperVersion = '2.3'
 $dir = Join-Path $env:APPDATA 'JeongseoHelper'
 $cfg = Get-Content (Join-Path $dir 'config.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 $log = Join-Path $dir 'helper.log'
@@ -87,6 +90,10 @@ function Read-WorksRoomTitle {
     if (-not [JsWin]::IsWindowVisible($w) -or [JsWin]::IsIconic($w)) { continue }
     $t = [JsWin]::Title($w)
     if (-not $t) { continue }
+    # 웍스가 잠깐 띄우는 작은 창(메뉴·알림 등, 제목 'Form')은 건너뛴다
+    if ($t -match '^Form\d*$') { continue }
+    $rc = New-Object JsWin+RECT; [void][JsWin]::GetWindowRect($w, [ref]$rc)
+    if (($rc.R - $rc.L) -lt 300 -or ($rc.B - $rc.T) -lt 150) { continue }
     $h = $w; $title = $t; break
   }
   if ($h -eq [IntPtr]::Zero) { throw '보이는 웍스 창 없음' }
@@ -127,9 +134,36 @@ function Send-Report($id, $lines, $err) {
     -Body ([Text.Encoding]::UTF8.GetBytes($json)) -TimeoutSec 15 -UseBasicParsing | Out-Null
 }
 
-Write-Log '시작 v2'
+# ── 스스로 업데이트 ─────────────────────────────────────────────
+# version.txt 한 줄: "버전 SHA256" — 새 버전이고 받은 파일 지문이 같을 때만 바꾸고 새 도우미로 다시 켠다
+$updBase = 'https://raw.githubusercontent.com/ukwon-ganada/jeongseo/main/tools/pc-helper/'
+$script:nextUpdateCheck = (Get-Date).AddMinutes(1)
+function Invoke-SelfUpdate {
+  $script:nextUpdateCheck = (Get-Date).AddHours(6)
+  try {
+    $v = (Invoke-WebRequest -Uri ($updBase + 'version.txt?t=' + [DateTime]::UtcNow.Ticks) -TimeoutSec 20 -UseBasicParsing).Content
+    if ($v -is [byte[]]) { $v = [Text.Encoding]::UTF8.GetString($v) }
+    $parts = $v.Trim() -split '\s+'
+    if ($parts.Count -lt 2) { return }
+    if ([version]$parts[0] -le [version]$HelperVersion) { return }
+    $tmp = Join-Path $dir 'jeongseo-helper.new.ps1'
+    Invoke-WebRequest -Uri ($updBase + 'jeongseo-helper.ps1?t=' + [DateTime]::UtcNow.Ticks) -OutFile $tmp -TimeoutSec 30 -UseBasicParsing
+    $h = (Get-FileHash $tmp -Algorithm SHA256).Hash.ToLower()
+    if ($h -ne $parts[1].ToLower()) { Write-Log "업데이트 취소: 지문 다름 ($($parts[0]))"; Remove-Item $tmp -Force -ErrorAction SilentlyContinue; return }
+    Move-Item $tmp (Join-Path $dir 'jeongseo-helper.ps1') -Force
+    Write-Log "업데이트 $HelperVersion -> $($parts[0]), 다시 시작"
+    $mutex.ReleaseMutex(); $mutex.Dispose()
+    $vbs = Join-Path $dir 'start-hidden.vbs'
+    if (Test-Path $vbs) { Start-Process wscript.exe -ArgumentList ('"' + $vbs + '"') }
+    else { Start-Process powershell.exe -WindowStyle Hidden -ArgumentList ('-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' + (Join-Path $dir 'jeongseo-helper.ps1') + '"') }
+    exit
+  } catch { Write-Log "업데이트 확인 실패: $($_.Exception.Message)" }
+}
+
+Write-Log "시작 v$HelperVersion"
 $fail = 0
 while ($true) {
+  if ((Get-Date) -ge $script:nextUpdateCheck) { Invoke-SelfUpdate }
   try {
     $r = Invoke-WebRequest -Uri $waitUrl -Headers $headers -TimeoutSec 40 -UseBasicParsing
     $fail = 0
@@ -149,7 +183,13 @@ while ($true) {
   } catch {
     $code = $null
     try { $code = [int]$_.Exception.Response.StatusCode } catch {}
-    if ($code -eq 401) { Write-Log '토큰이 막혔거나 틀림 - 종료'; break }
+    # 절대 스스로 끝내지 않는다: 절전에서 깨어날 때 등 일시 오류로 401이 와도 기다렸다 다시 시도
+    if ($code -eq 401) {
+      Write-Log '토큰 확인 실패(401) - 5분 뒤 다시 시도'
+      Start-Sleep -Seconds 300
+      try { $cfg = Get-Content (Join-Path $dir 'config.json') -Raw -Encoding UTF8 | ConvertFrom-Json; $headers = @{ Authorization = "Bearer $($cfg.token)"; apikey = $cfg.anon } } catch {}
+      continue
+    }
     $fail++
     Write-Log "연결 실패($fail): $($_.Exception.Message)"
     Start-Sleep -Seconds ([Math]::Min(60, 3 * $fail))

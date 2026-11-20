@@ -1,6 +1,6 @@
 // 실행: deno test supabase/functions/works-bot-callback/room_link_test.ts
 import { assertEquals } from "jsr:@std/assert@1";
-import { caseNosInTitle, linkPicked, linkRoom } from "./room_link.ts";
+import { caseNosInTitle, linkPicked, linkRoom, relinkRoom } from "./room_link.ts";
 
 Deno.test("방 제목에서 사건번호", () => {
   assertEquals(caseNosInTitle("(형)홍길동-사기-서울중앙 2026고단01234, 2025노987"), ["2026고단1234", "2025노987"]);
@@ -47,15 +47,66 @@ Deno.test("새 방: 제목 사건번호로 연결, 여러 사건이면 최근 �
   assertEquals((await linkRoom(ENV, "1", "room-N", f)).how, "already");
 });
 
-Deno.test("사건번호 없거나 로웨어에 없으면 연결 안 함", async () => {
-  const db = { rooms: [] as any[], cases: [{ l_num: 10, l_code: "2025고단987", state: "진행" }] };
-  assertEquals((await linkRoom(ENV, "1", "r1", fake(db, "(민)을지문덕-대여금").f)).how, "no-case-no");
-  assertEquals((await linkRoom(ENV, "1", "r2", fake(db, "(형)갑-사기 2024고단1").f)).how, "not-in-lawware");
-  assertEquals(db.rooms.length, 0);
-});
+// 로웨어에 없거나 번호가 없는 방은 자체 사건을 만든다(inv_case_test.ts)
 
 Deno.test("직원이 고른 사건 기억", async () => {
   const db = { rooms: [] as any[], cases: [{ l_num: 10, l_code: "2025고단987", state: "종결" }] };
   const r = await linkPicked(ENV, ["1"], "r3", 10, fake(db, "어떤 방").f);
   assertEquals([r.linked, db.rooms[0].source, db.rooms[0].status, db.rooms[0].room_title], [1, "picked", "종결", "어떤 방"]);
+});
+
+// 연결 바꾸기·풀기용 가짜 DB (방 연결·거절 기록·자체 사건)
+function fake2(db: { rooms: any[]; cases: any[]; rejects: any[]; inv: any[]; moved: string[] }, title: string) {
+  const f: typeof fetch = async (input, init) => {
+    const u = new URL(String(input)), m = init?.method || "GET", p = u.pathname;
+    const ch = (u.searchParams.get("channel_id") || "").slice(3);
+    if (u.host === "auth.worksmobile.com") return Response.json({ access_token: "t", expires_in: 3600 });
+    if (p.includes("/channels/")) return Response.json({ title });
+    if (p.endsWith("/works_room_case")) {
+      if (m === "GET") return Response.json(db.rooms.filter((r) => r.channel_id === ch));
+      if (m === "DELETE") { db.rooms = db.rooms.filter((r) => r.channel_id !== ch); return new Response(null, { status: 204 }); }
+      db.rooms.push(...JSON.parse(String(init!.body))); return new Response(null, { status: 201 });
+    }
+    if (p.endsWith("/room_link_reject")) {
+      if (m === "GET") return Response.json(db.rejects.filter((r) => r.channel_id === ch));
+      if (m === "DELETE") { const l = Number(u.searchParams.get("l_num")!.slice(3)); db.rejects = db.rejects.filter((r) => !(r.channel_id === ch && r.l_num === l)); return new Response(null, { status: 204 }); }
+      db.rejects.push(...JSON.parse(String(init!.body))); return new Response(null, { status: 201 });
+    }
+    if (p.endsWith("/cases")) {
+      const lq = u.searchParams.get("l_num"), inq = u.searchParams.get("l_code");
+      if (lq) return Response.json(db.cases.filter((c) => String(c.l_num) === lq.slice(3)));
+      const codes = inq!.slice(4, -1).split(",").map((x) => x.replace(/"/g, ""));
+      return Response.json(db.cases.filter((c) => codes.includes(c.l_code)));
+    }
+    if (p.endsWith("/inv_case")) {
+      if (m === "GET") return Response.json(db.inv.filter((r) => r.channel_id === ch));
+      if (m === "PATCH") return new Response(null, { status: 204 });
+      const row = { ...JSON.parse(String(init!.body))[0], l_num: -100000 - db.inv.length - 1 }; db.inv.push(row);
+      return Response.json([row], { status: 201 });
+    }
+    if (p.endsWith("/case_file") || p.endsWith("/room_event")) { db.moved.push(p.split("/").pop() + ":" + JSON.parse(String(init!.body)).l_num); return new Response(null, { status: 204 }); }
+    return new Response("?", { status: 404 });
+  };
+  return f;
+}
+
+Deno.test("연결 풀기: 자체 사건으로 남고, 자동 연결이 같은 사건을 다시 붙이지 않는다", async () => {
+  const title = "박)신)★(형/고소)김가나_사기_인천 2026고단55";
+  const db = { rooms: [{ channel_id: "r", l_num: 10, case_no: "2026고단55", is_primary: true, status: "대상", room_title: title }] as any[],
+    cases: [{ l_num: 10, l_code: "2026고단55", state: "진행" }, { l_num: 11, l_code: "2026고단77", state: "진행" }], rejects: [] as any[], inv: [] as any[], moved: [] as string[] };
+  const f = fake2(db, title);
+  const r = await relinkRoom(ENV, ["1"], "r", null, "석원", f);
+  assertEquals(r.how, "unlinked:new");
+  assertEquals([db.rooms.length, db.rooms[0].l_num < 0, db.rooms[0].source], [1, true, "inv"]);
+  assertEquals(db.rejects.map((x) => [x.l_num, x.rejected_by]), [[10, "석원"]]);
+  assertEquals(db.moved, ["case_file:" + db.rooms[0].l_num, "room_event:" + db.rooms[0].l_num]);
+  // 같은 방에 새 신호가 와도 다시 붙지 않음(이미 자체 사건이 있음) + 연결 로직에서 거절 사건 제외
+  db.rooms = [];
+  assertEquals((await linkRoom(ENV, "1", "r", f, title)).how, "inv-created:not-in-lawware");
+  // 다른 사건으로 바꾸기: 거절 기록에서 그 사건은 빠지고 직원이 고른 사건이 주 사건
+  const r2 = await relinkRoom(ENV, ["1"], "r", 11, "석원", f);
+  assertEquals([r2.how, db.rooms.length, db.rooms[0].l_num, db.rooms[0].source], ["relinked", 1, 11, "picked"]);
+  // 원래 사건으로 되돌리면 거절 기록도 지운다
+  await relinkRoom(ENV, ["1"], "r", 10, "석원", f);
+  assertEquals(db.rejects.map((x) => x.l_num), [11]);
 });

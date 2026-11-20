@@ -7,7 +7,7 @@
 //
 //  찾는 순서
 //   1) 제목 안 사건번호(2026고정100189 등)가 정확히 한 방의 제목에만 있으면 그 방
-//   2) 아니면 글자 두 개씩 묶어 비교(Dice)해서 가장 닮은 방. 충분히 닮고(0.6↑)
+//   2) 아니면 글자 두 개씩 묶어 비교(Dice)해서 가장 닮은 방(의뢰인 이름이 다른 방은 제외). 충분히 닮고(0.6↑)
 //      두 번째와 차이가 나야(0.08↑) 인정 — 애매하면 고르지 않는다(엉뚱한 사건을 띄우지 않게)
 //      창이 좁아 제목 뒤가 잘려도 되게(석원 2026-11-16): 저장된 제목의 "앞부분"(읽은 길이만큼)과도
 //      비교하고, OCR이 앞에 붙인 잡글자("80t", "*" 등)는 몇 글자까지 떼어 보고 가장 높은 점수를 쓴다.
@@ -69,6 +69,22 @@ export function titleScore(h: string, t: string): number {
   return best;
 }
 
+// 방 제목의 의뢰인 이름: "(형/피의)최병환_..." 처럼 괄호 바로 뒤 한글 이름
+export function clientName(s: string): string {
+  let name = "";
+  for (const m of String(s || "").matchAll(/\((?:형|형사|국선)[^)]*\)\s*([가-힣]{2,})/g)) name = m[1];
+  return name;
+}
+// 이름이 서로 다르면 false (OCR이 한 글자 틀리는 건 봐준다: 두 글자 묶음이 절반 이상 같으면 같은 이름)
+export function sameClient(a: string, b: string): boolean {
+  if (!a || !b) return true;
+  if (a.includes(b) || b.includes(a)) return true;
+  const A = bigrams(a), B = bigrams(b);
+  let inter = 0;
+  for (const [g] of B) if (A.has(g)) inter++;
+  return inter * 2 >= Math.min(A.size, B.size);
+}
+
 export function matchRoom(lines: OcrLine[], rooms: Room[]): MatchResult {
   const header = headerText(lines);
   const h = norm(header);
@@ -89,12 +105,29 @@ export function matchRoom(lines: OcrLine[], rooms: Room[]): MatchResult {
     if (hit.size === 1) return { channelId: [...hit][0], how: "case-no", score: 1, header };
   }
 
-  // 2) 제목 닮은 정도 (잘린 제목·앞 잡글자 고려)
+  // 2) 제목 닮은 정도 (잘린 제목·앞 잡글자 고려, 의뢰인 이름이 다른 방은 아무리 닮아도 제외)
+  const hName = clientName(header);
   let best = { ch: "", s: 0 }, second = 0;
   for (const [ch, t] of titles) {
+    if (!sameClient(hName, clientName(t))) continue;
     const s = titleScore(h, norm(t));
     if (s > best.s) { second = best.s; best = { ch, s }; } else if (s > second) second = s;
   }
   if (best.s >= 0.6 && best.s - second >= 0.08) return { channelId: best.ch, how: "title", score: best.s, header };
   return { channelId: null, how: best.s >= 0.6 ? "ambiguous" : "no-match", score: best.s, header };
+}
+
+// 방을 못 찾았을 때: 저장된 제목이 옛 제목일 수 있으니, 비슷한 방 몇 개의 현재 제목을 웍스에서 다시 읽어 보기 위한 후보
+export function nearRooms(lines: OcrLine[], rooms: Room[], n = 4): string[] {
+  const header = headerText(lines);
+  const h = norm(header);
+  if (h.length < 4) return [];
+  const hName = clientName(header);
+  const seen = new Map<string, number>();
+  for (const r of rooms) {
+    if (!r.room_title || seen.has(r.channel_id)) continue;
+    if (hName && !sameClient(hName, clientName(r.room_title))) continue;
+    seen.set(r.channel_id, titleScore(h, norm(r.room_title)));
+  }
+  return [...seen].filter(([, s]) => s >= 0.3).sort((a, b) => b[1] - a[1]).slice(0, n).map(([ch]) => ch);
 }

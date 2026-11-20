@@ -13,10 +13,18 @@
 //    { "action": "mycases" }                        → 내가 담당인 진행 사건 (고르기 화면용)
 //    { "action": "save_info", "lNum": 123, "fields": {...} } → 사건 정보 저장(case_info, 수정 기록 case_info_log)
 //    { "action": "file_open", "id": 12 }             → 사건방에 올린 서면 파일 열람 주소(5분짜리, 비공개 저장소 case-files)
-//    { "action": "set_file", "lNum": 1, "lp": 55, "id": 12 } → 타임라인 제출 줄에 붙을 파일을 직원이 직접 고름
+//    { "action": "set_file", "lNum": 1, "lp": 55, "id": 12 } → 타임라인 제출 줄에 붙을 파일을 직원이 직접 고름 (id 0 = 빼기)
 //    { "action": "locate" }                         → PC: 이 직원 PC 도우미에게 웍스 창 방 제목을 읽게 해서 지금 방을 찾음(최대 8초)
 //    { "action": "link_room", "room": "<방ID>", "case": "<사건번호>" } → 연결 안 된 방에 고른 사건 기억
+//    { "action": "remember_pick", "locate": 12, "case": "<사건번호>" } → PC 방 찾기에서 못 찾은 방: 고른 사건을 읽은 제목과 함께 기억
 //    { "action": "helper_token" }                   → 이 직원의 PC 도우미 연결 코드 발급(한 번만 보여 줌, 서버엔 해시만)
+//    { "action": "chat_import_preview", "lNum": 1, "text": "<내보낸 대화>" } → AI가 뽑은 지난 업무 줄 미리보기(저장 안 함, 원문 안 남김)
+//    { "action": "chat_import_save", "lNum": 1, "events": [...] } → 직원이 고른 줄만 타임라인(room_event)에 저장
+//    { "action": "tl_refresh", "lNum": -100061 } → 보관된 수사 사건방 글(30일)을 AI가 다시 읽어 빠진 줄만 바로 저장
+//    { "action": "hide_event", "id": 12 }           → 타임라인의 대화 줄 하나 숨기기(예전 화면용)
+//    { "action": "chat_reset", "lNum": 1 }           → 대화 파일로 만든 줄 모두 지우기(다시 넣기 전 초기화)
+//    { "action": "tl_list", "lNum": 1 }              → 수정 화면: 이 사건의 대화·직접 입력 줄 전부(숨긴 줄 포함)
+//    { "action": "tl_save", "lNum": 1, "rows": [{id?, date, time, summary, hidden}] } → 줄 고치기·삭제(숨김)·되살리기·추가
 //  사건 정보 칸은 우리가 직접 입력·수정한다. 로웨어와 연동하지 않는다(자동으로 덮어쓰지 않음).
 //    저장된 값이 없을 때만 처음 값으로 로웨어 값을 한 번 보여 준다(PREFILL_FROM_LAWWARE).
 //  보류 방은 사건을 붙이지 않는다(잘못 붙이느니 안 붙인다) → { hold: true }
@@ -34,13 +42,61 @@ const CORS = {
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 
-import { computeDeadlines, deadlineEvents } from "./deadlines.ts";
-export const DEADLINE_NOTE = "잠정 계산입니다(형사 항소·상고·이유서만). 선고일·기록접수통지 도달일로 계산했고, 알림은 보내지 않습니다. 꼭 나의사건 기록으로 한 번 더 확인해 주세요.";
-export type Env = { sbUrl: string; sbKey: string };
+import { rankEvents } from "./timeline_rank.ts";
+import { applyConfirms, computeDeadlines, deadlineEvents, DL_ACTS, isNotice, mergeRoles, ourDefendants, type OtherCase } from "./deadlines.ts";
+import { findPick, normTitle } from "./title_match.ts";
+import { dropKnown, extractFromExport, msgsToExport, toRows } from "./chat_import.ts";
+import { shapeStages, diffStages, personChangeLine, isStage, noLines, chatNos, withChatNos, type NoHist } from "./stages.ts";
+// 방 제목 형제번호로 공소청 칸 채우기(2026-11-19): 바뀌는 방 목록을 석원님이 확인한 뒤 켠다
+const TITLE_PROS = true;
+import { applyInvDeadlines } from "./inv_deadlines.ts";
+import { buildLevels, levelOf, LV_LABEL, lvByDate, shortNo } from "./levels.ts";
+import { MANUAL, applyMatches, askMatch, buildPrompt, candidateLines, fileSig, isPdf, pendingFiles, type MatchRow } from "./file_ai.ts";
+export const DEADLINE_NOTE = "잠정 계산입니다. 재판 단계(항소·상고·이유서)는 선고일·기록접수통지 도달일로, 수사 단계(항고·재정신청·이의신청)는 사건방 줄의 처분·통지 날짜로 계산했습니다. 알림은 보내지 않습니다. 꼭 기록으로 한 번 더 확인해 주세요.";
+export type Env = { sbUrl: string; sbKey: string; anthropicKey?: string; chatModel?: string; refreshModel?: string; fileModel?: string };
 export type WhoAmI = { ok: boolean; status: number; userId?: string; domainId?: number | string; name?: string; error?: string };
 
-export async function worksWhoAmI(token: string, fetcher: typeof fetch = fetch): Promise<WhoAmI> {
+// 같은 토큰이면 30분 동안 웍스에 다시 묻지 않는다. 확인된 것만 기억.
+//   서버(인스턴스)가 75초 쉬면 꺼져 메모리 기억이 사라지므로, DB(works_who_cache, 토큰은 해시만)에도 기억해
+//   새로 깨어난 서버도 웍스에 다시 묻지 않게 한다(새로 깨울 때마다 약 0.6초 아낌, 2026-11-20)
+const WHO_CACHE = new Map<string, { who: WhoAmI; until: number }>();
+const WHO_TTL = 30 * 60_000;
+export async function tokenHash(token: string): Promise<string> {
+  const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+  return [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
+}
+export async function worksWhoAmI(token: string, fetcher: typeof fetch = fetch, env?: Env, bg?: (p: Promise<unknown>) => void): Promise<WhoAmI> {
   if (!token || token.length < 20) return { ok: false, status: 0, error: "토큰 없음" };
+  const hit = WHO_CACHE.get(token);
+  if (hit && hit.until > Date.now()) return hit.who;
+  const remember = (who: WhoAmI, until: number) => {
+    if (WHO_CACHE.size > 500) WHO_CACHE.clear();
+    WHO_CACHE.set(token, { who, until });
+  };
+  const h = env ? await tokenHash(token) : "";
+  if (env) {
+    const row = (await rest(env, `works_who_cache?select=user_id,domain_id,name,until&token_hash=eq.${h}&until=gt.${enc(new Date().toISOString())}&limit=1`, {}, fetcher).catch(() => []))?.[0];
+    if (row?.user_id) {
+      const who: WhoAmI = { ok: true, status: 200, userId: row.user_id, domainId: row.domain_id ?? undefined, name: row.name ?? undefined };
+      remember(who, Math.min(Date.parse(row.until), Date.now() + WHO_TTL));
+      return who;
+    }
+  }
+  const who = await askWorksWho(token, fetcher);
+  if (who.ok) {
+    const until = Date.now() + WHO_TTL;
+    remember(who, until);
+    if (env && who.userId) {
+      const save = rest(env, "works_who_cache?on_conflict=token_hash", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+        body: JSON.stringify({ token_hash: h, user_id: who.userId, domain_id: who.domainId == null ? null : String(who.domainId), name: who.name ?? null, until: new Date(until).toISOString() }) }, fetcher)
+        .catch((e) => console.log("who save fail", String(e).slice(0, 120)));
+      if (bg) bg(save); else await save;
+    }
+  }
+  return who;
+}
+export function clearWhoCache() { WHO_CACHE.clear(); }
+async function askWorksWho(token: string, fetcher: typeof fetch): Promise<WhoAmI> {
   const r = await fetcher("https://www.worksapis.com/v1.0/users/me", { headers: { Authorization: "Bearer " + token } });
   const t = await r.text();
   if (!r.ok) return { ok: false, status: r.status, error: t.slice(0, 200) };
@@ -79,8 +135,39 @@ export function caseNoVariants(p: string): string[] {
 // ── 자료를 화면 모양으로 바꾸기 ─────────────────────────
 // "보정서"처럼 "정서"가 들어간 낱말과 헷갈리지 않게 "법무법인 정서"로 찾음
 const OUR_FIRM = /법무법인\s*정서/;
+
+// 우리 서면 알아보기. 법원 기록은 우리 이름을 "피고인1 변호인 법OOOOOO 변론요지서 제출"처럼 가리기도 한다.
+// 가려진 줄은 ① 우리가 맡은 자리(피고인1·신청인 등)와 같고 ② 우리 이름이 처음 보인 날(선임) 이후일 때만 우리 것으로 본다.
+// 맡은 자리를 모르면(선임계에 "변호인 법무법인 정서"만 있음) 선임 이후 가려진 자리가 한 곳뿐일 때만 그 자리로 본다.
+const MASKED = /^(\S*?)\s*(변호인|소송대리인)\s+법O{6}(?!O)/;
+const OUR_ROLE = /^(\S*?)\s*(변호인|소송대리인)\s+법무법인\s*정서/;
+const APPEAL_BRIEF = /(항소|상고)\s*(보충\s*)?이유서/;
+// 낸 사람: 전자소송 앞머리 그대로("피고인2 변호인" → 피고인2 변호인, 우리 법인이면 우리)
+function filerOf(c: string): string {
+  if (OUR_FIRM.test(c)) return "우리";
+  const head = c.split(/\s{2,}/)[0].replace(/\(항소인\)|\(상고인\)|의/g, " ").replace(/\s+/g, " ").trim();
+  return head || "피고인";
+}
+export function ourFilingTest(list: any[]): (e: any) => boolean {
+  const day = (e: any) => nz(e.lp_appoint_date).slice(0, 10);
+  const firm = list.filter((e) => OUR_FIRM.test(nz(e.lp_contents)));
+  const since = firm.map(day).filter(Boolean).sort()[0] || "";
+  const roles = new Set<string>();
+  for (const e of firm) { const m = nz(e.lp_contents).match(OUR_ROLE); if (m && m[1]) roles.add(m[1]); }
+  if (since && !roles.size) {
+    const seen = new Set(list.filter((e) => e.lp_set === "서면" && day(e) >= since).map((e) => nz(e.lp_contents).match(MASKED)?.[1]).filter((r) => r != null) as string[]);
+    if (seen.size === 1) roles.add([...seen][0]);
+  }
+  return (e: any) => {
+    if (e.lp_set !== "서면") return false;
+    const c = nz(e.lp_contents);
+    if (OUR_FIRM.test(c)) return true;
+    const m = c.match(MASKED);
+    return !!m && !!since && day(e) >= since && roles.has(m[1]);
+  };
+}
 export const PREFILL_FROM_LAWWARE = true;
-export const INFO_FIELDS = ["case_name", "client_name", "client_phone", "lawyer", "court_dept", "court_phone", "investigator", "investigator_phone", "memo", "extra_phones"] as const;
+export const INFO_FIELDS = ["case_name", "client_name", "client_rrn", "client_phone", "lawyer", "court_dept", "court_phone", "investigator", "investigator_phone", "memo", "extra_phones"] as const;
 const kstNow = () => new Date(Date.now() + 9 * 3600e3);
 export const kstToday = () => kstNow().toISOString().slice(0, 10);
 const dot = (d: string) => d.replace(/-/g, ".");
@@ -111,7 +198,7 @@ export function infoFields(c: any, saved: any | null, prefill = PREFILL_FROM_LAW
     const police = [nz(raw.l_police_station), nz(raw.l_police_detective)].filter(Boolean).join(" ");
     const pros = nz(raw.l_prosecutor);
     Object.assign(f, {
-      case_name: nz(c.l_name).replace(/^\[전자\]\s*/, ""), client_name: nz(raw.l_client), client_phone: nz(raw.l_client_hp),
+      case_name: nz(c.l_name).replace(/^\[전자\]\s*/, ""), client_name: nz(raw.l_client), client_rrn: "", client_phone: nz(raw.l_client_hp),
       lawyer: nz(c.charge_lawyer).split(/[,\s]+/)[0] || "",
       court_dept: [nz(c.court), nz(raw.l_justice_dept).replace(/\s*\(?\s*전화.*$/, "")].filter(Boolean).join(" "),
       court_phone: (nz(raw.l_justice_dept).match(/전화\s*:?\s*([\d-]{7,})/) || [])[1] || "",
@@ -121,7 +208,10 @@ export function infoFields(c: any, saved: any | null, prefill = PREFILL_FROM_LAW
   return { fields: f, saved: !!saved, updatedBy: saved ? nz(saved.updated_by) : "", updatedAt: saved ? nz(saved.updated_at) : "" };
 }
 
-export function shapeCase(c: any, evs: any[], opts: { today: string; linked: string[]; myHearings: any[]; status?: string; saved?: any }) {
+// 타임라인 정렬: 날짜순, 같은 날이면 "사건 선임"이 맨 위 (석원 2026-11-16). 나머지는 원래 순서 유지.
+export const byDay = (a: any, b: any) => a.d.localeCompare(b.d) || (b.g === "accept" ? 1 : 0) - (a.g === "accept" ? 1 : 0);
+
+export function shapeCase(c: any, evs: any[], opts: { today: string; linked: string[]; myHearings: any[]; status?: string; saved?: any; others?: OtherCase[] }) {
   const raw = c.raw || {};
   const today = opts.today;
   const title = nz(c.l_name).replace(/^\[전자\]\s*/, "");
@@ -130,7 +220,10 @@ export function shapeCase(c: any, evs: any[], opts: { today: string; linked: str
     .filter((e) => isDate(e.lp_appoint_date) && e.lp_set !== "문자" && e.lp_set !== "메일")
     .sort((a, b) => (a.lp_appoint_date + (a.lp_appoint_time || "")).localeCompare(b.lp_appoint_date + (b.lp_appoint_time || "")) || (a.lp_num || 0) - (b.lp_num || 0));
 
-  const ours = (e: any) => e.lp_set === "서면" && OUR_FIRM.test(nz(e.lp_contents));
+  const ours = ourFilingTest(list);
+  // 공동피고인 사건: 우리 법인이 붙은 줄의 피고인 번호 = 우리 의뢰인 (모르면 null → 모두)
+  const oursSet = ourDefendants(list);
+  const ourNo = (c: string) => { const m = c.match(/^피고인(\d+)/); return !m || !oursSet || oursSet.has(m[1]); };
   const toUs = (e: any) => e.lp_set === "송달" && OUR_FIRM.test(nz(e.lp_contents));
 
   // 타임라인 (석원 결정 2026-11-13): "우리가 이 사건에서 한 일·해야 할 일"만.
@@ -151,25 +244,52 @@ export function shapeCase(c: any, evs: any[], opts: { today: string; linked: str
       const future = d >= today;
       events.push({ d, k: future ? "due" : verdict ? "ours" : "done", g: "hearing", t: (future ? "" : verdict ? "" : "출석 ") + t, f: null });
     } else if (ours(e)) {
-      events.push({ d, k: "ours", g: "ours", t: nz(e.lp_contents).replace(/^.*?법무법인\s*정서\s*/, "") || nz(e.lp_contents), f: null, lp: e.lp_num });
+      events.push({ d, k: "ours", g: "ours", t: nz(e.lp_contents).replace(/^.*?(법무법인\s*정서|법O{6}(?!O))\s*/, "") || nz(e.lp_contents), f: null, lp: e.lp_num });
+    } else if (e.lp_set === "서면" && APPEAL_BRIEF.test(nz(e.lp_contents)) && !/^\s*검사/.test(nz(e.lp_contents)) && ourNo(nz(e.lp_contents))) {
+      // 불변기한 서면(항소·상고이유서)은 국선·피고인이 낸 것도 남긴다 (2026-11-19 석원, 이강효 사건)
+      events.push({ d, k: "done", g: "filing", w: 2, t: (nz(e.lp_contents).match(APPEAL_BRIEF) || [""])[0].replace(/\s+/g, "") + " 제출 (" + filerOf(nz(e.lp_contents)) + ")", f: null });
     }
   }
-  // 의뢰인에게 보낸 안내 문자도 우리가 한 일 (석원 2026-11-13). 인사말은 빼고 앞부분만.
+  // 소송기록접수통지 도달: 이유서 기한의 기산점. 기한 계산과 같은 기준(우리 피고인 본인·우리 법인)만, 같은 날은 한 줄
+  //   이름표는 전자소송 번호 그대로 [피고인2] [우리] (2026-11-20 석원)
+  const notice = new Map<string, Set<string>>();
+  for (const e of list) {
+    const c = nz(e.lp_contents);
+    if (!isNotice(e, oursSet)) continue;
+    const dd = isDate(e.delivered_date) ? nz(e.delivered_date).slice(0, 10) : ((nz(e.lp_remark).match(/(\d{4})\.(\d{2})\.(\d{2})\s*송달됨/) || []).slice(1, 4).join("-"));
+    if (!isDate(dd)) continue;
+    (notice.get(dd) || notice.set(dd, new Set()).get(dd)!).add(OUR_FIRM.test(c) ? "우리" : (c.match(/^피고인\d*/) || ["피고인"])[0]);
+  }
+  for (const [d, who] of notice) events.push({ d, k: "done", g: "notice", w: 2, t: "소송기록접수통지 도달 (" + [...who].join("·") + ")", f: null });
+  // 공소장 부본 도달(받은 중요 문서, 2026-11-20 석원): 방에 올린 공소장 파일을 붙일 줄. 첫 도달 하루만(변경·병합 공소장, 검사 줄 제외)
+  const indict = list.map((e) => {
+    const c = nz(e.lp_contents);
+    if (e.lp_set !== "송달" || !/공소장\s*부본/.test(c) || /변경|병합/.test(c) || /^\s*검사/.test(c)) return "";
+    return isDate(e.delivered_date) ? nz(e.delivered_date).slice(0, 10) : ((nz(e.lp_remark).match(/(\d{4})\.(\d{2})\.(\d{2})\s*송달됨/) || []).slice(1, 4).join("-")) || e.lp_appoint_date.slice(0, 10);
+  }).filter(isDate).sort()[0];
+  if (indict) events.push({ d: indict, k: "done", g: "notice", w: 2, t: "공소장 부본 도달", f: null });
+  // 의뢰인에게 안내 문자를 보냈는지만 (석원 2026-11-16: 내용은 불필요). 같은 날 여러 통이어도 한 줄.
+  const smsDays = new Set<string>();
   for (const e of evs) {
     if (e.lp_set !== "문자" || !isDate(e.lp_appoint_date)) continue;
-    events.push({ d: e.lp_appoint_date.slice(0, 10), k: "done", g: "msg", t: "안내 문자 · " + smsGist(nz(e.lp_contents)), f: null });
+    const d = e.lp_appoint_date.slice(0, 10);
+    if (smsDays.has(d)) continue;
+    smsDays.add(d);
+    events.push({ d, k: "done", g: "msg", t: "안내 문자 발송", f: null });
   }
   const jd = isDate(raw.l_judgment_date) ? raw.l_judgment_date.slice(0, 10) : "";
   if (jd && !verdictSeen) events.push({ d: jd, k: jd >= today ? "due" : "ours", g: "hearing", t: "선고", f: null });
   const nextDate = isDate(c.next_date) ? c.next_date.slice(0, 10) : "";
-  const hasNext = nextDate && list.some((e) => e.lp_set === "기일" && e.lp_appoint_date.slice(0, 10) === nextDate);
+  // 로웨어 '다음 기일' 칸은 기일이 아니면 마지막 진행 날짜만 들어온다(박큰별 2심 11.19 = 의견서 송달일). 기일 내용·시각이 있을 때만 기일로 본다
+  const nextReal = !!(nz(c.next_contents) || nz(c.next_time));
+  const hasNext = !nextReal || (nextDate && list.some((e) => e.lp_set === "기일" && e.lp_appoint_date.slice(0, 10) === nextDate));
   if (nextDate >= today && !hasNext) {
     events.push({ d: nextDate, k: "due", g: "hearing", t: "다음 기일 " + [nz(c.next_time), nz(c.next_contents)].filter(Boolean).join(" ") });
   }
   // 법정기한(형사, 잠정 계산) — 석원 2026-11-13. 규칙서 엔진이 생기면 그 결과로 바꾼다.
-  const deadlines = computeDeadlines(c.l_code, evs, today);
+  const deadlines = computeDeadlines(c.l_code, evs, today, opts.others || []);
   events.push(...deadlineEvents(deadlines, today));
-  events.sort((a, b) => a.d.localeCompare(b.d));
+  events.sort(byDay);
 
   // 기일: 이 사건 기일 + 내 다른 사건의 다가오는 기일(“내 사건 전체” 보기용)
   const hearings: any[] = list.filter((e) => e.lp_set === "기일").map((e) => ({
@@ -195,7 +315,8 @@ export function shapeCase(c: any, evs: any[], opts: { today: string; linked: str
   const info = { ...infoFields(c, opts.saved ?? null), linked: opts.linked };
 
   return {
-    caseNo: c.l_code, lNum: c.l_num, title, court: court || "법원 정보 없음", today, closed: opts.status === "종결",
+    caseNo: c.l_code, lNum: c.l_num, title, court: c.is_inv ? ["수사 단계", [nz(raw.l_police_station), nz(raw.agency_no)].filter(Boolean).join(" ")].filter(Boolean).join(" · ") : court || "법원 정보 없음",
+    inv: !!c.is_inv, today, closed: opts.status === "종결",
     events, deadlines, deadlineNote: DEADLINE_NOTE,
     hearings, progress: { updated, checked: "", changed, rows }, info,
   };
@@ -238,6 +359,9 @@ export async function caseFiles(env: Env, lNum: string, fetcher: typeof fetch = 
     const seen = await rest(env, `case_view_log?select=works_user_id,viewer_name&works_user_id=in.${enc(inList(ids))}&viewer_name=not.is.null&order=viewed_at.desc&limit=500`, {}, fetcher).catch(() => []) || [];
     for (const v of seen) if (!names[v.works_user_id]) names[v.works_user_id] = nz(v.viewer_name);
   }
+  return shapeFiles(rows, names);
+}
+export function shapeFiles(rows: any[], names: Record<string, string>) {
   return rows.map((r: any) => {
     const k = new Date(Date.parse(r.posted_at) + 9 * 3600e3).toISOString();
     return { id: r.id, n: nz(r.file_name) || "파일", d: k.slice(0, 10), tm: k.slice(11, 16), by: names[r.works_user_id] || "",
@@ -247,27 +371,115 @@ export async function caseFiles(env: Env, lNum: string, fetcher: typeof fetch = 
 }
 
 // 사건방 대화에서 AI가 뽑은 일정(room_event): 수사 단계처럼 로웨어에 없는 일정
-export async function roomEvents(env: Env, lNum: string | null, channels: string[], fetcher: typeof fetch = fetch) {
+export async function roomEvents(env: Env, lNum: string | null, channels: string[], fetcher: typeof fetch = fetch, more: number[] = []) {
   const ors: string[] = [];
-  if (lNum) ors.push(`l_num.eq.${enc(lNum)}`);
+  const nums = [...new Set([...(lNum ? [Number(lNum)] : []), ...more].filter((n) => Number.isFinite(n) && n !== 0))];
+  if (nums.length) ors.push(`l_num.in.(${nums.join(",")})`);
   if (channels.length) ors.push(`channel_id.in.${enc(inList(channels))}`);
   if (!ors.length) return [];
-  return await rest(env, `room_event?select=id,kind,ev_date,ev_time,summary,state&hidden=eq.false&or=(${ors.join(",")})&order=ev_date.asc&limit=500`, {}, fetcher) || [];
+  return await rest(env, `room_event?select=id,kind,ev_date,ev_time,summary,state,source&hidden=eq.false&or=(${ors.join(",")})&order=ev_date.asc&limit=500`, {}, fetcher) || [];
+}
+// 같은 방에 함께 연결된 다른 사건(예: 형제번호 사건 → 재판 사건, 1심 → 항소심). 석원 2026-11-16:
+// 재판번호가 붙으면 그 사건이 주 사건이 되고, 이전 사건 기록(타임라인·접견·사건정보)은 이어서 보여 준다.
+export async function relatedNums(env: Env, lNum: number, channels: string[], fetcher: typeof fetch = fetch): Promise<number[]> {
+  if (!channels.length) return [];
+  const rows = await rest(env, `works_room_case?select=l_num&channel_id=in.${enc(inList(channels))}&l_num=not.is.null`, {}, fetcher).catch(() => []) || [];
+  return [...new Set(rows.map((r: any) => Number(r.l_num)).filter((n: number) => Number.isFinite(n) && n !== 0 && n !== lNum))] as number[];
+}
+// 이 사건에 아직 직접 저장한 사건정보가 없으면, 같은 방 이전 사건에 적어 둔 사건정보를 이어 받는다("지금 단계"는 새로 정함)
+export async function noHist(env: Env, nums: number[], fetcher: typeof fetch = fetch): Promise<NoHist[]> {
+  const ok = nums.filter((n) => Number.isFinite(n) && n !== 0);
+  if (!ok.length) return [];
+  return await rest(env, `case_no_hist?select=id,stage,org,no,seen_on,hidden&l_num=in.(${ok.join(",")})&order=id.asc&limit=200`, {}, fetcher).catch(() => []) || [];
+}
+// 사건방 글(30일 보관)에 적힌 형제번호·경찰 접수번호 (2026-11-19 석원: 송치 뒤 공소청·공소관·형제번호가 안 들어옴)
+export async function chatNoHist(env: Env, chans: string[], fetcher: typeof fetch = fetch): Promise<NoHist[]> {
+  if (!chans.length) return [];
+  const rows = await rest(env, `room_msg?select=sent_at,text&channel_id=in.${enc(inList(chans))}&or=${enc("(text.like.*형제*,text.like.*경찰서*)")}&order=sent_at.asc&limit=200`, {}, fetcher).catch(() => []) || [];
+  return chatNos(rows);
+}
+export function hideRemovedNos(hist: NoHist[], body: any): number[] {
+  const out: number[] = [];
+  for (const s of ["police", "pros"]) {
+    const b = body?.[s];
+    if (!b || !Array.isArray(b.prev)) continue;
+    const keep = new Set([nz(b.no), ...b.prev.map((p: any) => nz(p?.no))].filter(Boolean));
+    for (const h of hist) if (h.stage === s && !h.hidden && h.id != null && !keep.has(nz(h.no))) out.push(h.id);
+  }
+  return out;
+}
+export function dropStage(x: any): any | null {
+  if (!x) return null;
+  const { cur_stage: _c, ...rest2 } = x;
+  return rest2;
+}
+export async function inheritedInfo(env: Env, rel: number[], fetcher: typeof fetch = fetch): Promise<any | null> {
+  if (!rel.length) return null;
+  const r = await rest(env, `case_info?select=*&l_num=in.(${rel.join(",")})&order=updated_at.desc&limit=1`, {}, fetcher).catch(() => []);
+  const x = r?.[0];
+  if (!x) return null;
+  const { cur_stage: _c, ...rest2 } = x;
+  return rest2;
 }
 const MEET = new Set(["조사", "출석요구", "기일"]);
+// 수사 단계 줄도 재판 단계와 같은 색: 우리 제출(선임계·서면) 초록, 조사·출석·기일 파랑, 송치·기소·처분 파랑 굵게, 접견 청록, 나머지는 흐린 대화 줄
+export function roomGroup(kind: string, summary: string): string {
+  const s = nz(summary);
+  if (kind === "접견" || /접견/.test(s)) return "meet";
+  if (["서면제출", "고소장제출"].includes(kind)) return "ours";
+  if (["송치", "처분", "기소"].includes(kind) || /송치|불송치|기소|불기소|기소유예|약식|처분/.test(s)) return "decision";
+  if (/선임계|선임신고서|선임서|의견서|고소장|고발장|이의신청|탄원서|서면\s*제출/.test(s)) return "ours";
+  if (MEET.has(kind) || /조사|출석/.test(s)) return "hearing";
+  if ((kind === "사건접수" && !/형제|\d{4}-\d{3,}|사건\s*번호|배당|이송|송치/.test(s)) || s === "사건 선임") return "accept";
+  return "chat";
+}
+export const isChatDeadline = (r: any) => r.kind !== "지시" && /(마감|기한)(일)?\s*$|마감일|기한\s*:/.test(nz(r.summary));
 export function mergeRoomEvents(shaped: any, rows: any[], caseNo: string) {
   const seen = new Set<string>();
   for (const r of rows) {
     const d = String(r.ev_date).slice(0, 10), tm = nz(r.ev_time);
     const key = d + tm + r.summary;
     if (seen.has(key)) continue; seen.add(key);
-    const t = (tm ? tm + " " : "") + nz(r.summary);
-    shaped.events.push({ d, k: d >= shaped.today && r.state !== "완료" ? "due" : "room", t, f: null, g: "chat", src: "chat" });
-    if (MEET.has(r.kind)) shaped.hearings.push({ c: caseNo, d, tm, t: nz(r.summary), p: "사건방 대화" });
+    const t = (tm ? tm + " " : "") + (r.kind === "지시" ? "지시 · " : "") + nz(r.summary);
+    // 대화에서 뽑은 "○○ 마감·기한" 줄은 기일이 아니라 기한 (석원 2026-11-16): 기한 탭에 '대화 기준'으로, 기일 탭에서는 뺌.
+    if (isChatDeadline(r)) {
+      shaped.events.push({ d, k: d >= shaped.today ? "due" : "done", g: "limit", lim: d >= shaped.today ? 1 : 0, t, f: null, src: "chat", rid: r.id });
+      (shaped.deadlines ||= []).push({ t: nz(r.summary), d, kind: "대화", st: "open", why: "사건방 대화에서 확인한 날짜 · 계산한 기한 아님" });
+      continue;
+    }
+    const g = roomGroup(nz(r.kind), nz(r.summary)), future = d >= shaped.today && r.state !== "완료";
+    const k = future ? "due" : g === "chat" ? "room" : g === "hearing" || g === "meet" ? "done" : "ours";
+    shaped.events.push({ d, k, t, f: null, g: g === "decision" ? "hearing" : g, src: "chat", rid: r.id });
+    if (MEET.has(r.kind) || g === "hearing") shaped.hearings.push({ c: caseNo, d, tm, t: nz(r.summary), p: "사건방 대화" });
   }
-  shaped.events.sort((a: any, b: any) => a.d.localeCompare(b.d));
+  shaped.events.sort(byDay);
 }
 // 접견(웍스 캘린더 → meet_event): 우리가 한 일. 앞으로의 접견은 "예정"
+// 사건 선임 줄 하나만: 로웨어 사건은 로웨어 수임일, 수사 사건은 (방 만든 날·대화 첫날·가장 이른 업무 날) 중 가장 이른 날
+// 2026-11-16 석원: 선임계가 이미 나갔으면 그 전에 선임된 것, 우리 방식상 방을 만든 날이 선임일
+export function fixAccept(shaped: any, isInv: boolean) {
+  const ev = shaped.events as any[];
+  const base = ev.find((e) => e.g === "accept" && e.src !== "chat");
+  const chatAcc = ev.filter((e) => e.g === "accept" && e.src === "chat");
+  if (!isInv) { shaped.events = ev.filter((e) => !(e.g === "accept" && e.src === "chat")); return; }
+  const dates = ev.filter((e) => e.src === "chat" && e.d).map((e) => e.d as string);
+  if (base) dates.push(base.d);
+  if (!dates.length) return;
+  const first = dates.sort()[0];
+  const keep = base || chatAcc[0];
+  keep.d = first; keep.k = "ours"; keep.t = "사건 선임"; keep.g = "accept";
+  shaped.events = ev.filter((e) => e === keep || !(e.g === "accept"));
+  shaped.events.sort(byDay);
+}
+// 같은 방 이전 사건의 선임일이 더 이르면 그날을 "사건 선임"으로
+export function earliestAccept(shaped: any, relCases: any[]) {
+  const ds = relCases.map((x) => nz(x?.raw?.l_accept_date).slice(0, 10)).filter(isDate).sort();
+  if (!ds.length) return;
+  const acc = shaped.events.find((e: any) => e.g === "accept");
+  if (acc) { if (ds[0] < acc.d) acc.d = ds[0]; }
+  else shaped.events.push({ d: ds[0], k: "ours", g: "accept", t: "사건 선임", f: null });
+  shaped.events.sort(byDay);
+}
 export function mergeMeets(shaped: any, rows: any[]) {
   const seen = new Set<string>();
   for (const r of rows) {
@@ -276,13 +488,13 @@ export function mergeMeets(shaped: any, rows: any[]) {
     const t = (tm ? tm + " " : "") + "접견" + (future ? " 예정" : "") + (nz(r.lawyer) ? " · " + nz(r.lawyer) : "") + (nz(r.place) ? " (" + nz(r.place) + ")" : "");
     shaped.events.push({ d, k: future ? "due" : "done", g: "meet", t, f: null });
   }
-  shaped.events.sort((a: any, b: any) => a.d.localeCompare(b.d));
+  shaped.events.sort(byDay);
 }
 // 로웨어 사건이 없는 방(보류·미연결)이라도 대화 일정이 있으면 그것만으로 화면을 만든다
 export function roomOnlyShape(title: string, rows: any[], today: string, myHearings: any[]) {
   const shaped: any = {
     caseNo: "", lNum: null, title: title || "사건방", court: "수사 단계 · 사건방 대화 기준", today, closed: false, roomOnly: true,
-    events: [], deadlines: [], deadlineNote: "기한 계산은 새 규칙서 엔진이 완성되면 이곳에 표시됩니다.",
+    events: [], deadlines: [], deadlineNote: DEADLINE_NOTE,
     hearings: [], progress: { updated: "로웨어 사건 없음", rows: [] },
     info: { fields: Object.fromEntries(INFO_FIELDS.map((k) => [k, ""])), saved: false, updatedBy: "", updatedAt: "", linked: [] },
   };
@@ -291,24 +503,53 @@ export function roomOnlyShape(title: string, rows: any[], today: string, myHeari
   return shaped;
 }
 
-// 최종 제출본 고르기 (석원 결정 2026-11-13: "규칙은 어쨌든 마지막 서면")
-//   로웨어에 "법무법인 정서 … 제출"(우리 서면)이 찍힌 날 D마다,
-//   그 날짜(D)에 방에 올라온 문서 파일 중 마지막 하나만 그 줄에 붙인다 (석원: "그 날짜 최종서면만").
-//   로웨어 제출 기록엔 시각이 없어서 "그날의 마지막"으로 본다. 초안·수정본은 화면에 내지 않는다.
-//   실시간일 필요 없음: 로웨어에 제출이 뜬 뒤 사건 화면을 열 때 계산된다.
-//   직원이 직접 고른 파일(lp_num)이 있으면 그것이 우선.
+// 최종 제출본 고르기 (석원 결정 2026-11-13 "규칙은 어쨌든 마지막 서면", 2026-11-18 보완)
+//   로웨어에 "법무법인 정서 … 제출"(우리 서면)이 찍힌 줄마다,
+//   제출일 D-7 ~ D 사이 방에 올라온 문서 파일 중 "파일 이름이 서면 제목과 비슷한" 마지막 하나만 붙인다.
+//   제목이 안 맞으면 아무것도 붙이지 않는다(2026-11-18 석원: 관계없는 파일이 붙으면 안 됨 → 날짜만 보고 붙이던 규칙 없앰).
+//   열람복사신청 같은 중요하지 않은 제출(MINOR_RE)은 파일을 붙이지 않는다.
+//   직원이 직접 고른 파일(lp_num)이 있으면 그것이 우선, 직원이 뺀 줄(case_file_none)은 비워 둔다.
 const DOC_RE = /\.(pdf|hwp|hwpx|doc|docx)$/i;
 // 계약서(석원 2026-11-13): 방에 올라온 파일 이름에 "계약"·"약정서"가 들어가면 서면 후보에서 빼고
 //   "사건 선임" 줄에 가장 최근 것 하나를 붙인다.
-export const CONTRACT_RE = /계약|약정서/;
+// 2026-11-20: 증거·첨부 파일("증 제6호증 … 매매약정서")이 계약서로 붙던 문제 → 증거·첨부·사본 이름은 빼고, 계약서·약정서만
+export const CONTRACT_RE = /^(?!.*(호증|증\s*제?\s*\d|첨부|사본|증거)).*(계약서|위임계약|선임계약|수임계약|약정서)/;
 export function attachContract(events: any[], files: any[]) {
   const acc = events.find((e) => e.g === "accept");
   const c = files.filter((f) => CONTRACT_RE.test(f.n) && f.lp == null).sort((a, b) => b.at - a.at)[0];
   if (acc && c) acc.cf = { id: c.id, n: c.n };
   return events;
 }
-export function attachFinalFiles(events: any[], files: any[]) {
-  const docs = files.filter((f) => (f.pdf || DOC_RE.test(f.n)) && (f.lp != null || !CONTRACT_RE.test(f.n)));
+export const TITLE_WINDOW_DAYS = 7;
+// 중요하지 않은 제출: 방에 서면을 올리지 않는 서류 (석원 2026-11-18)
+export const MINOR_RE = /열람|복사|등사|정보\s*공개|기일\s*(변경|연기)|연기\s*신청|증명원|송달|주소\s*보정|영상\s*재판|중계|녹음|녹화/;
+// 로웨어 제출 줄 글 → 서면 제목 ("변호인 법무법인 정서 변호사 서고은 열람및복사신청 제출" → "열람및복사신청")
+export function docTitle(t: string): string {
+  return nz(t).split(" · ")[0].replace(/^.*?법무법인\s*정서[,\s]*/, "").replace(/^변호사\s*[가-힣]{2,4}\s+/, "")
+    .replace(/\s*제출\s*$/, "").trim();
+}
+export const isMinor = (t: string) => MINOR_RE.test(docTitle(t));
+const hangulOnly = (s: string) => s.replace(/\.[a-z0-9]{1,5}$/i, "").replace(/\([^)]*\)/g, "").replace(/[^가-힣]/g, "");
+const GENERIC = /^(신청서?|제출서?|요청서?|서면|최종|수정본?|초안|변호사|변호인|소송대리인|법무법인|정서|사건|의견)$/;
+function longestCommon(a: string, b: string): string {
+  let best = "";
+  for (let i = 0; i < a.length; i++) for (let j = i + best.length + 1; j <= a.length; j++) {
+    const sub = a.slice(i, j);
+    if (b.includes(sub)) best = sub; else break;
+  }
+  return best;
+}
+// 파일 이름과 서면 제목이 비슷한가: 한글 공통 부분이 3글자 이상(제목 전체가 2글자면 2글자), 흔한 말만 겹친 건 제외
+export function titleMatch(fileName: string, title: string): boolean {
+  const a = hangulOnly(nz(fileName)), b = hangulOnly(nz(title));
+  if (!a || !b) return false;
+  const c = longestCommon(b, a);
+  if (GENERIC.test(c)) return false;
+  return c.length >= 3 || (c.length >= 2 && c === b);
+}
+const addDays = (d: string, n: number) => new Date(Date.parse(d) + n * 864e5).toISOString().slice(0, 10);
+export function attachFinalFiles(events: any[], files: any[], none: Set<string> = new Set(), auto = true) {
+  const docs = files.filter((f) => (f.pdf || DOC_RE.test(f.n)) && (f.lp != null || (!CONTRACT_RE.test(f.n) && !JUDG_RE.test(f.n))));
   const used = new Set<number>();
   const picked = new Map<string, any>();
   for (const f of docs) if (f.lp != null && !picked.has(String(f.lp))) { picked.set(String(f.lp), f); used.add(f.id); }
@@ -316,11 +557,87 @@ export function attachFinalFiles(events: any[], files: any[]) {
   for (const e of ours) {
     const m = picked.get(String(e.lp));
     if (m) { e.f = { id: m.id, n: m.n, pick: 1 }; continue; }
-    const pool = docs.filter((f) => !used.has(f.id) && f.lp == null && f.d === e.d)
+    if (isMinor(e.t)) { e.minor = 1; continue; }
+    if (none.has(String(e.lp))) { e.none = 1; continue; }
+    if (!auto) continue;
+    const title = docTitle(e.t), lo = addDays(e.d, -TITLE_WINDOW_DAYS);
+    const pool = docs.filter((f) => !used.has(f.id) && f.lp == null && isPdf(f) && f.d <= e.d && f.d >= lo && titleMatch(f.n, title))
       .sort((a, b) => b.at - a.at);
     if (pool[0]) { used.add(pool[0].id); e.f = { id: pool[0].id, n: pool[0].n, pick: 0 }; }
   }
   return events;
+}
+
+// 판결문(2026-11-18 석원): 파일 이름에 "판결"이 들어가면 그날이나 그 전 가장 가까운(60일 안) 선고 줄에 붙인다
+export const JUDG_RE = /판결/;
+const isVerdictLine = (e: any) => e.g === "hearing" && e.k !== "due" && /선고/.test(nz(e.t)) && !/연기|변경|취소|추정/.test(nz(e.t));
+export function attachJudgment(events: any[], files: any[]) {
+  const used = new Set(events.flatMap((e) => [e.f?.id, e.cf?.id]).filter((x) => x != null));
+  const lines = events.filter(isVerdictLine).sort((a, b) => b.d.localeCompare(a.d));
+  for (const f of files.filter((x) => JUDG_RE.test(x.n) && isPdf(x) && x.lp == null && !used.has(x.id)).sort((a, b) => b.at - a.at)) {
+    const e = lines.find((l) => l.d <= f.d && f.d <= addDays(l.d, 60));
+    if (e && !e.f) { e.f = { id: f.id, n: f.n, pick: 0 }; used.add(f.id); }
+  }
+  return events;
+}
+// 사건방 대화에서 뽑은 우리 제출 줄(수사 단계 등, 로웨어 줄 없음)에도 제목이 비슷한 파일을 붙인다 (2026-11-18 석원)
+//   선임계·선임신고서는 "선임"만 겹쳐도 짝으로 본다. 열람복사·정보공개청구 같은 줄은 붙이지 않는다.
+export function attachChatFiles(events: any[], files: any[]) {
+  const used = new Set(events.flatMap((e) => [e.f?.id, e.cf?.id]).filter((x) => x != null));
+  const docs = files.filter((f) => isPdf(f) && f.lp == null && !CONTRACT_RE.test(f.n) && !JUDG_RE.test(f.n));
+  const lines = events.filter((e) => e.src === "chat" && e.g === "ours" && !e.f).sort((a, b) => a.d.localeCompare(b.d));
+  for (const e of lines) {
+    const t = nz(e.t);
+    if (MINOR_RE.test(t)) continue;
+    const lo = addDays(e.d, -TITLE_WINDOW_DAYS), sel = /선임/.test(t);
+    const pool = docs.filter((f) => !used.has(f.id) && f.d <= e.d && f.d >= lo && (titleMatch(f.n, t) || (sel && /선임/.test(f.n))))
+      .sort((a, b) => b.at - a.at);
+    if (pool[0]) { used.add(pool[0].id); e.f = { id: pool[0].id, n: pool[0].n, pick: 0 }; }
+  }
+  return events;
+}
+
+// AI로 파일 붙이기: 기억된 판단을 먼저 붙이고, 새 파일·줄 목록이 바뀐 파일만 한 번에 묻는다. 결과는 case_file_match에
+export async function attachByAI(env: Env, events: any[], files: any[], chans: string[], title: string, fetcher: typeof fetch = fetch, bg?: (p: Promise<unknown>) => void, known?: any[]): Promise<boolean> {
+  if (!env.anthropicKey) return false;
+  // 자동 후보는 PDF만(2026-11-19 석원: 한글 파일은 초안, 최종 제출본은 PDF). 한글·워드는 AI에 참고로만
+  const all = files.filter((f) => DOC_RE.test(nz(f.n)) || f.pdf);
+  // 계약서도 AI가 사건 선임 줄에 붙일지 고른다(2026-11-20 석원: 이름 규칙으론 예외를 못 잡음)
+  const docs = all.filter((f) => isPdf(f) && f.lp == null);
+  if (!docs.length) return true;
+  const lines = candidateLines(events, MINOR_RE);
+  const rows = known ?? await rest(env, `case_file_match?select=file_id,line_key,sig&file_id=in.(${docs.map((f) => Number(f.id)).join(",")})`, {}, fetcher);
+  const cache = new Map<number, MatchRow>((rows || []).map((r: any) => [Number(r.file_id), r]));
+  applyMatches(events, docs, cache, lines);
+  const pend = pendingFiles(docs, lines, cache, () => false);
+  if (!pend.length) return true;
+  // bg가 있으면: 지금 화면은 기억된 판단으로 보여 주고, AI에는 응답 뒤에 물어 결과를 저장만 한다(다음 열 때 반영)
+  if (bg) { bg(askAndSave(env, docs, pend, lines, cache, all, chans, title, fetcher)); return true; }
+  await askAndSave(env, docs, pend, lines, cache, all, chans, title, fetcher);
+  applyMatches(events, docs, cache, lines);
+  return true;
+}
+async function askAndSave(env: Env, docs: any[], pend: any[], lines: any[], cache: Map<number, MatchRow>, all: any[], chans: string[], title: string, fetcher: typeof fetch) {
+  if (!env.anthropicKey) return;
+  const lo = new Date(Math.min(...pend.map((f) => f.at)) - 6 * 3600e3).toISOString();
+  const hi = new Date(Math.max(...pend.map((f) => f.at)) + 6 * 3600e3).toISOString();
+  const msgs = chans.length ? await rest(env, `room_msg?select=sent_at,text&channel_id=in.${enc(inList(chans))}&sent_at=gte.${enc(lo)}&sent_at=lte.${enc(hi)}&order=sent_at.asc&limit=200`, {}, fetcher).catch(() => []) : [];
+  const { user, lineIds, fileIds } = buildPrompt(title, lines, pend, (msgs || []).map((m: any) => ({ at: Date.parse(m.sent_at), text: nz(m.text) })), all.filter((f) => !isPdf(f)));
+  const picks = await askMatch({ key: env.anthropicKey, model: env.fileModel }, user, fetcher, 9000, { files: [...fileIds.keys()], lines: [...lineIds.keys()] });
+  // 답과 파일 번호가 어긋나면(번호 앞뒤 공백·이름을 적은 경우 등) 번호만 떼어 맞춘다. 그래도 못 맞추면 기록에 남긴다
+  const norm = (x: unknown) => (nz(x).match(/[FL]\d+/) || [""])[0];
+  for (const p of picks) { p.file = norm(p.file) || p.file; if (p.line) p.line = norm(p.line) || null; }
+  const miss = [...fileIds.keys()].filter((k) => !picks.some((p) => p.file === k));
+  if (miss.length) console.log("file ai no answer", miss.length, "of", fileIds.size, JSON.stringify(picks).slice(0, 300));
+  const save: any[] = [];
+  for (const [fid, f] of fileIds) {
+    const p = picks.find((x) => x.file === fid);
+    const row = { file_id: Number(f.id), line_key: (p?.line && lineIds.get(p.line)) || null, sig: fileSig(f, lines), reason: nz(p?.why).slice(0, 300) || "답 없음",
+      model: env.fileModel || "claude-haiku-5-5", decided_at: new Date().toISOString() };
+    cache.set(row.file_id, row); save.push(row);
+  }
+  await rest(env, "case_file_match?on_conflict=file_id", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify(save) }, fetcher)
+    .catch((e) => console.log("file ai save fail", String(e).slice(0, 120)));
 }
 
 // 방 제목에서 사건번호 꺼내기 (OCR이 0을 O로 읽는 것까지)
@@ -336,7 +653,7 @@ export function caseNosIn(s: string): string[] {
 }
 
 // 아직 연결 안 된 방 자동 연결: works-bot-callback 함수에 부탁 (웍스 봇 열쇠가 거기 있음). 실패해도 화면은 계속
-async function autoLink(env: Env, body: { channelId: string; lNum?: number }, fetcher: typeof fetch): Promise<{ linked: number; how: string } | null> {
+async function autoLink(env: Env, body: { channelId: string; lNum?: number | null; relink?: boolean; by?: string }, fetcher: typeof fetch): Promise<{ linked: number; how: string } | null> {
   try {
     const r = await fetcher(env.sbUrl + "/functions/v1/works-bot-callback", {
       method: "POST", headers: { "Content-Type": "application/json", "x-internal-key": env.sbKey }, body: JSON.stringify(body),
@@ -352,13 +669,89 @@ async function logView(env: Env, who: WhoAmI, action: string, room: string, c: a
   } catch (e) { console.log("log fail", String(e).slice(0, 120)); }
 }
 
-export async function handle(req: Request, env: Env, fetcher: typeof fetch = fetch): Promise<Response> {
+// 이미 올라온 파일 전부 다시 맞추기(2026-11-18 석원 요청): 파일이 있는 방마다 사건 화면을 한 번씩 만들어 AI 판단을 채운다.
+//   예약 작업과 같은 열쇠(lw_settings.cron_secret)로만 부른다. 열람 기록에는 "자동 정리"로 남는다.
+// sinceHours를 주면 그 시간 안에 파일이 올라온 방만 (15분마다 cron: 화면을 열기 전에 AI 판단을 미리 해 둔다, 2026-11-20)
+async function fileBackfill(req: Request, env: Env, fetcher: typeof fetch, body: any = {}): Promise<Response> {
+  const sec = (await rest(env, "lw_settings?select=value&key=eq.cron_secret", {}, fetcher).catch(() => []))?.[0]?.value;
+  if (!sec || req.headers.get("x-cron-secret") !== sec) return json({ error: "forbidden" }, 403);
+  const h = Number(body?.sinceHours);
+  const since = Number.isFinite(h) && h > 0 ? `&posted_at=gte.${enc(new Date(Date.now() - h * 3600e3).toISOString())}` : "";
+  const rows = await rest(env, `case_file?select=channel_id&status=eq.보관&channel_id=not.is.null${since}&limit=2000`, {}, fetcher) || [];
+  const rooms = [...new Set(rows.map((r: any) => nz(r.channel_id)).filter(Boolean))] as string[];
+  const token = "backfill-" + crypto.randomUUID();
+  WHO_CACHE.set(token, { who: { ok: true, status: 200, userId: "system-backfill", name: "자동 정리" }, until: Date.now() + 10 * 60_000 });
+  let ok = 0, fail = 0;
+  try {
+    for (let i = 0; i < rooms.length; i += 4) {
+      await Promise.all(rooms.slice(i, i + 4).map(async (room) => {
+        const r = await handle(new Request("http://local/", { method: "POST", headers: { "content-type": "application/json", "x-works-token": token },
+          body: JSON.stringify({ action: "case", room }) }), env, fetcher).catch(() => null);
+        if (r?.ok) ok++; else fail++;
+      }));
+    }
+  } finally { WHO_CACHE.delete(token); }
+  return json({ rooms: rooms.length, ok, fail });
+}
+
+// 응답을 보낸 뒤에도 끝까지 돌릴 일(AI 파일 판단 등). Supabase 런타임이면 EdgeRuntime.waitUntil, 아니면(시험) 그냥 돌림
+export function runInBackground(p: Promise<unknown>) {
+  const safe = p.catch((e) => console.log("bg fail", String(e).slice(0, 160)));
+  // deno-lint-ignore no-explicit-any
+  const rt = (globalThis as any).EdgeRuntime;
+  if (rt?.waitUntil) rt.waitUntil(safe);
+}
+
+// 방으로 열 때 DB 함수 하나로 받기(속도 개선 4번). 2026-11-20 bundle_check 29방: 25방 같음, 4방은 파일 올린 사람 이름만 다름(예전 방식이 열람 기록 500줄 제한에 걸려 이름을 못 찾던 것)
+const BUNDLE_ON = true;
+// 운영 확인용(cron 비밀값 필요): 방마다 DB 함수 한 번(case_view_bundle)과 예전 방식으로 만든 화면 자료가 같은지 비교
+export function firstDiff(a: any, b: any, path = ""): string | null {
+  if (a === b) return null;
+  if (typeof a !== typeof b || a === null || b === null || typeof a !== "object") return path + " " + JSON.stringify(a)?.slice(0, 80) + " ≠ " + JSON.stringify(b)?.slice(0, 80);
+  if (Array.isArray(a) !== Array.isArray(b)) return path + " 배열/객체";
+  if (Array.isArray(a) && a.length !== b.length) return path + " 길이 " + a.length + "≠" + b.length;
+  for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) { const d = firstDiff(a[k], b[k], path + "." + k); if (d) return d; }
+  return null;
+}
+async function bundleCheck(req: Request, env: Env, fetcher: typeof fetch, body: any): Promise<Response> {
+  const sec = (await rest(env, "lw_settings?select=value&key=eq.cron_secret", {}, fetcher).catch(() => []))?.[0]?.value;
+  if (!sec || req.headers.get("x-cron-secret") !== sec) return json({ error: "forbidden" }, 403);
+  const rows = await rest(env, `works_room_case?select=channel_id&l_num=not.is.null&order=updated_at.desc&limit=${Math.min(Number(body?.limit) || 30, 200)}`, {}, fetcher) || [];
+  const rooms = [...new Set(rows.map((r: any) => nz(r.channel_id)).filter(Boolean))] as string[];
+  const token = "backfill-" + crypto.randomUUID();
+  WHO_CACHE.set(token, { who: { ok: true, status: 200, userId: "system-backfill", name: nz(body?.name) || "자동 정리" }, until: Date.now() + 10 * 60_000 });
+  const call = async (room: string, noBundle: boolean) => {
+    const r = await handle(new Request("http://local/", { method: "POST", headers: { "content-type": "application/json", "x-works-token": token },
+      body: JSON.stringify({ action: "case", room, bundle: !noBundle }) }), env, fetcher);
+    const j = await r.json(); delete j.progress?.checked; return j;
+  };
+  const out: any[] = []; let same = 0;
+  try {
+    for (const room of rooms) {
+      const t0 = Date.now(); const old = await call(room, true); const t1 = Date.now(); const neu = await call(room, false); const t2 = Date.now();
+      const d = firstDiff(old, neu);
+      if (d) out.push({ room, diff: d }); else same++;
+      out.push({ room: room.slice(0, 8), oldMs: t1 - t0, newMs: t2 - t1 });
+    }
+  } finally { WHO_CACHE.delete(token); }
+  return json({ rooms: rooms.length, same, details: out });
+}
+
+export async function handle(req: Request, env: Env, fetcher: typeof fetch = fetch, bg: (p: Promise<unknown>) => void = runInBackground): Promise<Response> {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
   let body: any = {};
   try { body = await req.json(); } catch { /* 빈 몸 허용 */ }
+  if (body?.action === "file_backfill") return await fileBackfill(req, env, fetcher, body);
+  if (body?.action === "bundle_check") return await bundleCheck(req, env, fetcher, body);
+  // 깨워 두기(1분마다 cron): 서버가 75초 쉬면 꺼져 다음 사람이 1~3초를 기다린다. DB도 한 번 불러 연결을 데워 둔다.
+  //   아무 자료도 돌려주지 않으므로 직원 확인 없이 받는다 (2026-11-20)
+  if (body?.action === "warm") {
+    await rest(env, "lw_feed_runs?select=id&limit=1", {}, fetcher).catch(() => null);
+    return json({ ok: true });
+  }
   const token = req.headers.get("x-works-token") || "";
-  const who = await worksWhoAmI(token, fetcher);
+  const who = await worksWhoAmI(token, fetcher, env, bg);
   console.log("whoami", body?.action, who.ok, who.status, who.error ? who.error.slice(0, 80) : "");
   if (body?.action === "whoami") return json(who, who.ok ? 200 : 401);
   if (!who.ok) return json({ error: "직원 확인이 안 됐습니다. 웍스에서 다시 열어 주세요.", status: who.status }, 401);
@@ -373,10 +766,69 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       })) });
     }
 
+    let located: { room?: string; case?: string } | null = null;
+    if (body?.action === "locate") {
+      if (!who.userId) return json({ error: "직원 확인이 안 됐습니다" }, 401);
+      // 도우미가 최근 90초 안에 서버에 들렀어야 켜져 있는 것
+      const alive = new Date(Date.now() - 90_000).toISOString();
+      const devs = await rest(env, `pc_helper_device?select=id&revoked_at=is.null&works_user_id=eq.${enc(who.userId)}&last_seen_at=gte.${enc(alive)}&limit=1`, {}, fetcher);
+      if (!devs?.length) return json({ nohelper: true });
+      const ins = await rest(env, "pc_locate", { method: "POST", headers: { Prefer: "return=representation" },
+        body: JSON.stringify({ works_user_id: who.userId }) }, fetcher);
+      const id = ins?.[0]?.id;
+      if (!id) return json({ error: "요청을 만들지 못했습니다" }, 500);
+      const until = Date.now() + (body.waitMs ?? 8000);
+      while (Date.now() < until && !located) {
+        await new Promise((r) => setTimeout(r, 100));
+        const row = (await rest(env, `pc_locate?select=taken_at,done_at,channel_id,how,header_text&id=eq.${id}`, {}, fetcher))?.[0];
+        if (row?.done_at) {
+          await logView(env, who, "locate:" + nz(row.how), nz(row.channel_id), null, fetcher);
+          if (row.channel_id) { located = { room: row.channel_id }; break; }
+          // 방 표에 없는 새 방이라도 제목에 사건번호가 있고 로웨어에 딱 하나 있으면 그 사건을 연다
+          const nos = row.how === "error" ? [] : caseNosIn(nz(row.header_text));
+          if (nos.length) {
+            const hit = await rest(env, `cases?select=l_code&l_code=in.${enc(inList(nos.flatMap(caseNoVariants)))}&limit=2`, {}, fetcher) || [];
+            if (hit.length === 1) { located = { case: hit[0].l_code }; break; }
+          }
+          // 방 목록에 없는 방: 전에 직원이 이 제목에서 고른 사건이 있으면 그것 (석원 2026-11-16)
+          if (row.how !== "error" && nz(row.header_text)) {
+            const picks = await rest(env, `pc_title_pick?select=header_norm,l_num,case_no&order=updated_at.desc&limit=3000`, {}, fetcher).catch(() => []) || [];
+            const p = findPick(nz(row.header_text), picks);
+            if (p) {
+              const c = (await rest(env, `case_all?select=l_code&l_num=eq.${p.l_num}`, {}, fetcher))?.[0];
+              if (c) { await logView(env, who, "locate:picked-title", "", { l_num: p.l_num, l_code: c.l_code }, fetcher); located = { case: c.l_code }; break; }
+            }
+          }
+          // 못 찾음: 화면에서 직원이 고르면 이 읽은 제목과 함께 기억한다(remember_pick)
+          return json({ notfound: true, how: row.how, locate: row.how === "error" ? null : id });
+        }
+        if (!row?.taken_at && Date.now() > until - 5000) break; // 3초 안에 도우미가 안 받아 가면 꺼진 것(또는 옛 버전)
+      }
+      if (!located) {
+        await logView(env, who, "locate:timeout", "", null, fetcher);
+        return json({ timeout: true });
+      }
+      // open: 찾은 방의 사건 자료까지 이 요청에서 바로 만든다(화면이 한 번 더 묻지 않게)
+      if (!body.open) return json(located);
+      body = { action: "case", room: located.room || "", case: located.case || "" };
+    }
+
+
     if (body?.action === "case") {
+      const out = (o: any, st?: number) => { if (Array.isArray(o?.events)) rankEvents(o.events); return json(located ? { ...o, located } : o, st); };
       const room = nz(body.room), caseParam = nz(body.case);
       let c: any = null, status: string | undefined, linked: string[] = [];
-      if (room) {
+      // 방으로 열 때는 DB 함수 하나(case_view_bundle)로 자료를 한 번에 받는다(차례로 6단계 → 1번, 2026-11-20 속도 개선 4번).
+      //   연결 없는 방·보류 방·사건번호만 있는 방은 fallback → 아래 예전 방식 그대로
+      // bundle_check(내부 비교)에서는 bundle 값으로 직접 고른다
+      const useB = who.userId === "system-backfill" && typeof body.bundle === "boolean" ? body.bundle : BUNDLE_ON;
+      const B: any = room && useB ? await rest(env, "rpc/case_view_bundle", { method: "POST", body: JSON.stringify({ p_room: room, p_name: who.name || "" }) }, fetcher)
+        .catch((e) => { console.log("bundle fail", String(e).slice(0, 160)); return null; }) : null;
+      const fast = !!(B && !B.fallback && B.c && Array.isArray(B.maps));
+      if (fast) {
+        c = B.c; status = B.maps[0]?.status;
+        linked = B.maps.slice(1).map((m: any) => nz(m.case_no)).filter(Boolean);
+      } else if (room) {
         const q = `works_room_case?select=l_num,case_no,is_primary,status&channel_id=eq.${enc(room)}&order=is_primary.desc,updated_at.desc`;
         let maps = await rest(env, q, {}, fetcher) || [];
         // 아직 연결 안 된 새 방: 그 자리에서 방 제목 사건번호로 자동 연결 시도
@@ -389,46 +841,169 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
           if (rows.length) {
             const t = (await rest(env, `works_room_case?select=room_title&channel_id=eq.${enc(room)}&room_title=not.is.null&limit=1`, {}, fetcher).catch(() => []))?.[0]?.room_title;
             await logView(env, who, act + ":chat", room, null, fetcher);
-            return json(roomOnlyShape(nz(t), rows, today, []));
+            const ro = roomOnlyShape(nz(t), rows, today, []);
+            applyInvDeadlines(ro, rows, nz(t));
+            return out(ro);
           }
           await logView(env, who, act, room, null, fetcher);
-          return json(!main ? { unpaired: true } : { hold: true });
+          return out(!main ? { unpaired: true } : { hold: true });
         }
         status = main.status;
         linked = maps.slice(1).map((m: any) => nz(m.case_no)).filter(Boolean);
-        if (main.l_num != null) c = (await rest(env, `cases?select=*&l_num=eq.${main.l_num}`, {}, fetcher))[0];
-        else if (main.case_no) c = (await rest(env, `cases?select=*&l_code=in.${enc(inList(caseNoVariants(main.case_no)))}&limit=1`, {}, fetcher))[0];
-        if (!c) return json({ notfound: true, caseNo: main.case_no || "" });
+        if (main.l_num != null) c = (await rest(env, `case_all?select=*&l_num=eq.${main.l_num}`, {}, fetcher))[0];
+        else if (main.case_no) c = (await rest(env, `case_all?select=*&l_code=in.${enc(inList(caseNoVariants(main.case_no)))}&limit=1`, {}, fetcher))[0];
+        if (!c) return out({ notfound: true, caseNo: main.case_no || "" });
       } else if (caseParam) {
-        c = (await rest(env, `cases?select=*&l_code=in.${enc(inList(caseNoVariants(caseParam)))}&order=l_num.desc&limit=1`, {}, fetcher))[0];
-        if (!c) return json({ notfound: true, caseNo: caseParam });
+        c = (await rest(env, `case_all?select=*&l_code=in.${enc(inList(caseNoVariants(caseParam)))}&order=l_num.desc&limit=1`, {}, fetcher))[0];
+        if (!c) return out({ notfound: true, caseNo: caseParam });
         if (c.state === "종결") status = "종결";
-      } else return json({ error: "방이나 사건번호가 없습니다" }, 400);
+      } else return out({ error: "방이나 사건번호가 없습니다" }, 400);
 
-      const roomRows = await rest(env, `works_room_case?select=channel_id&l_num=eq.${c.l_num}`, {}, fetcher).catch(() => []) || [];
-      const chans = [...new Set([room, ...roomRows.map((r: any) => nz(r.channel_id))].filter(Boolean))] as string[];
-      const [evs, mine, saved, files, chat, checked, meets] = await Promise.all([
-        rest(env, `lw_process_events?select=lp_num,lp_set,lp_appoint_date,lp_appoint_time,lp_contents,lp_remark,delivered_date,court,last_seen_at,lp_append_udate&l_num=eq.${c.l_num}&order=lp_appoint_date.asc&limit=2000`, {}, fetcher),
-        myCases(env, who.name || "", fetcher),
-        rest(env, `case_info?select=*&l_num=eq.${c.l_num}`, {}, fetcher).then((r: any[]) => r?.[0] ?? null).catch(() => null),
-        caseFiles(env, String(c.l_num), fetcher).catch((e) => { console.log("files fail", String(e).slice(0, 120)); return []; }),
-        roomEvents(env, String(c.l_num), chans, fetcher).catch(() => []),
-        lastFeedRun(env, fetcher),
-        rest(env, `meet_event?select=event_id,ev_date,ev_time,lawyer,place&l_num=eq.${c.l_num}&order=ev_date.asc&limit=300`, {}, fetcher).catch(() => []),
-      ]);
+      let chans: string[], rel: number[];
+      let evs: any, mine: any, savedOwn: any, files: any, chat: any, checked: any, meets: any, stageLogs: any, relCases: any, titleRows: any, relEvs: any, hist: any;
+      if (fast) {
+        chans = (B.chans || []).map(String); rel = (B.rel || []).map(Number);
+        bg(logView(env, who, "case", room, c, fetcher));
+        ({ evs, mine, saved: savedOwn, chat, meets, stageLogs, relCases, titles: titleRows, relEvs } = B);
+        files = shapeFiles(B.files || [], B.names || {});
+        checked = B.feed ? kstMdHm(B.feed) : "";
+        hist = withChatNos(B.hist || [], chatNos(B.noMsgs || []));
+      } else {
+        const roomRows = await rest(env, `works_room_case?select=channel_id&l_num=eq.${c.l_num}`, {}, fetcher).catch(() => []) || [];
+        chans = [...new Set([room, ...roomRows.map((r: any) => nz(r.channel_id))].filter(Boolean))] as string[];
+        rel = await relatedNums(env, Number(c.l_num), chans, fetcher);
+        const allNums = [Number(c.l_num), ...rel].join(",");
+        [evs, mine, savedOwn, files, chat, checked, meets, stageLogs, relCases, titleRows, , relEvs, hist] = await Promise.all([
+          rest(env, `lw_process_events?select=lp_num,lp_set,lp_appoint_date,lp_appoint_time,lp_contents,lp_remark,delivered_date,court,last_seen_at,lp_append_udate&l_num=eq.${c.l_num}&order=lp_appoint_date.asc&limit=2000`, {}, fetcher),
+          myCases(env, who.name || "", fetcher),
+          rest(env, `case_info?select=*&l_num=eq.${c.l_num}`, {}, fetcher).then((r: any[]) => r?.[0] ?? null).catch(() => null),
+          caseFiles(env, String(c.l_num), fetcher).catch((e) => { console.log("files fail", String(e).slice(0, 120)); return []; }),
+          roomEvents(env, String(c.l_num), chans, fetcher, rel).catch(() => []),
+          lastFeedRun(env, fetcher),
+          rest(env, `meet_event?select=event_id,ev_date,ev_time,lawyer,place&l_num=in.(${allNums})&order=ev_date.asc&limit=300`, {}, fetcher).catch(() => []),
+          rest(env, `case_info_log?select=field,old_value,new_value,editor,edited_at&l_num=in.(${allNums})&field=like.stage.*&order=edited_at.desc&limit=300`, {}, fetcher).catch(() => []),
+          rel.length ? rest(env, `case_all?select=l_num,l_code,raw&l_num=in.(${rel.join(",")})`, {}, fetcher).catch(() => []) : Promise.resolve([]),
+          chans.length ? rest(env, `works_room_case?select=room_title&channel_id=in.${enc(inList(chans))}&room_title=not.is.null&limit=5`, {}, fetcher).catch(() => []) : Promise.resolve([]),
+          logView(env, who, "case", room, c, fetcher),
+          // 같은 방 다른 사건 기록 전체: 병합 이유서 기한(R21~R23), 지난 심급 타임라인·나의사건(심급 구분)
+          rel.length ? rest(env, `lw_process_events?select=l_num,lp_num,lp_set,lp_appoint_date,lp_appoint_time,lp_contents,lp_remark,delivered_date,court,last_seen_at,lp_append_udate&l_num=in.(${rel.join(",")})&order=lp_appoint_date.asc&limit=6000`, {}, fetcher).catch(() => []) : Promise.resolve([]),
+          noHist(env, [Number(c.l_num), ...rel], fetcher).then(async (h: NoHist[]) => withChatNos(h, await chatNoHist(env, chans, fetcher).catch(() => []))),
+        ]);
+      }
+      const saved = savedOwn ?? (fast ? dropStage(B.inherited) : await inheritedInfo(env, rel, fetcher));
       const end = new Date(Date.parse(today) + 28 * 864e5).toISOString().slice(0, 10);
       const myHearings = mine.filter((m: any) => isDate(m.next_date) && m.next_date.slice(0, 10) >= today && m.next_date.slice(0, 10) <= end)
         .map((m: any) => ({ c: m.l_code, d: m.next_date.slice(0, 10), tm: nz(m.next_time), t: nz(m.next_contents) || "기일", p: nz(m.court) }));
-      await logView(env, who, "case", room, c, fetcher);
-      const shaped = shapeCase(c, evs || [], { today, linked, myHearings, status, saved });
+      const others: OtherCase[] = (relCases || []).filter((x: any) => x.l_code).map((x: any) => ({ code: nz(x.l_code), evs: (relEvs || []).filter((e: any) => String(e.l_num) === String(x.l_num)) }));
+      // 병합 이유서 규칙(R21~R23)은 같은 심급 사건끼리만: 2심 사건이 1심 병합결정을 보고 "병합됨"이 되지 않게 (박큰별 2026-11-19)
+      const sameLv = others.filter((o) => levelOf(o.code) === levelOf(nz(c.l_code)));
+      const shaped = shapeCase(c, evs || [], { today, linked, myHearings, status, saved, others: sameLv });
       shaped.progress.checked = checked;
-      attachFinalFiles(shaped.events, files);
-      attachContract(shaped.events, files);
+      const titles = (titleRows || []) as any[];
+      const roomTitle = nz(titles[0]?.room_title);
+      // 심급 묶음: 같은 방 사건을 1심·2심…으로 묶고, 지난 심급 업무 줄과 심급별 나의사건 기록을 만든다
+      const curLv = levelOf(nz(c.l_code));
+      const relList = (relCases || []).filter((x: any) => x.l_code).map((x: any) => ({ rc: x, evs: (relEvs || []).filter((e: any) => String(e.l_num) === String(x.l_num)) }));
+      const levels = buildLevels([{ code: nz(c.l_code), evs: evs || [], accept: nz(c.raw?.l_accept_date) },
+        ...relList.map((x: any) => ({ code: nz(x.rc.l_code), evs: x.evs, accept: nz(x.rc.raw?.l_accept_date) }))], roomTitle);
+      const multi = levels.length > 1;
+      const subShape = new Map<string, any>();
+      const shapeOf = (x: any) => {
+        const k = String(x.rc.l_num);
+        if (!subShape.has(k)) subShape.set(k, shapeCase({ ...x.rc, l_name: c.l_name }, x.evs, { today, linked: [], myHearings: [], others: [] }));
+        return subShape.get(k);
+      };
+      if (multi) {
+        for (const e of shaped.events) e.lv = curLv;
+        const acc = shaped.events.find((e: any) => e.g === "accept");
+        const curL = levels.find((L) => L.lv === curLv);
+        // 로웨어는 윗심급 사건에 아랫심급 선임일을 그대로 옮겨 적는다(박큰별 2026노101087 = 1심 선임일 2026-06-16).
+        // 이 심급 기록이 시작되기 전 날짜의 선임 줄은 아랫심급 선임이므로 이 심급 줄로 두지 않는다
+        if (acc && levels[0].lv < curLv && curL?.start && acc.d < curL.start) shaped.events = shaped.events.filter((e: any) => e !== acc);
+        else if (acc && levels[0].lv < curLv) acc.t = (curL?.label || "") + " 선임";
+        // 로웨어가 윗심급 사건에 옮겨 적은 아랫심급 선고일(l_judgment_date) 같은 줄: 이 심급 시작 전 날짜면 그날의 심급으로
+        if (curL?.start) for (const e of shaped.events) if (e.lv === curLv && e.d && e.d < curL.start) e.lv = lvByDate(levels, e.d);
+        for (const x of relList) {
+          const lv = levelOf(nz(x.rc.l_code));
+          if (lv >= curLv) continue;
+          // 병합된 사건의 기한 줄은 빼고 본 사건 것만 (박큰별: 항소 마감이 두 줄로 겹침, 2026-11-19)
+          const isMerged = levels.some((L) => L.merged.includes(nz(x.rc.l_code)));
+          for (const e of shapeOf(x).events) if (!(isMerged && e.g === "limit")) shaped.events.push({ ...e, lv });
+        }
+        // 지난 심급의 선임 줄은 그 심급에서 가장 이른 하나만 (병합된 사건의 선임일은 따로 보이지 않게)
+        const firstAcc = new Map<number, any>();
+        for (const e of shaped.events) if (e.g === "accept" && e.lv < curLv && (!firstAcc.has(e.lv) || e.d < firstAcc.get(e.lv).d)) firstAcc.set(e.lv, e);
+        shaped.events = shaped.events.filter((e: any) => !(e.g === "accept" && e.lv < curLv && firstAcc.get(e.lv) !== e));
+        shaped.events.sort(byDay);
+      }
+      const lvRows: Record<string, any[]> = {};
+      for (const L of levels) {
+        if (L.cases.length < 2 && L.lv === curLv) continue;
+        const rows: any[] = [];
+        for (const code of L.cases) {
+          const isC = code === nz(c.l_code);
+          const x = isC ? null : relList.find((y: any) => nz(y.rc.l_code) === code);
+          const src = isC ? shaped.progress.rows : x ? shapeOf(x).progress.rows : [];
+          const tag = code !== L.main ? shortNo(code) : "";
+          for (const r of src) rows.push(tag ? { ...r, cn: tag } : r);
+        }
+        rows.sort((a, b) => a.d.localeCompare(b.d));
+        lvRows[L.lv] = rows.slice(-600);
+      }
+      if (lvRows[curLv]) shaped.progress.rows = lvRows[curLv];
+      const ourLps = shaped.events.filter((e: any) => e.k === "ours" && e.lp != null).map((e: any) => Number(e.lp)).filter(Number.isFinite);
+      const noneRows = fast ? (B.none || []).map((n: any) => ({ lp_num: n })) : ourLps.length ? await rest(env, `case_file_none?select=lp_num&lp_num=in.(${ourLps.join(",")})`, {}, fetcher).catch(() => []) : [];
+      const noneSet = new Set<string>((noneRows || []).map((r: any) => String(r.lp_num)));
+      attachFinalFiles(shaped.events, files, noneSet, false);
       mergeRoomEvents(shaped, chat, c.l_code);
+      // 파일을 붙일 줄은 AI가 고른다(2026-11-18 석원). AI를 못 쓰면 예전 이름 규칙으로
+      //   화면을 연 사람은 AI를 기다리지 않는다(2026-11-20): 기억된 판단만 붙이고, 새로 물을 것은 응답 뒤에 묻는다.
+      //   자동 정리(file_backfill)만 끝까지 기다린다
+      const aiOk = await attachByAI(env, shaped.events, files, chans, [nz(c.l_code), nz(c.l_name)].filter(Boolean).join(" "), fetcher, who.userId === "system-backfill" ? undefined : bg, fast ? (B.matches || []) : undefined)
+        .catch((e) => { console.log("file ai fail", String(e).slice(0, 160)); return false; });
+      if (!aiOk) {
+        for (const e of shaped.events) if (e.f?.ai) e.f = null;
+        attachFinalFiles(shaped.events, files, noneSet, true);
+        attachContract(shaped.events, files);
+        attachJudgment(shaped.events, files);
+        attachChatFiles(shaped.events, files);
+      }
+      // 수사 단계 기한(R18~R20): 방 제목 괄호로 의뢰인 지위를 본다
+      applyInvDeadlines(shaped, chat, roomTitle);
+      if (linked.length) (shaped.info as any).merge = mergeRoles([{ code: nz(c.l_code), evs: evs || [] }, ...others], roomTitle);
+      fixAccept(shaped, !!c.is_inv);
+      earliestAccept(shaped, (relCases || []).filter((x: any) => levelOf(nz(x.l_code)) === curLv));
       mergeMeets(shaped, meets || []);
+      for (const x of noLines(hist || [])) shaped.events.push({ d: x.d, k: "room", g: "chat", t: x.t, f: null });
+      shaped.events.sort(byDay);
+      if (multi) for (const e of shaped.events) if (e.lv == null) e.lv = lvByDate(levels, e.d);
+      // 아랫심급 사건이 로웨어에 없을 때(이강효 2026노100136, 2026-11-19 석원): 이 사건 기록의 첫날(사건접수)이 심급 경계.
+      // 그 앞의 줄(로웨어가 옮겨 적은 선임일·원심 선고일 등)은 아랫심급 구간으로. 타임라인 띠만 쓰고 탭·나의사건은 그대로
+      if (!multi && !c.is_inv && curLv >= 2) {
+        const own = (evs || []).map((e: any) => nz(e.lp_appoint_date).slice(0, 10)).filter(isDate).sort()[0];
+        if (own && shaped.events.some((e: any) => e.d && e.d < own)) {
+          const prev = curLv - 1;
+          for (const e of shaped.events) e.lv = e.d && e.d < own ? prev : curLv;
+          shaped.events.push({ d: own, k: "done", g: "court", w: 2, lv: curLv, t: LV_LABEL[curLv] + " 사건접수", f: null });
+          (shaped as any).tlLevels = [
+            { lv: prev, label: LV_LABEL[prev], main: "", cases: [], merged: [] },
+            { lv: curLv, label: LV_LABEL[curLv], main: nz(c.l_code), cases: [nz(c.l_code)], merged: [] },
+          ];
+        }
+      }
+      if (levels.length > 1 || levels.some((L) => L.cases.length > 1)) {
+        (shaped as any).levels = levels.map(({ start: _s, ...L }) => L);
+        (shaped as any).lv = curLv;
+        if (multi) (shaped as any).lvRows = lvRows;
+      }
+      // 사람이 확정한 기한(R17)은 회색으로
+      const dlc = fast ? (B.dlc || []) : c.l_code ? await rest(env, `deadline_confirm?select=id,kind,due,action,undone_at&undone_at=is.null&l_code=eq.${enc(nz(c.l_code))}&order=created_at.desc&limit=100`, {}, fetcher).catch(() => []) : [];
+      applyConfirms(shaped, dlc || []);
       // 직원이 줄마다 파일을 바꿀 때 고를 목록 (화면에 따로 나열하지 않음)
-      const fileChoices = files.map((f: any) => ({ id: f.id, n: f.n, d: f.d, tm: f.tm, by: f.by }));
-      return json({ ...shaped, fileChoices });
+      // 계약서는 표시(c)만 해 두고 화면이 사건 선임 줄에서만 보여 준다
+      const fileChoices = files.map((f: any) => ({ id: f.id, n: f.n, d: f.d, tm: f.tm, by: f.by, ...(f.lp == null && CONTRACT_RE.test(f.n) ? { c: 1 } : {}) }));
+      const stages = shapeStages(c, saved, stageLogs || [], TITLE_PROS ? roomTitle : "", chat || [], hist || []);
+      return out({ ...shaped, fileChoices, stages, dispNo: stages.dispNo });
     }
 
     if (body?.action === "file_open") {
@@ -448,49 +1023,42 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
 
     if (body?.action === "set_file") {
       const lNum = String(body.lNum ?? ""), lp = Number(body.lp), id = Number(body.id);
-      if (!lNum || !Number.isFinite(lp) || !Number.isFinite(id) || id <= 0) return json({ error: "고를 파일이 없습니다" }, 400);
+      if (!lNum || !Number.isFinite(lp) || !Number.isFinite(id) || id < 0) return json({ error: "고를 파일이 없습니다" }, 400);
       const mine = await caseFiles(env, lNum, fetcher);
-      if (!mine.some((f: any) => f.id === id)) return json({ error: "이 사건 파일이 아닙니다" }, 404);
+      if (id > 0 && !mine.some((f: any) => f.id === id)) return json({ error: "이 사건 파일이 아닙니다" }, 404);
       const ev = await rest(env, `lw_process_events?select=lp_num&l_num=eq.${enc(lNum)}&lp_num=eq.${lp}&limit=1`, {}, fetcher);
       if (!ev?.length) return json({ error: "제출 기록이 없습니다" }, 404);
       const others = mine.filter((f: any) => f.lp === lp && f.id !== id).map((f: any) => f.id);
       if (others.length) await rest(env, `case_file?id=in.(${others.join(",")})`, { method: "PATCH", headers: { Prefer: "return=minimal" },
         body: JSON.stringify({ lp_num: null, pick_by: null, pick_at: null }) }, fetcher);
+      const by = who.name || who.userId;
+      if (id === 0) {
+        // 빼기: 이 줄은 파일 없이 둔다 (자동으로 다시 붙지 않게 기록)
+        await rest(env, "case_file_none?on_conflict=lp_num", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+          body: JSON.stringify({ lp_num: lp, l_num: lNum, pick_by: by, pick_at: new Date().toISOString() }) }, fetcher);
+        await logView(env, who, "unset_file:" + lp, "", { l_num: lNum, l_code: null }, fetcher);
+        return json({ ok: true });
+      }
       await rest(env, `case_file?id=eq.${id}`, { method: "PATCH", headers: { Prefer: "return=minimal" },
-        body: JSON.stringify({ lp_num: lp, pick_by: who.name || who.userId, pick_at: new Date().toISOString() }) }, fetcher);
+        body: JSON.stringify({ lp_num: lp, pick_by: by, pick_at: new Date().toISOString() }) }, fetcher);
+      await rest(env, `case_file_none?lp_num=eq.${lp}`, { method: "DELETE", headers: { Prefer: "return=minimal" } }, fetcher).catch(() => null);
       await logView(env, who, "set_file:" + id, "", { l_num: lNum, l_code: null }, fetcher);
       return json({ ok: true });
     }
 
-    if (body?.action === "locate") {
-      if (!who.userId) return json({ error: "직원 확인이 안 됐습니다" }, 401);
-      // 도우미가 최근 90초 안에 서버에 들렀어야 켜져 있는 것
-      const alive = new Date(Date.now() - 90_000).toISOString();
-      const devs = await rest(env, `pc_helper_device?select=id&revoked_at=is.null&works_user_id=eq.${enc(who.userId)}&last_seen_at=gte.${enc(alive)}&limit=1`, {}, fetcher);
-      if (!devs?.length) return json({ nohelper: true });
-      const ins = await rest(env, "pc_locate", { method: "POST", headers: { Prefer: "return=representation" },
-        body: JSON.stringify({ works_user_id: who.userId }) }, fetcher);
-      const id = ins?.[0]?.id;
-      if (!id) return json({ error: "요청을 만들지 못했습니다" }, 500);
-      const until = Date.now() + (body.waitMs ?? 8000);
-      while (Date.now() < until) {
-        await new Promise((r) => setTimeout(r, 300));
-        const row = (await rest(env, `pc_locate?select=taken_at,done_at,channel_id,how,header_text&id=eq.${id}`, {}, fetcher))?.[0];
-        if (row?.done_at) {
-          await logView(env, who, "locate:" + nz(row.how), nz(row.channel_id), null, fetcher);
-          if (row.channel_id) return json({ room: row.channel_id });
-          // 방 표에 없는 새 방이라도 제목에 사건번호가 있고 로웨어에 딱 하나 있으면 그 사건을 연다
-          const nos = row.how === "error" ? [] : caseNosIn(nz(row.header_text));
-          if (nos.length) {
-            const hit = await rest(env, `cases?select=l_code&l_code=in.${enc(inList(nos.flatMap(caseNoVariants)))}&limit=2`, {}, fetcher) || [];
-            if (hit.length === 1) return json({ case: hit[0].l_code });
-          }
-          return json({ notfound: true, how: row.how });
-        }
-        if (!row?.taken_at && Date.now() > until - 5000) break; // 3초 안에 도우미가 안 받아 가면 꺼진 것(또는 옛 버전)
-      }
-      await logView(env, who, "locate:timeout", "", null, fetcher);
-      return json({ timeout: true });
+    // 로웨어 제출 줄이 아닌 줄(방 대화·받은 문서·선고·사건 선임)의 파일을 직원이 직접 고르거나 뺀다(2026-11-20).
+    //   판단 기억(case_file_match)에 sig=manual로 남겨 AI가 다시 묻거나 덮어쓰지 않는다. old = 그 줄에 붙어 있던 파일
+    if (body?.action === "set_file_line") {
+      const lNum = String(body.lNum ?? ""), lk = nz(body.lk), id = Number(body.id), old = Number(body.old || 0);
+      if (!lNum || !lk || lk.length > 120 || lk.startsWith("lp:") || !Number.isFinite(id) || id < 0 || !Number.isFinite(old)) return json({ error: "고를 파일이 없습니다" }, 400);
+      const mine = await caseFiles(env, lNum, fetcher);
+      for (const x of [id, old]) if (x > 0 && !mine.some((f: any) => f.id === x)) return json({ error: "이 사건 파일이 아닙니다" }, 404);
+      const by = who.name || who.userId, now = new Date().toISOString(), rows: any[] = [];
+      if (old > 0 && old !== id) rows.push({ file_id: old, line_key: null, sig: MANUAL, reason: "직원이 뺌: " + by, model: MANUAL, decided_at: now });
+      if (id > 0) rows.push({ file_id: id, line_key: lk, sig: MANUAL, reason: "직원이 고름: " + by, model: MANUAL, decided_at: now });
+      if (rows.length) await rest(env, "case_file_match?on_conflict=file_id", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify(rows) }, fetcher);
+      await logView(env, who, (id > 0 ? "set_file_line:" + id : "unset_file_line:" + old) + ":" + lk.slice(0, 60), "", { l_num: lNum, l_code: null }, fetcher);
+      return json({ ok: true });
     }
 
     // 사건 고르기에서 고른 사건을 아직 연결 안 된 이 방에 기억 (휴대폰: 방을 아는 경우만)
@@ -504,6 +1072,38 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       return json(r || { linked: 0, how: "error" });
     }
 
+    // 사건정보 [수정]에서 이 방의 로웨어 사건을 바꾸거나(사건번호) 풀기(빈칸). 풀면 방 자체 사건으로 남는다
+    if (body?.action === "relink_room") {
+      const room = nz(body.room), code = nz(body.case);
+      if (!room) return json({ error: "사건방에서 연 화면에서만 바꿀 수 있습니다" }, 400);
+      let c: any = null;
+      if (code) {
+        c = (await rest(env, `cases?select=l_num,l_code&l_code=in.${enc(inList(caseNoVariants(code)))}&order=l_num.desc&limit=1`, {}, fetcher))?.[0];
+        if (!c) return json({ error: "로웨어에 없는 사건번호입니다" }, 404);
+      }
+      const r = await autoLink(env, { channelId: room, relink: true, lNum: c?.l_num ?? null, by: who.name || "" }, fetcher);
+      await logView(env, who, "relink:" + nz(r?.how), room, c, fetcher);
+      if (!r || (!r.linked && r.how !== "same")) return json({ error: "바꾸지 못했습니다" }, 500);
+      return json(r);
+    }
+
+    // PC 방 찾기에서 못 찾은 방: 직원이 고른 사건을 그때 읽은 제목과 함께 기억 → 다음부터 바로 열림
+    if (body?.action === "remember_pick") {
+      const id = Number(body.locate), code = nz(body.case);
+      if (!who.userId || !Number.isFinite(id) || !code) return json({ error: "기억할 내용이 없습니다" }, 400);
+      const since = new Date(Date.now() - 15 * 60_000).toISOString();
+      const row = (await rest(env, `pc_locate?select=header_text,channel_id,how&id=eq.${id}&works_user_id=eq.${enc(who.userId)}&done_at=gte.${enc(since)}`, {}, fetcher))?.[0];
+      const hn = normTitle(nz(row?.header_text));
+      if (!row || row.channel_id || row.how === "error" || hn.length < 8) return json({ saved: false });
+      const c = (await rest(env, `cases?select=l_num,l_code&l_code=in.${enc(inList(caseNoVariants(code)))}&order=l_num.desc&limit=1`, {}, fetcher))?.[0];
+      if (!c) return json({ saved: false });
+      await rest(env, "pc_title_pick?on_conflict=header_norm", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+        body: JSON.stringify({ header_norm: hn, header_text: nz(row.header_text).slice(0, 300), l_num: c.l_num, case_no: c.l_code,
+          picked_by: who.name || null, works_user_id: who.userId, updated_at: new Date().toISOString() }) }, fetcher);
+      await logView(env, who, "remember_pick", "", c, fetcher);
+      return json({ saved: true });
+    }
+
     if (body?.action === "helper_token") {
       if (!who.userId) return json({ error: "직원 확인이 안 됐습니다" }, 401);
       const label = (who.name || "직원") + " PC " + today;
@@ -512,24 +1112,201 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       return json({ token, label });
     }
 
+    // 기한 사람 확정·되돌리기 (규칙서 R17, 2026-11-19 석원): 웍스 알림 카드 버튼과 같은 기록
+    if (body?.action === "dl_confirm" || body?.action === "dl_undo") {
+      const lNum = Number(body.lNum);
+      const kind = nz(body.kind).slice(0, 20), due = nz(body.due).slice(0, 10);
+      if (!Number.isFinite(lNum) || !kind || !isDate(due)) return json({ error: "기한이 없습니다" }, 400);
+      const c = (await rest(env, `case_all?select=l_code&l_num=eq.${lNum}`, {}, fetcher))[0];
+      const code = nz(c?.l_code);
+      if (!code) return json({ error: "사건이 없습니다" }, 404);
+      const q = `deadline_confirm?undone_at=is.null&l_code=eq.${enc(code)}&kind=eq.${enc(kind)}&due=eq.${due}`;
+      // 하나의 기한에는 확정 하나: 다른 버튼을 누르면 앞의 것을 되돌리고 새로 남긴다
+      await rest(env, q, { method: "PATCH", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ undone_at: new Date().toISOString(), undone_by: who.name || who.userId || null }) }, fetcher);
+      if (body.action === "dl_undo") return json({ ok: true, cf: null });
+      const act = DL_ACTS[nz(body.act)];
+      if (!act) return json({ error: "버튼이 없습니다" }, 400);
+      const ins = await rest(env, "deadline_confirm?select=id", { method: "POST", headers: { Prefer: "return=representation" },
+        body: JSON.stringify({ l_code: code, kind, due, action: act, works_user_id: who.userId || null, channel_id: nz(body.room) || null }) }, fetcher);
+      return json({ ok: true, cf: { a: act, id: ins?.[0]?.id ?? null } });
+    }
     if (body?.action === "save_info") {
       const lNum = Number(body.lNum);
-      if (!Number.isFinite(lNum) || lNum <= 0) return json({ error: "사건이 없습니다" }, 400);
-      const c = (await rest(env, `cases?select=l_num,l_code&l_num=eq.${lNum}`, {}, fetcher))[0];
+      if (!Number.isFinite(lNum) || lNum === 0) return json({ error: "사건이 없습니다" }, 400); // 수사 사건은 음수 번호
+      const c = (await rest(env, `case_all?select=*&l_num=eq.${lNum}`, {}, fetcher))[0];
       if (!c) return json({ error: "사건이 없습니다" }, 404);
-      const prev = (await rest(env, `case_info?select=*&l_num=eq.${lNum}`, {}, fetcher))[0] || {};
-      const next: Record<string, string> = {};
-      for (const k of INFO_FIELDS) next[k] = k === "extra_phones" ? cleanPhones(body.fields?.[k]) : nz(body.fields?.[k]).slice(0, k === "memo" ? 2000 : 200);
-      const changed = INFO_FIELDS.filter((k) => nz(prev[k]) !== next[k]);
-      const now = new Date().toISOString();
-      await rest(env, "case_info?on_conflict=l_num", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-        body: JSON.stringify({ l_num: lNum, case_no: c.l_code, ...next, updated_by: who.name, updated_by_id: who.userId, updated_at: now }) }, fetcher);
-      if (changed.length) {
-        await rest(env, "case_info_log", { method: "POST", headers: { Prefer: "return=minimal" },
-          body: JSON.stringify(changed.map((k) => ({ l_num: lNum, field: k, old_value: prev[k] ?? null, new_value: next[k], editor: who.name, editor_id: who.userId }))) }, fetcher);
+      let prevRow = (await rest(env, `case_info?select=*&l_num=eq.${lNum}`, {}, fetcher))[0] || null;
+      if (!prevRow) {
+        const rr = await rest(env, `works_room_case?select=channel_id&l_num=eq.${lNum}`, {}, fetcher).catch(() => []) || [];
+        const ch = [...new Set(rr.map((r: any) => nz(r.channel_id)).filter(Boolean))] as string[];
+        prevRow = await inheritedInfo(env, await relatedNums(env, lNum, ch, fetcher), fetcher);
       }
+      const prev = prevRow || {};
+      // 저장된 사건정보가 없으면 화면에 보이던 로웨어 처음 값이 기준 (2026-11-19 석원: 단계 칸만 고쳤는데 인적사항이 지워짐)
+      const base: Record<string, any> = prevRow || infoFields(c, null).fields;
+      const next: Record<string, string> = {};
+      const sent = body.fields && typeof body.fields === "object" ? body.fields : {};
+      // 화면에서 보내지 않은 예전 칸(법원·재판부, 수사기관 등)은 그대로 둔다
+      for (const k of INFO_FIELDS) next[k] = !(k in sent) ? nz(base[k]) : k === "extra_phones" ? cleanPhones(sent[k]) : nz(sent[k]).slice(0, k === "memo" ? 2000 : 200);
+      const changed = INFO_FIELDS.filter((k) => nz(base[k]) !== next[k]);
+      const now = new Date().toISOString();
+      const row: Record<string, unknown> = { l_num: lNum, case_no: c.l_code, ...next, updated_by: who.name, updated_by_id: who.userId, updated_at: now };
+      const logRows: any[] = changed.map((k) => ({ l_num: lNum, field: k, old_value: base[k] ?? null, new_value: next[k], editor: who.name, editor_id: who.userId }));
+      let stageChanges: any[] = [];
+      // 공소청 칸(방 제목)·처분(사건방 처분 줄)을 화면과 같게 계산하려고
+      const myRooms = await rest(env, `works_room_case?select=channel_id,room_title&l_num=eq.${lNum}&order=is_primary.desc`, {}, fetcher).catch(() => []) || [];
+      const roomTitle = nz(myRooms.find((r: any) => nz(r.room_title))?.room_title);
+      const myChans = [...new Set(myRooms.map((r: any) => nz(r.channel_id)).filter(Boolean))] as string[];
+      const stageRows = await roomEvents(env, String(lNum), myChans, fetcher).catch(() => []);
+      const chatH = await chatNoHist(env, myChans, fetcher).catch(() => []);
+      let hist = withChatNos(await noHist(env, [lNum, ...(await relatedNums(env, lNum, myChans, fetcher))], fetcher), chatH);
+      if (body.stages && typeof body.stages === "object") {
+        const d = diffStages(c, prevRow, body.stages, TITLE_PROS ? roomTitle : "", hist);
+        row.stages = d.stages;
+        row.cur_stage = isStage(body.cur) ? body.cur : null;
+        row.start_stage = isStage(body.start) ? body.start : null;
+        stageChanges = d.changes;
+        for (const x of d.changes) logRows.push({ l_num: lNum, field: x.field, old_value: x.old, new_value: x.new, editor: who.name, editor_id: who.userId });
+        for (const k of ["cur_stage", "start_stage"]) {
+          if (nz(prev[k]) !== nz(row[k])) logRows.push({ l_num: lNum, field: k, old_value: prev[k] ?? null, new_value: row[k], editor: who.name, editor_id: who.userId });
+        }
+      }
+      await rest(env, "case_info?on_conflict=l_num", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+        body: JSON.stringify(row) }, fetcher);
+      if (logRows.length) {
+        await rest(env, "case_info_log", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify(logRows) }, fetcher);
+      }
+      // 수사관·공소관·재판부가 바뀌면 타임라인에 작은 줄로 남김
+      const lines = stageChanges.filter((x) => x.old && x.new && ((x.key === "person" && (x.stage === "police" || x.stage === "pros")) || (x.key === "dept" && /^c/.test(x.stage))));
+      if (lines.length) {
+        await rest(env, "room_event", { method: "POST", headers: { Prefer: "return=minimal" },
+          body: JSON.stringify(lines.map((x, i) => ({ channel_id: `stage:${lNum}:${x.stage}:${Date.now()}${i}`, l_num: lNum, kind: "기타", ev_date: today, ev_time: "",
+            summary: personChangeLine(x.stage, x.old, x.new), state: "완료", source: "stage-change" }))) }, fetcher).catch((e) => console.log("stage line fail", String(e).slice(0, 120)));
+      }
+      const gone = body.stages && typeof body.stages === "object" ? hideRemovedNos(hist, body.stages) : [];
+      if (gone.length) await rest(env, `case_no_hist?id=in.(${gone.join(",")})`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ hidden: true }) }, fetcher).catch(() => null);
+      const newNos = stageChanges.filter((x) => x.key === "no" && x.new && (x.stage === "police" || x.stage === "pros"));
+      for (const x of newNos) {
+        const org = nz(body.stages?.[x.stage]?.org);
+        await rest(env, "case_no_hist?on_conflict=l_num,stage,no", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+          body: JSON.stringify({ l_num: lNum, stage: x.stage, org, no: x.new, source: "manual", seen_on: today, hidden: false }) }, fetcher).catch(() => null);
+      }
+      if (gone.length || newNos.length) hist = withChatNos(await noHist(env, [lNum, ...(await relatedNums(env, lNum, myChans, fetcher))], fetcher), chatH);
       await logView(env, who, "save_info", "", c, fetcher);
-      return json({ ok: true, changed: changed.length, ...infoFields(c, { ...next, updated_by: who.name, updated_at: now }) });
+      const logs = await rest(env, `case_info_log?select=field,old_value,new_value,editor,edited_at&l_num=eq.${lNum}&field=like.stage.*&order=edited_at.desc&limit=300`, {}, fetcher).catch(() => []);
+      const savedNow = { ...prev, ...row };
+      const stages = shapeStages(c, savedNow, logs || [], TITLE_PROS ? roomTitle : "", stageRows || [], hist);
+      return json({ ok: true, changed: changed.length + stageChanges.length, ...infoFields(c, { ...next, updated_by: who.name, updated_at: now }), stages, dispNo: stages.dispNo });
+    }
+    if (body?.action === "chat_import_preview" || body?.action === "chat_import_save") {
+      const lNum = Number(body.lNum);
+      if (!Number.isFinite(lNum) || lNum === 0) return json({ error: "사건이 없습니다" }, 400);
+      const c = (await rest(env, `case_all?select=l_num,l_code,l_name&l_num=eq.${lNum}`, {}, fetcher))[0];
+      if (!c) return json({ error: "사건이 없습니다" }, 404);
+      if (body.action === "chat_import_preview") {
+        const text = String(body.text || "");
+        if (text.trim().length < 20) return json({ error: "대화 내용이 비어 있습니다" }, 400);
+        if (text.length > 1_500_000) return json({ error: "파일이 너무 큽니다" }, 400);
+        const r = await extractFromExport({ key: env.anthropicKey, model: env.chatModel, text, title: nz(c.l_name) }, fetcher);
+        await logView(env, who, "chat_import_preview", "", c, fetcher);
+        return json(r);
+      }
+      const rows = toRows(lNum, Array.isArray(body.events) ? body.events.slice(0, 300) : []);
+      const start = nz(body.startDate);
+      if (c.l_num < 0 && /^\d{4}-\d{2}-\d{2}$/.test(start) && !isNaN(Date.parse(start))) {
+        rows.push({ channel_id: "export-start:" + lNum, l_num: lNum, kind: "사건접수", ev_date: start, ev_time: "", summary: "사건 선임", state: "완료", source: "chat-export" });
+      }
+      if (!rows.length) return json({ ok: true, saved: 0 });
+      // 지운(숨긴) 줄과 날짜·종류가 겹치면 새 내용으로 바꾸고 다시 보이게 한다
+      await rest(env, "room_event?on_conflict=channel_id,kind,ev_date,ev_time", {
+        method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify(rows.map((r) => ({ ...r, hidden: false }))) }, fetcher);
+      await logView(env, who, "chat_import_save", "", c, fetcher);
+      return json({ ok: true, saved: rows.length });
+    }
+
+    if (body?.action === "chat_reset") {
+      // 대화 파일로 만든 줄을 모두 지운다(직원이 직접 넣은 줄·담당자 변경 줄은 그대로)
+      const lNum = Number(body.lNum);
+      if (!Number.isFinite(lNum) || lNum === 0) return json({ error: "사건이 없습니다" }, 400);
+      const c = (await rest(env, `case_all?select=l_num,l_code&l_num=eq.${lNum}`, {}, fetcher))[0];
+      if (!c) return json({ error: "사건이 없습니다" }, 404);
+      const gone = await rest(env, `room_event?l_num=eq.${lNum}&source=eq.chat-export&select=id`, { method: "DELETE", headers: { Prefer: "return=representation" } }, fetcher) || [];
+      await logView(env, who, "chat_reset:" + gone.length, "", c, fetcher);
+      return json({ ok: true, removed: gone.length });
+    }
+
+    if (body?.action === "tl_refresh") {
+      const lNum = Number(body.lNum);
+      if (!Number.isFinite(lNum) || lNum === 0) return json({ error: "사건이 없습니다" }, 400);
+      const c = (await rest(env, `case_all?select=l_num,l_code,l_name&l_num=eq.${lNum}`, {}, fetcher))[0];
+      if (!c) return json({ error: "사건이 없습니다" }, 404);
+      const rooms = await rest(env, `works_room_case?select=channel_id&l_num=eq.${lNum}`, {}, fetcher).catch(() => []) || [];
+      const chans = [...new Set(rooms.map((r: any) => nz(r.channel_id)).filter(Boolean))] as string[];
+      if (!chans.length) return json({ ok: true, saved: 0 });
+      const since = new Date(Date.now() - 30 * 864e5).toISOString();
+      const msgs = await rest(env, `room_msg?select=sent_at,text,works_user_id&channel_id=in.${enc(inList(chans))}&sent_at=gte.${enc(since)}&order=sent_at.asc&limit=3000`, {}, fetcher) || [];
+      if (!msgs.length) return json({ ok: true, saved: 0 });
+      const ids = [...new Set(msgs.map((m: any) => nz(m.works_user_id)).filter(Boolean))] as string[];
+      const names: Record<string, string> = {};
+      if (ids.length) {
+        const seen = await rest(env, `case_view_log?select=works_user_id,viewer_name&works_user_id=in.${enc(inList(ids))}&viewer_name=not.is.null&order=viewed_at.desc&limit=500`, {}, fetcher).catch(() => []) || [];
+        for (const v of seen) if (!names[v.works_user_id]) names[v.works_user_id] = nz(v.viewer_name);
+      }
+      const have = await rest(env, `room_event?select=kind,ev_date,summary&or=(l_num.eq.${lNum},channel_id.in.${enc(inList(chans))})&limit=500`, {}, fetcher) || [];
+      const known = have.map((r: any) => `${String(r.ev_date).slice(0, 10)} ${r.kind} ${nz(r.summary)}`).join("\n");
+      const r = await extractFromExport({ key: env.anthropicKey, model: env.refreshModel || "claude-sonnet-5-5", text: msgsToExport(msgs, names), title: nz(c.l_name), known }, fetcher);
+      const rows = toRows(lNum, dropKnown(r.events, have), "refresh:", "chat-refresh");
+      if (rows.length) {
+        await rest(env, "room_event?on_conflict=channel_id,kind,ev_date,ev_time", {
+          method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=minimal" }, body: JSON.stringify(rows) }, fetcher);
+      }
+      await logView(env, who, "tl_refresh:" + rows.length, "", c, fetcher);
+      return json({ ok: true, saved: rows.length });
+    }
+
+    if (body?.action === "hide_event") {
+      const id = Number(body.id);
+      if (!Number.isFinite(id) || id <= 0) return json({ error: "줄이 없습니다" }, 400);
+      await rest(env, `room_event?id=eq.${id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ hidden: true }) }, fetcher);
+      await logView(env, who, "hide_event:" + id, "", null, fetcher);
+      return json({ ok: true });
+    }
+    if (body?.action === "tl_list" || body?.action === "tl_save") {
+      const lNum = Number(body.lNum);
+      if (!Number.isFinite(lNum) || lNum === 0) return json({ error: "사건이 없습니다" }, 400);
+      const c = (await rest(env, `case_all?select=l_num,l_code&l_num=eq.${lNum}`, {}, fetcher))[0];
+      if (!c) return json({ error: "사건이 없습니다" }, 404);
+      const rooms = await rest(env, `works_room_case?select=channel_id&l_num=eq.${lNum}`, {}, fetcher).catch(() => []) || [];
+      const chans = [...new Set(rooms.map((r: any) => nz(r.channel_id)).filter(Boolean))] as string[];
+      const nums = [lNum, ...(await relatedNums(env, lNum, chans, fetcher))].join(",");
+      const or = `or=(l_num.in.(${nums})${chans.length ? `,channel_id.in.${enc(inList(chans))}` : ""})`;
+      const mine = await rest(env, `room_event?select=id,channel_id,kind,ev_date,ev_time,summary,state,hidden&${or}&order=ev_date.asc,ev_time.asc&limit=500`, {}, fetcher) || [];
+      if (body.action === "tl_list") {
+        return json({ rows: mine.map((r: any) => ({ id: r.id, d: String(r.ev_date).slice(0, 10), tm: nz(r.ev_time), t: nz(r.summary), hid: !!r.hidden })) });
+      }
+      const byId = new Map(mine.map((r: any) => [Number(r.id), r]));
+      const list = Array.isArray(body.rows) ? body.rows.slice(0, 200) : [];
+      let saved = 0, failed = 0;
+      for (const x of list) {
+        const date = nz(x?.date), time = nz(x?.time), summary = nz(x?.summary).slice(0, 80), hidden = !!x?.hidden;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || isNaN(Date.parse(date)) || (time && !/^\d{2}:\d{2}$/.test(time)) || (!summary && !hidden)) { failed++; continue; }
+        const state = date > today ? "예정" : "완료";
+        try {
+          if (x?.id) {
+            const old = byId.get(Number(x.id));
+            if (!old) { failed++; continue; }
+            await rest(env, `room_event?id=eq.${Number(x.id)}`, { method: "PATCH", headers: { Prefer: "return=minimal" },
+              body: JSON.stringify({ ev_date: date, ev_time: time, summary, hidden, state }) }, fetcher);
+          } else {
+            await rest(env, "room_event", { method: "POST", headers: { Prefer: "return=minimal" },
+              body: JSON.stringify({ channel_id: `manual:${lNum}:${Date.now()}${saved}`, l_num: lNum, kind: "기타", ev_date: date, ev_time: time, summary, state, source: "manual" }) }, fetcher);
+          }
+          saved++;
+        } catch (e) { console.log("tl_save fail", String(e).slice(0, 160)); failed++; }
+      }
+      await logView(env, who, "tl_save", "", c, fetcher);
+      return json({ ok: true, saved, failed });
     }
     return json({ error: "모르는 요청" }, 400);
   } catch (e) {

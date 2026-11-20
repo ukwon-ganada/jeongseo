@@ -3,7 +3,7 @@
 //
 //  2026-11-13 석원 결정: 수사 단계(경찰·검찰) 사건은 로웨어에 받아올 정보가 없으니
 //  사건방 대화에서 고소장 제출·조사 일정·송치 같은 일을 AI가 골라 그 방 타임라인에 쌓는다.
-//    · 대화 원문은 저장하지 않는다. AI가 뽑은 "일정 한 줄"만 room_event 표에 남긴다.
+//    · 2026-11-16 바뀜: 수사 사건방 글은 room_msg 에 30일 보관(타임라인 [갱신]용). 일정 줄은 room_event.
 //    · 날짜·일정 낌새가 없는 글은 AI에 보내지도 않는다(looksLikeEvent).
 //    · 같은 방·같은 종류·같은 날짜·같은 시각이면 한 번만 남긴다(겹침 방지).
 //  시험 단계: ROOM_CHAT_BOTS(기본 시험봇 13580302)에 든 봇의 방만 처리.
@@ -13,6 +13,8 @@
 export type ChatEnv = { sbUrl: string; sbKey: string; anthropicKey?: string; model?: string };
 export type RoomEvent = { kind: string; date: string; time: string | null; summary: string; state: "예정" | "완료" };
 
+// 시각을 남기는 종류(약속 시각이 있는 일). 나머지는 같은 날 같은 종류면 한 줄 (2026-11-19 재정신청서 세 줄)
+const APPT = new Set(["조사", "출석요구", "기일"]);
 export const KINDS = ["사건접수", "고소장제출", "조사", "출석요구", "송치", "처분", "기소", "기일", "서면제출", "기타"] as const;
 
 // 날짜·시각·수사 절차 낱말이 하나라도 있어야 AI에 보낸다
@@ -52,6 +54,11 @@ const SYSTEM = [
   "날짜는 보낸 시각(한국 시간)을 기준으로 '내일', '다음 주 화요일' 같은 말을 실제 날짜로 바꾼다. 연도가 없으면 보낸 날 이후 가장 가까운 날로 본다.",
   "이미 일어난 일이면 state=완료, 앞으로의 일이면 state=예정.",
   "summary에는 사람 이름·전화번호·주민번호·주소를 넣지 않는다. 예: '인천논현서 피의자 조사', '고소장 제출(연수서)'.",
+  "'앞 글'과 '최근 올라온 파일'은 맥락으로만 쓴다. 일정은 '대화'(이번 글)에서만 뽑는다.",
+  "이번 글이 '우편제출완료하였습니다'처럼 무슨 서류인지 빠져 있으면 앞 글과 파일 이름을 보고 서류 이름을 summary에 적는다. 예: '선임계 우편 제출(연수서)', '의견서 제출(인천지검)'.",
+  "time은 조사·출석·재판 기일처럼 약속된 시각이 있을 때만 쓴다. 서면 제출·처분·접수 같은 일은 글을 보낸 시각을 쓰지 말고 null로 한다.",
+  "제출처(경찰서·공소청·법원 등)는 대화나 앞 글에 분명히 나올 때만 적는다. 짐작해서 '추정'·'불명'으로 적지 말고, 모르면 제출처 없이 '재정신청서 제출'처럼 쓴다.",
+  "'보내겠습니다'처럼 할 일이면 예정, '제출했습니다'·'발송 완료'처럼 끝난 일이면 완료로 한다. 같은 제출을 두고 여러 글이 오가도 한 일이다.",
   "골라낼 것이 없으면 events를 빈 배열로 한다. 확실하지 않으면 넣지 않는다.",
 ].join("\n");
 
@@ -74,22 +81,24 @@ export function cleanEvents(raw: unknown): RoomEvent[] {
   return out;
 }
 
-export async function extractEvents(env: ChatEnv, text: string, sentAt: string, roomTitle: string, fetcher: typeof fetch = fetch): Promise<RoomEvent[]> {
+export async function extractEvents(env: ChatEnv, text: string, sentAt: string, roomTitle: string, fetcher: typeof fetch = fetch, context = ""): Promise<RoomEvent[]> {
   if (!env.anthropicKey) throw new Error("ANTHROPIC_API_KEY 없음");
   const d = new Date(Date.parse(sentAt) + 9 * 3600e3);
-  const user = `보낸 시각(한국): ${KST(sentAt)} (${WEEK[d.getUTCDay()]}요일)\n방 제목: ${roomTitle || "(모름)"}\n\n대화:\n${text}`;
+  const user = `보낸 시각(한국): ${KST(sentAt)} (${WEEK[d.getUTCDay()]}요일)\n방 제목: ${roomTitle || "(모름)"}\n${context ? "\n" + context + "\n" : ""}\n대화:\n${text}`;
+  const model = env.model || "claude-opus-5-5";
+  const haiku = model.includes("haiku");
   const res = await fetcher("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "x-api-key": env.anthropicKey, "anthropic-version": "2023-06-01", "content-type": "application/json",
-      "anthropic-beta": "server-side-fallback-2026-07-01",
+      ...(haiku ? {} : { "anthropic-beta": "server-side-fallback-2026-07-01" }),
     },
     body: JSON.stringify({
-      model: env.model || "claude-opus-5-5",
+      model,
       max_tokens: 4000,
       system: SYSTEM,
       output_config: { effort: "low", format: { type: "json_schema", schema: SCHEMA } },
-      fallbacks: "default",
+      ...(haiku ? {} : { fallbacks: "default" }),
       messages: [{ role: "user", content: user }],
     }),
   });
@@ -108,22 +117,69 @@ async function rest(env: ChatEnv, path: string, init: RequestInit = {}, fetcher:
   });
 }
 
-// 방에 올라온 글 하나 처리: 낌새 확인 → AI → room_event 저장. 원문은 어디에도 남기지 않는다.
-export async function handleRoomText(env: ChatEnv, a: { channelId: string; text: string; sentAt?: string }, fetcher: typeof fetch = fetch): Promise<{ saved: number; how: string }> {
-  if (!looksLikeEvent(a.text)) return { saved: 0, how: "no-cue" };
+const PII = /\d{6}\s*-\s*[1-4]\d{6}|0\d{1,2}\s*-\s*\d{3,4}\s*-\s*\d{4}|01\d\s*\d{3,4}\s*\d{4}/g;
+
+// 수사 사건방 글 보관(2026-11-16 석원 결정): 타임라인 [갱신]이 다시 읽는다. 번호는 지우고, 30일 지나면 DB가 매일 지운다.
+async function keepText(env: ChatEnv, a: { channelId: string; text: string; userId?: string }, sentAt: string, fetcher: typeof fetch) {
+  const text = a.text.replace(PII, "[번호]").slice(0, 4000);
+  const r = await rest(env, "room_msg?on_conflict=channel_id,sent_at,text_hash", {
+    method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
+    body: JSON.stringify([{ channel_id: a.channelId, works_user_id: a.userId || null, sent_at: sentAt, text }]),
+  }, fetcher);
+  if (!r.ok) console.error("room_msg 저장 실패", r.status);
+  await r.body?.cancel();
+}
+
+// 짧은 답글("우편제출완료하였습니다")도 무슨 서류인지 알 수 있게: 같은 방 최근 이틀 글 6개 + 올라온 파일 이름 (2026-11-18 석원 사례)
+export async function recentContext(env: ChatEnv, channelId: string, sentAt: string, text: string, fetcher: typeof fetch = fetch): Promise<string> {
+  const ch = encodeURIComponent(channelId), from = encodeURIComponent(new Date(Date.parse(sentAt) - 2 * 864e5).toISOString()), to = encodeURIComponent(sentAt);
+  const [m, f] = await Promise.all([
+    rest(env, `room_msg?select=sent_at,text&channel_id=eq.${ch}&sent_at=gte.${from}&sent_at=lte.${to}&order=sent_at.desc&limit=8`, {}, fetcher),
+    rest(env, `case_file?select=file_name,posted_at&channel_id=eq.${ch}&posted_at=gte.${from}&posted_at=lte.${to}&file_name=not.is.null&order=posted_at.desc&limit=5`, {}, fetcher),
+  ]);
+  const msgs = m.ok ? await m.json() : (await m.body?.cancel(), []);
+  const files = f.ok ? await f.json() : (await f.body?.cancel(), []);
+  const prev = (msgs as any[]).filter((x) => String(x.text || "").trim() !== String(text || "").trim()).slice(0, 6).reverse()
+    .map((x) => `${KST(x.sent_at)} ${String(x.text || "").replace(/\n+/g, " ").slice(0, 200)}`);
+  const names = (files as any[]).map((x) => `${KST(x.posted_at)} ${String(x.file_name).slice(0, 80)}`);
+  return [prev.length ? "앞 글:\n" + prev.join("\n") : "", names.length ? "최근 올라온 파일:\n" + names.join("\n") : ""].filter(Boolean).join("\n\n");
+}
+
+async function noCourt(env: ChatEnv, lNum: number, fetcher: typeof fetch): Promise<boolean> {
+  const r = await rest(env, `cases?select=court&l_num=eq.${lNum}`, {}, fetcher);
+  if (!r.ok) { await r.body?.cancel(); return false; }
+  const row = (await r.json().catch(() => []))?.[0];
+  return !!row && !String(row.court || "").trim();
+}
+
+// 방에 올라온 글 하나 처리: 수사 사건방이면 글 보관 → 낌새 확인 → AI → room_event 저장
+export async function handleRoomText(env: ChatEnv, a: { channelId: string; text: string; sentAt?: string; invOnly?: boolean; userId?: string }, fetcher: typeof fetch = fetch): Promise<{ saved: number; how: string }> {
+  if (String(a.text || "").trim().length < 2) return { saved: 0, how: "no-cue" };
   const sentAt = a.sentAt && !isNaN(Date.parse(a.sentAt)) ? new Date(a.sentAt).toISOString() : new Date().toISOString();
   const m = await rest(env, `works_room_case?select=l_num,room_title,status&channel_id=eq.${encodeURIComponent(a.channelId)}&order=is_primary.desc&limit=1`, {}, fetcher);
   const room = m.ok ? (await m.json())[0] : (await m.body?.cancel(), null);
-  const evs = await extractEvents(env, a.text.slice(0, 4000), sentAt, room?.room_title || "", fetcher);
+  // 수사 단계 방: 자체 사건(l_num<0)이거나, 로웨어 사건이라도 아직 법원(재판번호)이 없는 사건(2026-11-20, 이종수·김한곤 방 사례)
+  const inv = Number(room?.l_num) < 0 || (Number(room?.l_num) > 0 && await noCourt(env, Number(room.l_num), fetcher));
+  if (a.invOnly && !inv) return { saved: 0, how: "not-inv" };
+  if (inv) await keepText(env, a, sentAt, fetcher);
+  if (!looksLikeEvent(a.text)) return { saved: 0, how: "no-cue" };
+  const ctx = await recentContext(env, a.channelId, sentAt, a.text, fetcher).catch(() => "");
+  const evs = await extractEvents(env, a.text.slice(0, 4000), sentAt, room?.room_title || "", fetcher, ctx);
   if (!evs.length) return { saved: 0, how: "none" };
   const rows = evs.map((e) => ({
     channel_id: a.channelId, l_num: room?.status === "보류" ? null : room?.l_num ?? null,
-    kind: e.kind, ev_date: e.date, ev_time: e.time ?? "", summary: e.summary, state: e.state, msg_at: sentAt, source: "chat-ai",
+    kind: e.kind, ev_date: e.date, ev_time: APPT.has(e.kind) ? e.time ?? "" : "", summary: e.summary, state: e.state, msg_at: sentAt, source: "chat-ai",
   }));
   const ins = await rest(env, "room_event?on_conflict=channel_id,kind,ev_date,ev_time", {
     method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=minimal" }, body: JSON.stringify(rows),
   }, fetcher);
   if (!ins.ok) throw new Error("room_event 저장 실패 " + ins.status + " " + (await ins.text()).slice(0, 120));
   await ins.body?.cancel();
+  // 같은 날 같은 일이 '예정'으로 먼저 들어와 있으면, 끝났다는 글이 왔을 때 그 줄을 '완료'로 바꾼다
+  for (const r of rows.filter((x) => x.state === "완료")) {
+    const q = `room_event?channel_id=eq.${encodeURIComponent(r.channel_id)}&kind=eq.${encodeURIComponent(r.kind)}&ev_date=eq.${r.ev_date}&ev_time=eq.${encodeURIComponent(r.ev_time)}&state=eq.${encodeURIComponent("예정")}&source=eq.chat-ai`;
+    const up = await rest(env, q, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ state: "완료", summary: r.summary, msg_at: sentAt }) }, fetcher);
+    await up.body?.cancel();
+  }
   return { saved: rows.length, how: "ai" };
 }

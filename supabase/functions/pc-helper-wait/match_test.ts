@@ -1,6 +1,6 @@
 // 실행: deno test supabase/functions/pc-helper-wait/match_test.ts
 import { assertEquals } from "jsr:@std/assert@1";
-import { caseNos, headerText, matchRoom } from "./match.ts";
+import { caseNos, clientName, headerText, matchRoom, sameClient } from "./match.ts";
 
 // 2026-11-13 사무실 PC 시험 결과 모양(이름은 가짜)
 const LINES = [
@@ -65,4 +65,33 @@ Deno.test("앞부분이 같은 방이 둘 이상이면 고르지 않는다", () 
     { channel_id: "B", room_title: "신)△(형/피의)홍길동_사기_안양지청 2026형제12815" },
   ];
   assertEquals(matchRoom([{ x: 30, y: 6, t: "신)△(형/피의)홍길동-사기-" }], rooms).channelId, null);
+});
+
+Deno.test("의뢰인 이름이 다른 방은 제목이 닮아도 열지 않는다", () => {
+  const rooms = [
+    { channel_id: "kim", room_title: "박)신)★(형/고소)김가나_사기_인천연수경찰서_2026-8730" },
+    { channel_id: "lee", room_title: "서)최)★(형/피고인)이다라_전기통신금융사기피해방지 등_인천 26노100808" },
+  ];
+  const line = (t: string) => [{ x: 28, y: 7, t }];
+  assertEquals(matchRoom(line("서)최)!(형/피의) 최마바-사기-인천연수경찰서 2026-5079 10"), rooms).channelId, null);
+  // OCR이 이름 한 글자를 틀려도 같은 사람으로 본다
+  assertEquals(matchRoom(line("서)최)*(형/피고인)이다러-전기통신금융사기피해방지 등- 인천"), rooms).channelId, "lee");
+  assertEquals(clientName("(국선)(형/피고인3)백가나_도박_인천"), "백가나");
+  assertEquals(sameClient("최마바", "김가나"), false);
+});
+
+Deno.test("nearRooms: 제목이 바뀐 방(옛 제목 저장)도 후보 맨 앞에 온다", async () => {
+  const { nearRooms, matchRoom } = await import("./match.ts");
+  const rooms = [
+    { channel_id: "A", room_title: "서)신)★(형/피)박큰별_사기_부천지원 2025고단1888(병합 2026고단101287)" },
+    { channel_id: "B", room_title: "박)신)★(형/피의)손용구_사기_고양경찰서 2026-9316" },
+    { channel_id: "C", room_title: "서)최)★(형/피고인)이승원_상해_인천지방법원 2026고단101290" },
+  ];
+  const lines = [{ x: 30, y: 5, t: "*` 서)신)*(형/피)박큰별-사기-인천지방법원2026노101087 12" }];
+  const m = matchRoom(lines, rooms);
+  if (m.channelId) throw new Error("옛 제목으로는 못 찾아야 함");
+  const near = nearRooms(lines, rooms);
+  if (near[0] !== "A" || near.includes("B")) throw new Error("후보 " + near.join(","));
+  const m2 = matchRoom(lines, [{ channel_id: "A", room_title: "서)신)★(형/피)박큰별_사기_인천지방법원2026노101087" }, rooms[1], rooms[2]]);
+  if (m2.channelId !== "A") throw new Error("새 제목으로는 찾아야 함 " + m2.how);
 });

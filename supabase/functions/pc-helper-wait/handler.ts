@@ -16,11 +16,11 @@
 
 export const WOFF = "https://woff.worksmobile.com/woff/Nxkob0LER_dfaSzH8s6flw";
 const WAIT_MS = 25_000;
-const STEP_MS = 600;
+const STEP_MS = 250;
 const LOCATE_FRESH_SEC = 20; // 방 찾기 요청은 20초 안에 받아 간 것만 (화면이 기다리는 시간)
 const FRESH_SEC = 60; // 1분 넘게 지난 클릭은 열지 않음 (PC가 꺼져 있다 켜졌을 때 엉뚱하게 열리지 않게)
 
-import { matchRoom, type OcrLine } from "./match.ts";
+import { matchRoom, nearRooms, type OcrLine } from "./match.ts";
 
 type Env = { sbUrl: string; sbKey: string; waitMs?: number; stepMs?: number };
 
@@ -65,7 +65,18 @@ async function report(req: Request, env: Env, userId: string): Promise<Response>
   let m = { channelId: null as string | null, how: "error", score: 0, header: String(b?.error ?? "").slice(0, 200) };
   if (!b?.error) {
     const rr = await rest(env, "works_room_case?select=channel_id,room_title&room_title=not.is.null&limit=5000");
-    m = matchRoom(lines, rr.ok ? await rr.json() : []);
+    const rooms = rr.ok ? await rr.json() : [];
+    m = matchRoom(lines, rooms);
+    // 못 찾았으면: 방 제목이 바뀌었을 수 있다(심급이 올라가면 직원이 제목을 고침).
+    // 비슷한 방 몇 개의 현재 제목을 웍스에서 다시 읽어 저장해 두고 한 번 더 맞춰 본다.
+    if (!m.channelId && m.how !== "no-header") {
+      const near = nearRooms(lines, rooms);
+      if (near.length && await refreshTitles(env, near)) {
+        const r2 = await rest(env, "works_room_case?select=channel_id,room_title&room_title=not.is.null&limit=5000");
+        const m2 = matchRoom(lines, r2.ok ? await r2.json() : []);
+        if (m2.channelId) m = { ...m2, how: m2.how + "+refresh" };
+      }
+    }
   }
   await rest(env, `pc_locate?id=eq.${id}`, {
     method: "PATCH", headers: { Prefer: "return=minimal" },
@@ -75,6 +86,19 @@ async function report(req: Request, env: Env, userId: string): Promise<Response>
 }
 
 // 이 직원의 방 찾기 요청 하나를 집어 온다 (PC 두 대여도 한 대만)
+// works-bot-callback(서비스 키로만 부르는 길)에 방 제목 다시 읽기를 부탁. 바뀐 방이 하나라도 있으면 true
+async function refreshTitles(env: Env, channels: string[]): Promise<boolean> {
+  try {
+    const r = await fetch(env.sbUrl + "/functions/v1/works-bot-callback", {
+      method: "POST", headers: { "Content-Type": "application/json", "x-internal-key": env.sbKey },
+      body: JSON.stringify({ titles: channels }), signal: AbortSignal.timeout(5000),
+    });
+    if (!r.ok) { await r.body?.cancel(); return false; }
+    const j = await r.json();
+    return Number(j?.changed) > 0;
+  } catch { return false; }
+}
+
 async function takeLocate(env: Env, userId: string): Promise<number | null> {
   const since = new Date(Date.now() - LOCATE_FRESH_SEC * 1000).toISOString();
   const r = await rest(env, "pc_locate?select=id&taken_at=is.null&works_user_id=eq." + encodeURIComponent(userId) +
@@ -94,7 +118,9 @@ export async function handle(req: Request, env: Env): Promise<Response> {
   if (!/^[0-9a-f]{48}$/.test(tok)) return new Response("unauthorized", { status: 401 });
   const h = await sha256Hex(tok);
   const d = await rest(env, "pc_helper_device?select=id,works_user_id&revoked_at=is.null&token_hash=eq." + h);
-  const dev = d.ok ? (await d.json())[0] : null;
+  // 서버(DB) 확인이 잠깐 실패한 것은 "토큰이 틀림"(401)이 아니라 503 → 도우미가 꺼지지 않고 다시 시도
+  if (!d.ok) { await d.body?.cancel(); return new Response("retry", { status: 503 }); }
+  const dev = (await d.json())[0] ?? null;
   if (!dev) return new Response("unauthorized", { status: 401 });
   if (req.method === "POST") return report(req, env, dev.works_user_id);
   // 도우미 버전(?v=2 이상)만 방 찾기 일을 받는다. 옛 도우미는 받아도 처리 못 하므로 주지 않음

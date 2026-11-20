@@ -61,7 +61,7 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
     }
     // 2) 사건(의뢰인 이름) 목록
     //    의뢰인 칸 + 나의사건 피고인 목록(lw_case_detail.defendants) + 국선 관리표(gukseon_cases)의 피고인
-    const cs = await rest(env, "cases?select=l_num,l_code,charge_lawyer,raw->>l_client,raw->>l_accept_date&limit=5000", {}, fetcher) || [];
+    const cs = await rest(env, "case_all?select=l_num,l_code,charge_lawyer,raw->>l_client,raw->>l_accept_date&limit=5000", {}, fetcher) || [];
     const cases: CaseRow[] = cs.map((c: any) => ({ l_num: c.l_num, client: c.l_client || "", lawyer: c.charge_lawyer || "", extra: [], accept: String(c.l_accept_date || "").slice(0, 10) }));
     const byNum = new Map<number, CaseRow>(cases.map((c) => [c.l_num, c]));
     const byCode = new Map<string, CaseRow>();

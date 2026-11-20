@@ -1,5 +1,5 @@
 // 실행: deno test supabase/functions/case-view/shape_test.ts
-import { attachContract, attachFinalFiles, caseNoVariants, caseNosIn, cleanPhones, infoFields, mergeMeets, shapeCase, smsGist } from "./handler.ts";
+import { CONTRACT_RE, attachChatFiles, attachJudgment, attachContract, byDay, earliestAccept, attachFinalFiles, caseNoVariants, caseNosIn, cleanPhones, infoFields, mergeMeets, ourFilingTest, shapeCase, smsGist } from "./handler.ts";
 function assert(c: unknown, m: string) { if (!c) throw new Error(m); }
 
 Deno.test("사건번호 후보", () => {
@@ -64,7 +64,7 @@ Deno.test("계약서는 선임 줄에, 서면 후보에서는 빠짐", () => {
   const ev = [{ d: "2026-10-01", k: "ours", g: "accept", t: "사건 선임" }, { d: "2026-10-01", k: "ours", g: "ours", t: "의견서 제출", lp: 7 }];
   const files = [
     { id: 1, n: "위임계약서_홍길동.pdf", d: "2026-10-01", at: 3, pdf: 1, lp: null },
-    { id: 2, n: "의견서.hwp", d: "2026-10-01", at: 2, pdf: 0, lp: null },
+    { id: 2, n: "의견서.pdf", d: "2026-10-01", at: 2, pdf: 1, lp: null },
   ];
   attachFinalFiles(ev, files);
   attachContract(ev, files);
@@ -84,4 +84,185 @@ Deno.test("방 제목 사건번호: 2자리 연도도", () => {
   if (!a.includes("2026고단103412")) throw new Error(JSON.stringify(a));
   const b = caseNosIn("인천 2026고합100351");
   if (!b.includes("2026고합100351")) throw new Error(JSON.stringify(b));
+});
+
+import { mergeRoomEvents as _mre, roomGroup as _rg } from "./handler.ts";
+import { assertEquals } from "jsr:@std/assert@1";
+Deno.test("수사 단계 줄 색: 선임계·서면 초록, 조사 파랑, 송치 파랑 굵게, 정보공개청구는 흐린 줄", () => {
+  assertEquals(_rg("서면제출", "선임계 우편 제출"), "ours");
+  assertEquals(_rg("기타", "선임계 킥스 다시 제출, 수사관 확인"), "ours");
+  assertEquals(_rg("조사", "피의자 조사 참여 (인천광역시경찰청)"), "hearing");
+  assertEquals(_rg("송치", "검찰 송치"), "decision");
+  assertEquals(_rg("기타", "피신조서 정보공개 결과 받음"), "chat");
+  const sh: any = { today: "2026-11-16", events: [], hearings: [] };
+  _mre(sh, [
+    { id: 1, kind: "조사", ev_date: "2026-11-05", ev_time: "11:00", summary: "피의자 조사 참여", state: "완료" },
+    { id: 2, kind: "송치", ev_date: "2026-11-10", ev_time: "", summary: "검찰 송치", state: "완료" },
+    { id: 3, kind: "조사", ev_date: "2026-11-20", ev_time: "", summary: "피의자 2회 조사", state: "예정" },
+  ], "수사-1");
+  assertEquals(sh.events.map((e: any) => [e.g, e.k]), [["hearing", "done"], ["hearing", "ours"], ["hearing", "due"]]);
+  assertEquals(sh.hearings.length, 2);
+});
+
+import { fixAccept as _fa } from "./handler.ts";
+import { firstDate as _fd } from "./chat_import.ts";
+Deno.test("수사 사건 선임일: 방 첫날·가장 이른 업무 날로 당김, 로웨어 사건은 그대로", () => {
+  assertEquals(_fd("NAVER WORKS\n2026년 10월 7일 수요일\n13:20 원가을"), "2026-10-07");
+  const inv: any = { events: [
+    { d: "2026-11-16", k: "ours", g: "accept", t: "사건 선임" },
+    { d: "2026-10-07", k: "ours", g: "accept", src: "chat", t: "사건 선임" },
+    { d: "2026-10-08", k: "ours", g: "ours", src: "chat", t: "선임계 우편 제출" },
+  ] };
+  _fa(inv, true);
+  assertEquals(inv.events.filter((e: any) => e.g === "accept").map((e: any) => e.d), ["2026-10-07"]);
+  const law: any = { events: [
+    { d: "2026-10-07", k: "ours", g: "accept", t: "사건 선임" },
+    { d: "2026-10-01", k: "ours", g: "accept", src: "chat", t: "사건 선임" },
+  ] };
+  _fa(law, false);
+  assertEquals(law.events.map((e: any) => e.d), ["2026-10-07"]);
+});
+
+Deno.test("같은 방 이전 사건 선임일이 더 이르면 그날로", async () => {
+  const { earliestAccept } = await import("./handler.ts");
+  const shaped: any = { events: [{ d: "2026-10-01", k: "ours", g: "accept", t: "사건 선임" }, { d: "2026-10-05", k: "ours", g: "ours", t: "x" }] };
+  earliestAccept(shaped, [{ raw: { l_accept_date: "2026-06-03 00:00:00" } }, { raw: {} }]);
+  assertEquals(shaped.events[0].d, "2026-06-03");
+  const s2: any = { events: [] };
+  earliestAccept(s2, [{ raw: { l_accept_date: "2026-06-03" } }]);
+  assertEquals(s2.events[0].t, "사건 선임");
+});
+
+Deno.test("같은 날 사건 선임이 맨 위", () => {
+  const shaped: any = { today: "2026-11-16", events: [], hearings: [] };
+  shaped.events.push({ d: "2026-08-25", k: "ours", g: "ours", t: "선임계 우편 제출", src: "chat" });
+  shaped.events.push({ d: "2026-08-24", k: "done", g: "chat", t: "앞날" });
+  shaped.events.push({ d: "2026-08-25", k: "ours", g: "accept", t: "사건 선임" });
+  shaped.events.push({ d: "2026-08-25", k: "done", g: "chat", t: "기타" });
+  earliestAccept(shaped, []);
+  shaped.events.sort(byDay);
+  assertEquals(shaped.events.map((e: any) => e.t), ["앞날", "사건 선임", "선임계 우편 제출", "기타"]);
+});
+
+Deno.test("대화에서 뽑은 마감 줄은 기한 탭으로, 기일 탭에서는 뺀다", () => {
+  const shaped: any = { today: "2026-11-16", events: [], hearings: [], deadlines: [] };
+  _mre(shaped, [
+    { id: 1, kind: "기일", ev_date: "2026-12-06", ev_time: "", summary: "항고 마감일", state: "예정" },
+    { id: 2, kind: "지시", ev_date: "2026-11-16", ev_time: "", summary: "항고장 작성 지시 (서변호사)", state: "완료" },
+    { id: 3, kind: "조사", ev_date: "2026-12-01", ev_time: "14:00", summary: "피의자 조사", state: "예정" },
+  ], "");
+  assertEquals(shaped.deadlines.map((x: any) => [x.t, x.d, x.kind]), [["항고 마감일", "2026-12-06", "대화"]]);
+  assertEquals(shaped.hearings.map((h: any) => h.t), ["피의자 조사"]);
+  assertEquals(shaped.events.find((e: any) => e.rid === 1).g, "limit");
+});
+
+Deno.test("법원 기록에서 가려진 우리 이름(법OOOOOO)도 우리 서면으로 본다", () => {
+  const L = (d: string, set: string, c: string) => ({ lp_appoint_date: d, lp_set: set, lp_contents: c });
+  const t = ourFilingTest([
+    L("2026-07-29", "서면", "피고인1 변호인  법OOOOOO 항소이유서 제출"),   // 우리 선임 전 → 전 변호인
+    L("2026-08-04", "서면", "변호인  법무법인 정서 변호인선임계 제출"),
+    L("2026-08-21", "송달", "피고인1 변호인  법무법인 정서 공판기일통지서(변호인용) 발송"),
+    L("2026-09-29", "서면", "피고인1 변호인  법OOOOOO 변호인 의견서 제출"),
+    L("2026-10-12", "서면", "피고인2 변호인  법OOOOOOO 참고자료 제출"),
+    L("2026-10-13", "서면", "피고인2 변호인  법OOOOOO 의견서 제출"),
+  ]);
+  assertEquals([
+    "2026-07-29|피고인1 변호인  법OOOOOO 항소이유서 제출", "2026-08-04|변호인  법무법인 정서 변호인선임계 제출",
+    "2026-09-29|피고인1 변호인  법OOOOOO 변호인 의견서 제출", "2026-10-12|피고인2 변호인  법OOOOOOO 참고자료 제출",
+    "2026-10-13|피고인2 변호인  법OOOOOO 의견서 제출",
+  ].map((x) => t({ lp_set: "서면", lp_appoint_date: x.split("|")[0], lp_contents: x.split("|")[1] })), [false, true, true, false, false]);
+  // 맡은 자리를 모를 때: 선임 뒤 가려진 자리가 하나뿐이면 그 자리
+  const u = ourFilingTest([L("2026-11-02", "서면", "변호인  법무법인 정서 변호인선임계 제출"), L("2026-11-03", "서면", "피고인1 변호인  법OOOOOO 기일변경신청서 제출")]);
+  assertEquals(u(L("2026-11-03", "서면", "피고인1 변호인  법OOOOOO 기일변경신청서 제출")), true);
+});
+
+Deno.test("최종 서면: 제목이 비슷한 파일만, 중요하지 않은 제출·뺀 줄은 비움", () => {
+  // 2026고합100415 실제 사례(2026-11-18): 선임계·열람복사신청 같은 날 제출, 방엔 선임신고서·편지·계약서
+  const ev: any[] = [
+    { d: "2026-11-17", k: "ours", g: "ours", t: "변호인선임계 제출", lp: 75860 },
+    { d: "2026-11-17", k: "ours", g: "ours", t: "변호사 서고은 열람및복사신청 제출", lp: 75861 },
+    { d: "2026-11-20", k: "ours", g: "ours", t: "변호사 서고은 의견서 제출", lp: 9 },
+    { d: "2026-11-25", k: "ours", g: "ours", t: "보석허가청구서 제출", lp: 10 },
+  ];
+  const files = [
+    { id: 35, n: "이상한_변호인선임신고서_261117.pdf", d: "2026-11-17", at: 3, pdf: 1, lp: null },
+    { id: 26, n: "이상한_편지_261117.pdf", d: "2026-11-17", at: 2, pdf: 1, lp: null },
+    { id: 15, n: "(형사)송무위임계약서_이상한.pdf", d: "2026-11-16", at: 1, pdf: 1, lp: null },
+    { id: 40, n: "서고은_메모.pdf", d: "2026-11-20", at: 5, pdf: 1, lp: null },
+    { id: 41, n: "보석허가청구서_최종.pdf", d: "2026-11-24", at: 6, pdf: 1, lp: null },
+  ];
+  attachFinalFiles(ev, files, new Set(["10"]));
+  if (ev[0].f?.id !== 35) throw new Error("선임계 " + JSON.stringify(ev[0]));
+  if (ev[1].f || !ev[1].minor) throw new Error("열람복사에 파일 " + JSON.stringify(ev[1]));
+  if (ev[2].f) throw new Error("변호사 이름만 겹친 파일이 붙음 " + JSON.stringify(ev[2]));
+  if (ev[3].f) throw new Error("뺀 줄에 다시 붙음");
+});
+
+Deno.test("판결문은 선고 줄에, 수사 방 대화 줄엔 선임신고서", () => {
+  // 2026노952(2026-11-18): 판결등본 줄이 아니라 선고 줄 / 정상우 방: 대화 줄 "선임계 우편 제출"
+  const ev: any[] = [
+    { d: "2026-11-17", k: "ours", g: "hearing", t: "선고기일 · 319호 법정" },
+    { d: "2026-11-18", k: "ours", g: "ours", t: "판결등본", lp: 76064 },
+    { d: "2026-11-18", k: "ours", g: "ours", t: "선임계 우편 제출(연수서)", src: "chat" },
+    { d: "2026-11-18", k: "ours", g: "ours", t: "고소장 정보공개청구", src: "chat" },
+  ];
+  const files = [
+    { id: 89, n: "이향원_판결문_2026노952.pdf", d: "2026-11-18", at: 5, pdf: 1, lp: null },
+    { id: 49, n: "변호인선임신고서_정상우.pdf", d: "2026-11-18", at: 3, pdf: 1, lp: null },
+  ];
+  attachFinalFiles(ev, files);
+  attachJudgment(ev, files);
+  attachChatFiles(ev, files);
+  if (ev[0].f?.id !== 89) throw new Error("선고 줄 " + JSON.stringify(ev[0]));
+  if (ev[1].f) throw new Error("판결등본 줄에 붙음");
+  if (ev[2].f?.id !== 49) throw new Error("선임계 줄 " + JSON.stringify(ev[2]));
+  if (ev[3].f) throw new Error("정보공개청구 줄에 붙음");
+});
+
+Deno.test("불변기한 줄(이강효 2026-11-19): 접수통지 도달·국선 이유서 제출·제출된 마감도 타임라인에 남는다", () => {
+  const evs = [
+    { lp_set: "송달", lp_appoint_date: "2026-09-01", lp_contents: "피고인1 변호인  문OO 국선변호인선정결정/소송기록접수통지서 발송", lp_remark: "2026.09.03 송달됨", delivered_date: "2026-09-03" },
+    { lp_set: "송달", lp_appoint_date: "2026-09-01", lp_contents: "피고인1  인OOOO 국선변호인선정결정/소송기록접수통지서 발송", lp_remark: "2026.09.03 송달됨", delivered_date: "2026-09-03" },
+    { lp_set: "송달", lp_appoint_date: "2026-09-01", lp_contents: "검사  서울고등검찰청 소송기록접수통지서 발송", lp_remark: "2026.09.01 송달됨", delivered_date: "2026-09-01" },
+    { lp_set: "서면", lp_appoint_date: "2026-09-22", lp_contents: "피고인(항소인)의 변호인  문OO 항소이유서 제출" },
+  ];
+  const s: any = shapeCase({ l_num: 1, l_code: "2026노1", l_name: "x", raw: {} }, evs, { today: "2026-11-19", linked: [], myHearings: [], others: [] });
+  const t = s.events.map((e: any) => e.d + " " + e.t);
+  assertEquals(t.includes("2026-09-03 소송기록접수통지 도달 (피고인1)"), true);
+  assertEquals(t.includes("2026-09-22 항소이유서 제출 (피고인 변호인)"), true);
+  assertEquals(t.some((x: string) => x.startsWith("2026-09-01 소송기록")), false);
+  assertEquals(s.events.find((e: any) => e.g === "limit")?.cfa, "제출 9.22");
+});
+
+Deno.test("로웨어 다음 기일 칸에 날짜만 있으면 기일로 보지 않는다 (박큰별 2026-11-19)", () => {
+  const s: any = shapeCase({ l_num: 1, l_code: "2026노1", l_name: "x", raw: {}, next_date: "2026-11-19" }, [], { today: "2026-11-19", linked: [], myHearings: [], others: [] });
+  assertEquals(s.events.some((e: any) => /다음 기일/.test(e.t)), false);
+  const s2: any = shapeCase({ l_num: 1, l_code: "2026노1", l_name: "x", raw: {}, next_date: "2026-12-01", next_time: "10:00", next_contents: "공판기일" }, [], { today: "2026-11-19", linked: [], myHearings: [], others: [] });
+  assertEquals(s2.events.some((e: any) => /다음 기일/.test(e.t)), true);
+});
+
+Deno.test("공동피고인: 우리 피고인 번호의 통지·이유서만, 이름표는 전자소송 번호 그대로 (2026-11-20 석원)", () => {
+  const evs = [
+    { lp_set: "서면", lp_appoint_date: "2026-09-01", lp_contents: "피고인2 변호인  법무법인 정서 변호인선임계 제출" },
+    { lp_set: "송달", lp_appoint_date: "2026-09-02", lp_contents: "피고인1  인OOOO 소송기록접수통지서 발송", delivered_date: "2026-09-04" },
+    { lp_set: "송달", lp_appoint_date: "2026-09-02", lp_contents: "피고인1 변호인  김OO 소송기록접수통지서 발송", delivered_date: "2026-09-04" },
+    { lp_set: "송달", lp_appoint_date: "2026-09-02", lp_contents: "피고인2  인OOOO 소송기록접수통지서 발송", delivered_date: "2026-09-05" },
+    { lp_set: "송달", lp_appoint_date: "2026-09-02", lp_contents: "피고인2 변호인  법무법인 정서 소송기록접수통지서 발송", delivered_date: "2026-09-05" },
+    { lp_set: "서면", lp_appoint_date: "2026-09-20", lp_contents: "피고인1 변호인  김OO 항소이유서 제출" },
+  ];
+  const s: any = shapeCase({ l_num: 1, l_code: "2026노1", l_name: "x", raw: {} }, evs, { today: "2026-11-20", linked: [], myHearings: [], others: [] });
+  const t = s.events.filter((e: any) => e.g === "notice" || e.g === "filing").map((e: any) => e.d + " " + e.t);
+  assertEquals(t, ["2026-09-05 소송기록접수통지 도달 (피고인2·우리)"]);
+});
+
+Deno.test("계약서: 증거·첨부 파일은 계약서로 보지 않음, 공소장 부본 도달 줄 (2026-11-20 석원)", () => {
+  const ok = ["(형사)송무위임계약서_김재학.pdf", "위임계약서.pdf", "약정서_홍길동.pdf"].every((n) => CONTRACT_RE.test(n));
+  const no = ["증 제6호증. 최승한의 가처분 이의신청서, 부동산 매매약정서 및 매매예약증서.pdf", "첨부서류 2. 매매계약서 사본.pdf"].some((n) => CONTRACT_RE.test(n));
+  if (!ok || no) throw new Error("계약서 규칙 " + ok + " " + no);
+  const s = shapeCase({ l_code: "2026고단100", l_num: 1, raw: {} }, [
+    { lp_set: "송달", lp_appoint_date: "2026-03-01", lp_contents: "피고인 홍OO 공소장부본 송달", delivered_date: "2026-03-04", lp_num: 1 },
+    { lp_set: "송달", lp_appoint_date: "2026-05-01", lp_contents: "피고인 홍OO 공소장변경허가신청서부본 송달", delivered_date: "2026-05-03", lp_num: 2 },
+  ], { today: "2026-11-20", linked: [], myHearings: [] });
+  const g = s.events.filter((e: any) => /공소장/.test(e.t));
+  if (g.length !== 1 || g[0].d !== "2026-03-04" || g[0].g !== "notice") throw new Error(JSON.stringify(g));
 });
