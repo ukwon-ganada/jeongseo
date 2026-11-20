@@ -192,3 +192,13 @@ Deno.test("소속 변호사 개인 이름 송달도 우리 수신 (2026노9005: 
   ], "2026-06-01");
   assertEquals([dl[0].d, dl[0].st, dl[0].warn], ["2026-06-10", "open", undefined]);
 });
+
+Deno.test("선고 전에는 상소 기한을 알리지 않음: 잡힌 선고기일=예정, 연기·변론재개·결과 없음=없음", () => {
+  const n = (r: string, d = "2026-11-18") => computeDeadlines("2026고단9", [V(d, r)], "2026-11-20").filter((x) => x.kind === "항소");
+  assertEquals(computeDeadlines("2026고단9", [V("2026-11-27", "")], "2026-11-20").map((x) => x.st), ["expected"]);
+  assertEquals(n("변론재개").length, 0);
+  assertEquals(n("선고연기").length, 0);
+  assertEquals(n("기일변경").length, 0);
+  assertEquals(n("").length, 0);
+  assertEquals(n("판결선고").map((x) => x.st), ["open"]);
+});

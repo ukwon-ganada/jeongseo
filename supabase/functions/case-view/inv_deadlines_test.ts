@@ -106,3 +106,15 @@ Deno.test("AI가 판단한 제출 서류(filed)가 있으면 낱말 대신 그�
   // 다른 서류
   assertEquals(t({ kind: "서면제출", ev_date: "2026-11-21", state: "완료", summary: "이의신청서 제출", filed: "이의신청서" }).st, "open");
 });
+
+Deno.test("일어나기 전 처분은 기한을 만들지 않음: 예정 줄·미래 날짜·정보공개청구 줄", () => {
+  const T = "(형/고소)";
+  assertEquals(computeInvDeadlines([{ kind: "처분", ev_date: "2026-11-25", summary: "불송치 결정" }], T, "2026-11-20").length, 0);
+  assertEquals(computeInvDeadlines([{ kind: "처분", ev_date: "2026-11-18", summary: "불송치 결정", state: "예정" }], T, "2026-11-20").length, 0);
+  assertEquals(computeInvDeadlines([{ kind: "송치", ev_date: "2026-11-20", summary: "불송치 결정서 정보공개청구(경찰서)" }], T, "2026-11-20").length, 0);
+  const ok = computeInvDeadlines([
+    { kind: "처분", ev_date: "2026-11-05", summary: "불송치 결정" },
+    { kind: "송치", ev_date: "2026-11-20", summary: "불송치 결정서 정보공개청구(경찰서)" },
+  ], T, "2026-11-20");
+  assertEquals(ok.map((x) => [x.kind, x.d]), [["이의신청", "2027-02-05"]]);
+});

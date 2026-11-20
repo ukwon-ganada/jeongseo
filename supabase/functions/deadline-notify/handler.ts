@@ -122,15 +122,17 @@ export async function buildPlan(env: Env, today: string, fetcher: typeof fetch =
 
   // 5) 수사 단계 기한: 방 대화에서 뽑은 처분·통지 줄(room_event)로 방마다 계산 (사건 화면 applyInvDeadlines와 같음)
   const evRows = await restAll(env, `room_event?select=channel_id,l_num,kind,ev_date,summary,state,source,filed&hidden=eq.false&order=ev_date.asc`, fetcher);
-  const byChan = new Map<string, any[]>();
-  for (const r of evRows) if (r.channel_id) (byChan.get(r.channel_id) || byChan.set(r.channel_id, []).get(r.channel_id)!).push(r);
+  // 사건 화면(roomEvents)처럼 '이 방' 줄 + '이 사건(l_num)' 줄을 함께 본다. 대화 가져오기 줄은 방 없이 사건 번호로만 남는다
   const seen = new Set<string>();
   for (const r of rooms) {
-    if (seen.has(r.channel_id) || !byChan.has(r.channel_id)) continue;
+    if (seen.has(r.channel_id)) continue;
     seen.add(r.channel_id);
     const c = caseBy.get(Number(r.l_num));
     if (!c || nz(c.state) === "종결" || (nz(c.charge_lawyer) && !isTeamCase(c.charge_lawyer))) continue;
-    const dls = computeInvDeadlines(byChan.get(r.channel_id)!, nz(r.room_title), today).map(({ strip: _s, ...d }) => d as Deadline);
+    const nums = new Set(rooms.filter((x) => x.channel_id === r.channel_id && x.l_num).map((x) => Number(x.l_num)));
+    const mine = evRows.filter((e) => e.channel_id === r.channel_id || nums.has(Number(e.l_num)));
+    if (!mine.length) continue;
+    const dls = computeInvDeadlines(mine, nz(r.room_title), today).map(({ strip: _s, ...d }) => d as Deadline);
     if (!dls.length) continue;
     const shown = nz(r.case_no) && !/^수사-/.test(nz(c.l_code)) ? nz(c.l_code) : (nz(r.room_title).match(/\d{4}\s*형제\s*\d+|\d{4}-\d+/)?.[0] || nz(c.l_code));
     add(c, r, dls, shown);
