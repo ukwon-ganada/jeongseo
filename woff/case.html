@@ -391,7 +391,20 @@ function relogin(j){
   }
   throw new Error(inClient ? '웍스 로그인이 만료됐습니다. 웍스 앱을 완전히 종료했다가 다시 열어 주세요.' : '웍스 로그인이 만료됐습니다. 이 창을 닫고 다시 열어 주세요.');
 }
-function loadCase(key){ return api({action:'case', room:key.room||'', 'case':key['case']||''}); }
+function loadCase(key){ return api({action:'case', room:key.room||'', 'case':key['case']||''}).then(function(d){ ccPut(key, d); return d; }); }
+// 한 번 본 사건 화면은 이 기기에 기억해 두었다가 다음에 열 때 바로 그린다(같은 날만, 최근 12개). 새 자료는 뒤에서 받아 바뀐 게 있으면 바꿔 끼운다 (2026-11-20)
+var CC_KEY='jeongseo.caseCache.v1', CC_MAX=12;
+function kstDay(){ return new Date(Date.now()+9*3600e3).toISOString().slice(0,10); }
+function ccId(key){ return key.room ? 'r:'+key.room : key['case'] ? 'c:'+key['case'] : ''; }
+function ccAll(){ try{ return JSON.parse(localStorage.getItem(CC_KEY)||'{}')||{}; }catch(e){ return {}; } }
+function ccGet(key){ var e=ccAll()[ccId(key)]; return e && e.d && e.d.today===kstDay() ? e.d : null; }
+function ccPut(key, d){
+  var id=ccId(key); if(!id || !d || !((d.caseNo && d.events) || d.roomOnly)) return;
+  var all=ccAll(), c={}; for(var k in d) if(k!=='located') c[k]=d[k];
+  all[id]={t:Date.now(), d:c};
+  Object.keys(all).sort(function(a,b){ return all[b].t-all[a].t; }).slice(CC_MAX).forEach(function(k){ delete all[k]; });
+  try{ localStorage.setItem(CC_KEY, JSON.stringify(all)); }catch(e){ try{ localStorage.removeItem(CC_KEY); }catch(_){} }
+}
 function loadMyCases(){ return api({action:'mycases'}).then(function(j){ return j.cases||[]; }); }
 
 // ── 공통 ──────────────────────────────────────────────
@@ -1059,8 +1072,18 @@ function message(title, subText, body){
 function showHold(){ message('사건 미확정','', emptySt('이 방의 사건이 아직 정해지지 않았습니다')); }
 function showCase(key){
   ctx.key=key;
-  $('#sub').textContent='불러오는 중…';
-  return loadCase(key).then(function(d){ return showCaseData(key, d); }).catch(function(e){
+  var cached=ccGet(key), shown=cached ? JSON.stringify(cached) : '';
+  if(cached) showCaseData(key, cached); else $('#sub').textContent='불러오는 중…';
+  return loadCase(key).then(function(d){
+    if(cached){
+      // 그사이 다른 사건으로 옮겼거나 수정 중이면 덮지 않는다. 바뀐 게 없으면 다시 그리지 않는다
+      if(ctx.key!==key || editing || tl.on) return;
+      var f={}; for(var k in d) if(k!=='located') f[k]=d[k];
+      if(JSON.stringify(f)===shown) return;
+    }
+    return showCaseData(key, d);
+  }).catch(function(e){
+    if(cached) return;
     message('불러오지 못함', '', emptySt('잠시 뒤 다시 열어 주세요', esc((e&&e.message)||e)));
   });
 }
