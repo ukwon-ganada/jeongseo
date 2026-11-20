@@ -30,7 +30,12 @@ const HOLIDAYS = new Set([
 
 const nz = (v: unknown) => (v == null ? "" : String(v).trim());
 const isDate = (s: unknown) => /^\d{4}-\d{2}-\d{2}/.test(nz(s));
-const OUR_FIRM = /법무법인\s*정서/;
+// 우리 법인 수신 판별. 송달 기록에는 "피고인1 변호인 양선화"처럼 소속 변호사 개인 이름으로 오는 경우가 많다.
+// 퇴직자(우숭민)도 재직 중 받은 송달은 우리 수신이 맞다. 법원 기록 오타(우승민, 김흥일, 깅홍일)도 그대로 넣는다.
+// (사무실 PC extract_deadlines.py 명단을 옮김 + 서고은 팀 강현구·박종덕, 2026-11-20)
+const OUR_NAMES = ["서고은", "정필성", "김홍일", "김흥일", "깅홍일", "양선화", "손영우", "이예나", "우숭민", "우승민", "강현구", "박종덕"];
+const OUR_FIRM_ONLY = /법무법인\s*정서/;
+const OUR_FIRM = { test: (c: string) => OUR_FIRM_ONLY.test(c) || (/변호인|소송대리인/.test(c) && OUR_NAMES.some((n) => c.includes(n))) };
 const addDays = (d: string, n: number) => new Date(Date.parse(d + "T00:00:00Z") + n * 864e5).toISOString().slice(0, 10);
 const md = (d: string) => Number(d.slice(5, 7)) + "." + d.slice(8, 10);
 
@@ -99,7 +104,35 @@ export function isIndictCopy(e: any, ours: Set<string> | null = null): boolean {
   return toUs(c, ours);
 }
 
-export type Deadline = { t: string; d: string; why: string; st: "open" | "done" | "expected"; kind: string; doneOn?: string };
+export type Deadline = { t: string; d: string; why: string; st: "open" | "done" | "expected"; kind: string; doneOn?: string; hold?: string; warn?: string; who?: string };
+
+// ── 사무실 PC(extract_deadlines.py)에만 있던 규칙 (2026-11-20 일원화, 석원 "슈파베이스로 몰아 일원화") ──
+// 상소·이유서를 낼 주체가 아닌 지위. 피해자·고소인 사건에 항소이유서 기한을 붙이면 오판이다(형소법 361조의3①은 '항소인').
+export const NOT_APPELLANT = new Set(["피해자", "고소인", "피고소인", "고발인", "피고발인", "신청인", "참고인"]);
+// 공판기일이 실제로 '진행'된 결과. 이유서 문제는 이미 정리된 것이므로 기한을 더 울리지 않는다.
+const HEARING_HELD = /^(속행|변론종결|판결선고|심문종결|변론재개|종결)/;
+const TRIAL_DATE = /공판기일|변론기일/;
+const APPEAL_NOTICE = /(항소장|상고장)\s*접수통지/;
+
+// 피고인이 한 명뿐인가 — '피고인2' 같은 번호가 기록에 없으면 한 명이다.
+export function singleDefendant(evs: any[]): boolean {
+  return !(evs || []).some((e) => [...nz(e.lp_contents).matchAll(/피고인\s?(\d+)/g)].some((m) => Number(m[1]) >= 2));
+}
+
+// 이 서면이 우리 의뢰인 쪽 것인가 (검사·다른 피고인 것 제외).
+//  번호 없는 '변호인' → 우리 것. '피고인들' → 우리 것. 번호 없는 '피고인(항소인)의 변호인' → 피고인이 한 명일 때만.
+export function ourFiling(c: string, ours: Set<string> | null, single: boolean): boolean {
+  const t = nz(c);
+  if (/^\s*검사/.test(t)) return false;
+  // 서면 기록에서 우리 법인은 '법OOOOOO'로 가려진다. 다른 법무법인 이름이 그대로 보이면 남의 서면
+  if (/법무법인\s*[가-힣]/.test(t) && !OUR_FIRM.test(t)) return false;
+  if (!ours) return true;
+  const m = t.match(/피고인(들|\s?\d+)?/);
+  if (!m) return true;
+  if (m[1] === "들") return true;
+  if (!m[1]) return single;
+  return ours.has(m[1].trim());
+}
 
 // 병합 사건(규칙서 R21~R23, 석원 확정 2026-11-17): 같은 방의 다른 사건(주 사건)에 병합되면 이유서는 주 사건 기록에만 남는다.
 //  ① 다른 사건 기록에 "항소이유서(26-100177)"처럼 이 사건번호가 괄호로 붙은 이유서 줄 → 제출
@@ -133,15 +166,18 @@ export function mergedReason(code: string, from: string, others: OtherCase[]): {
   return { done: best, into };
 }
 
-export function computeDeadlines(code: string, evs: any[], today: string, others: OtherCase[] = []): Deadline[] {
+export function computeDeadlines(code: string, evs: any[], today: string, others: OtherCase[] = [], position = ""): Deadline[] {
   const top = courtStage(code);
   if (!top) return [];
+  if (NOT_APPELLANT.has(nz(position))) return []; // 우리 의뢰인이 피해자·고소인이면 상소·이유서 주체가 아니다
   const list = (evs || []).filter((e) => isDate(e.lp_appoint_date))
     .map((e) => ({ ...e, _d: nz(e.lp_appoint_date).slice(0, 10) }))
     .sort((a, b) => a._d.localeCompare(b._d) || (a.lp_num || 0) - (b.lp_num || 0));
   // 검사가 낸 항소장·이유서는 우리 제출이 아니다 (박큰별 1심: 검사 항소 11.04를 '제출'로 봄, 2026-11-19)
-  const filings = list.filter((e) => e.lp_set === "서면" && !/^\s*검사/.test(nz(e.lp_contents)));
   const ours = ourDefendants(list);
+  const single = singleDefendant(list);
+  // 공동피고인 사건에서 다른 피고인이 낸 이유서를 우리 제출로 보면 기한을 놓친다 → 우리 쪽 서면만
+  const filings = list.filter((e) => e.lp_set === "서면" && ourFiling(nz(e.lp_contents), ours, single));
 
   // 1) 선고(날짜별 하나)와 통지 묶음(선고 사이마다 한 묶음)을 시간 순서로
   type Item = { kind: "v"; d: string; future: boolean } | { kind: "n"; first: string; got: { d: string; who: string }[] };
@@ -194,11 +230,28 @@ export function computeDeadlines(code: string, evs: any[], today: string, others
       const first = it.got.slice().sort((a, b) => a.d.localeCompare(b.d))[0];
       const { due, moved } = dueDate(first.d, 20);
       const nextV = items.slice(i + 1).find((x) => x.kind === "v");
-      const done = filings.find((f) => f._d >= it.first && (!nextV || f._d <= nextV.d) && /이유서/.test(nz(f.lp_contents)) && !/연장|기간/.test(nz(f.lp_contents)));
+      const prevV = items.slice(0, i).reverse().find((x) => x.kind === "v") as { d: string } | undefined;
+      const inRound = (e: any) => e._d >= (prevV ? prevV.d : "0000") && (!nextV || e._d <= nextV.d);
+      // 통지 전에 미리 낸 이유서도 제출로 본다. 범위는 앞 선고 뒤부터
+      const done = filings.find((f) => inRound(f) && /이유서/.test(nz(f.lp_contents)) && !/연장|기간/.test(nz(f.lp_contents)));
       const mg = done ? {} : mergedReason(code, it.first, others);
       const doneOn = done?._d || mg.done;
+      // 이 심급이 종국(상고기각결정 등)으로 끝났으면 더 울리지 않는다(사무실 PC 규칙). 선고는 다음 상소 기한이 따로 잡힌다
+      const ended = doneOn ? undefined : list.find((e) => e.lp_set === "접수" && /종국/.test(nz(e.lp_contents)) && !/선고/.test(nz(e.lp_contents)) && e._d >= first.d && (!nextV || e._d <= nextV.d));
+      // 기산일 뒤 공판기일이 실제로 열렸으면 상소가 각하되지 않고 진행 중 → 더 울리지 않는다
+      const held = doneOn ? undefined : ended || list.find((e) => e.lp_set === "기일" && TRIAL_DATE.test(nz(e.lp_contents)) && HEARING_HELD.test(nz(e.lp_remark)) && e._d >= first.d && (!nextV || e._d <= nextV.d));
+      // 상소장접수통지는 '상대방'이 받는다. 우리 쪽만 받았으면 검사만 상소했을 수 있다(그러면 이유서 의무 없음)
+      const an = list.filter((e) => APPEAL_NOTICE.test(nz(e.lp_contents)) && inRound(e));
+      const prosOnly = an.length > 0 && !an.some((e) => /^\s*검사/.test(nz(e.lp_contents)));
+      // 검사만 상소 + 우리가 '항소이유에 대한 답변서'를 냈으면 우리는 피항소인 → 이유서 의무 없음
+      const answered = prosOnly && !doneOn ? filings.find((f) => inRound(f) && /이유에\s*대한\s*답변서/.test(nz(f.lp_contents))) : undefined;
+      // 상소장접수통지 기록이 없어도(로웨어에 하급심 줄이 빠진 사건) 우리가 '항소이유에 대한 답변서'만 냈으면 확인 필요로 표시
+      const answerOnly = !prosOnly && !doneOn && filings.some((f) => inRound(f) && /이유에\s*대한\s*답변서/.test(nz(f.lp_contents)));
+      const warn = answerOnly ? "우리는 '항소이유에 대한 답변서'만 냈습니다 — 검사만 상소했다면 이유서 제출 의무가 없습니다. 확인 필요" : prosOnly ? "상소장접수통지서가 우리 측에만 송달됨 — 검사만 상소했다면 이유서 제출 의무가 없습니다. 확인 필요"
+        : first.who !== "우리" && !it.got.some((g) => g.who === "우리") ? "우리 법인 수신 기록이 없어 의뢰인 수신일로 계산했습니다. 기간이 이미 진행 중일 수 있습니다" : undefined;
       out.push({
-        t: what + " 마감", d: due, kind: what, doneOn, st: doneOn ? "done" : "open",
+        t: what + " 마감", d: due, kind: what, doneOn, st: doneOn || held || answered ? "done" : "open", who: first.who,
+        hold: held ? (held === ended ? "종국 " + md(held._d) : "공판기일 진행 " + md(held._d)) : answered ? "검사만 상소 · 답변서 " + md(answered._d) : undefined, warn,
         why: "기록접수통지 도달 " + md(first.d) + "(" + first.who + ") + 20일" + (moved ? " (쉬는 날이라 다음 평일)" : "") +
           (mg.into ? " · " + mg.into + "에 병합됨" + (mg.done ? ", 그 사건에 제출 " + md(mg.done) : ", 그 사건에 제출") : ""),
       });
@@ -211,7 +264,7 @@ export function computeDeadlines(code: string, evs: any[], today: string, others
 export function deadlineEvents(dls: Deadline[], today: string) {
   // 제출이 끝난 기한도 지우지 않고 회색 "제출 m.d"로 남긴다 (2026-11-19 석원, 이강효 사건)
   return dls.filter((x) => x.d).map((x) => x.st === "done" ? {
-    d: x.d, k: "done", g: "limit", lim: 0, dk: x.kind, cfa: "제출" + (x.doneOn ? " " + md(x.doneOn) : ""),
+    d: x.d, k: "done", g: "limit", lim: 0, dk: x.kind, cfa: x.hold && !x.doneOn ? x.hold : "제출" + (x.doneOn ? " " + md(x.doneOn) : ""),
     t: x.t + " · " + x.why, f: null,
   } : {
     d: x.d, k: x.d >= today ? "due" : "done", g: "limit", lim: x.d >= today ? 1 : 0, dk: x.kind,
