@@ -43,7 +43,7 @@ const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 
 import { rankEvents } from "./timeline_rank.ts";
-import { applyConfirms, computeDeadlines, deadlineEvents, DL_ACTS, mergeRoles, type OtherCase } from "./deadlines.ts";
+import { applyConfirms, computeDeadlines, deadlineEvents, DL_ACTS, isNotice, mergeRoles, ourDefendants, type OtherCase } from "./deadlines.ts";
 import { findPick, normTitle } from "./title_match.ts";
 import { dropKnown, extractFromExport, msgsToExport, toRows } from "./chat_import.ts";
 import { shapeStages, diffStages, personChangeLine, isStage, noLines, chatNos, withChatNos, type NoHist } from "./stages.ts";
@@ -117,12 +117,11 @@ const OUR_FIRM = /법무법인\s*정서/;
 const MASKED = /^(\S*?)\s*(변호인|소송대리인)\s+법O{6}(?!O)/;
 const OUR_ROLE = /^(\S*?)\s*(변호인|소송대리인)\s+법무법인\s*정서/;
 const APPEAL_BRIEF = /(항소|상고)\s*(보충\s*)?이유서/;
-// 받는 사람·낸 사람: 로웨어 줄 앞머리("피고인1 변호인  문OO …", "피고인1  인OOO …")만 본다 (뒤의 '국선변호인선정결정' 같은 서류 이름에 속지 않게)
-function whoOf(c: string): string {
-  const head = c.split(/\s{2,}/)[0];
-  if (/변호인/.test(head)) return "변호인";
-  if (/피고인/.test(head)) return "피고인";
-  return "";
+// 낸 사람: 전자소송 앞머리 그대로("피고인2 변호인" → 피고인2 변호인, 우리 법인이면 우리)
+function filerOf(c: string): string {
+  if (OUR_FIRM.test(c)) return "우리";
+  const head = c.split(/\s{2,}/)[0].replace(/\(항소인\)|\(상고인\)|의/g, " ").replace(/\s+/g, " ").trim();
+  return head || "피고인";
 }
 export function ourFilingTest(list: any[]): (e: any) => boolean {
   const day = (e: any) => nz(e.lp_appoint_date).slice(0, 10);
@@ -197,6 +196,9 @@ export function shapeCase(c: any, evs: any[], opts: { today: string; linked: str
     .sort((a, b) => (a.lp_appoint_date + (a.lp_appoint_time || "")).localeCompare(b.lp_appoint_date + (b.lp_appoint_time || "")) || (a.lp_num || 0) - (b.lp_num || 0));
 
   const ours = ourFilingTest(list);
+  // 공동피고인 사건: 우리 법인이 붙은 줄의 피고인 번호 = 우리 의뢰인 (모르면 null → 모두)
+  const oursSet = ourDefendants(list);
+  const ourNo = (c: string) => { const m = c.match(/^피고인(\d+)/); return !m || !oursSet || oursSet.has(m[1]); };
   const toUs = (e: any) => e.lp_set === "송달" && OUR_FIRM.test(nz(e.lp_contents));
 
   // 타임라인 (석원 결정 2026-11-13): "우리가 이 사건에서 한 일·해야 할 일"만.
@@ -218,19 +220,20 @@ export function shapeCase(c: any, evs: any[], opts: { today: string; linked: str
       events.push({ d, k: future ? "due" : verdict ? "ours" : "done", g: "hearing", t: (future ? "" : verdict ? "" : "출석 ") + t, f: null });
     } else if (ours(e)) {
       events.push({ d, k: "ours", g: "ours", t: nz(e.lp_contents).replace(/^.*?(법무법인\s*정서|법O{6}(?!O))\s*/, "") || nz(e.lp_contents), f: null, lp: e.lp_num });
-    } else if (e.lp_set === "서면" && APPEAL_BRIEF.test(nz(e.lp_contents)) && !/^\s*검사/.test(nz(e.lp_contents))) {
+    } else if (e.lp_set === "서면" && APPEAL_BRIEF.test(nz(e.lp_contents)) && !/^\s*검사/.test(nz(e.lp_contents)) && ourNo(nz(e.lp_contents))) {
       // 불변기한 서면(항소·상고이유서)은 국선·피고인이 낸 것도 남긴다 (2026-11-19 석원, 이강효 사건)
-      events.push({ d, k: "done", g: "filing", w: 2, t: (nz(e.lp_contents).match(APPEAL_BRIEF) || [""])[0].replace(/\s+/g, "") + " 제출 (" + whoOf(nz(e.lp_contents)) + ")", f: null });
+      events.push({ d, k: "done", g: "filing", w: 2, t: (nz(e.lp_contents).match(APPEAL_BRIEF) || [""])[0].replace(/\s+/g, "") + " 제출 (" + filerOf(nz(e.lp_contents)) + ")", f: null });
     }
   }
-  // 소송기록접수통지 도달: 이유서 기한의 기산점이라 누구에게 도달했든 남긴다 (검사 제외, 같은 날은 한 줄)
+  // 소송기록접수통지 도달: 이유서 기한의 기산점. 기한 계산과 같은 기준(우리 피고인 본인·우리 법인)만, 같은 날은 한 줄
+  //   이름표는 전자소송 번호 그대로 [피고인2] [우리] (2026-11-20 석원)
   const notice = new Map<string, Set<string>>();
   for (const e of list) {
     const c = nz(e.lp_contents);
-    if (e.lp_set !== "송달" || !/소송기록접수통지/.test(c) || /^\s*검사/.test(c)) continue;
+    if (!isNotice(e, oursSet)) continue;
     const dd = isDate(e.delivered_date) ? nz(e.delivered_date).slice(0, 10) : ((nz(e.lp_remark).match(/(\d{4})\.(\d{2})\.(\d{2})\s*송달됨/) || []).slice(1, 4).join("-"));
     if (!isDate(dd)) continue;
-    (notice.get(dd) || notice.set(dd, new Set()).get(dd)!).add(OUR_FIRM.test(c) ? "우리" : whoOf(c) || "피고인");
+    (notice.get(dd) || notice.set(dd, new Set()).get(dd)!).add(OUR_FIRM.test(c) ? "우리" : (c.match(/^피고인\d*/) || ["피고인"])[0]);
   }
   for (const [d, who] of notice) events.push({ d, k: "done", g: "notice", w: 2, t: "소송기록접수통지 도달 (" + [...who].join("·") + ")", f: null });
   // 의뢰인에게 안내 문자를 보냈는지만 (석원 2026-11-16: 내용은 불필요). 같은 날 여러 통이어도 한 줄.
