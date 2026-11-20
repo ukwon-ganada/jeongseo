@@ -30,10 +30,15 @@ type Rule = { side?: "suspect"; key: string; t: string; days?: number; months?: 
 type Ev = { key: string; d: string; manual: boolean; notice: boolean; label: string };
 
 // 처분 줄 → 생기는 기한들
-function eventOf(r: any): { key: string; label: string } | null {
+function eventOf(r: any, today = ""): { key: string; label: string } | null {
+  // 기준 사건이 실제로 일어난 뒤에만 기한을 만든다(석원 2026-11-20 "이벤트 발생 전에 미리 계산된 기한 안내는 하면 안 된다")
+  //  → '예정' 줄, 오늘 이후 날짜 줄은 처분으로 보지 않는다
+  if (nz(r.state) === "예정" || (today && nz(r.ev_date).slice(0, 10) > today)) return null;
   // 괄호 속 메모("(재정신청 마감 11/23)" 등)는 처분 종류 판단에서 뺀다
   const s = nz(r.summary).replace(/\([^)]*\)/g, " ");
   if (r.kind === "지시" || /예정|지시|이유서|신청서|항고장|제출|작성/.test(s)) return null;
+  // 결정서 정보공개청구·열람복사처럼 처분 '뒤'의 일은 처분이 아니다(늦은 날로 잡히면 기한이 늦어져 위험)
+  if (/정보\s*공개|열람|등사|복사/.test(s)) return null;
   if (/재정신청\s*(이|은|에\s*대한)?\s*기각/.test(s)) return { key: "jaejeong_reject", label: "재정신청 기각" };
   if (/항고\s*(이|은|에\s*대한)?\s*기각/.test(s)) return { key: "hanggo_reject", label: "항고 기각" };
   if (/약식\s*명령/.test(s) && !/청구|기소|정식/.test(s)) return { key: "yaksik", label: "약식명령" };
@@ -84,7 +89,7 @@ export function computeInvDeadlines(rows: any[], title: string, today: string): 
   const role = clientRole(title);
   const evs: Ev[] = [];
   for (const r of rows || []) {
-    const e = eventOf(r);
+    const e = eventOf(r, today);
     const d = nz(r.ev_date).slice(0, 10);
     if (!e || !/^\d{4}-\d{2}-\d{2}$/.test(d)) continue;
     evs.push({ key: e.key, d, manual: r.source === "manual", notice: /통지|수령|받|도달|송달/.test(nz(r.summary)), label: e.label });

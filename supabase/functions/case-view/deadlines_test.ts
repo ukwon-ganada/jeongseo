@@ -123,3 +123,82 @@ Deno.test("검사 항소장은 우리 항소 제출로 보지 않는다 (박큰�
   const d = computeDeadlines("2025고단1888", evs, "2026-11-19").find((x) => x.kind === "항소")!;
   assertEquals([d.st, d.doneOn], ["open", undefined]);
 });
+
+// ── 사무실 PC 규칙 옮기기 (2026-11-20 일원화) ──
+Deno.test("피해자·고소인 사건은 상소·이유서 기한 없음", () => {
+  const evs = [V("2026-10-29"), S("2026-11-10", "피고인1  인OO 소송기록접수통지서 발송", "2026-11-10")];
+  assertEquals(computeDeadlines("2026노1", evs, "2026-11-13", [], "피해자").length, 0);
+  assertEquals(computeDeadlines("2026노1", evs, "2026-11-13", [], "피고인").length, 2);
+});
+
+Deno.test("공동피고인: 다른 피고인이 낸 이유서는 우리 제출이 아님, 번호 없는 '피고인' 서면은 1명일 때만", () => {
+  const base = [
+    S("2026-11-02", "피고인2 변호인  법무법인 정서 소송기록접수통지서 발송", "2026-11-03"),
+    S("2026-11-02", "피고인1  김OO 소송기록접수통지서 발송", "2026-11-03"),
+  ];
+  const other = computeDeadlines("2026노7", [...base, F("2026-11-10", "피고인1 변호인  김OO 항소이유서 제출")], "2026-11-13");
+  assertEquals(other[0].st, "open");
+  const unnumbered = computeDeadlines("2026노7", [...base, F("2026-11-10", "피고인(항소인)의 변호인  문OO 항소이유서 제출")], "2026-11-13");
+  assertEquals(unnumbered[0].st, "open");
+  const mine = computeDeadlines("2026노7", [...base, F("2026-11-10", "피고인2 변호인  법OOOOOO 항소이유서 제출")], "2026-11-13");
+  assertEquals(mine[0].st, "done");
+  const solo = computeDeadlines("2026노8", [
+    S("2026-11-02", "피고인  김OO 소송기록접수통지서 발송", "2026-11-03"),
+    F("2026-11-10", "피고인(항소인)의 변호인  문OO 항소이유서 제출"),
+  ], "2026-11-13");
+  assertEquals(solo[0].st, "done");
+});
+
+Deno.test("기산 뒤 공판기일이 열렸으면 보류(2026노9006처럼)", () => {
+  const dl = computeDeadlines("2026노9006", [
+    S("2026-09-01", "피고인1 변호인  법무법인 정서 소송기록접수통지서 발송", "2026-09-02"),
+    { lp_set: "기일", lp_appoint_date: "2026-10-23", lp_contents: "공판기일(본관 325호)", lp_remark: "속행" },
+  ], "2026-11-13");
+  assertEquals([dl[0].st, dl[0].hold], ["done", "공판기일 진행 10.23"]);
+});
+
+Deno.test("상소장접수통지가 우리 쪽에만 → 검사만 상소 경고, 우리 법인 수신 없음 → 경고 (2026노9004)", () => {
+  const dl = computeDeadlines("2026노9004", [
+    { lp_set: "접수", lp_appoint_date: "2026-10-01", lp_contents: "피고인 김OO 종국 : 선고" },
+    F("2026-10-08", "검사  박OO 항소장 제출"),
+    S("2026-10-12", "피고인1  김OO 항소장접수통지서 발송", "2026-10-15"),
+    S("2026-10-15", "피고인1  김OO 국선변호인선정결정/소송기록접수통지서/항소이유서/피고인소환장 발송", "2026-10-20"),
+    S("2026-10-19", "피고인1 변호인  법무법인 정서 소송기록접수통지서/항소이유서/전자소송안내문 발송", "2026-10-21"),
+  ], "2026-11-13");
+  const r = dl.find((x) => x.kind === "항소이유서")!;
+  assertEquals([r.d, r.st, /검사만/.test(r.warn || "")], ["2026-11-09", "open", true]);
+  const ans = computeDeadlines("2026노9004", [
+    F("2026-10-08", "검사  박OO 항소장 제출"),
+    S("2026-10-12", "피고인1  김OO 항소장접수통지서 발송", "2026-10-15"),
+    S("2026-10-19", "피고인1 변호인  법무법인 정서 소송기록접수통지서/항소이유서/전자소송안내문 발송", "2026-10-21"),
+    F("2026-10-27", "피고인1 변호인  법OOOOOO 항소이유에 대한 답변서 제출"),
+  ], "2026-11-13").find((x) => x.kind === "항소이유서")!;
+  assertEquals([ans.st, ans.hold], ["done", "검사만 상소 · 답변서 10.27"]);
+  const noNotice = computeDeadlines("2026노9004", [
+    S("2026-10-19", "피고인1 변호인  법무법인 정서 소송기록접수통지서/항소이유서/전자소송안내문 발송", "2026-10-21"),
+    F("2026-10-27", "피고인1 변호인  법OOOOOO 항소이유에 대한 답변서 제출"),
+  ], "2026-11-13").find((x) => x.kind === "항소이유서")!;
+  assertEquals([noNotice.st, /답변서/.test(noNotice.warn || "")], ["open", true]);
+  const r2 = computeDeadlines("2026노9", [S("2026-11-02", "피고인  김OO 소송기록접수통지서 발송", "2026-11-03")], "2026-11-13")[0];
+  assertEquals(/우리 법인 수신 기록이 없/.test(r2.warn || ""), true);
+});
+
+Deno.test("소속 변호사 개인 이름 송달도 우리 수신 (2026노9005: 피고인2 변호인 양선화 → 피고인2만 우리 의뢰인)", () => {
+  const dl = computeDeadlines("2026노9005", [
+    S("2026-05-14", "피고인1  정OO 소송기록접수통지서/국선변호인선정고지 발송", "2026-05-18"),
+    S("2026-05-19", "피고인2  인OO 소송기록접수통지서 발송", "2026-05-21"),
+    S("2026-05-19", "피고인2 변호인  양선화 소송기록접수통지서 발송", "2026-05-21"),
+    F("2026-06-05", "변호인  법무법인 갑을 항소이유서 제출"),
+  ], "2026-06-01");
+  assertEquals([dl[0].d, dl[0].st, dl[0].warn], ["2026-06-10", "open", undefined]);
+});
+
+Deno.test("선고 전에는 상소 기한을 알리지 않음: 잡힌 선고기일=예정, 연기·변론재개·결과 없음=없음", () => {
+  const n = (r: string, d = "2026-11-18") => computeDeadlines("2026고단9", [V(d, r)], "2026-11-20").filter((x) => x.kind === "항소");
+  assertEquals(computeDeadlines("2026고단9", [V("2026-11-27", "")], "2026-11-20").map((x) => x.st), ["expected"]);
+  assertEquals(n("변론재개").length, 0);
+  assertEquals(n("선고연기").length, 0);
+  assertEquals(n("기일변경").length, 0);
+  assertEquals(n("").length, 0);
+  assertEquals(n("판결선고").map((x) => x.st), ["open"]);
+});
