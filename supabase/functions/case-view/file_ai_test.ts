@@ -38,9 +38,9 @@ Deno.test("AI가 고른 줄에 붙이고, 판단은 기억해서 다시 묻지 �
       const body = JSON.parse(init.body);
       assert(body.model === "claude-haiku-5-5", "모델");
       const msg = body.messages[0].content as string;
-      assert(!msg.includes("계약서"), "계약서는 AI에 안 보냄");
+      assert(asked > 1 || msg.includes("위임계약서"), "계약서도 AI가 판단(2026-11-20)");
       // L1 선고, L2 판결등본, L3 우편 제출 / F1 판결문, F2 선임신고서, F3 편지
-      const picks = [{ file: "F1", line: "L1", why: "판결문" }, { file: "F2", line: "L3", why: "선임신고서 우편 제출" }, { file: "F3", line: null, why: "편지" }];
+      const picks = [{ file: "F1", line: "L1", why: "판결문" }, { file: "F2", line: "L3", why: "선임신고서 우편 제출" }, { file: "F3", line: null, why: "편지" }, { file: "F4", line: null, why: "선임 줄 없음" }];
       return Response.json({ content: [{ type: "text", text: JSON.stringify({ picks }) }], stop_reason: "end_turn" });
     }
     throw new Error("예상 못한 요청 " + u);
@@ -48,7 +48,7 @@ Deno.test("AI가 고른 줄에 붙이고, 판단은 기억해서 다시 묻지 �
   const e1 = ev();
   assert(await attachByAI(env, e1, files, ["ch"], "사건", fetcher), "실패");
   assert(e1[0].f?.id === 89 && e1[3].f?.id === 49 && !e1[1].f && !e1[2].f, JSON.stringify(e1.map((e) => e.f)));
-  assert(saved.length === 3 && saved.find((r) => r.file_id === 27).line_key === null, "안 붙은 것도 기록");
+  assert(saved.length === 4 && saved.find((r) => r.file_id === 27).line_key === null, "안 붙은 것도 기록");
   const e2 = ev();
   await attachByAI(env, e2, files, ["ch"], "사건", fetcher);
   assert(asked === 1, "다시 물음 " + asked);
@@ -162,7 +162,7 @@ Deno.test("화면을 연 사람은 AI를 기다리지 않는다: 뒤에서 묻�
     if (u.includes("/room_msg")) return Response.json([]);
     if (u.includes("anthropic.com")) {
       asked++; await gate;
-      const picks = [{ file: "F1", line: "L1", why: "판결문" }, { file: "F2", line: null, why: "" }, { file: "F3", line: null, why: "" }];
+      const picks = [{ file: "F1", line: "L1", why: "판결문" }, { file: "F2", line: null, why: "" }, { file: "F3", line: null, why: "" }, { file: "F4", line: null, why: "" }];
       return Response.json({ content: [{ type: "text", text: JSON.stringify({ picks }) }], stop_reason: "end_turn" });
     }
     throw new Error("예상 못한 요청 " + u);
@@ -173,7 +173,7 @@ Deno.test("화면을 연 사람은 AI를 기다리지 않는다: 뒤에서 묻�
   assert(!e1[0].f, "AI 답 전에는 안 붙음");
   assert(jobs.length === 1 && saved.length === 0, "뒤에서 할 일 하나, 아직 저장 전");
   release(); await Promise.all(jobs);
-  assert(asked === 1 && saved.length === 3, "뒤에서 물어 저장");
+  assert(asked === 1 && saved.length === 4, "뒤에서 물어 저장");
   const e2 = ev();
   await attachByAI(env, e2, files, ["ch"], "사건", fetcher, (p) => jobs.push(p));
   assert(e2[0].f?.id === 89 && asked === 1 && jobs.length === 1, "다음 열 때 붙고 다시 안 물음");
@@ -190,4 +190,14 @@ Deno.test("받은 중요 문서(2026-11-20 석원): 공소장 줄, 처분 통지
   const old = { id: 1, n: "문승현_2025노1790_판결문.pdf", d: "2026-11-18", tm: "10:00", at: 1, pdf: 1 };
   const p = buildPrompt("사건", lines, [old], []);
   assert(p.user.includes("2025-06-10") && p.user.includes("받은 문서"), p.user);
+});
+
+Deno.test("계약서도 AI가: 사건 선임 줄을 고르면 계약서 자리(cf)에 붙음 (2026-11-20 석원)", () => {
+  const e: any[] = [{ d: "2026-11-01", k: "ours", g: "accept", t: "사건 선임" }, { d: "2026-11-02", k: "ours", g: "ours", t: "의견서", lp: 3 }];
+  const lines = candidateLines(e, /열람/);
+  assert(lines.some((x) => x.g === "accept"), "선임 줄이 후보에 없음");
+  const fs = [{ id: 5, n: "(형사)송무위임계약서_홍길동.pdf", d: "2026-11-01", at: 1, pdf: 1, lp: null }];
+  applyMatches(e, fs, new Map([[5, { file_id: 5, line_key: lineKey(e[0]), sig: "" }]]), lines);
+  assert(e[0].cf?.id === 5 && !e[0].f, JSON.stringify(e[0]));
+  assert(buildPrompt("사건", lines, fs, []).user.includes("[사건 선임]"), "선임 줄 이름");
 });

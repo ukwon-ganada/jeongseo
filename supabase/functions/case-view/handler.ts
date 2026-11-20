@@ -602,7 +602,8 @@ export async function attachByAI(env: Env, events: any[], files: any[], chans: s
   if (!env.anthropicKey) return false;
   // 자동 후보는 PDF만(2026-11-19 석원: 한글 파일은 초안, 최종 제출본은 PDF). 한글·워드는 AI에 참고로만
   const all = files.filter((f) => DOC_RE.test(nz(f.n)) || f.pdf);
-  const docs = all.filter((f) => isPdf(f) && f.lp == null && !CONTRACT_RE.test(f.n));
+  // 계약서도 AI가 사건 선임 줄에 붙일지 고른다(2026-11-20 석원: 이름 규칙으론 예외를 못 잡음)
+  const docs = all.filter((f) => isPdf(f) && f.lp == null);
   if (!docs.length) return true;
   const lines = candidateLines(events, MINOR_RE);
   const rows = known ?? await rest(env, `case_file_match?select=file_id,line_key,sig&file_id=in.(${docs.map((f) => Number(f.id)).join(",")})`, {}, fetcher);
@@ -954,7 +955,6 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       const noneRows = fast ? (B.none || []).map((n: any) => ({ lp_num: n })) : ourLps.length ? await rest(env, `case_file_none?select=lp_num&lp_num=in.(${ourLps.join(",")})`, {}, fetcher).catch(() => []) : [];
       const noneSet = new Set<string>((noneRows || []).map((r: any) => String(r.lp_num)));
       attachFinalFiles(shaped.events, files, noneSet, false);
-      attachContract(shaped.events, files);
       mergeRoomEvents(shaped, chat, c.l_code);
       // 파일을 붙일 줄은 AI가 고른다(2026-11-18 석원). AI를 못 쓰면 예전 이름 규칙으로
       //   화면을 연 사람은 AI를 기다리지 않는다(2026-11-20): 기억된 판단만 붙이고, 새로 물을 것은 응답 뒤에 묻는다.
@@ -964,6 +964,7 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       if (!aiOk) {
         for (const e of shaped.events) if (e.f?.ai) e.f = null;
         attachFinalFiles(shaped.events, files, noneSet, true);
+        attachContract(shaped.events, files);
         attachJudgment(shaped.events, files);
         attachChatFiles(shaped.events, files);
       }
