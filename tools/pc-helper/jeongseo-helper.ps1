@@ -1,4 +1,8 @@
 ﻿# 정서 사건 도우미 — 사건방 "이 방 사건 보기"를 누르면 이 PC 브라우저에 사건 화면을 연다.
+# v2.4: 웍스에서 ≡ 메뉴를 누르는 순간(웍스 작은 창이 새로 뜸, 웍스가 맨 앞) 웍스 창 위쪽을 화면 그대로 찍어 둔다.
+#       사건 화면이 방을 물으면 그 그림을 먼저 읽고(브라우저에 가려지기 전 모습), 안 되면 예전처럼 찍어서 읽는다.
+#       (그때 화면을 다시 찍지는 않는다: 브라우저가 앞에 있어 다른 글자를 읽을 수 있음) 읽은 방법·못 읽은 이유를 함께 보낸다
+#       (웍스는 창 안 글자를 윈도우에 알려 주지 않아 직접 읽기는 불가: 2026-11-13·11-20 시험)
 # v2.3: 스스로 업데이트(6시간마다 GitHub의 version.txt 확인, 지문(SHA-256)이 맞을 때만 바꿔 끼움)
 # v2.2: 절전·네트워크 끊김·서버 오류가 있어도 꺼지지 않고 계속 다시 연결(401이어도 5분 뒤 다시 시도)
 # v2.1: 따로 띄운 대화방 창도 찾음(창 제목=방 이름), 메인 창이 숨어 있어도 찾음
@@ -7,7 +11,7 @@
 # 화면 없이 뒤에서 돈다. 설정: %APPDATA%\JeongseoHelper\config.json (설치 때 만들어짐)
 # 끄기: 작업 관리자 > powershell(정서 사건 도우미) 끝내기, 또는 uninstall.cmd
 $ErrorActionPreference = 'Stop'
-$HelperVersion = '2.3'
+$HelperVersion = '2.4'
 $dir = Join-Path $env:APPDATA 'JeongseoHelper'
 $cfg = Get-Content (Join-Path $dir 'config.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 $log = Join-Path $dir 'helper.log'
@@ -54,6 +58,12 @@ public static class JsWin {
     using (var g = Graphics.FromImage(b)) { var dc = g.GetHdc(); PrintWindow(h, dc, 2); g.ReleaseHdc(dc); }
     return b;
   }
+  // 위쪽 띠가 한 가지 색뿐이면 빈 그림
+  public static bool Blank(Bitmap b, int h) {
+    var c0 = b.GetPixel(0, 0); int n = 0;
+    for (int y = 0; y < h; y += 3) for (int x = 0; x < b.Width; x += 7) { if (b.GetPixel(x, y) != c0) { n++; if (n > 20) return false; } }
+    return true;
+  }
 }
 "@
   [void][JsWin]::SetProcessDPIAware()
@@ -65,7 +75,6 @@ public static class JsWin {
     $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation`1' })[0]
   $script:engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromLanguage((New-Object Windows.Globalization.Language 'ko'))
   if (-not $script:engine) { $script:engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages() }
-  if (-not $script:engine) { throw '한국어 글자 인식 없음' }
   $script:ocrReady = $true
 }
 function Await($op, [Type]$t) {
@@ -74,7 +83,74 @@ function Await($op, [Type]$t) {
   while (-not $task.IsCompleted) { Start-Sleep -Milliseconds 20; if ($sw.ElapsedMilliseconds -gt 8000) { throw '글자 인식 응답 없음' } }
   $task.Result
 }
-# 웍스 메인 창 위쪽 18%를 찍어 읽고, 방 제목 띠(왼쪽 20% 이후, 위 12% 안)의 줄만 돌려준다
+# ── ≡ 메뉴 지켜보기 (따로 준비: 여기서 문제가 나도 예전 방식은 그대로 돈다) ─────
+$script:menuOn = $false
+function Start-MenuWatch {
+  try {
+    Add-Type -ReferencedAssemblies System.Drawing -TypeDefinition @"
+using System; using System.Drawing; using System.Runtime.InteropServices; using System.Collections.Generic; using System.Threading;
+public static class MenuWatch {
+  [StructLayout(LayoutKind.Sequential)] public struct RECT { public int L, T, R, B; }
+  [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr h, out RECT r);
+  [DllImport("user32.dll")] static extern bool IsIconic(IntPtr h);
+  [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
+  [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr h, System.Text.StringBuilder s, int n);
+  delegate bool EnumProc(IntPtr h, IntPtr l);
+  [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc f, IntPtr l);
+  static Bitmap last; static DateTime lastAt; static readonly object lk = new object(); static bool started;
+  public static string LastError = "";
+  static string Title(IntPtr h) { var sb = new System.Text.StringBuilder(64); GetWindowText(h, sb, 64); return sb.ToString(); }
+  static uint Pid(IntPtr h) { uint p; GetWindowThreadProcessId(h, out p); return p; }
+  public static void Start() {
+    if (started) return; started = true;
+    var t = new Thread(Loop); t.IsBackground = true; t.Priority = ThreadPriority.BelowNormal; t.Start();
+  }
+  static void Loop() {
+    var seen = new HashSet<IntPtr>(); bool first = true;
+    while (true) {
+      try {
+        Thread.Sleep(150);
+        var wins = new List<IntPtr>();
+        EnumWindows(delegate (IntPtr h, IntPtr l) { wins.Add(h); return true; }, IntPtr.Zero);
+        var pids = new HashSet<uint>();
+        foreach (var w in wins) if (Title(w) == "WORKS") pids.Add(Pid(w));
+        if (pids.Count == 0) { seen.Clear(); first = true; continue; }
+        var now = new HashSet<IntPtr>(); IntPtr main = IntPtr.Zero; bool fresh = false;
+        foreach (var w in wins) {
+          if (!IsWindowVisible(w) || !pids.Contains(Pid(w))) continue;
+          now.Add(w);
+          RECT r; GetWindowRect(w, out r); int ww = r.R - r.L, hh = r.B - r.T;
+          if (main == IntPtr.Zero && Title(w) == "WORKS" && !IsIconic(w) && ww >= 300 && hh >= 150) main = w;
+          if (!first && !seen.Contains(w) && ww < 500 && hh < 500) fresh = true;
+        }
+        seen = now; first = false;
+        if (!fresh || main == IntPtr.Zero) continue;
+        var fg = GetForegroundWindow();
+        if (fg == IntPtr.Zero || !pids.Contains(Pid(fg))) continue;
+        RECT m; GetWindowRect(main, out m);
+        var b = new Bitmap(Math.Max(1, m.R - m.L), Math.Max(1, m.B - m.T));
+        using (var g = Graphics.FromImage(b)) { g.CopyFromScreen(m.L, m.T, 0, 0, b.Size); }
+        lock (lk) { if (last != null) last.Dispose(); last = b; lastAt = DateTime.UtcNow; }
+      } catch (Exception e) { LastError = e.Message; }
+    }
+  }
+  // maxAgeMs 안에 찍어 둔 그림의 복사본 (없으면 null)
+  public static Bitmap Take(int maxAgeMs) {
+    lock (lk) {
+      if (last == null || (DateTime.UtcNow - lastAt).TotalMilliseconds > maxAgeMs) return null;
+      return (Bitmap)last.Clone();
+    }
+  }
+}
+"@
+    [MenuWatch]::Start()
+    $script:menuOn = $true
+  } catch { Write-Log "메뉴 지켜보기 준비 실패: $($_.Exception.Message)" }
+}
+
+# 웍스 창의 방 제목 줄을 돌려준다: ≡ 누른 순간 찍어 둔 그림 → 지금 찍어서 읽기(PrintWindow)
 function Read-WorksRoomTitle {
   Initialize-Ocr
   # 웍스 프로그램 찾기: 'WORKS' 제목 창(숨어 있어도)의 프로세스, 없으면 이름에 works 가 든 프로세스
@@ -98,16 +174,37 @@ function Read-WorksRoomTitle {
   }
   if ($h -eq [IntPtr]::Zero) { throw '보이는 웍스 창 없음' }
   # 대화방을 따로 띄운 창은 창 제목이 곧 방 이름 → 글자 인식 없이 바로
-  if ($title -ne 'WORKS') { return ,@(@{ x = 30; y = 5; t = $title }) }
+  if ($title -ne 'WORKS') { $script:via = 'title'; return ,@(@{ x = 30; y = 5; t = $title }) }
+  if (-not $script:engine) { throw '한국어 글자 인식 없음' }
+  $why = @()
+  # ≡ 누른 순간 찍어 둔 그림(10초 안: 다른 방 그림을 잘못 쓰지 않게 짧게)이 있으면 그것부터
+  $mb = $null
+  if ($script:menuOn) { $mb = [MenuWatch]::Take(10000) }
+  if ($mb) {
+    try { $out = Read-ByOcr $mb; if ($out.Count) { $script:via = 'menu'; return ,$out }; $why += 'menu 0줄' } finally { $mb.Dispose() }
+  } else { $why += 'menu 없음' }
   $full = [JsWin]::Capture($h)
   try {
-    $cropH = [int]($full.Height * 0.18)
-    $crop = New-Object Drawing.Bitmap ($full.Width * 2), ($cropH * 2)
-    $g = [Drawing.Graphics]::FromImage($crop)
-    $g.InterpolationMode = 'HighQualityBicubic'
-    $g.DrawImage($full, (New-Object Drawing.Rectangle 0, 0, $crop.Width, $crop.Height), (New-Object Drawing.Rectangle 0, 0, $full.Width, $cropH), 'Pixel')
-    $g.Dispose()
-    $ms = New-Object IO.MemoryStream
+    $blank = [JsWin]::Blank($full, [int]($full.Height * 0.18))
+    $out = @()
+    if (-not $blank) { $out = Read-ByOcr $full }
+    if ($out.Count) { $script:via = 'ocr'; return ,$out }
+    $why += $(if ($blank) { 'ocr 빈그림' } else { 'ocr 0줄' })
+  } finally { $full.Dispose() }
+  $script:via = 'none'; $script:why = ($why -join ', ')
+  return ,@()
+}
+
+# 찍은 그림의 위쪽 18%를 두 배로 키워 읽고, 방 제목 띠(왼쪽 20% 이후, 위 12% 안)의 줄만 돌려준다
+function Read-ByOcr($full) {
+  $cropH = [int]($full.Height * 0.18)
+  $crop = New-Object Drawing.Bitmap ($full.Width * 2), ($cropH * 2)
+  $g = [Drawing.Graphics]::FromImage($crop)
+  $g.InterpolationMode = 'HighQualityBicubic'
+  $g.DrawImage($full, (New-Object Drawing.Rectangle 0, 0, $crop.Width, $crop.Height), (New-Object Drawing.Rectangle 0, 0, $full.Width, $cropH), 'Pixel')
+  $g.Dispose()
+  $ms = New-Object IO.MemoryStream
+  try {
     $crop.Save($ms, [Drawing.Imaging.ImageFormat]::Png); $ms.Position = 0
     $stream = [System.IO.WindowsRuntimeStreamExtensions]::AsRandomAccessStream($ms)
     $dec = Await ($([Windows.Graphics.Imaging.BitmapDecoder]::CreateAsync($stream))) ([Windows.Graphics.Imaging.BitmapDecoder])
@@ -117,18 +214,18 @@ function Read-WorksRoomTitle {
     foreach ($l in $res.Lines) {
       $first = $null; foreach ($wd in $l.Words) { $first = $wd; break }
       if (-not $first) { continue }
-      $r = $first.BoundingRect
-      $x = [int](100.0 * [double]$r.X / [double]$crop.Width)
-      $y = [int](18.0 * [double]$r.Y / [double]$crop.Height)
+      $rr = $first.BoundingRect
+      $x = [int](100.0 * [double]$rr.X / [double]$crop.Width)
+      $y = [int](18.0 * [double]$rr.Y / [double]$crop.Height)
       if ($x -ge 20 -and $y -le 12) { $out += @{ x = $x; y = $y; t = $l.Text } }
     }
-    $crop.Dispose(); $ms.Dispose()
     return ,$out
-  } finally { $full.Dispose() }
+  } finally { $crop.Dispose(); $ms.Dispose() }
 }
 function Send-Report($id, $lines, $err) {
-  $body = @{ id = $id; lines = $lines }
+  $body = @{ id = $id; lines = $lines; via = $script:via; ver = $HelperVersion }
   if ($err) { $body.error = $err }
+  if ($script:why) { $body.why = $script:why }
   $json = $body | ConvertTo-Json -Depth 4 -Compress
   Invoke-WebRequest -Uri $base -Method Post -Headers $headers -ContentType 'application/json; charset=utf-8' `
     -Body ([Text.Encoding]::UTF8.GetBytes($json)) -TimeoutSec 15 -UseBasicParsing | Out-Null
@@ -161,6 +258,9 @@ function Invoke-SelfUpdate {
 }
 
 Write-Log "시작 v$HelperVersion"
+# 시작할 때 글자 인식·메뉴 지켜보기를 준비해 둔다 (실패해도 도우미는 계속 돈다)
+try { Initialize-Ocr } catch { Write-Log "글자 인식 준비 실패: $($_.Exception.Message)" }
+if ($script:ocrReady) { Start-MenuWatch }
 $fail = 0
 while ($true) {
   if ((Get-Date) -ge $script:nextUpdateCheck) { Invoke-SelfUpdate }
@@ -171,7 +271,8 @@ while ($true) {
       $msg = $r.Content | ConvertFrom-Json
       if ($msg.task -eq 'ocr') {
         $sw = [Diagnostics.Stopwatch]::StartNew()
-        try { $lines = Read-WorksRoomTitle; Send-Report $msg.id $lines $null; Write-Log "방 제목 읽기 $($lines.Count)줄 $($sw.ElapsedMilliseconds)ms" }
+        $script:via = $null; $script:why = $null
+        try { $lines = Read-WorksRoomTitle; Send-Report $msg.id $lines $null; Write-Log "방 제목 읽기($($script:via)) $($lines.Count)줄 $($sw.ElapsedMilliseconds)ms $($script:why)" }
         catch { $e = "$($_.Exception.Message)"; Write-Log "방 제목 읽기 실패: $e"; try { Send-Report $msg.id @() $e } catch {} }
         continue
       }

@@ -78,9 +78,13 @@ async function report(req: Request, env: Env, userId: string): Promise<Response>
       }
     }
   }
+  // 도우미 v2.4부터: 어떤 방법으로 읽었는지(uia·ocr·screen·title)와 못 읽은 이유(why)를 함께 보낸다
+  const via = /^[a-z]{2,8}$/.test(String(b?.via ?? "")) ? String(b.via) : "";
+  if (via && m.how !== "error") m = { ...m, how: m.how + "/" + via };
+  const why = b?.why ? String(b.why).slice(0, 300) : null;
   await rest(env, `pc_locate?id=eq.${id}`, {
     method: "PATCH", headers: { Prefer: "return=minimal" },
-    body: JSON.stringify({ done_at: new Date().toISOString(), channel_id: m.channelId, how: m.how, score: m.score, header_text: m.header.slice(0, 300) }),
+    body: JSON.stringify({ done_at: new Date().toISOString(), channel_id: m.channelId, how: m.how, score: m.score, header_text: m.header.slice(0, 300), ...(why ? { why } : {}) }),
   }).then((x) => x.body?.cancel());
   return jsonRes({ ok: true, found: !!m.channelId, how: m.how });
 }
