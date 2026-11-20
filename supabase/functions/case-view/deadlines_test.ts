@@ -174,6 +174,11 @@ Deno.test("상소장접수통지가 우리 쪽에만 → 검사만 상소 경고
     F("2026-10-27", "피고인1 변호인  법OOOOOO 항소이유에 대한 답변서 제출"),
   ], "2026-11-13").find((x) => x.kind === "항소이유서")!;
   assertEquals([ans.st, ans.hold], ["done", "검사만 상소 · 답변서 10.27"]);
+  const noNotice = computeDeadlines("2026노9004", [
+    S("2026-10-19", "피고인1 변호인  법무법인 정서 소송기록접수통지서/항소이유서/전자소송안내문 발송", "2026-10-21"),
+    F("2026-10-27", "피고인1 변호인  법OOOOOO 항소이유에 대한 답변서 제출"),
+  ], "2026-11-13").find((x) => x.kind === "항소이유서")!;
+  assertEquals([noNotice.st, /답변서/.test(noNotice.warn || "")], ["open", true]);
   const r2 = computeDeadlines("2026노9", [S("2026-11-02", "피고인  김OO 소송기록접수통지서 발송", "2026-11-03")], "2026-11-13")[0];
   assertEquals(/우리 법인 수신 기록이 없/.test(r2.warn || ""), true);
 });

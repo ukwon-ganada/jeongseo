@@ -30,6 +30,13 @@ Deno.test("사람 확정: 제출함 → 안 보냄, 상소 안 함 → 마감 �
   assertEquals(pick(dl("2026-11-25"), "x", "2026-11-24", [], { action: "상소 안 함" }).send, true);
 });
 
+Deno.test("상소장·수사 서류는 마감 지나면 안 보냄, 이유서만 경과 알림", () => {
+  assertEquals(pick(dl("2026-11-18", { kind: "항소" }), "x", "2026-11-20", []).why, "마감 지남");
+  assertEquals(pick(dl("2026-11-18", { kind: "항고" }), "x", "2026-11-20", []).send, false);
+  assertEquals(pick(dl("2026-11-20", { kind: "항소" }), "x", "2026-11-20", []).send, true);
+  assertEquals(pick(dl("2026-11-18"), "x", "2026-11-20", []).send, true);
+});
+
 Deno.test("제출·보류·선고 전·도달 전은 안 보냄", () => {
   assertEquals(pick(dl("2026-11-25", { st: "done", doneOn: "2026-11-20" }), "x", "2026-11-23", []).send, false);
   assertEquals(pick(dl("2026-11-25", { st: "done", hold: "공판기일 진행 11.21" }), "x", "2026-11-23", []).why, "공판기일 진행 11.21");

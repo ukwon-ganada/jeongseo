@@ -65,6 +65,9 @@ export function pick(dl: Deadline, code: string, today: string, sent: SentRow[],
     if (dday !== 1) return { send: false, why: "[" + confirm.action + "] 확인 · 전날만 다시" };
     return { send: true, why: "[" + confirm.action + "] 확인 · 마감 전날" };
   }
+  // 상소장(선고 7일)·수사 단계 서류는 마감이 지나면 확정·종결이라 지난 뒤 다시 울릴 일이 없다.
+  // 경과 알림은 이유서만(기간 경과 뒤에도 연장 신청 등 할 일이 남음, 2025마7481) — 사무실 PC와 같음
+  if (dday < 0 && !/이유서$/.test(dl.kind)) return { send: false, why: "마감 지남" };
   if (-dday > OVERDUE_LIMIT) return { send: false, why: OVERDUE_LIMIT + "일 넘게 지남" };
   if (dday > DAILY_FROM) {
     const first = !announced(sent, code, dl.kind, dl.d);

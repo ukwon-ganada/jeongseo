@@ -245,7 +245,9 @@ export function computeDeadlines(code: string, evs: any[], today: string, others
       const prosOnly = an.length > 0 && !an.some((e) => /^\s*검사/.test(nz(e.lp_contents)));
       // 검사만 상소 + 우리가 '항소이유에 대한 답변서'를 냈으면 우리는 피항소인 → 이유서 의무 없음
       const answered = prosOnly && !doneOn ? filings.find((f) => inRound(f) && /이유에\s*대한\s*답변서/.test(nz(f.lp_contents))) : undefined;
-      const warn = prosOnly ? "상소장접수통지서가 우리 측에만 송달됨 — 검사만 상소했다면 이유서 제출 의무가 없습니다. 확인 필요"
+      // 상소장접수통지 기록이 없어도(로웨어에 하급심 줄이 빠진 사건) 우리가 '항소이유에 대한 답변서'만 냈으면 확인 필요로 표시
+      const answerOnly = !prosOnly && !doneOn && filings.some((f) => inRound(f) && /이유에\s*대한\s*답변서/.test(nz(f.lp_contents)));
+      const warn = answerOnly ? "우리는 '항소이유에 대한 답변서'만 냈습니다 — 검사만 상소했다면 이유서 제출 의무가 없습니다. 확인 필요" : prosOnly ? "상소장접수통지서가 우리 측에만 송달됨 — 검사만 상소했다면 이유서 제출 의무가 없습니다. 확인 필요"
         : first.who !== "우리" && !it.got.some((g) => g.who === "우리") ? "우리 법인 수신 기록이 없어 의뢰인 수신일로 계산했습니다. 기간이 이미 진행 중일 수 있습니다" : undefined;
       out.push({
         t: what + " 마감", d: due, kind: what, doneOn, st: doneOn || held || answered ? "done" : "open", who: first.who,
