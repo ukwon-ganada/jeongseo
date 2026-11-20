@@ -145,6 +145,9 @@ main{max-width:880px;margin:0 auto;padding:12px 16px 32px}
 .li.moved .t>span.x{text-decoration:line-through;color:var(--muted)}
 /* 법정기한(잠정): 빨간 점 + 남은 날 */
 .ev.g-limit{--gc:var(--danger)}
+.ev .pill.who{background:var(--g-hearing-t);color:var(--g-hearing);font-weight:700}
+.ev .pill.who.us{background:var(--g-ours-t);color:var(--g-ours)}
+.ev .pill.who+.pill.who{margin-left:4px}
 .ev.g-limit.due .tt{color:var(--danger)}
 .ev.g-limit .pill{background:var(--danger);color:#fff}
 .ev.g-limit.done .tt{color:var(--muted);font-weight:500}
@@ -474,6 +477,8 @@ var VIEWS = {
       var p=split(e), pill='';
       if(g==='limit'){ var n=dd(e.d); pill='<span class="pill">'+(e.cfa?esc(e.cfa):n<0?'지남':n===0?'오늘까지':'D-'+n)+'</span>'; p.ts=(p.ts?p.ts+' · ':'')+(e.src==='chat'?'대화 기준':'잠정'); }
       else if(e.k==='due') pill='<span class="pill">예정</span>';
+      // 받은 사람·낸 사람(소송기록접수통지 도달, 이유서 제출)은 제목 옆에 (2026-11-20 석원)
+      if(g==='notice'||g==='filing'){ var wm=String(e.t||'').match(/\s*\(([^()]*)\)\s*$/); if(wm){ p.tt=String(e.t).slice(0,wm.index); p.ts=''; pill=wm[1].split('·').map(function(w){ return '<span class="pill who'+(w==='우리'?' us':'')+'">'+esc(w)+'</span>'; }).join(''); } }
       var moved=g==='hearing' && isMoved(p.ts); if(moved){ pill='<span class="pill">'+(p.ts.match(MOVED_RE)[0])+'</span>'; p.ts=p.ts.replace(/\s*·\s*[^·]*(변론재개|선고연기|재판연기|기일변경|기일연기|연기|추정|취소)[^·]*$/,''); }
       body+='<div class="ev '+e.k+(e.cfa?' cf'+(/^제출/.test(e.cfa)?' sub':''):'')+(g?' g-'+g:'')+(minor?' minor':'')+(key&&!moved?' key':'')+(moved?' moved':'')+'"><div class="d"><b>'+md(e.d)+'</b><small>'+wk(e.d)+'</small></div><div class="rail"></div><div class="t">'
         +'<div class="tt">'+esc(p.tt)+pill+(e.cf?fileChip(e.cf,'계약서'):'')+(e.f&&!e.minor?fileChip(e.f,'열기'):'')+'</div>'+(p.ts?'<div class="ts">'+esc(p.ts)+'</div>':'')+'</div></div>';
