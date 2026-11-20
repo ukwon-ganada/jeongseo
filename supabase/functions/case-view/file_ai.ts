@@ -39,7 +39,7 @@ const isDoc = (f: any) => !!(f.pdf || DOC_RE.test(nz(f.n)));
 // 자동으로 붙일 수 있는 파일: PDF만 (한글·워드는 초안). 직원이 [수정]에서 고른 파일은 형식과 관계없이 그대로
 export const isPdf = (f: any) => !!(f.pdf || /\.pdf$/i.test(nz(f.n)));
 // 판단 기준이 바뀌면 올린다: 예전 판단을 모두 다시 묻게 된다
-const RULE_VER = "v5-caseno";
+const RULE_VER = "v6-noself";
 
 // AI에게 보여 줄 줄: 지난 일(예정 아님)의 우리 제출·기일/선고·처분 줄. 사소한 제출, 직원이 뺀 줄, 직원이 파일을 고른 줄은 뺀다
 // 앞으로의 줄(due)은 빼되, 방 대화에서 뽑은 '우리 제출 예정' 줄은 넣는다(2026-11-20: 선임계 제출 '예정' 줄에 오늘 올린 선임계 PDF)
@@ -102,10 +102,12 @@ export function buildPrompt(caseTitle: string, lines: any[], files: any[], msgs:
   const hi = addDays(files.reduce((m, f) => (f.d > m ? f.d : m), files[0].d), AFTER_DAYS);
   const ls = lines.filter((e) => e.d >= lo && e.d <= hi).sort((a, b) => a.d.localeCompare(b.d));
   const lineIds = new Map<string, string>(), fileIds = new Map<string, any>();
+  // 지금 묻는 파일이 예전 판단으로 붙어 있는 줄은 '이미 붙음'으로 보이지 않게(2026-11-20: 자기 자신을 중복으로 보고 빼 버림)
+  const asking = new Set(files.map((f) => String(f.id)));
   const lineTxt = ls.map((e, i) => {
     const id = "L" + (i + 1); lineIds.set(id, lineKey(e));
     const kind = e.g === "accept" ? "사건 선임" : e.g === "hearing" ? (e.src === "chat" ? "처분·일정(방 대화)" : "기일·선고") : e.g === "notice" ? "받은 문서" : e.src === "chat" ? "우리 업무(방 대화)" : "우리 제출";
-    return `${id} ${e.d} [${kind}] ${nz(e.t).split(" · ")[0]}${e.f ? ` (이미 붙음: ${e.f.n})` : ""}`;
+    return `${id} ${e.d} [${kind}] ${nz(e.t).split(" · ")[0]}${e.f && !asking.has(String(e.f.id)) ? ` (이미 붙음: ${e.f.n})` : ""}`;
   });
   const fileTxt = files.map((f, i) => { const id = "F" + (i + 1); fileIds.set(id, f); return `${id} ${f.d} ${nz(f.tm)} ${nz(f.n)}`; });
   // 같은 무렵(파일 앞 14일~뒤 1일) 올라온 한글·워드 초안 이름: 고르지 않고 참고만
