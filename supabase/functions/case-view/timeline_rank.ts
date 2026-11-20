@@ -108,6 +108,12 @@ function actOf(e: any, t: string): string {
   if (/사건\s*선임|수임|신건/.test(t) || e.g === "accept") return "선임";
   return "";
 }
+// 서류 이름: '제출' 앞 마지막 낱말(…서·…장·…자료 등). 제출처·방법 낱말은 뺀다
+const docName = (t: string) => {
+  const m = t.replace(/\([^()]*\)/g, " ").match(/([가-힣]{2,}(?:서|장|자료|목록|신청|청구))\s*(?:을|를)?\s*(?:\S+\s*)?(?:제출|송부|접수)/);
+  return m && !/(경찰서|검찰청|지청|법원|지원|공소청|구치소|교도소)$/.test(m[1]) ? m[1] : "";
+};
+const plain = (t: string) => t.replace(/[^0-9A-Za-z가-힣]/g, "");
 const docsOf = (t: string) => DOCS.filter(([, re]) => re.test(t)).map(([k]) => k).sort().join("+");
 const DEC_WORDS: [string, RegExp][] = [["불송치", /불송치/], ["송치", /(^|[^불])송치/], ["불기소", /불기소|혐의\s*없음|기소\s*유예/], ["기소", /(^|[^불])기소|구공판|구약식|공소\s*제기/],
   ["약식명령", /약식\s*명령/], ["선고", /선고/], ["보완수사", /보완\s*수사/], ["기각", /기각/], ["각하", /각하/], ["확정", /확정/]];
@@ -140,16 +146,21 @@ export function dedupeEvents(events: any[]): any[] {
     const seen = new Map<string, any>();
     for (const e of list) {
       const t = body(e.t), act = actOf(e, t);
-      if (!act || act === "지시") continue;
       let key = "";
-      if (e.w === 1) key = "결과:" + (act === "선고" || /선고/.test(t) ? "선고" : decOf(t));
+      if (!act || act === "지시") key = "글:" + plain(t);
+      else if (e.w === 1) key = "결과:" + (act === "선고" || /선고/.test(t) ? "선고" : decOf(t));
       else if (act === "선고" || act === "기일" || act.startsWith("조사") || act === "접견" || act === "선임") key = act;
       else if (docsOf(t)) key = act + ":" + docsOf(t);
-      if (!key || key === "결과:") continue;
+      // 목록에 없는 서류(변론병합신청서·사실조회신청서 등)는 서류 이름 그대로 (2026-11-20 석원, 2026노364)
+      else if (act === "제출" && docName(t)) key = act + ":" + docName(t);
+      else key = "글:" + plain(t);
+      if (!key || key === "결과:" || key === "글:") continue;
       if (e.w !== 1) key += "#" + (e.w ?? "");
       key += "@" + (e.lv ?? "");
       const prev = seen.get(key);
       if (!prev) { seen.set(key, e); continue; }
+      // 법원 전산(로웨어)에 실제로 따로 찍힌 두 줄은 합치지 않는다 (2026-11-20 석원). 다른 사건에서 옮겨 적은 줄은 합친다
+      if (prev.row != null && e.row != null && prev.row !== e.row && prev.lc === e.lc) continue;
       const oa = orgsOf(body(prev.t)), ob = orgsOf(t);
       // 제출처가 달라도 AI가 짐작한 곳(추정·불명)이거나 한쪽이 '예정'이면 같은 제출로 본다 (2026-11-19 재정신청서 세 줄)
       const loose = GUESS.test(body(prev.t)) || GUESS.test(t) || prev.k === "due" || e.k === "due";

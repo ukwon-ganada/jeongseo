@@ -45,7 +45,7 @@ const json = (b: unknown, status = 200) =>
 import { rankEvents } from "./timeline_rank.ts";
 import { applyConfirms, computeDeadlines, deadlineEvents, DL_ACTS, isNotice, mergeRoles, ourDefendants, type OtherCase } from "./deadlines.ts";
 import { findPick, normTitle } from "./title_match.ts";
-import { dropKnown, extractFromExport, msgsToExport, toRows } from "./chat_import.ts";
+import { dropKnown, dropSame, extractFromExport, msgsToExport, toRows } from "./chat_import.ts";
 import { shapeStages, diffStages, personChangeLine, isStage, noLines, chatNos, withChatNos, type NoHist } from "./stages.ts";
 // 방 제목 형제번호로 공소청 칸 채우기(2026-11-19): 바뀌는 방 목록을 석원님이 확인한 뒤 켠다
 const TITLE_PROS = true;
@@ -242,12 +242,12 @@ export function shapeCase(c: any, evs: any[], opts: { today: string; linked: str
       let t = nz(e.lp_contents);
       if (nz(e.lp_remark)) t += " · " + nz(e.lp_remark);
       const future = d >= today;
-      events.push({ d, k: future ? "due" : verdict ? "ours" : "done", g: "hearing", t: (future ? "" : verdict ? "" : "출석 ") + t, f: null });
+      events.push({ d, k: future ? "due" : verdict ? "ours" : "done", g: "hearing", t: (future ? "" : verdict ? "" : "출석 ") + t, f: null, row: e.lp_num, lc: c.l_num });
     } else if (ours(e)) {
-      events.push({ d, k: "ours", g: "ours", t: nz(e.lp_contents).replace(/^.*?(법무법인\s*정서|법O{6}(?!O))\s*/, "") || nz(e.lp_contents), f: null, lp: e.lp_num });
+      events.push({ d, k: "ours", g: "ours", t: nz(e.lp_contents).replace(/^.*?(법무법인\s*정서|법O{6}(?!O))\s*/, "") || nz(e.lp_contents), f: null, lp: e.lp_num, row: e.lp_num, lc: c.l_num });
     } else if (e.lp_set === "서면" && APPEAL_BRIEF.test(nz(e.lp_contents)) && !/^\s*검사/.test(nz(e.lp_contents)) && ourNo(nz(e.lp_contents))) {
       // 불변기한 서면(항소·상고이유서)은 국선·피고인이 낸 것도 남긴다 (2026-11-19 석원, 이강효 사건)
-      events.push({ d, k: "done", g: "filing", w: 2, t: (nz(e.lp_contents).match(APPEAL_BRIEF) || [""])[0].replace(/\s+/g, "") + " 제출 (" + filerOf(nz(e.lp_contents)) + ")", f: null });
+      events.push({ d, k: "done", g: "filing", w: 2, t: (nz(e.lp_contents).match(APPEAL_BRIEF) || [""])[0].replace(/\s+/g, "") + " 제출 (" + filerOf(nz(e.lp_contents)) + ")", f: null, row: e.lp_num, lc: c.l_num });
     }
   }
   // 소송기록접수통지 도달: 이유서 기한의 기산점. 기한 계산과 같은 기준(우리 피고인 본인·우리 법인)만, 같은 날은 한 줄
@@ -1212,7 +1212,11 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
         await logView(env, who, "chat_import_preview", "", c, fetcher);
         return json(r);
       }
-      const rows = toRows(lNum, Array.isArray(body.events) ? body.events.slice(0, 300) : []);
+      // 이미 이 사건(방 대화·앞선 대화파일)에 보이는 같은 날·같은 일은 다시 넣지 않는다 (2026-11-20 석원: 대화파일을 올릴 때마다 중복)
+      const chansI = ((await rest(env, `works_room_case?select=channel_id&l_num=eq.${lNum}`, {}, fetcher).catch(() => [])) || []).map((r: any) => nz(r.channel_id)).filter(Boolean);
+      const haveI = await rest(env, `room_event?select=kind,ev_date,summary&hidden=eq.false&or=(l_num.eq.${lNum}${chansI.length ? `,channel_id.in.${enc(inList(chansI))}` : ""})&limit=1000`, {}, fetcher).catch(() => []) || [];
+      const picked = Array.isArray(body.events) ? body.events.slice(0, 300) : [];
+      const rows = toRows(lNum, dropSame(picked, haveI));
       const start = nz(body.startDate);
       if (c.l_num < 0 && /^\d{4}-\d{2}-\d{2}$/.test(start) && !isNaN(Date.parse(start))) {
         rows.push({ channel_id: "export-start:" + lNum, l_num: lNum, kind: "사건접수", ev_date: start, ev_time: "", summary: "사건 선임", state: "완료", source: "chat-export" });
