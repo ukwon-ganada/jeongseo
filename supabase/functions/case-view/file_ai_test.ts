@@ -1,6 +1,6 @@
 // 실행: deno test supabase/functions/case-view/file_ai_test.ts
 import { attachByAI, attachFinalFiles, handle } from "./handler.ts";
-import { applyMatches, buildPrompt, candidateLines, fileSig, lineKey } from "./file_ai.ts";
+import { MANUAL, applyMatches, buildPrompt, candidateLines, fileSig, lineKey, pendingFiles } from "./file_ai.ts";
 function assert(c: unknown, m: string) { if (!c) throw new Error(m); }
 const env = { sbUrl: "https://x.supabase.co", sbKey: "k", anthropicKey: "a" };
 const ev = () => [
@@ -221,4 +221,25 @@ Deno.test("다시 묻는 파일이 예전 판단으로 붙어 있어도 '이미 
   const { user } = buildPrompt("2026고단1 홍길동", lines, [{ id: 7, d: "2026-11-19", n: "홍길동_공소장.pdf", at: Date.parse("2026-11-19T01:00:00Z") }], []);
   assert(!user.includes("이미 붙음: 홍길동_공소장"), user);
   assert(user.includes("이미 붙음: 홍길동_의견서"), "다른 파일은 그대로: " + user);
+});
+
+Deno.test("직원이 고른 판단(manual)은 다시 묻지 않고, 같은 줄에선 AI 판단보다 먼저 / 후보 줄엔 lk", () => {
+  const ev = [
+    { d: "2026-11-17", k: "done", g: "hearing", t: "송치·불송치", src: "chat", rid: 5 },
+    { d: "2026-11-18", k: "ours", g: "ours", t: "의견서 제출", lp: 9 },
+  ];
+  const lines = candidateLines(ev, /열람/);
+  const files = [
+    { id: 1, n: "홍길동_결정결과 통지서.pdf", d: "2026-11-19", at: Date.parse("2026-11-19T01:00:00Z"), pdf: 1 },
+    { id: 2, n: "홍길동_통지서 사본.pdf", d: "2026-11-20", at: Date.parse("2026-11-20T01:00:00Z"), pdf: 1 },
+  ];
+  const cache = new Map<number, any>([
+    [1, { file_id: 1, line_key: "r:5", sig: MANUAL }],
+    [2, { file_id: 2, line_key: "r:5", sig: fileSig(files[1], lines) }],
+  ]);
+  applyMatches(ev, files, cache, lines);
+  assert((ev[0] as any).f?.id === 1, "직원이 고른 파일이 먼저: " + JSON.stringify(ev[0]));
+  assert((ev[0] as any).lk === "r:5" && (ev[1] as any).lk === undefined, "lk는 lp 아닌 줄에만");
+  const pend = pendingFiles(files.map((f) => ({ ...f, n: f.n })), lines, cache, () => false);
+  assert(!pend.some((f: any) => f.id === 1), "manual은 다시 안 물음");
 });

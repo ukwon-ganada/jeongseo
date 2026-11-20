@@ -686,27 +686,51 @@ var DOC_SVG='<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-w
 function fileChip(f, label){
   return '<button class="fchip" data-file="'+f.id+'" data-label="'+label+'" title="'+esc(f.n)+'">'+DOC_SVG+label+'</button>';
 }
-function nearChoices(d, lp){
+function nearChoices(d, key, wide, contract){
   var t=Date.parse(d), used={};
-  (data.events||[]).forEach(function(e){ if(e.f && e.lp!=null && String(e.lp)!==String(lp)) used[e.f.id]=1; });
-  return (data.fileChoices||[]).filter(function(f){ return !used[f.id] && Math.abs(Date.parse(f.d)-t)<=14*864e5; })
-    .sort(function(a,b){ return (b.d+b.tm).localeCompare(a.d+a.tm); });
+  (data.events||[]).forEach(function(e){
+    var k=e.lp!=null?'lp:'+e.lp:e.lk;
+    if(k===key) return;
+    if(e.f) used[e.f.id]=1;
+    if(e.cf) used[e.cf.id]=1;
+  });
+  return (data.fileChoices||[]).filter(function(f){
+    if(used[f.id] || (!contract && f.c)) return false;
+    var dd=Date.parse(f.d)-t;
+    return wide ? (dd>=-30*864e5 && dd<=365*864e5) : Math.abs(dd)<=14*864e5;
+  }).sort(function(a,b){ return (b.d+b.tm).localeCompare(a.d+a.tm); });
 }
-// [수정] 화면의 제출 서면 줄들 (열람복사신청 같은 중요하지 않은 제출은 뺌)
+// [수정] 화면의 파일 줄: 로웨어 제출 서면(lp) + 방 대화·받은 문서·선고·사건 선임 줄(lk)
+//  (열람복사신청 같은 중요하지 않은 제출은 뺌)
 function tlFileRows(){
-  var list=(data.events||[]).filter(function(e){ return e.k==='ours' && e.lp!=null && !e.minor && (e.f || nearChoices(e.d,e.lp).length); });
+  var list=(data.events||[]).map(function(e){
+    if(e.minor) return null;
+    if(e.k==='ours' && e.lp!=null){ var n=nearChoices(e.d,'lp:'+e.lp,false,false); return (e.f||n.length)?{e:e,key:'lp:'+e.lp,cur:e.f,near:n}:null; }
+    if(e.lk){ var acc=e.g==='accept', cur=acc?e.cf:e.f, n2=nearChoices(e.d,e.lk,!acc,acc); return (cur||n2.length)?{e:e,key:e.lk,cur:cur,near:n2}:null; }
+    return null;
+  }).filter(Boolean);
   if(!list.length) return '';
-  return '<div class="tlf-h">제출 서면 파일</div>'+list.map(function(e){
-    var cur=e.f?String(e.f.id):'', near=nearChoices(e.d,e.lp), tt=String(e.t||'').split(' · ')[0];
+  return '<div class="tlf-h">파일</div>'+list.map(function(x){
+    var e=x.e, cur=x.cur?String(x.cur.id):'', tt=String(e.t||'').split(' · ')[0];
+    var near=x.near.slice();
+    if(x.cur && !near.some(function(f){ return String(f.id)===cur; })){
+      var cf=(data.fileChoices||[]).find(function(f){ return String(f.id)===cur; }) || {id:x.cur.id, n:x.cur.n, d:e.d, tm:''};
+      near.unshift(cf);
+    }
+    var attr=e.lp!=null?' data-lp="'+e.lp+'"':' data-lk="'+esc(x.key)+'"';
     return '<div class="tlf"><span class="d">'+md(e.d)+'</span><span class="t" title="'+esc(tt)+'">'+esc(tt)+'</span>'
-      +'<select class="tlf-s" data-lp="'+e.lp+'" data-o="'+cur+'"><option value="">없음</option>'
-      +near.map(function(f){ return '<option value="'+f.id+'"'+(String(f.id)===cur?' selected':'')+'>'+esc(f.n)+' ('+esc(md(f.d)+' '+f.tm)+')</option>'; }).join('')
+      +'<select class="tlf-s"'+attr+' data-o="'+cur+'"><option value="">없음</option>'
+      +near.map(function(f){ return '<option value="'+f.id+'"'+(String(f.id)===cur?' selected':'')+'>'+esc(f.n)+' ('+esc(md(f.d)+(f.tm?' '+f.tm:''))+')</option>'; }).join('')
       +'</select></div>';
   }).join('');
 }
 function tlFileChanges(){
   var out=[];
-  document.querySelectorAll('#main .tlf-s').forEach(function(el){ if(el.value!==el.dataset.o) out.push({lp:Number(el.dataset.lp), id:el.value?Number(el.value):0}); });
+  document.querySelectorAll('#main .tlf-s').forEach(function(el){
+    if(el.value===el.dataset.o) return;
+    if(el.dataset.lk) out.push({lk:el.dataset.lk, id:el.value?Number(el.value):0, old:el.dataset.o?Number(el.dataset.o):0});
+    else out.push({lp:Number(el.dataset.lp), id:el.value?Number(el.value):0});
+  });
   return out;
 }
 // 파일 열기: 서버가 5분짜리 열람 주소를 줌 → 휴대폰은 바깥 브라우저, PC는 새 탭
@@ -892,7 +916,7 @@ function tlSave(btn){
   if(!ch.length && !fc.length){ tl.on=false; render(); return; }
   btn.disabled=true; btn.textContent='저장 중…';
   var chain=Promise.resolve();
-  fc.forEach(function(x){ chain=chain.then(function(){ return api({action:'set_file', lNum:data.lNum, lp:x.lp, id:x.id}); }); });
+  fc.forEach(function(x){ chain=chain.then(function(){ return x.lk ? api({action:'set_file_line', lNum:data.lNum, lk:x.lk, id:x.id, old:x.old}) : api({action:'set_file', lNum:data.lNum, lp:x.lp, id:x.id}); }); });
   chain.then(function(){ return ch.length ? api({action:'tl_save', lNum:data.lNum, rows:ch}) : {saved:0, failed:0}; }).then(function(j){
     tl.on=false;
     return loadCase(ctx.key).then(function(d){ data=d; render(); toast(j.failed?('저장 '+j.saved+'줄, 실패 '+j.failed+'줄'):'저장했습니다'); });
