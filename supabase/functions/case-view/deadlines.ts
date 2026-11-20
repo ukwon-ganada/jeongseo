@@ -169,12 +169,7 @@ export function computeDeadlines(code: string, evs: any[], today: string, others
   rounds.forEach((r, i) => stageOfRound.set(r, Math.max(2, top - (rounds.length - 1 - i))));
 
   const out: Deadline[] = [];
-  if (top === 1) {
-    const copies = list.filter((e) => isIndictCopy(e, ours));
-    // 지난 의견서 기한은 훈시 기간이고 선임 전 일이 많아(1심 211건 중 131건) 내지 않은 채 지났으면 보여 주지 않는다
-    const x = copies.length ? indictDeadline(code, copies, filings) : null;
-    if (x && !(x.st === "open" && x.d < today)) out.push(x);
-  }
+  // 공소장 부본 + 7일(형소법 266조의2 의견서)은 훈시 기한이라 기한으로 띄우지 않는다(2026-11-20 석원 결정). '공소장 부본 도달' 줄만 타임라인에 남는다
   items.forEach((it, i) => {
     if (it.kind === "v") {
       const next = items.slice(i + 1).find((x) => x.kind === "n");
@@ -210,24 +205,6 @@ export function computeDeadlines(code: string, evs: any[], today: string, others
     }
   });
   return out;
-}
-
-// 공소장 부본 첫 도달 + 7일. 우리가 낸 의견서·의사확인서가 있으면 제출로 본다.
-function indictDeadline(code: string, copies: any[], filings: any[]): Deadline {
-  const sent = copies[0]._d;
-  const jury = /고합/.test(nz(code)) || copies.some((e) => /국민참여재판/.test(nz(e.lp_contents)));
-  const t = (jury ? "공소사실 의견서·국민참여재판 의사확인서" : "공소사실 의견서") + " 마감";
-  const got = copies.filter((e) => isDate(e.delivered_date))
-    .map((e) => ({ d: nz(e.delivered_date).slice(0, 10), who: OUR_FIRM.test(nz(e.lp_contents)) ? "우리" : "피고인" }))
-    .sort((a, b) => a.d.localeCompare(b.d))[0];
-  if (!got) return { t, d: "", kind: "의견서", st: "expected", why: "공소장 부본 발송 " + md(sent) + " · 아직 도달 전" };
-  const { due, moved } = dueDate(got.d, 7);
-  const done = filings.find((f) => f._d >= sent && f._d <= addDays(due, 14) && OURS_RE.test(nz(f.lp_contents)) &&
-    /의견서|의사확인서/.test(nz(f.lp_contents)) && !/배상|절차|소송진행|피해자|양형/.test(nz(f.lp_contents)));
-  return {
-    t, d: due, kind: "의견서", doneOn: done?._d, st: done ? "done" : "open",
-    why: "공소장 부본 도달 " + md(got.d) + "(" + got.who + ") + 7일" + (moved ? " (쉬는 날이라 다음 평일)" : ""),
-  };
 }
 
 // 타임라인 줄로: 이미 낸 기한은 '제출' 줄이 따로 있으니 빼고, 남은 것만 기한 줄로.
