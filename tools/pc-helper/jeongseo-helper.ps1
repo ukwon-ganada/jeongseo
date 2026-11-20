@@ -1,6 +1,8 @@
 ﻿# 정서 사건 도우미 — 사건방 "이 방 사건 보기"를 누르면 이 PC 브라우저에 사건 화면을 연다.
-# v2.4: 웍스 창 글자를 먼저 "직접" 읽는다(UI Automation, 찍지 않음 → PC 화면 설정과 무관). 안 되면 예전처럼 찍어서 읽고,
-#       찍은 그림이 비었거나 줄이 없으면 화면에서 한 번 더 찍는다. 어떤 방법으로 읽었는지·못 읽은 이유를 함께 보낸다
+# v2.4: 웍스에서 ≡ 메뉴를 누르는 순간(웍스 작은 창이 새로 뜸, 웍스가 맨 앞) 웍스 창 위쪽을 화면 그대로 찍어 둔다.
+#       사건 화면이 방을 물으면 그 그림을 먼저 읽고(브라우저에 가려지기 전 모습), 안 되면 예전처럼 찍어서 읽는다.
+#       (그때 화면을 다시 찍지는 않는다: 브라우저가 앞에 있어 다른 글자를 읽을 수 있음) 읽은 방법·못 읽은 이유를 함께 보낸다
+#       (웍스는 창 안 글자를 윈도우에 알려 주지 않아 직접 읽기는 불가: 2026-11-13·11-20 시험)
 # v2.3: 스스로 업데이트(6시간마다 GitHub의 version.txt 확인, 지문(SHA-256)이 맞을 때만 바꿔 끼움)
 # v2.2: 절전·네트워크 끊김·서버 오류가 있어도 꺼지지 않고 계속 다시 연결(401이어도 5분 뒤 다시 시도)
 # v2.1: 따로 띄운 대화방 창도 찾음(창 제목=방 이름), 메인 창이 숨어 있어도 찾음
@@ -56,13 +58,6 @@ public static class JsWin {
     using (var g = Graphics.FromImage(b)) { var dc = g.GetHdc(); PrintWindow(h, dc, 2); g.ReleaseHdc(dc); }
     return b;
   }
-  // 화면에 보이는 그대로 찍기 (PrintWindow가 빈 그림을 줄 때 대신)
-  public static Bitmap CaptureScreen(IntPtr h) {
-    RECT r; GetWindowRect(h, out r);
-    var b = new Bitmap(Math.Max(1, r.R - r.L), Math.Max(1, r.B - r.T));
-    using (var g = Graphics.FromImage(b)) { g.CopyFromScreen(r.L, r.T, 0, 0, b.Size); }
-    return b;
-  }
   // 위쪽 띠가 한 가지 색뿐이면 빈 그림
   public static bool Blank(Bitmap b, int h) {
     var c0 = b.GetPixel(0, 0); int n = 0;
@@ -88,7 +83,74 @@ function Await($op, [Type]$t) {
   while (-not $task.IsCompleted) { Start-Sleep -Milliseconds 20; if ($sw.ElapsedMilliseconds -gt 8000) { throw '글자 인식 응답 없음' } }
   $task.Result
 }
-# 웍스 창의 방 제목 줄을 돌려준다: 직접 읽기 → 찍어서 읽기 → 화면에서 찍어 읽기
+# ── ≡ 메뉴 지켜보기 (따로 준비: 여기서 문제가 나도 예전 방식은 그대로 돈다) ─────
+$script:menuOn = $false
+function Start-MenuWatch {
+  try {
+    Add-Type -ReferencedAssemblies System.Drawing -TypeDefinition @"
+using System; using System.Drawing; using System.Runtime.InteropServices; using System.Collections.Generic; using System.Threading;
+public static class MenuWatch {
+  [StructLayout(LayoutKind.Sequential)] public struct RECT { public int L, T, R, B; }
+  [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr h, out RECT r);
+  [DllImport("user32.dll")] static extern bool IsIconic(IntPtr h);
+  [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
+  [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr h, System.Text.StringBuilder s, int n);
+  delegate bool EnumProc(IntPtr h, IntPtr l);
+  [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc f, IntPtr l);
+  static Bitmap last; static DateTime lastAt; static readonly object lk = new object(); static bool started;
+  public static string LastError = "";
+  static string Title(IntPtr h) { var sb = new System.Text.StringBuilder(64); GetWindowText(h, sb, 64); return sb.ToString(); }
+  static uint Pid(IntPtr h) { uint p; GetWindowThreadProcessId(h, out p); return p; }
+  public static void Start() {
+    if (started) return; started = true;
+    var t = new Thread(Loop); t.IsBackground = true; t.Priority = ThreadPriority.BelowNormal; t.Start();
+  }
+  static void Loop() {
+    var seen = new HashSet<IntPtr>(); bool first = true;
+    while (true) {
+      try {
+        Thread.Sleep(150);
+        var wins = new List<IntPtr>();
+        EnumWindows(delegate (IntPtr h, IntPtr l) { wins.Add(h); return true; }, IntPtr.Zero);
+        var pids = new HashSet<uint>();
+        foreach (var w in wins) if (Title(w) == "WORKS") pids.Add(Pid(w));
+        if (pids.Count == 0) { seen.Clear(); first = true; continue; }
+        var now = new HashSet<IntPtr>(); IntPtr main = IntPtr.Zero; bool fresh = false;
+        foreach (var w in wins) {
+          if (!IsWindowVisible(w) || !pids.Contains(Pid(w))) continue;
+          now.Add(w);
+          RECT r; GetWindowRect(w, out r); int ww = r.R - r.L, hh = r.B - r.T;
+          if (main == IntPtr.Zero && Title(w) == "WORKS" && !IsIconic(w) && ww >= 300 && hh >= 150) main = w;
+          if (!first && !seen.Contains(w) && ww < 500 && hh < 500) fresh = true;
+        }
+        seen = now; first = false;
+        if (!fresh || main == IntPtr.Zero) continue;
+        var fg = GetForegroundWindow();
+        if (fg == IntPtr.Zero || !pids.Contains(Pid(fg))) continue;
+        RECT m; GetWindowRect(main, out m);
+        var b = new Bitmap(Math.Max(1, m.R - m.L), Math.Max(1, m.B - m.T));
+        using (var g = Graphics.FromImage(b)) { g.CopyFromScreen(m.L, m.T, 0, 0, b.Size); }
+        lock (lk) { if (last != null) last.Dispose(); last = b; lastAt = DateTime.UtcNow; }
+      } catch (Exception e) { LastError = e.Message; }
+    }
+  }
+  // maxAgeMs 안에 찍어 둔 그림의 복사본 (없으면 null)
+  public static Bitmap Take(int maxAgeMs) {
+    lock (lk) {
+      if (last == null || (DateTime.UtcNow - lastAt).TotalMilliseconds > maxAgeMs) return null;
+      return (Bitmap)last.Clone();
+    }
+  }
+}
+"@
+    [MenuWatch]::Start()
+    $script:menuOn = $true
+  } catch { Write-Log "메뉴 지켜보기 준비 실패: $($_.Exception.Message)" }
+}
+
+# 웍스 창의 방 제목 줄을 돌려준다: ≡ 누른 순간 찍어 둔 그림 → 지금 찍어서 읽기(PrintWindow)
 function Read-WorksRoomTitle {
   Initialize-Ocr
   # 웍스 프로그램 찾기: 'WORKS' 제목 창(숨어 있어도)의 프로세스, 없으면 이름에 works 가 든 프로세스
@@ -113,11 +175,14 @@ function Read-WorksRoomTitle {
   if ($h -eq [IntPtr]::Zero) { throw '보이는 웍스 창 없음' }
   # 대화방을 따로 띄운 창은 창 제목이 곧 방 이름 → 글자 인식 없이 바로
   if ($title -ne 'WORKS') { $script:via = 'title'; return ,@(@{ x = 30; y = 5; t = $title }) }
-  $u = Read-ByUia $h
-  if ($u) { $script:via = 'uia'; return ,$u }
+  if (-not $script:engine) { throw '한국어 글자 인식 없음' }
   $why = @()
-  if ($script:uiaWhy) { $why += $script:uiaWhy }
-  if (-not $script:engine) { throw ('한국어 글자 인식 없음; ' + $script:uiaWhy) }
+  # ≡ 누른 순간 찍어 둔 그림(10초 안: 다른 방 그림을 잘못 쓰지 않게 짧게)이 있으면 그것부터
+  $mb = $null
+  if ($script:menuOn) { $mb = [MenuWatch]::Take(10000) }
+  if ($mb) {
+    try { $out = Read-ByOcr $mb; if ($out.Count) { $script:via = 'menu'; return ,$out }; $why += 'menu 0줄' } finally { $mb.Dispose() }
+  } else { $why += 'menu 없음' }
   $full = [JsWin]::Capture($h)
   try {
     $blank = [JsWin]::Blank($full, [int]($full.Height * 0.18))
@@ -126,58 +191,8 @@ function Read-WorksRoomTitle {
     if ($out.Count) { $script:via = 'ocr'; return ,$out }
     $why += $(if ($blank) { 'ocr 빈그림' } else { 'ocr 0줄' })
   } finally { $full.Dispose() }
-  # 화면에서 그대로 한 번 더 (다른 창에 가려졌으면 소용없음)
-  $scr = [JsWin]::CaptureScreen($h)
-  try {
-    $out = Read-ByOcr $scr
-    if ($out.Count) { $script:via = 'screen'; return ,$out }
-    $why += 'screen 0줄'
-  } finally { $scr.Dispose() }
   $script:via = 'none'; $script:why = ($why -join ', ')
   return ,@()
-}
-
-# 직접 읽기: 웍스 창 안 글자 중 방 제목 자리(왼쪽 20%~90%, 위 12% 안)의 가장 긴 글자.
-# 대화 내용 쪽(위 15% 밖)은 아예 들어가 보지 않는다. 세 번 연속 안 되면 이 도우미가 켜져 있는 동안은 건너뛴다.
-$script:uiaFail = 0
-function Read-ByUia($h) {
-  $script:uiaWhy = $null
-  if ($script:uiaFail -ge 3) { $script:uiaWhy = 'uia 꺼둠'; return $null }
-  $sw = [Diagnostics.Stopwatch]::StartNew()
-  try {
-    if (-not $script:uiaReady) { Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes; $script:uiaReady = $true }
-    $root = [System.Windows.Automation.AutomationElement]::FromHandle($h)
-    $r = $root.Current.BoundingRectangle
-    if ($r.Width -lt 300 -or $r.Height -lt 150) { throw '창 크기' }
-    $walker = [System.Windows.Automation.TreeWalker]::ControlViewWalker
-    $band = $r.Top + $r.Height * 0.15
-    $queue = New-Object System.Collections.Queue
-    $queue.Enqueue($root)
-    $best = $null; $bestLen = 0; $seen = 0
-    while ($queue.Count -and $seen -lt 1500 -and $sw.ElapsedMilliseconds -lt 1500) {
-      $e = $queue.Dequeue()
-      $c = $walker.GetFirstChild($e)
-      while ($c) {
-        $seen++
-        try {
-          $b = $c.Current.BoundingRectangle
-          if (-not $b.IsEmpty -and $b.Top -le $band) {
-            $n = $c.Current.Name
-            if ($n) {
-              $x = [int](100.0 * ($b.Left - $r.Left) / $r.Width); $y = [int](100.0 * ($b.Top - $r.Top) / $r.Height)
-              $len = ($n -replace '[^0-9A-Za-z가-힣]', '').Length
-              if ($x -ge 20 -and $x -le 88 -and $y -ge 0 -and $y -le 11 -and $len -ge 4 -and $len -gt $bestLen) { $best = @{ x = $x; y = $y; t = $n.Trim() }; $bestLen = $len }
-            }
-            $queue.Enqueue($c)
-          }
-        } catch {}
-        $c = $walker.GetNextSibling($c)
-      }
-    }
-    if ($best) { $script:uiaFail = 0; return ,@($best) }
-    $script:uiaFail++; $script:uiaWhy = "uia 0개($seen개 봄 $($sw.ElapsedMilliseconds)ms)"
-  } catch { $script:uiaFail++; $script:uiaWhy = "uia 오류 $($_.Exception.Message)" }
-  return $null
 }
 
 # 찍은 그림의 위쪽 18%를 두 배로 키워 읽고, 방 제목 띠(왼쪽 20% 이후, 위 12% 안)의 줄만 돌려준다
@@ -243,6 +258,9 @@ function Invoke-SelfUpdate {
 }
 
 Write-Log "시작 v$HelperVersion"
+# 시작할 때 글자 인식·메뉴 지켜보기를 준비해 둔다 (실패해도 도우미는 계속 돈다)
+try { Initialize-Ocr } catch { Write-Log "글자 인식 준비 실패: $($_.Exception.Message)" }
+if ($script:ocrReady) { Start-MenuWatch }
 $fail = 0
 while ($true) {
   if ((Get-Date) -ge $script:nextUpdateCheck) { Invoke-SelfUpdate }
