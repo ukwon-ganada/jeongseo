@@ -159,8 +159,8 @@
 
   /* ══════════ 형사 항소장 ══════════ */
   function fillHangso(ctx, c) {
-    ctx.replace('2025고단4209', c.casenum || '').replace('사기', c.casename || '')
-       .replace('함 석 훈', spaced(c.defendant)).replace('2026. 7. 9.', c.sentDate || '')
+    ctx.replace('2025고단9001', c.casenum || '').replace('사기', c.casename || '')
+       .replace('김 갑 동', spaced(c.defendant)).replace('2026. 7. 9.', c.sentDate || '')
        .replace('2026. 7. 10.', c.writeDate || '').replace('인천지방법원', c.court || '').replace('형사7단독', c.courtDiv || '');
     if (c.reasons.length) {
       REASONS.forEach(function (r) { if (c.reasons.indexOf(r) < 0) uncheckBox(ctx, r); });
@@ -174,8 +174,8 @@
   }
   /* ══════════ 형사 상고장 ══════════ */
   function fillSanggo(ctx, c) {
-    ctx.replace('2025노3460', c.casenum || '').replace('전자금융거래법위반', c.casename || '')
-       .replace('조용순', c.defendant || '').replace('2026.07.06', c.sentDate || '')
+    ctx.replace('2025노9003', c.casenum || '').replace('전자금융거래법위반', c.casename || '')
+       .replace('박병동', c.defendant || '').replace('2026.07.06', c.sentDate || '')
        .replace('2026. 7. 11.', c.writeDate || '').replace('수원지방법원', c.court || '').replace('제8-1형사부(항소)', c.courtDiv || '');
     if (c.result && c.result !== '항소기각') ctx.replace('항소기각', c.result);
     if (c.gukseon) ctx.replace('위 피고인의 변호인', '위 피고인의 국선변호인');
@@ -186,8 +186,8 @@
   }
 
   /* ══════════ 민가사 항소장 ══════════
-     minga_hangso.hwpx 샘플: 2025가단210684 운송료 / 원고 엄대봉(항소인) /
-       피고 주식회사 비피알코퍼레이션(피항소인) / 인천지방법원 2026.05.20 선고 2026.05.26 송달 /
+     minga_hangso.hwpx 샘플: 2025가단900001 운송료 / 원고 김원고(항소인) /
+       피고 주식회사 가나다상사(피항소인) / 인천지방법원 2026.05.20 선고 2026.05.26 송달 /
        원판결표시(2줄) / 항소취지(4줄) / 2026. 7. 11. / 원고(항소인) 소송대리인 / 인천지방법원 민사13단독 귀중 */
   function fillMingaHangso(ctx, c) {
     var first = c.pairFirst || '원고', second = c.pairSecond || '피고';
@@ -206,8 +206,8 @@
       ctx.section = ctx.section.replace(TOK, '(항  소  인)');
     }
     ctx.replace('원고(항소인) 소송대리인', (c.clientJiwi || '원고') + '(항소인) 소송대리인')
-       .replace('2025가단210684 운송료', (c.casenum || '') + ' ' + (c.casename || ''))
-       .replace('엄대봉', c.plaintiff || '').replace('주식회사 비피알코퍼레이션', c.defendant2 || '')
+       .replace('2025가단900001 운송료', (c.casenum || '') + ' ' + (c.casename || ''))
+       .replace('김원고', c.plaintiff || '').replace('주식회사 가나다상사', c.defendant2 || '')
        .replace('인천지방법원에서', (c.court || '') + '에서')
        .replace('2026. 05. 20.', c.sentDate || '').replace('2026. 05. 26.', c.serveDate || '')
        .replace('2026. 7. 11.', c.writeDate || '');
@@ -221,7 +221,7 @@
   }
 
   /* ══════════ 민가사 상고장 ══════════
-     minga_sanggo.hwpx(f8f672e7 양식): 사건 '2026나50613  손해배상(기)' /
+     minga_sanggo.hwpx(f8f672e7 양식): 사건 '2026나900002  손해배상(기)' /
        상고인 → '상고인 이름' + '(피고, 항소인)' + '(상고인 주소입력공간)' /
        피상고인 → '피상고인 이름' + '(원고, 피항소인)' + '(피상고인 주소입력공간)' /
          (구 양식과 달리 지위 라벨이 이름 '아래' 별도 문단으로 분리됨)
@@ -235,7 +235,7 @@
     var oppName = c.clientSide === 'second' ? c.plaintiff : c.defendant2;
     var clientAddr = c.clientSide === 'second' ? c.addr2 : c.addr1;
     var oppAddr = c.clientSide === 'second' ? c.addr1 : c.addr2;
-    ctx.replace('2026나50613  손해배상(기)', (c.casenum || '') + '  ' + (c.casename || ''))
+    ctx.replace('2026나900002  손해배상(기)', (c.casenum || '') + '  ' + (c.casename || ''))
        .replace('피상고인 이름', oppName || '').replace('상고인 이름', clientName || '')
        .replace('(피상고인 주소입력공간)', oppAddr || '').replace('(상고인 주소입력공간)', clientAddr || '');
     // 당사자 지위 라벨(이름 아래 별도 문단) — 원고/피고 → 실지위. 항소인/피항소인 역할은 기본값 유지
@@ -362,7 +362,7 @@
             '<div class="hs-pick hs-minga"><span class="hs-pick-l">의뢰인 <span class="fs-hint">(지위 자동)</span></span><div class="fs-chips" id="hs-side">' +
               '<span class="fs-chip on" data-v="first" onclick="hsSide(\'first\')"><span class="hs-p1">원고</span> 측</span>' +
               '<span class="fs-chip" data-v="second" onclick="hsSide(\'second\')"><span class="hs-p2">피고</span> 측</span></div></div>' +
-            '<div class="fs-row2 hs-minga"><div class="fs-field"><label class="fs-label"><span class="hs-p1">원고</span></label><input type="text" class="fs-input" id="hs-plaintiff" placeholder="엄대봉"></div>' +
+            '<div class="fs-row2 hs-minga"><div class="fs-field"><label class="fs-label"><span class="hs-p1">원고</span></label><input type="text" class="fs-input" id="hs-plaintiff" placeholder="김원고"></div>' +
               '<div class="fs-field"><label class="fs-label"><span class="hs-p2">피고</span></label><input type="text" class="fs-input" id="hs-defendant2" placeholder="주식회사 ○○"></div></div>' +
             // 사건번호+사건명 한 칸 · 법원+재판부 한 칸 (압축)
             '<div class="fs-field"><label class="fs-label"><span class="hs-hyeongsa">사건번호 · 죄명</span><span class="hs-minga">사건번호 · 사건명</span> <span class="fs-hint">(사건번호 한 칸 띄우고 사건명)</span></label><input type="text" class="fs-input" id="hs-case" placeholder="2025고단1234 사기"></div>' +

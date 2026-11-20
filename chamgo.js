@@ -306,7 +306,7 @@
             '<div class="fs-section">사건 정보</div>' +
             '<div class="cg-row2">' +
               '<div class="fs-field"><label class="fs-label" id="cg-client-label">피고인</label><input type="text" class="fs-input" id="cg-client" placeholder="홍길동"></div>' +
-              '<div class="fs-field"><label class="fs-label">사건명</label><input type="text" class="fs-input" id="cg-caseline" placeholder="2026고단100539 도로교통법위반"></div>' +
+              '<div class="fs-field"><label class="fs-label">사건명</label><input type="text" class="fs-input" id="cg-caseline" placeholder="2026고단1234 도로교통법위반"></div>' +
             '</div>' +
             '<div class="fs-field"><label class="fs-label">제출기관 <span class="fs-hint">(법원 재판부 자동, 검찰 검사실은 수기)</span></label><input type="text" class="fs-input" id="cg-court" placeholder="인천지방법원 형사16단독"></div>' +
             '<div class="fs-field"><label class="fs-label"><input type="checkbox" id="cg-gukseon"> 국선사건 <span class="fs-hint">(국선변호인 + 법무법인 정서 줄 생략)</span></label></div>' +

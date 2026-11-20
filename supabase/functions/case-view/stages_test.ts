@@ -66,20 +66,20 @@ Deno.test("이송·수사관 변경: 바뀌기 전 모습이 이전 기록으로
 
 Deno.test("방 제목에서 공소청 이름·형제번호", () => {
   const f = (t: string) => prosFromTitle(t);
-  assertEquals(f("%$(형/고소)이재욱_광주지방검찰청 2026형제29256"), { org: "광주지방검찰청", no: "2026형제29256" });
+  assertEquals(f("%$(형/고소)이가나_광주지방검찰청 2026형제99999"), { org: "광주지방검찰청", no: "2026형제99999" });
   assertEquals(f("박)신)★%(형/피의)이준호_마약(향정)_의정부지검 고양지청 2026형제308호"), { org: "의정부지검 고양지청", no: "2026형제308" });
   assertEquals(f("◎%■(형/피의)이선구_사기등_남양주지청2026형제3675"), { org: "남양주지청", no: "2026형제3675" });
   assertEquals(f("서)최)★(형/피의자)이종수_사기_인천공 2026형제68248/대전공2026불제16763"), { org: "인천공", no: "2026형제68248" });
   assertEquals(f("서)최)!(형/피의)이선호_스토킹_인천지2026형제64473/잠정"), { org: "", no: "2026형제64473" });
   assertEquals(f("우)%(형/고소)함성은_사기_대구지방공소청 포항지청_2026형제8367"), { org: "대구지방공소청 포항지청", no: "2026형제8367" });
   assertEquals(f("(형/고소)홍길동_사기"), null);
-  const c = { l_code: "2025이재욱", is_inv: false, raw: { l_police_station: "파주경찰서" } };
-  const t = "%$(형/고소)이재욱_광주지방검찰청 2026형제29256";
+  const c = { l_code: "2025이가나", is_inv: false, raw: { l_police_station: "파주경찰서" } };
+  const t = "%$(형/고소)이가나_광주지방검찰청 2026형제99999";
   const s = shapeStages(c, null, [], t);
-  assertEquals([s.cur, s.list[1].org, s.list[1].no, s.list[0].org], ["pros", "광주지방검찰청", "2026형제29256", "파주경찰서"]);
+  assertEquals([s.cur, s.list[1].org, s.list[1].no, s.list[0].org], ["pros", "광주지방검찰청", "2026형제99999", "파주경찰서"]);
   const saved = { cur_stage: "police", stages: { police: { org: "파주경찰서/수사6팀", person: "임대우" } } };
   const s2 = shapeStages(c, saved, [], t);
-  assertEquals([s2.cur, s2.list[1].no], ["police", "2026형제29256"]);
+  assertEquals([s2.cur, s2.list[1].no], ["police", "2026형제99999"]);
 });
 
 Deno.test("제목 형제번호가 로웨어와 다르면 제목이 지금 번호, 로웨어 번호는 이전 기록", () => {
@@ -109,11 +109,11 @@ Deno.test("처분 줄 → 죄명별 처분, 일부 송치면 경찰·공소청 �
     { kind: "송치", ev_date: "2026-07-10", summary: "이의신청으로 인천지검 송치" },
   ]);
   assertEquals(two.police, "송치");
-  const c = { l_code: "2025이재욱", is_inv: false, raw: { l_police_station: "파주경찰서" } };
+  const c = { l_code: "2025이가나", is_inv: false, raw: { l_police_station: "파주경찰서" } };
   const saved = { cur_stage: "police", stages: { police: { org: "파주경찰서/수사6팀", person: "임대우" } } };
-  const s = shapeStages(c, saved, [], "%$(형/고소)이재욱_광주지방검찰청 2026형제29256", [{ kind: "처분", ev_date: "2026-08-20", summary: "사기 송치, 모욕 불송치 확인" }]);
+  const s = shapeStages(c, saved, [], "%$(형/고소)이가나_광주지방검찰청 2026형제99999", [{ kind: "처분", ev_date: "2026-08-20", summary: "사기 송치, 모욕 불송치 확인" }]);
   assertEquals([s.cur, s.act, s.list[0].disp, s.list[0].dispAuto], ["police", ["police", "pros"], "사기 송치 · 모욕 불송치", "사기 송치 · 모욕 불송치"]);
-  assertEquals(s.dispNo, "2026형제29256");
+  assertEquals(s.dispNo, "2026형제99999");
   const s2 = shapeStages(c, { ...saved, stages: { police: { org: "파주경찰서", disp: "사기 송치" } } }, [], "", [{ kind: "처분", ev_date: "2026-08-20", summary: "사기 송치, 모욕 불송치 확인" }]);
   assertEquals([s2.list[0].disp, s2.act], ["사기 송치", []]);
 });

@@ -30,7 +30,7 @@ export function stageOfNo(no: string): StageKey | "" {
 }
 
 // 방 제목의 공소청(검찰청) 이름·형제번호 (2026-11-19 석원 "1순위": 제목엔 있는데 공소청 칸이 비어 있던 문제)
-//   예) "광주지방검찰청 2026형제29256" → { org: "광주지방검찰청", no: "2026형제29256" }
+//   예) "광주지방검찰청 2026형제99999" → { org: "광주지방검찰청", no: "2026형제99999" }
 export function prosFromTitle(title: string): { org: string; no: string } | null {
   const t = nz(title);
   const m = t.match(/(?:([가-힣]+(?:\s+[가-힣]+지청)?)[\s_]*)?(\d{4})\s*형제\s*(\d+)/);
@@ -260,7 +260,7 @@ export function shapeStages(c: any, saved: any | null, logs: any[], title = "", 
   // 처분: 직원이 [수정]에서 적은 값이 없으면 사건방 처분 줄에서 뽑은 값
   const auto = dispFromEvents(rows);
   for (const s of ["police", "pros"] as const) if (!vals[s].disp) vals[s].disp = auto[s];
-  // 일부 송치(송치와 불송치가 함께): 경찰·공소청 둘 다 진행 중 (2026-11-19 석원, 이재욱 사건)
+  // 일부 송치(송치와 불송치가 함께): 경찰·공소청 둘 다 진행 중 (2026-11-19 석원)
   const act: StageKey[] = mixedDisp(vals.police.disp) ? ["police", "pros"] : [];
   let cur: StageKey = isStage(saved?.cur_stage) ? saved.cur_stage : autoStage(c, title);
   // 송치돼 공소청 번호가 새로 들어오면 지금 단계를 공소청으로 (저장 뒤에 들어온 번호일 때만)
