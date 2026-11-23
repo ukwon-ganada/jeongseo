@@ -143,6 +143,7 @@ main{max-width:880px;margin:0 auto;padding:12px 16px 32px}
 .ev.moved .rail::after{background:var(--surface)}
 .ev.moved .tt{color:var(--muted);font-weight:500;text-decoration:line-through;text-decoration-color:var(--muted)}
 .ev.moved .pill,.li .mv{background:var(--due);color:#fff;font-weight:700;text-decoration:none}
+.ev .pill.res,.li .res{display:inline-block;font-size:11px;font-weight:600;line-height:1;padding:2px 6px;border-radius:999px;margin-left:6px;vertical-align:2px;background:transparent;color:var(--muted);border:1px solid var(--line)}
 .pill.wit,.li .wit{display:inline-block;font-size:11px;font-weight:700;line-height:1;padding:3px 6px;border-radius:999px;margin-left:6px;vertical-align:2px;background:var(--g-hearing);color:#fff;border:1px solid var(--g-hearing)}
 .pill.wit.est,.li .wit.est{background:transparent;color:var(--g-hearing)}
 .li .mv{display:inline-block;font-size:11px;font-weight:600;line-height:1;padding:3px 6px;border-radius:999px;margin-left:6px;vertical-align:2px}
@@ -505,6 +506,9 @@ var VIEWS = {
       // 받은 사람·낸 사람(소송기록접수통지 도달, 이유서 제출)은 제목 옆에 (2026-11-20 석원)
       if(g==='notice'||g==='filing'){ var wm=String(e.t||'').match(/\s*\(([^()]*)\)\s*$/); if(wm){ p.tt=String(e.t).slice(0,wm.index); p.ts=''; pill=wm[1].split('·').map(function(w){ return '<span class="pill who'+(w==='우리'?' us':'')+'">'+esc(w)+'</span>'; }).join(''); } }
       if(e.wit && !(g==='hearing' && isMoved(p.ts))) pill='<span class="pill wit'+(e.wit==='추정'?' est':'')+'">증인신문</span>'+pill;
+      // 속행된 기일: 취소는 아니지만 한눈에 (2026-11-23 석원, 증인신문보다 약하게)
+      var SOK=/\s*·\s*속행(\s*\(\s*추정\s*\))?\s*$/;
+      if(g==='hearing' && SOK.test(p.ts||'') && !isMoved(p.ts)){ p.ts=p.ts.replace(SOK,''); pill+='<span class="pill res">속행</span>'; }
       var moved=g==='hearing' && isMoved(p.ts); if(moved){ pill='<span class="pill">'+(p.ts.match(MOVED_RE)[0])+'</span>'; p.ts=p.ts.replace(/\s*·\s*[^·]*(변론재개|선고연기|재판연기|기일변경|기일연기|연기|추정|취소)[^·]*$/,''); }
       body+='<div class="ev '+e.k+(e.cfa?' cf'+(/^제출/.test(e.cfa)?' sub':''):'')+(g?' g-'+g:'')+(minor?' minor':'')+(key&&!moved?' key':'')+(moved?' moved':'')+'"><div class="d"><b>'+md(e.d)+'</b><small>'+wk(e.d)+'</small></div><div class="rail"></div><div class="t">'
         +'<div class="tt">'+esc(p.tt)+pill+(e.cf?fileChip(e.cf,'계약서'):'')+(e.f&&!e.minor?fileChip(e.f,'열기'):'')+'</div>'+(p.ts?'<div class="ts">'+esc(p.ts)+'</div>':'')+'</div></div>';
@@ -541,7 +545,7 @@ var VIEWS = {
     var gone=function(x){ return isMoved(x.t); };
     var up=pick.filter(function(x){return dd(x.d)>=0 && !gone(x);}).sort(function(a,b){return (a.d+a.tm).localeCompare(b.d+b.tm);});
     var past=all?[]:pick.filter(function(x){return dd(x.d)<0 || gone(x);}).sort(function(a,b){return b.d.localeCompare(a.d);});
-    var row=function(x, isPast){ var t=String(x.t||''), mv=isMoved(t) && t.match(MOVED_RE); if(mv) t=t.replace(/\s+\(.*$/,''); return '<div class="li'+(isPast?' past':'')+(mv?' moved':'')+'"><span class="tm">'+esc(x.tm||'')+'</span><div class="main"><div class="t">'+(all?'<span class="casechip">'+esc(x.c)+'</span>':'')+(mv?'<span class="x">'+esc(t)+'</span><span class="mv">'+mv[0]+'</span>':esc(t))+(x.wit&&!mv?'<span class="wit'+(x.wit==='추정'?' est':'')+'">증인신문</span>':'')+'</div>'+(x.p?'<div class="s">'+esc(x.p)+'</div>':'')+'</div></div>'; };
+    var row=function(x, isPast){ var t=String(x.t||''), mv=isMoved(t) && t.match(MOVED_RE); if(mv) t=t.replace(/\s+\(.*$/,''); var sok=!mv && /\s*\(\s*속행(\s*\(\s*추정\s*\))?\s*\)\s*$/.test(t); if(sok) t=t.replace(/\s*\(\s*속행.*$/,''); return '<div class="li'+(isPast?' past':'')+(mv?' moved':'')+'"><span class="tm">'+esc(x.tm||'')+'</span><div class="main"><div class="t">'+(all?'<span class="casechip">'+esc(x.c)+'</span>':'')+(mv?'<span class="x">'+esc(t)+'</span><span class="mv">'+mv[0]+'</span>':esc(t))+(x.wit&&!mv?'<span class="wit'+(x.wit==='추정'?' est':'')+'">증인신문</span>':'')+(sok?'<span class="res">속행</span>':'')+'</div>'+(x.p?'<div class="s">'+esc(x.p)+'</div>':'')+'</div></div>'; };
     var h=chips('scope', [['case','이 사건'],['all','내 사건 전체 · 4주']]), last='', card='';
     up.forEach(function(x){
       if(x.d!==last){ if(card) h+=card+'</div>'; last=x.d; var n=dd(x.d); card='<div class="card"><div class="card-h"><span style="color:var(--ink)">'+md(x.d)+' ('+wk(x.d)+')</span><span class="dday">'+(n===0?'오늘':'D-'+n)+'</span></div>'; }
