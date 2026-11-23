@@ -17,9 +17,9 @@ const files = [
   { id: 5, n: "위임계약서.pdf", d: "2026-11-01", tm: "10:00", at: 1, pdf: 1, lp: null },
 ];
 
-Deno.test("AI 질문: 예정·사소한 줄은 빼고, 대화도 함께", () => {
+Deno.test("AI 질문: 사소한 줄은 빼고(앞으로의 기일은 후보, 단 파일 무렵만 물음), 대화도 함께", () => {
   const lines = candidateLines(ev(), /열람|복사/);
-  assert(lines.length === 3, "줄 수 " + lines.length);
+  assert(lines.length === 4, "줄 수 " + lines.length);
   const p = buildPrompt("사건", lines, files.slice(0, 2), [{ at: Date.parse("2026-11-18T00:35:00Z"), text: "선임신고서 우편제출하겠습니다" }]);
   assert(p.user.includes("선임신고서 우편제출하겠습니다"), "대화 없음");
   assert(!p.user.includes("열람"), "사소한 줄 들어감");
@@ -202,13 +202,13 @@ Deno.test("계약서도 AI가: 사건 선임 줄을 고르면 계약서 자리(c
   assert(buildPrompt("사건", lines, fs, []).user.includes("[사건 선임]"), "선임 줄 이름");
 });
 
-Deno.test("예정인 우리 제출 줄(방 대화)은 후보, 기한·앞으로의 기일은 아님 / 사건번호를 프롬프트에", () => {
+Deno.test("예정인 우리 제출 줄(방 대화)·앞으로의 기일은 후보, 기한은 아님 / 사건번호를 프롬프트에", () => {
   const lines = candidateLines([
     { d: "2026-11-20", k: "due", g: "ours", t: "선임계 제출(○○경찰서)", src: "chat", rid: 1 },
     { d: "2026-11-30", k: "due", g: "hearing", t: "다음 기일" },
     { d: "2026-11-25", k: "due", g: "limit", t: "항소이유서 마감", src: "chat", rid: 2 },
   ], /열람/);
-  assert(lines.length === 1 && lines[0].rid === 1, "예정 제출 줄만: " + JSON.stringify(lines));
+  assert(lines.length === 2 && lines[0].rid === 1 && lines[1].g === "hearing", "예정 제출 줄·기일: " + JSON.stringify(lines));
   const { user } = buildPrompt("2025노1234 홍길동외1", lines, [{ id: 9, d: "2026-11-20", n: "홍길동_선임계.pdf", at: Date.parse("2026-11-20T00:45:00Z") }], []);
   assert(user.includes("사건: 2025노1234") && user.includes("선임계 제출"), user);
 });
@@ -242,4 +242,10 @@ Deno.test("직원이 고른 판단(manual)은 다시 묻지 않고, 같은 줄�
   assert((ev[0] as any).lk === "r:5" && (ev[1] as any).lk === undefined, "lk는 lp 아닌 줄에만");
   const pend = pendingFiles(files.map((f) => ({ ...f, n: f.n })), lines, cache, () => false);
   assert(!pend.some((f: any) => f.id === 1), "manual은 다시 안 물음");
+});
+
+Deno.test("신문사항(2026-11-23 석원): 오늘 공판기일 줄도 후보, 지침에 신문사항", () => {
+  const lines = candidateLines([{ d: "2026-11-23", k: "due", g: "hearing", t: "공판기일(제318호 법정 15:20)" }], /열람/);
+  const { user } = buildPrompt("2025고단1 홍길동", lines, [{ id: 3, d: "2026-11-23", n: "피고인홍길동신문사항_261123.pdf", at: Date.parse("2026-11-23T01:30:00Z") }], []);
+  assert(user.includes("공판기일(제318호 법정 15:20)"), user);
 });
