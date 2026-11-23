@@ -47,6 +47,7 @@ const json = (b: unknown, status = 200) =>
 import { rankEvents } from "./timeline_rank.ts";
 import { applyConfirms, computeDeadlines, deadlineEvents, DL_ACTS, isNotice, mergeRoles, ourDefendants, type OtherCase } from "./deadlines.ts";
 import { findPick, normTitle } from "./title_match.ts";
+import { applyWitness } from "./witness.ts";
 import { dropKnown, dropSame, extractFromExport, msgsToExport, toRows } from "./chat_import.ts";
 import { shapeStages, diffStages, personChangeLine, isStage, noLines, chatNos, withChatNos, type NoHist } from "./stages.ts";
 // 방 제목 형제번호로 공소청 칸 채우기(2026-11-19): 바뀌는 방 목록을 석원님이 확인한 뒤 켠다
@@ -881,6 +882,8 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
         if (c.state === "종결") status = "종결";
       } else return out({ error: "방이나 사건번호가 없습니다" }, 400);
 
+      // 증인신문 기일 확정 근거(대법원 기일 참석자): 다른 조회와 함께 미리 받아 둔다
+      const witLogP = c.l_num != null && Number(c.l_num) > 0 ? rest(env, `lw_case_detail?select=scourt_appoint_log&l_num=eq.${c.l_num}&limit=1`, {}, fetcher).catch(() => []) : Promise.resolve([]);
       let chans: string[], rel: number[];
       let evs: any, mine: any, savedOwn: any, files: any, chat: any, checked: any, meets: any, stageLogs: any, relCases: any, titleRows: any, relEvs: any, hist: any;
       if (fast) {
@@ -921,6 +924,7 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       const sameLv = others.filter((o) => levelOf(o.code) === levelOf(nz(c.l_code)));
       const shaped = shapeCase(c, evs || [], { today, linked, myHearings, status, saved, others: sameLv });
       shaped.progress.checked = checked;
+      applyWitness(shaped, evs || [], nz(((await witLogP) || [])[0]?.scourt_appoint_log));
       const titles = (titleRows || []) as any[];
       const roomTitle = nz(titles[0]?.room_title);
       // 심급 묶음: 같은 방 사건을 1심·2심…으로 묶고, 지난 심급 업무 줄과 심급별 나의사건 기록을 만든다
