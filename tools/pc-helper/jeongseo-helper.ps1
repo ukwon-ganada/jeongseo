@@ -1,4 +1,7 @@
 ﻿# 정서 사건 도우미 — 사건방 "이 방 사건 보기"를 누르면 이 PC 브라우저에 사건 화면을 연다.
+# v2.6: 미리 읽기로 답한 경우 읽은 방법을 'pre'로 보고(서버 기록에 남게)
+# v2.5: ≡ 누른 순간 찍은 그림의 글자 읽기를 뒤에서 미리 해 둔다(사건 화면이 물을 때 바로 답함, 약 0.4초 단축).
+#       미리 읽기가 아직 안 끝났거나 실패하면 예전처럼 그 자리에서 읽는다
 # v2.4: 웍스에서 ≡ 메뉴를 누르는 순간(웍스 작은 창이 새로 뜸, 웍스가 맨 앞) 웍스 창 위쪽을 화면 그대로 찍어 둔다.
 #       사건 화면이 방을 물으면 그 그림을 먼저 읽고(브라우저에 가려지기 전 모습), 안 되면 예전처럼 찍어서 읽는다.
 #       (그때 화면을 다시 찍지는 않는다: 브라우저가 앞에 있어 다른 글자를 읽을 수 있음) 읽은 방법·못 읽은 이유를 함께 보낸다
@@ -11,7 +14,7 @@
 # 화면 없이 뒤에서 돈다. 설정: %APPDATA%\JeongseoHelper\config.json (설치 때 만들어짐)
 # 끄기: 작업 관리자 > powershell(정서 사건 도우미) 끝내기, 또는 uninstall.cmd
 $ErrorActionPreference = 'Stop'
-$HelperVersion = '2.4'
+$HelperVersion = '2.6'
 $dir = Join-Path $env:APPDATA 'JeongseoHelper'
 $cfg = Get-Content (Join-Path $dir 'config.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 $log = Join-Path $dir 'helper.log'
@@ -100,6 +103,7 @@ public static class MenuWatch {
   delegate bool EnumProc(IntPtr h, IntPtr l);
   [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc f, IntPtr l);
   static Bitmap last; static DateTime lastAt; static readonly object lk = new object(); static bool started;
+  public static int Seq;
   public static string LastError = "";
   static string Title(IntPtr h) { var sb = new System.Text.StringBuilder(64); GetWindowText(h, sb, 64); return sb.ToString(); }
   static uint Pid(IntPtr h) { uint p; GetWindowThreadProcessId(h, out p); return p; }
@@ -132,9 +136,13 @@ public static class MenuWatch {
         RECT m; GetWindowRect(main, out m);
         var b = new Bitmap(Math.Max(1, m.R - m.L), Math.Max(1, m.B - m.T));
         using (var g = Graphics.FromImage(b)) { g.CopyFromScreen(m.L, m.T, 0, 0, b.Size); }
-        lock (lk) { if (last != null) last.Dispose(); last = b; lastAt = DateTime.UtcNow; }
+        lock (lk) { if (last != null) last.Dispose(); last = b; lastAt = DateTime.UtcNow; Seq++; Monitor.PulseAll(lk); }
       } catch (Exception e) { LastError = e.Message; }
     }
+  }
+  // 새 그림(번호가 seen과 다름)이 올 때까지 기다린다 (뒤에서 미리 읽기용)
+  public static bool WaitNew(int seen, int timeoutMs) {
+    lock (lk) { if (Seq != seen) return true; Monitor.Wait(lk, timeoutMs); return Seq != seen; }
   }
   // maxAgeMs 안에 찍어 둔 그림의 복사본 (없으면 null)
   public static Bitmap Take(int maxAgeMs) {
@@ -148,6 +156,74 @@ public static class MenuWatch {
     [MenuWatch]::Start()
     $script:menuOn = $true
   } catch { Write-Log "메뉴 지켜보기 준비 실패: $($_.Exception.Message)" }
+  if ($script:menuOn) { Start-PreOcr }
+}
+
+# ── 뒤에서 미리 읽기: 새 그림이 찍히면 바로 글자를 읽어 $script:pre 에 둔다 (따로 도는 작업, 실패해도 본래 흐름은 그대로) ──
+$script:pre = [hashtable]::Synchronized(@{ seq = -1; lines = $null; err = '' })
+$preScript = @'
+$ErrorActionPreference = 'Stop'
+try {
+  Add-Type -AssemblyName System.Runtime.WindowsRuntime
+  $null = [Windows.Media.Ocr.OcrEngine, Windows.Foundation, ContentType = WindowsRuntime]
+  $null = [Windows.Graphics.Imaging.BitmapDecoder, Windows.Graphics, ContentType = WindowsRuntime]
+  $null = [Windows.Globalization.Language, Windows.Globalization, ContentType = WindowsRuntime]
+  $asTask = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object {
+    $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation`1' })[0]
+  $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromLanguage((New-Object Windows.Globalization.Language 'ko'))
+  if (-not $engine) { $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages() }
+  if (-not $engine) { throw '한국어 글자 인식 없음' }
+} catch { $pre.err = "준비 실패: $($_.Exception.Message)"; return }
+function AwaitP($op, [Type]$t) {
+  $task = $asTask.MakeGenericMethod($t).Invoke($null, @($op))
+  $sw = [Diagnostics.Stopwatch]::StartNew()
+  while (-not $task.IsCompleted) { Start-Sleep -Milliseconds 15; if ($sw.ElapsedMilliseconds -gt 8000) { throw '글자 인식 응답 없음' } }
+  $task.Result
+}
+$seen = [MenuWatch]::Seq
+while ($true) {
+  try {
+    if (-not [MenuWatch]::WaitNew($seen, 30000)) { continue }
+    $seen = [MenuWatch]::Seq
+    $full = [MenuWatch]::Take(10000)
+    if (-not $full) { continue }
+    try {
+      $cropH = [int]($full.Height * 0.18)
+      $crop = New-Object Drawing.Bitmap ($full.Width * 2), ($cropH * 2)
+      $g = [Drawing.Graphics]::FromImage($crop)
+      $g.InterpolationMode = 'HighQualityBicubic'
+      $g.DrawImage($full, (New-Object Drawing.Rectangle 0, 0, $crop.Width, $crop.Height), (New-Object Drawing.Rectangle 0, 0, $full.Width, $cropH), 'Pixel')
+      $g.Dispose()
+      $ms = New-Object IO.MemoryStream
+      $crop.Save($ms, [Drawing.Imaging.ImageFormat]::Png); $ms.Position = 0
+      $stream = [System.IO.WindowsRuntimeStreamExtensions]::AsRandomAccessStream($ms)
+      $dec = AwaitP ($([Windows.Graphics.Imaging.BitmapDecoder]::CreateAsync($stream))) ([Windows.Graphics.Imaging.BitmapDecoder])
+      $bmp = AwaitP ($dec.GetSoftwareBitmapAsync()) ([Windows.Graphics.Imaging.SoftwareBitmap])
+      $res = AwaitP ($engine.RecognizeAsync($bmp)) ([Windows.Media.Ocr.OcrResult])
+      $out = @()
+      foreach ($l in $res.Lines) {
+        $first = $null; foreach ($wd in $l.Words) { $first = $wd; break }
+        if (-not $first) { continue }
+        $rr = $first.BoundingRect
+        $x = [int](100.0 * [double]$rr.X / [double]$crop.Width)
+        $y = [int](18.0 * [double]$rr.Y / [double]$crop.Height)
+        if ($x -ge 20 -and $y -le 12) { $out += @{ x = $x; y = $y; t = $l.Text } }
+      }
+      $crop.Dispose(); $ms.Dispose()
+      $pre.lines = $out; $pre.seq = $seen
+    } finally { $full.Dispose() }
+  } catch { $pre.err = $_.Exception.Message; Start-Sleep -Milliseconds 500 }
+}
+'@
+function Start-PreOcr {
+  try {
+    $rs = [runspacefactory]::CreateRunspace(); $rs.Open()
+    $rs.SessionStateProxy.SetVariable('pre', $script:pre)
+    $ps = [powershell]::Create(); $ps.Runspace = $rs
+    [void]$ps.AddScript($preScript)
+    $script:preHandle = $ps.BeginInvoke()
+    $script:prePs = $ps
+  } catch { Write-Log "미리 읽기 준비 실패: $($_.Exception.Message)" }
 }
 
 # 웍스 창의 방 제목 줄을 돌려준다: ≡ 누른 순간 찍어 둔 그림 → 지금 찍어서 읽기(PrintWindow)
@@ -179,7 +255,21 @@ function Read-WorksRoomTitle {
   $why = @()
   # ≡ 누른 순간 찍어 둔 그림(10초 안: 다른 방 그림을 잘못 쓰지 않게 짧게)이 있으면 그것부터
   $mb = $null
-  if ($script:menuOn) { $mb = [MenuWatch]::Take(10000) }
+  if ($script:menuOn) {
+    # 뒤에서 미리 읽어 둔 결과가 지금 그림(번호 같음)의 것이면 바로 쓴다. 읽는 중이면 0.8초까지 기다린다
+    try {
+      $probe = [MenuWatch]::Take(10000)
+      if ($probe) {
+        $probe.Dispose()
+        $want = [MenuWatch]::Seq
+        $sw2 = [Diagnostics.Stopwatch]::StartNew()
+        while ($script:pre.seq -ne $want -and $sw2.ElapsedMilliseconds -lt 800 -and $script:prePs -and -not $script:preHandle.IsCompleted) { Start-Sleep -Milliseconds 20 }
+        $pl = $script:pre.lines
+        if ($script:pre.seq -eq $want -and $pl -and $pl.Count) { $script:via = 'pre'; return ,@($pl) }
+      }
+    } catch {}
+    $mb = [MenuWatch]::Take(10000)
+  }
   if ($mb) {
     try { $out = Read-ByOcr $mb; if ($out.Count) { $script:via = 'menu'; return ,$out }; $why += 'menu 0줄' } finally { $mb.Dispose() }
   } else { $why += 'menu 없음' }
