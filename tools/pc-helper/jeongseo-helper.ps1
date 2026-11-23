@@ -1,4 +1,5 @@
 ﻿# 정서 사건 도우미 — 사건방 "이 방 사건 보기"를 누르면 이 PC 브라우저에 사건 화면을 연다.
+# v2.6: 미리 읽기로 답한 경우 읽은 방법을 'pre'로 보고(서버 기록에 남게)
 # v2.5: ≡ 누른 순간 찍은 그림의 글자 읽기를 뒤에서 미리 해 둔다(사건 화면이 물을 때 바로 답함, 약 0.4초 단축).
 #       미리 읽기가 아직 안 끝났거나 실패하면 예전처럼 그 자리에서 읽는다
 # v2.4: 웍스에서 ≡ 메뉴를 누르는 순간(웍스 작은 창이 새로 뜸, 웍스가 맨 앞) 웍스 창 위쪽을 화면 그대로 찍어 둔다.
@@ -13,7 +14,7 @@
 # 화면 없이 뒤에서 돈다. 설정: %APPDATA%\JeongseoHelper\config.json (설치 때 만들어짐)
 # 끄기: 작업 관리자 > powershell(정서 사건 도우미) 끝내기, 또는 uninstall.cmd
 $ErrorActionPreference = 'Stop'
-$HelperVersion = '2.5'
+$HelperVersion = '2.6'
 $dir = Join-Path $env:APPDATA 'JeongseoHelper'
 $cfg = Get-Content (Join-Path $dir 'config.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 $log = Join-Path $dir 'helper.log'
@@ -264,7 +265,7 @@ function Read-WorksRoomTitle {
         $sw2 = [Diagnostics.Stopwatch]::StartNew()
         while ($script:pre.seq -ne $want -and $sw2.ElapsedMilliseconds -lt 800 -and $script:prePs -and -not $script:preHandle.IsCompleted) { Start-Sleep -Milliseconds 20 }
         $pl = $script:pre.lines
-        if ($script:pre.seq -eq $want -and $pl -and $pl.Count) { $script:via = 'menu-pre'; return ,@($pl) }
+        if ($script:pre.seq -eq $want -and $pl -and $pl.Count) { $script:via = 'pre'; return ,@($pl) }
       }
     } catch {}
     $mb = [MenuWatch]::Take(10000)
