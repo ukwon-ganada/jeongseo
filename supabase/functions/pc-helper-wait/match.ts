@@ -81,6 +81,8 @@ export function clientName(s: string): string {
 export function sameClient(a: string, b: string): boolean {
   if (!a || !b) return true;
   if (a.includes(b) || b.includes(a)) return true;
+  // 같은 길이에서 한 글자만 다르면 같은 이름(3글자 이름은 한 글자만 틀려도 두 글자 묶음이 다 달라짐: 이흥권→이홍권, 2026-11-23 석원 PC)
+  if (a.length === b.length && [...a].filter((ch, i) => ch !== b[i]).length <= 1) return true;
   const A = bigrams(a), B = bigrams(b);
   let inter = 0;
   for (const [g] of B) if (A.has(g)) inter++;
