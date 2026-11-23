@@ -248,4 +248,6 @@ Deno.test("신문사항(2026-11-23 석원): 오늘 공판기일 줄도 후보, �
   const lines = candidateLines([{ d: "2026-11-23", k: "due", g: "hearing", t: "공판기일(제318호 법정 15:20)" }], /열람/);
   const { user } = buildPrompt("2025고단1 홍길동", lines, [{ id: 3, d: "2026-11-23", n: "피고인홍길동신문사항_261123.pdf", at: Date.parse("2026-11-23T01:30:00Z") }], []);
   assert(user.includes("공판기일(제318호 법정 15:20)"), user);
+  const w = buildPrompt("2025고단1 홍길동", [{ d: "2026-11-24", k: "due", g: "hearing", t: "공판기일", wit: "추정" }], [{ id: 4, d: "2026-11-23", n: "증인신문사항_261123.pdf", at: Date.parse("2026-11-23T01:30:00Z") }], []);
+  assert(w.user.includes("[증인신문 기일]"), w.user);
 });
