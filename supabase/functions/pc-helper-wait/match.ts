@@ -78,11 +78,23 @@ export function clientName(s: string): string {
   return name;
 }
 // 이름이 서로 다르면 false (OCR이 한 글자 틀리는 건 봐준다: 두 글자 묶음이 절반 이상 같으면 같은 이름)
+const VOWEL_GROUP: Record<number, number> = { 8: 1, 12: 1, 13: 1, 17: 1, 18: 1, 4: 2, 6: 2, 0: 3, 2: 3 };
+export function ocrVowelSlip(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  const diff = [...a].map((ch, i) => [ch, b[i]] as const).filter(([x, y]) => x !== y);
+  if (diff.length !== 1) return false;
+  const ca = diff[0][0].charCodeAt(0) - 0xac00, cb = diff[0][1].charCodeAt(0) - 0xac00;
+  if (ca < 0 || cb < 0 || ca > 11171 || cb > 11171) return false;
+  if (Math.floor(ca / 588) !== Math.floor(cb / 588) || ca % 28 !== cb % 28) return false;
+  const va = Math.floor((ca % 588) / 28), vb = Math.floor((cb % 588) / 28);
+  return !!VOWEL_GROUP[va] && VOWEL_GROUP[va] === VOWEL_GROUP[vb];
+}
 export function sameClient(a: string, b: string): boolean {
   if (!a || !b) return true;
   if (a.includes(b) || b.includes(a)) return true;
-  // 같은 길이에서 한 글자만 다르면 같은 이름(3글자 이름은 한 글자만 틀려도 두 글자 묶음이 다 달라짐: 이흥권→이홍권, 2026-11-23 석원 PC)
-  if (a.length === b.length && [...a].filter((ch, i) => ch !== b[i]).length <= 1) return true;
+  // OCR이 모음 획 하나를 헷갈린 경우만 같은 이름(이흥권→이홍권, 2026-11-23 석원 PC): 한 글자만 다르고,
+  // 그 글자의 첫소리·받침이 같고, 모음이 모양 비슷한 무리(ㅗㅛㅜㅠㅡ / ㅓㅕ / ㅏㅑ) 안에서만 다를 때
+  if (ocrVowelSlip(a, b)) return true;
   const A = bigrams(a), B = bigrams(b);
   let inter = 0;
   for (const [g] of B) if (A.has(g)) inter++;

@@ -117,6 +117,8 @@ Deno.test("넓은 창: x=21% 제목 줄도 읽고 짧은 잡줄은 뺀다", () =
 Deno.test("이름 한 글자 OCR 오류는 같은 사람으로 보고 제목으로 찾는다", () => {
   assertEquals(sameClient("이흥길", "이홍길"), true);
   assertEquals(sameClient("이흥길", "김홍길"), false);
+  assertEquals(sameClient("이상민", "이성민"), false); // ㅏ/ㅓ는 다른 이름으로
+  assertEquals(sameClient("한수연", "한소연"), true);  // ㅜ/ㅗ는 OCR 혼동 가능(제목 나머지 비교로 가림)
   const rooms = [...ROOMS, { channel_id: "F", room_title: "박)신)!(형/피고인)이흥길_강간상해등_인천지방법원 항소심" }];
   const m = matchRoom([{ x: 24, y: 8, t: "박)신)!(형/피고인)이홍길-강간상해등-인천지방법원 항소심" }], rooms);
   assertEquals([m.channelId, m.how], ["F", "title"]);
