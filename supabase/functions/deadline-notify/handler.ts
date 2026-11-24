@@ -179,7 +179,8 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
     if (dup?.length) { result.push({ channel: r.channel, skip: "같은 내용 이미 보냄" }); continue; }
     try {
       const bot = await sendRoom(env, token, r.channel, { type: "text", text: r.text }, fetcher);
-      if (r.cards.length) await sendRoom(env, token, r.channel, { type: "carousel", columns: r.cards }, fetcher).catch((e) => result.push({ channel: r.channel, cardError: String(e?.message || e) }));
+      // 확정 버튼 카드는 보내지 않는다 (2026-11-24 석원 "버튼기능 삭제"): 웍스 카드는 눌러도 반응을 보여 줄 수 없어서.
+      //   기한 확정은 사건 화면 기한 탭 [수정]에서 한다.
       await rest(env, "sent", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ fingerprint: fp, channel_id: r.channel, l_code: null, sent_at: new Date().toISOString(), body: r.text, sent_by: "supabase:" + bot }) }, fetcher);
       result.push({ channel: r.channel, ok: true });
     } catch (e) {
