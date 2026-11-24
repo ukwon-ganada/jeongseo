@@ -4,6 +4,7 @@
 //  지금 하는 일:
 //    · 기한 알림 카드의 버튼 [제출함] [상소 안 함] [종결·사임](postback "dl|f|사건번호|종류|만료일")을 누르면
 //      deadline_confirm 에 기록한다 → 알림 프로그램이 그 기한을 더 알리지 않는다 (규칙서 R17).
+//      누르자마자 도우미가 짧은 글로 답한다(dl_ack.ts, lw_settings.dl_ack_to = room|user|off).
 //    · 사건방 리치 메뉴 "이 방 사건 보기"(postback, data="room-case")를 받으면
 //      누가(userId)·어느 방(channelId)에서 눌렀는지 pc_open_request 에 기록한다.
 //      → 그 사람 PC의 "정서 사건 도우미"가 받아서 사건 화면을 연다.
@@ -30,6 +31,7 @@
 // ============================================================================
 
 import { saveRoomFile } from "./room_file.ts";
+import { ackText, sendAck } from "./dl_ack.ts";
 import { linkPicked, linkRoomAnyBot, relinkRoom } from "./room_link.ts";
 import { handleRoomFile, handleRoomText } from "./room_chat.ts";
 import { backfillHold, recheckAll, recheckLinked, recheckRoom, refreshRoomTitles } from "./inv_case.ts";
@@ -177,18 +179,28 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
   }
   const dl = ev?.type === "postback" ? parseDeadlinePostback(data) : null;
   if (dl && userId) {
-    // 같은 사람이 같은 기한에 같은 버튼을 또 누르면 한 번만 남긴다
+    // 같은 기한에 같은 버튼이 또 눌리면 한 번만 남기고 답도 다시 하지 않는다
     const q = `deadline_confirm?select=id&undone_at=is.null&l_code=eq.${encodeURIComponent(dl.l_code)}` +
       `&kind=eq.${encodeURIComponent(dl.kind)}&due=eq.${dl.due}&action=eq.${encodeURIComponent(dl.action)}&limit=1`;
     const ex = await rest(env, q).then((r) => r.ok ? r.json() : []).catch(() => []);
+    let fresh = false; // 이번 누름으로 처음 확정됨 (동시에 여러 번 눌려도 표의 고유 조건으로 하나만 성공)
     if (!ex?.length) {
       const ins = await rest(env, "deadline_confirm", {
         method: "POST",
         headers: { Prefer: "return=minimal" },
         body: JSON.stringify({ ...dl, works_user_id: userId, channel_id: channelId || null }),
       });
-      if (!ins.ok) console.error("deadline_confirm insert failed", ins.status, await ins.text());
-      else { await ins.body?.cancel(); console.log("deadline_confirm", dl.action); }
+      if (ins.status === 409) await ins.body?.cancel(); // 방금 다른 누름이 먼저 확정함
+      else if (!ins.ok) console.error("deadline_confirm insert failed", ins.status, await ins.text());
+      else { await ins.body?.cancel(); fresh = true; console.log("deadline_confirm", dl.action); }
+    }
+    // 누르면 바로 답 (2026-11-24 석원): 카드는 고칠 수 없어 글로 답한다. 처음 확정될 때 한 번만, 이름 없이
+    const bot = req.headers.get("x-works-botid") || String(ev?.botId || "");
+    if (bot && fresh) {
+      background((async () => {
+        const mode = await rest(env, "lw_settings?select=value&key=eq.dl_ack_to").then((r) => r.ok ? r.json() : []).catch(() => []);
+        return sendAck(env, { bot, channelId, userId, mode: String(mode?.[0]?.value || "room") }, ackText(dl), fetcher);
+      })().then((r) => console.log("dl-ack", r)).catch((e) => console.error("dl-ack fail", String(e?.message || e).slice(0, 200))));
     }
   }
   // 사건방에 올라온 파일 → 내려받아 보관 (오래 걸릴 수 있어 응답 뒤에)
