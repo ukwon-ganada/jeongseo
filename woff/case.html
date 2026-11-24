@@ -971,6 +971,12 @@ function fmtTel(v){
   if(d.length<=10) return d.slice(0,3)+'-'+d.slice(3,6)+'-'+d.slice(6);
   return d.slice(0,3)+'-'+d.slice(3,7)+'-'+d.slice(7,11);
 }
+// 한 칸 속 전화번호들(쉼표·'/'·띄어쓰기로 이어 적은 것): 번호마다 '-' 형식으로
+function phonesIn(v){
+  var out=[], m, re=/(?:0\d{1,2}|1[5-9]\d{2})[\s.-]?\d{3,4}[\s.-]?\d{4}/g;
+  while((m=re.exec(String(v||'')))) out.push(fmtTel(m[0].replace(/\D/g,'')));
+  return out;
+}
 function fmtRrn(v){
   if(!/^[\d\s-]*$/.test(v)) return v;
   var d=v.replace(/\D/g,'').slice(0,13);
@@ -1070,7 +1076,11 @@ function saveInfo(btn){
   if(ln){ var no=ln.value.replace(/\s+/g,''); if(no!==linkOrig().replace(/\s+/g,'')) return relink(btn, no); }
   var fields={}; box.querySelectorAll('[data-k]').forEach(function(el){ fields[el.dataset.k]=el.value.trim(); });
   if(box.querySelector('#xp')){
-    var xp=[]; box.querySelectorAll('.xp').forEach(function(r){ var n=r.querySelector('.xp-n').value.trim(), p=r.querySelector('.xp-p').value.trim(); if(n||p) xp.push({n:n,p:p}); });
+    var xp=[]; box.querySelectorAll('.xp').forEach(function(r){ var n=r.querySelector('.xp-n').value.trim(), p=r.querySelector('.xp-p').value.trim(), ps=phonesIn(p);
+      if(ps.length>1) ps.forEach(function(x,i){ xp.push({n:i?'':n, p:x}); }); else if(n||p) xp.push({n:n,p:p}); });
+    // 의뢰인 전화 칸에 번호가 둘 이상이면 첫 번호만 남기고 나머지는 추가 전화 칸으로 (2026-11-24 석원)
+    var cps=phonesIn(fields.client_phone||'');
+    if(cps.length>1){ fields.client_phone=cps[0]; cps.slice(1).forEach(function(x){ if(!xp.some(function(y){ return y.p===x; })) xp.push({n:'',p:x}); }); }
     fields.extra_phones = xp.length ? JSON.stringify(xp) : '';
   }
   var body={action:'save_info', lNum:data.lNum, fields:fields};
