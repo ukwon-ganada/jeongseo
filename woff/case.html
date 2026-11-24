@@ -961,6 +961,33 @@ document.addEventListener('click', function(e){
   if(b.id==='tladd'){ tlRead(); tl.rows.push({id:null, d:data.today||'', tm:'', t:'', hid:false, o:''}); render(); var ins=document.querySelectorAll('#main .tle-t'); if(ins.length) ins[ins.length-1].focus(); }
   if(b.dataset.tlx!==undefined){ tlRead(); var r=tl.rows[Number(b.dataset.tlx)]; if(r){ if(!r.id) tl.rows.splice(Number(b.dataset.tlx),1); else r.hid=!r.hid; } render(); }
 });
+// 전화번호·주민번호 칸: 숫자만 쳐도 '-'가 들어간다 (2026-11-24 석원). 숫자·'-'·띄어쓰기만 있는 값만 바꾼다(내선·메모 글은 그대로)
+function fmtTel(v){
+  if(!/^[\d\s-]*$/.test(v)) return v;
+  var d=v.replace(/\D/g,'').slice(0,12);
+  if(/^02/.test(d)){ if(d.length<=2) return d; if(d.length<=5) return d.slice(0,2)+'-'+d.slice(2); if(d.length<=9) return d.slice(0,2)+'-'+d.slice(2,5)+'-'+d.slice(5); return d.slice(0,2)+'-'+d.slice(2,6)+'-'+d.slice(6,10); }
+  if(/^1[5-9]\d{2}/.test(d) && d.length<=8) return d.length<=4?d:d.slice(0,4)+'-'+d.slice(4);
+  if(d.length<=3) return d; if(d.length<=6) return d.slice(0,3)+'-'+d.slice(3);
+  if(d.length<=10) return d.slice(0,3)+'-'+d.slice(3,6)+'-'+d.slice(6);
+  return d.slice(0,3)+'-'+d.slice(3,7)+'-'+d.slice(7,11);
+}
+function fmtRrn(v){
+  if(!/^[\d\s-]*$/.test(v)) return v;
+  var d=v.replace(/\D/g,'').slice(0,13);
+  return d.length<=6?d:d.slice(0,6)+'-'+d.slice(6);
+}
+document.addEventListener('input', function(e){
+  var t=e.target; if(!t || t.tagName!=='INPUT') return;
+  var f = t.getAttribute('inputmode')==='tel' ? fmtTel : t.getAttribute('data-k')==='client_rrn' ? fmtRrn : null;
+  if(!f || (e.inputType||'').indexOf('delete')===0) return;
+  var atEnd=t.selectionStart===t.value.length, nv=f(t.value);
+  if(nv!==t.value && atEnd){ t.value=nv; try{ t.setSelectionRange(nv.length,nv.length); }catch(x){} }
+});
+document.addEventListener('focusout', function(e){
+  var t=e.target; if(!t || t.tagName!=='INPUT') return;
+  var f = t.getAttribute('inputmode')==='tel' ? fmtTel : t.getAttribute('data-k')==='client_rrn' ? fmtRrn : null;
+  if(f){ var nv=f(t.value); if(nv!==t.value) t.value=nv; }
+});
 document.addEventListener('change', function(e){
   if(e.target.id==='st-start'||e.target.id==='st-cur'){
     var a=SK.indexOf($('#st-start').value), z=SK.indexOf($('#st-cur').value);
