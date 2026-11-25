@@ -95,7 +95,7 @@ export async function hearingNotify(env: SchedEnv, o: NotifyOpts, fetcher: typeo
 
   const nums = [...new Set(todo.map((r) => r.l_num))];
   const rooms: any[] = await rest(env, `works_room_case?select=channel_id,l_num,room_title,status,is_primary&l_num=in.(${nums.join(",")})&status=eq.${encodeURIComponent("대상")}&order=is_primary.desc,updated_at.desc`, fetcher);
-  const cases: any[] = await rest(env, `case_all?select=l_num,l_code,l_client,court,raw->>l_another&l_num=in.(${nums.join(",")})`, fetcher);
+  const cases: any[] = await rest(env, `case_all?select=l_num,l_code,l_client,court,charge_lawyer,raw->>l_another&l_num=in.(${nums.join(",")})`, fetcher);
   const gk: any[] = await rest(env, "gukseon_cases?select=data->>caseNumber&limit=3000", fetcher).catch(() => []);
   const norm = (s: string) => String(s || "").replace(/\s/g, "");
   const gkSet = new Set(gk.map((g) => norm(g.caseNumber)));
@@ -137,8 +137,12 @@ export async function hearingNotify(env: SchedEnv, o: NotifyOpts, fetcher: typeo
     });
     const client = String(c.l_client || "").split(/[,(]/)[0].trim();
     const lw = lawyerFromTitle(room.room_title || "");
+    // 방 제목에 변호사 표시가 없으면 담당 변호사들 + 기일 일정을 쓰는 변호사 넷의 캘린더를 다 본다
+    const who = lw ? [lw.name] : [...new Set([...String(c.charge_lawyer || "").split(/[,\s]+/).filter(Boolean), "서고은", "이예나", "박종덕", "강현구"])];
     let inCal = false;
-    if (lw) inCal = alreadyInCalendar(await calEvents(lw.name, r.date).catch(() => []), client, plan.time);
+    for (const n of who) {
+      if (alreadyInCalendar(await calEvents(n, r.date).catch(() => []), client, plan.time)) { inCal = true; break; }
+    }
     // 바뀐 기일: 전에 알린 날짜 또는 로웨어 옛 값
     const p = prevBy.get(r.lp_num), old = oldBy.get(r.lp_num);
     const before = p ? `${p.ev_date} ${p.ev_time || ""}`.trim() : old?.lp_appoint_date ? `${String(old.lp_appoint_date).slice(0, 10)} ${String(old.lp_appoint_time || "").slice(0, 5)}`.trim() : "";
