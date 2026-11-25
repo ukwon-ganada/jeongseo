@@ -465,11 +465,26 @@ var PHONE_SVG = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"
 // 기일 탭 [문자] (2026-11-25): 로웨어 문자발송(팝빌) 창을 이 사건·의뢰인 번호로 연다. 보내기는 직원이 창에서 직접. PC만
 var LW_SMS='https://jeongseolaw.lawware.kr/groupware/popbill_main.html';
 function smsUrl(){
-  if((view!=='hearing' && view!=='dates') || sub.scope==='all' || !data || data.roomOnly || !(Number(data.lNum) > 0) || !data.caseNo) return '';
+  if((view!=='hearing' && view!=='dates') || sub.scope==='all' || !data || data.roomOnly) return '';
   if(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||'')) return '';
   var f=(data.info&&data.info.fields)||{}, to=String(f.client_phone||'').split(/[,\/]/)[0].replace(/\D/g,'');
-  var msg=smsMsg();
-  return LW_SMS+'?'+(to.length>=9?'to='+to+'&':'')+'tab=sms&l_num='+encodeURIComponent(data.lNum)+'&l_code='+encodeURIComponent(data.caseNo)+(msg?'&msg='+encodeURIComponent(msg):'');
+  var lw=Number(data.lNum) > 0 && !!data.caseNo;
+  // 로웨어에 없는 수사 사건방(2026-11-25 석원): 사건번호 없이 사건정보의 의뢰인 번호와 조사일정 안내만으로 연다(번호가 없으면 받는번호 빈 칸)
+  if(!lw && !data.inv) return '';
+  var msg=data.inv ? invMsg() : smsMsg();
+  return LW_SMS+'?'+(to.length>=9?'to='+to+'&':'')+'tab=sms'+(lw?'&l_num='+encodeURIComponent(data.lNum)+'&l_code='+encodeURIComponent(data.caseNo):'')+(msg?'&msg='+encodeURIComponent(msg):'');
+}
+// 조사일정 안내 문자(2026-11-25, 실제 보낸 문구 기준): 사건방 대화에서 뽑은 다가오는 조사 일정으로 채운다
+function invMsg(){
+  var h=(data.hearings||[]).filter(function(x){ return x.c===data.caseNo && dd(x.d)>=0 && /조사|출석/.test(x.t||'') && !/취소|마무리|완료/.test(x.t||''); })
+    .sort(function(a,b){ return a.d.localeCompare(b.d) || (!a.tm)-(!b.tm) || String(a.tm).localeCompare(String(b.tm)); })[0];
+  if(!h) return '';
+  var f=(data.info&&data.info.fields)||{}, name=String(f.client_name||'').replace(/\s*\(.*$/,'').trim();
+  var pm=String(h.t||'').match(/[가-힣]+(경찰서|경찰청|검찰청|공소청|지청|서)(?=[\s,)]|$)/);
+  var place=pm?pm[0]:String(data.court||'').replace(/^수사 단계\s*·?\s*/,'').split(' ')[0];
+  return ['[법무법인 정서]','','안녕하세요.','법무법인 정서입니다.','',(name?name+'님 ':'')+'조사일정 안내드립니다.','',
+    '1. '+h.d.replace(/-/g,'.')+'.'+(h.tm?' '+h.tm:'')+(place?' '+place:''),
+    '2. 신분증 및 도장 지참(도장 없는 경우 지장으로 대체 가능)','','감사합니다.'].join('\n');
 }
 // 기일안내 문자(2026-11-25, 로웨어 문자현황의 실제 보낸 문구 기준): 이 사건의 다가오는 기일로 채운다. 기일이 없으면 빈 칸으로 연다
 function smsMsg(){
