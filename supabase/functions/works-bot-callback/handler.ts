@@ -32,6 +32,7 @@
 import { saveRoomFile } from "./room_file.ts";
 import { linkPicked, linkRoomAnyBot, relinkRoom } from "./room_link.ts";
 import { handleRoomFile, handleRoomText } from "./room_chat.ts";
+import { handleScheduleCmd, isScheduleCmd } from "./schedule_cmd.ts";
 import { backfillHold, recheckAll, recheckLinked, recheckRoom, refreshRoomTitles } from "./inv_case.ts";
 
 // 우리 봇: 운영 봇(사건관리 도우미), 시험봇(정서 시험봇)
@@ -69,6 +70,7 @@ function safeEqual(a: string, b: string): boolean {
 type Env = {
   sbUrl: string; sbKey: string; botSecret: string; botSecrets?: string[];
   clientId?: string; clientSecret?: string; serviceAccount?: string; privateKey?: string;
+  scheduleBots?: string[];
   anthropicKey?: string; chatModel?: string; chatBots?: string[]; invChatBots?: string[]; invChatModel?: string;
 };
 
@@ -213,8 +215,19 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
     }
   }
 
+  // "/일정" → 로웨어 다음 기일로 채운 웍스 캘린더 입력 창 버튼 (schedule_cmd.ts). 지금은 scheduleBots(기본: 시험봇) 방만
+  const schedCmd = ev?.type === "message" && content?.type === "text" && isScheduleCmd(content?.text) && !!channelId;
+  if (schedCmd) {
+    const botId = req.headers.get("x-works-botid") || String(ev?.botId || "");
+    if ((env.scheduleBots || ["13580302"]).includes(botId)) {
+      background(handleScheduleCmd(env, botId, channelId, fetcher)
+        .then((r) => console.log("schedule", r.slice(0, 60)))
+        .catch((e) => console.error("schedule fail", String(e?.message || e).slice(0, 200))));
+    }
+  }
+
   // 사건방 글 → AI가 일정만 뽑아 room_event 에 (수사 사건방 글은 room_msg 에 30일 보관). 시험 봇(chatBots)은 모든 방, 운영 봇(invChatBots)은 수사 사건 방(자체 사건)만 Sonnet으로
-  if (ev?.type === "message" && content?.type === "text" && content?.text && channelId) {
+  if (!schedCmd && ev?.type === "message" && content?.type === "text" && content?.text && channelId) {
     const botId = req.headers.get("x-works-botid") || String(ev?.botId || "");
     const invOnly = (env.invChatBots || ["12905890"]).includes(botId);
     if (invOnly || (env.chatBots || ["13580302"]).includes(botId)) {
