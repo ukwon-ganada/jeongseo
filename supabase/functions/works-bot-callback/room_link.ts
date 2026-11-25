@@ -119,7 +119,21 @@ async function linkRoomAnyBot1(env: FileEnv, botIds: string[], channelId: string
   if (had.ok && (await had.json()).length) return { linked: 0, how: "already" };
   let t: string | null = null;
   for (const b of botIds) { try { t = await roomTitle(env, b, channelId, fetcher); break; } catch { /* 다음 봇 */ } }
+  if (t && await isScheduleRoom(env, channelId, t, fetcher)) return { linked: 0, how: "schedule-room" };
   return await linkRoom(env, botIds[0], channelId, fetcher, t ?? "");
+}
+
+// 일정 방(석원 2026-11-25): 빠진 기일 알림을 모아 받는 방. 사건 방이 아니므로 사건을 만들지 않는다.
+// 방 제목이 lw_settings.schedule_room_title 과 같으면 그 채널을 schedule_room_channel 에 적는다.
+export const sameTitle = (a: string, b: string) => !!a && !!b && a.replace(/\s/g, "") === b.replace(/\s/g, "");
+async function isScheduleRoom(env: FileEnv, channelId: string, title: string, fetcher: typeof fetch): Promise<boolean> {
+  const r = await rest(env, "lw_settings?select=key,value&key=in.(schedule_room_title,schedule_room_channel)", {}, fetcher);
+  const kv = new Map<string, string>(r.ok ? (await r.json()).map((x: any) => [x.key, x.value]) : []);
+  if (kv.get("schedule_room_channel") === channelId) return true;
+  if (!sameTitle(kv.get("schedule_room_title") || "", title)) return false;
+  const w = await rest(env, "lw_settings?on_conflict=key", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ key: "schedule_room_channel", value: channelId }) }, fetcher);
+  await w.body?.cancel();
+  return true;
 }
 
 // 이 방에서 받은 서면 파일·대화 일정은 방을 따라간다

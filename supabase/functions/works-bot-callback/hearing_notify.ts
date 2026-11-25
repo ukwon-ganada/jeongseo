@@ -9,9 +9,10 @@
 //  켜는 범위: notifyRooms(방 ID 목록)가 있으면 그 방만, "*"면 모든 방. notifyBot 으로 보낸다.
 // ============================================================================
 import { pemToPkcs8 } from "./room_file.ts";
+import { scourtAdjust } from "./scourt_hearings.ts";
 import { buildPlan, calendarUrl, fetchSuperseded, lawyersFromTitle, type Plan, sendToRoom, type SchedEnv } from "./schedule_cmd.ts";
 
-export type NotifyOpts = { mode?: "new" | "missing"; graceHours?: number; lookbackDays?: number; force?: boolean; dryRun?: boolean; hours?: number; notifyRooms?: string[]; notifyBot: string; limit?: number; lpNum?: number };
+export type NotifyOpts = { mode?: "new" | "missing"; graceHours?: number; lookbackDays?: number; force?: boolean; dryRun?: boolean; hours?: number; notifyRooms?: string[]; notifyBot: string; limit?: number; lpNum?: number; toRoom?: string; scourt?: boolean };
 
 async function rest(env: SchedEnv, path: string, fetcher: typeof fetch, init: RequestInit = {}): Promise<any> {
   const r = await fetcher(env.sbUrl + "/rest/v1/" + path, {
@@ -64,7 +65,7 @@ export function alreadyInCalendar(events: { summary: string; start: string }[], 
 
 export const isPostponed = (c: string) => /연기|변경|추정|취소/.test(String(c || ""));
 
-type Row = { lp_num: number; l_num: number; date: string; time: string; contents: string };
+type Row = { lp_num: number; l_num: number; date: string; time: string; contents: string; sc?: boolean };
 
 export async function hearingNotify(env: SchedEnv, o: NotifyOpts, fetcher: typeof fetch = fetch) {
   const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
@@ -90,6 +91,13 @@ export async function hearingNotify(env: SchedEnv, o: NotifyOpts, fetcher: typeo
     // 기일변경 명령 뒤 같은 종류 기일이 또 잡혀 있으면 앞의 것은 변경된 기일 (supersededOf)
     const gone = await fetchSuperseded(env, [...new Set(all.map((e) => e.l_num).filter(Boolean))], today, fetcher);
     fresh = all.filter((e) => !chg.has(e.lp_num) && !gone.has(e.lp_num) && !(Number(e.changed_count) > 0) && !String(e.lp_remark || "").trim() && !isPostponed(e.lp_contents));
+    // 대법원 원문(있는 사건만): 원문에 결과가 붙은 기일은 빼고, 원문에만 있는 기일은 더한다
+    const sc = !o.scourt ? null : await scourtFuture(env, today, upTo, fetcher).catch((e) => { console.error("scourt", String(e?.message || e).slice(0, 120)); return null; });
+    if (sc) {
+      const adj = scourtAdjust(sc.lw, sc.sc);
+      fresh = [...fresh.filter((e) => !adj.drop.has(e.lp_num)),
+        ...adj.add.map((a) => ({ lp_num: a.lp_num, l_num: a.l_num, lp_appoint_date: a.date, lp_appoint_time: a.time, lp_contents: a.contents, sc: true }))];
+    }
   } else fresh = await rest(env, `lw_process_events?select=lp_num,l_num,lp_appoint_date,lp_appoint_time,lp_contents&lp_set=eq.${giil}&lp_appoint_date=gte.${today}&first_seen_at=gte.${since}&limit=300`, fetcher);
   const ch: any[] = o.lpNum || missing ? [] : await rest(env, `lw_process_event_changes?select=lp_num,old_row&changed_at=gte.${since}&limit=500`, fetcher);
   const oldBy = new Map<number, any>();
@@ -99,7 +107,7 @@ export async function hearingNotify(env: SchedEnv, o: NotifyOpts, fetcher: typeo
     ? await rest(env, `lw_process_events?select=lp_num,l_num,lp_appoint_date,lp_appoint_time,lp_contents&lp_set=eq.${giil}&lp_appoint_date=gte.${today}&lp_num=in.(${chNums.slice(0, 200).join(",")})`, fetcher)
     : [];
   const rows: Row[] = [...fresh, ...changed].map((e) => ({
-    lp_num: e.lp_num, l_num: e.l_num, date: String(e.lp_appoint_date).slice(0, 10), time: String(e.lp_appoint_time || "").slice(0, 5), contents: e.lp_contents || "",
+    lp_num: e.lp_num, l_num: e.l_num, date: String(e.lp_appoint_date).slice(0, 10), time: String(e.lp_appoint_time || "").slice(0, 5), contents: e.lp_contents || "", sc: !!e.sc,
   })).filter((r) => r.l_num && /^\d{4}-\d{2}-\d{2}$/.test(r.date));
   const out = { candidates: rows.length, sent: 0, inCalendar: 0, noRoom: 0, skipped: 0, done: 0, items: [] as any[] };
   if (!rows.length) return out;
@@ -149,14 +157,16 @@ export async function hearingNotify(env: SchedEnv, o: NotifyOpts, fetcher: typeo
   for (const r of todo) {
     const room = rooms.find((x) => x.l_num === r.l_num);
     const c = cases.find((x) => x.l_num === r.l_num) || {};
-    if (!room) { out.noRoom++; records.push({ ...rec(r, null, "no_room", null) }); continue; }
-    if (o.notifyRooms && !o.notifyRooms.includes("*") && !o.notifyRooms.includes(room.channel_id)) { out.skipped++; continue; }
+    // 일정 방(toRoom) 한 곳으로 모으면 사건 방이 없는 사건도 알린다
+    if (!room && !o.toRoom) { out.noRoom++; records.push({ ...rec(r, null, "no_room", null) }); continue; }
+    if (!o.toRoom && room && o.notifyRooms && !o.notifyRooms.includes("*") && !o.notifyRooms.includes(room.channel_id)) { out.skipped++; continue; }
+    const dest = o.toRoom || room!.channel_id;
     const plan: Plan = buildPlan({
-      roomTitle: room.room_title || "", caseNo: c.l_code || "", client: c.l_client || "", another: c.l_another || "", court: c.court || "",
+      roomTitle: room?.room_title || "", caseNo: c.l_code || "", client: c.l_client || "", another: c.l_another || "", court: c.court || "",
       gukseon: gkSet.has(norm(c.l_code)), date: r.date, time: r.time, contents: r.contents, source: "도우미 알림",
     });
     const client = String(c.l_client || "").split(/[,(]/)[0].trim();
-    const lws = lawyersFromTitle(room.room_title || "");
+    const lws = lawyersFromTitle(room?.room_title || "");
     // 머리글 변호사 캘린더를 먼저 보고, 없으면 담당 변호사·변호사 넷 캘린더도 본다(박) 사건도 서고은 캘린더에 넣는 경우가 많음, 2026-11-25 신상현·소현섭)
     const who = [...new Set([...lws.map((l) => l.name), ...String(c.charge_lawyer || "").split(/[,\s]+/).filter(Boolean), "서고은", "이예나", "박종덕", "강현구"])];
     let inCal = false;
@@ -170,13 +180,13 @@ export async function hearingNotify(env: SchedEnv, o: NotifyOpts, fetcher: typeo
     const p = prevBy.get(r.lp_num), old = oldBy.get(r.lp_num);
     const before = p ? `${p.ev_date} ${p.ev_time || ""}`.trim() : old?.lp_appoint_date ? `${String(old.lp_appoint_date).slice(0, 10)} ${String(old.lp_appoint_time || "").slice(0, 5)}`.trim() : "";
     const was = before && before !== `${r.date} ${r.time}`.trim() ? before : "";
-    out.items.push({ room: room.channel_id.slice(0, 8), summary: plan.summary, date: r.date, time: plan.time, inCal, was, contents: r.contents.slice(0, 40), client, who, ...(inCal || !o.dryRun ? {} : { seenCal: seenCal.slice(0, 30) }) });
-    if (inCal) { out.inCalendar++; records.push(rec(r, room.channel_id, "in_calendar", plan)); continue; }
+    out.items.push({ room: room ? room.channel_id.slice(0, 8) : "", sc: r.sc || undefined, summary: plan.summary, date: r.date, time: plan.time, inCal, was, contents: r.contents.slice(0, 40), client, who, ...(inCal || !o.dryRun ? {} : { seenCal: seenCal.slice(0, 30) }) });
+    if (inCal) { out.inCalendar++; records.push(rec(r, dest, "in_calendar", plan)); continue; }
     if (!o.dryRun) {
-      await sendToRoom(env, o.notifyBot, room.channel_id, noticeMessage(plan, was, missing), fetcher);
+      await sendToRoom(env, o.notifyBot, dest, noticeMessage(plan, was, missing, o.toRoom ? (c.l_code || "") : ""), fetcher);
       out.sent++;
     }
-    records.push(rec(r, room.channel_id, "sent", plan, was));
+    records.push(rec(r, dest, "sent", plan, was));
   }
   if (!o.dryRun && records.length) {
     await rest(env, "hearing_notice?on_conflict=lp_num,ev_date,ev_time", fetcher, {
@@ -192,11 +202,32 @@ function rec(r: Row, channel: string | null, status: string, plan: Plan | null, 
 
 const W = ["일", "월", "화", "수", "목", "금", "토"];
 const dl = (d: string) => { const t = new Date(d + "T00:00:00Z"); return `${t.getUTCMonth() + 1}.${t.getUTCDate()}.(${W[t.getUTCDay()]})`; };
-export function noticeMessage(p: Plan, was: string, missing = false): unknown {
+export function noticeMessage(p: Plan, was: string, missing = false, caseNo = ""): unknown {
   const head = missing ? "캘린더에 없는 기일" : was ? `기일 변경 · 전 ${dl(was.slice(0, 10))}${was.slice(11) ? " " + was.slice(11) : ""}` : "새 기일";
   return {
     type: "button_template",
-    contentText: `${head}\n${p.summary}\n${dl(p.date)}${p.time ? " " + p.time : ""} · ${p.location || "장소 없음"}` + (p.lawyer ? `\n캘린더: ${p.lawyer}` : ""),
+    contentText: `${head}\n${caseNo ? caseNo + " " : ""}${p.summary}\n${dl(p.date)}${p.time ? " " + p.time : ""} · ${p.location || "장소 없음"}` + (p.lawyer ? `\n캘린더: ${p.lawyer}` : ""),
     actions: [{ type: "uri", label: "일정 입력 창 열기", uri: calendarUrl(p) }],
+  };
+}
+
+// 대법원 원문 앞으로 기일 줄 + 그 사건들의 로웨어 앞으로 기일 (scourtAdjust 재료)
+async function scourtFuture(env: SchedEnv, today: string, upTo: string, fetcher: typeof fetch) {
+  const rows: any[] = await rest(env, `scourt_progress_rows?select=case_code,ev_date,content,result,snapshot_id&ev_date=gte.${today}&limit=3000`, fetcher);
+  const hs = rows.filter((x) => /기일\(|조정사무수행일\(/.test(x.content || ""));
+  if (!hs.length) return null;
+  const codes = [...new Set(hs.map((x) => x.case_code))];
+  const snaps = [...new Set(hs.map((x) => x.snapshot_id).filter(Boolean))];
+  const cs: any[] = await rest(env, `case_all?select=l_num,l_code&l_code=in.(${codes.map((c) => '"' + c + '"').join(",")})`, fetcher);
+  const byCode = new Map(cs.map((c) => [c.l_code, c.l_num]));
+  const sn: any[] = snaps.length ? await rest(env, `scourt_raw_snapshots?select=id,captured_at&id=in.(${snaps.join(",")})`, fetcher) : [];
+  const at = new Map(sn.map((x) => [x.id, x.captured_at]));
+  const lnums = [...new Set(cs.map((c) => c.l_num))];
+  const lw: any[] = lnums.length ? await rest(env, `lw_process_events?select=lp_num,l_num,lp_appoint_date,lp_appoint_time,lp_contents&lp_set=eq.${encodeURIComponent("기일")}&lp_appoint_date=gte.${today}&l_num=in.(${lnums.join(",")})&limit=3000`, fetcher) : [];
+  return {
+    lw: lw.map((e) => ({ lp_num: e.lp_num, l_num: e.l_num, date: String(e.lp_appoint_date).slice(0, 10), time: String(e.lp_appoint_time || "").slice(0, 5), contents: e.lp_contents || "" })),
+    // 원문에만 있는 기일은 원문을 받은 지 하루(graceHours)가 지난 것만 (결과 비교는 시각 상관없이)
+    sc: hs.filter((x) => byCode.has(x.case_code)).filter((x) => String(x.result || "").trim() || !at.get(x.snapshot_id) || at.get(x.snapshot_id) <= upTo)
+      .map((x) => ({ l_num: byCode.get(x.case_code), date: String(x.ev_date).slice(0, 10), content: x.content || "", result: x.result })),
   };
 }

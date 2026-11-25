@@ -200,11 +200,18 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
         return Response.json({ uid, basic: await one(`/users/${uid}/calendar`), personals: await one(`/users/${uid}/calendar-personals`) });
       }
       if (b?.action === "hearing-notify") {
+        // toRoom "setting": 일정 방(석원 2026-11-25) — 방 제목으로 알아본 채널(lw_settings.schedule_room_channel)
+        let toRoom: string | undefined = typeof b?.toRoom === "string" && b.toRoom ? b.toRoom : undefined;
+        if (toRoom === "setting") {
+          const sr = await fetcher(env.sbUrl + "/rest/v1/lw_settings?select=value&key=eq.schedule_room_channel", { headers: { apikey: env.sbKey, Authorization: "Bearer " + env.sbKey } });
+          toRoom = sr.ok ? (await sr.json())[0]?.value || undefined : undefined;
+          if (!toRoom) return Response.json({ why: "일정 방이 아직 없습니다" });
+        }
         const r = await hearingNotify(env, {
           mode: b?.mode === "missing" ? "missing" : "new", graceHours: typeof b?.graceHours === "number" ? b.graceHours : undefined,
           lookbackDays: typeof b?.lookbackDays === "number" ? b.lookbackDays : undefined, limit: typeof b?.limit === "number" ? b.limit : undefined,
           dryRun: !!b?.dryRun, force: !!b?.force && typeof b?.lpNum === "number", hours: typeof b?.hours === "number" ? b.hours : undefined, lpNum: typeof b?.lpNum === "number" ? b.lpNum : undefined,
-          notifyRooms: Array.isArray(b?.rooms) ? b.rooms.map(String) : env.notifyRooms, notifyBot: String(b?.bot || env.notifyBot || "13580302"),
+          notifyRooms: Array.isArray(b?.rooms) ? b.rooms.map(String) : env.notifyRooms, notifyBot: String(b?.bot || env.notifyBot || "13580302"), toRoom, scourt: !!b?.scourt,
         }, fetcher);
         console.log("hearing-notify", r.candidates, r.sent, r.inCalendar, r.noRoom, r.skipped);
         return Response.json(r);
