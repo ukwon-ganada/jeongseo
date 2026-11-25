@@ -659,7 +659,7 @@ export function caseNosIn(s: string): string[] {
 }
 
 // 아직 연결 안 된 방 자동 연결: works-bot-callback 함수에 부탁 (웍스 봇 열쇠가 거기 있음). 실패해도 화면은 계속
-async function autoLink(env: Env, body: { channelId: string; lNum?: number | null; relink?: boolean; by?: string }, fetcher: typeof fetch): Promise<{ linked: number; how: string } | null> {
+async function autoLink(env: Env, body: { channelId?: string; lNum?: number | null; relink?: boolean; by?: string; sched?: string }, fetcher: typeof fetch): Promise<{ linked: number; how: string } | null> {
   try {
     const r = await fetcher(env.sbUrl + "/functions/v1/works-bot-callback", {
       method: "POST", headers: { "Content-Type": "application/json", "x-internal-key": env.sbKey }, body: JSON.stringify(body),
@@ -779,6 +779,20 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
         c: c.l_code, t: nz(c.l_name).replace(/^\[전자\]\s*/, ""),
         next: isDate(c.next_date) ? (c.next_date.slice(0, 10) >= today ? md(c.next_date) + " " + (nz(c.next_contents) || "기일") : "예정 기일 없음") : "예정 기일 없음",
       })) });
+    }
+
+    // 메뉴 [일정]: 이 방 기일로 채운 웍스 캘린더 입력 창 주소 (석원 2026-11-25). 계산은 works-bot-callback(schedule_cmd.ts)
+    //   room 이 없고 case 만 있으면(PC 방 찾기가 사건번호로 찾은 경우) 그 사건의 방을 찾는다
+    if (body?.action === "sched") {
+      let room = nz(body.room);
+      if (!room && nz(body.case)) {
+        const w = await rest(env, `works_room_case?select=channel_id&case_no=in.${enc(inList(caseNoVariants(nz(body.case))))}&order=is_primary.desc,updated_at.desc&limit=1`, {}, fetcher).catch(() => []) || [];
+        room = nz(w[0]?.channel_id);
+      }
+      if (!room) return json({ why: "이 사건의 방을 찾지 못했습니다" });
+      const r = await autoLink(env, { sched: room } as any, fetcher) as any;
+      bg(logView(env, who, "sched:" + (r?.url ? "ok" : "none"), room, null, fetcher));
+      return json(r?.url ? { url: r.url } : { why: nz(r?.why) || "일정을 만들지 못했습니다" });
     }
 
     let located: { room?: string; case?: string } | null = null;
