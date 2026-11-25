@@ -247,6 +247,33 @@ export async function readRecentNotice(env: SchedEnv, channelId: string, today: 
   if (!env.anthropicKey) return null;
   const since = new Date(Date.now() - 48 * 3600e3).toISOString();
   const imgs = await rest(env, `room_image?select=bot_id,file_id&channel_id=eq.${encodeURIComponent(channelId)}&created_at=gte.${since}&order=created_at.desc&limit=2`, fetcher);
+  const pdf = imgs.length ? [] : await rest(env, `case_file?select=storage_path&channel_id=eq.${encodeURIComponent(channelId)}&status=eq.${encodeURIComponent("보관")}&content_type=eq.application/pdf&saved_at=gte.${since}&order=saved_at.desc&limit=1`, fetcher);
+  // 같은 사진·통지서는 한 번만 읽는다 (읽은 결과를 notice_read에 남김)
+  const key = imgs.length ? "img:" + imgs.map((x) => x.file_id).sort().join(",") : pdf[0]?.storage_path ? "pdf:" + pdf[0].storage_path : "";
+  if (!key) return null;
+  const hit = await rest(env, `notice_read?select=result&key=eq.${encodeURIComponent(key)}&limit=1`, fetcher).catch(() => []);
+  if (hit[0]) return hit[0].result ?? null;
+  const miss = { n: 0 };
+  const r = await readFiles(env, imgs, pdf[0]?.storage_path, today, fetcher, miss);
+  if (r !== undefined && !miss.n) await saveRead(env, key, channelId, r, fetcher).catch((e) => console.error("notice_read save", String(e?.message || e).slice(0, 100)));
+  return r ?? null;
+}
+
+async function saveRead(env: SchedEnv, key: string, channelId: string, result: NoticeRead | null, fetcher: typeof fetch) {
+  const w = await fetcher(env.sbUrl + "/rest/v1/notice_read?on_conflict=key", {
+    method: "POST",
+    headers: { apikey: env.sbKey, Authorization: "Bearer " + env.sbKey, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify({ key, channel_id: channelId, result }),
+  });
+  await w.body?.cancel();
+  const old = new Date(Date.now() - 7 * 864e5).toISOString();
+  await fetcher(env.sbUrl + "/rest/v1/notice_read?created_at=lt." + old, {
+    method: "DELETE", headers: { apikey: env.sbKey, Authorization: "Bearer " + env.sbKey, Prefer: "return=minimal" },
+  }).then((x) => x.body?.cancel()).catch(() => {});
+}
+
+// undefined = 파일을 받지 못함(다음에 다시 시도), null = 읽었지만 기일 없음
+async function readFiles(env: SchedEnv, imgs: any[], pdfPath: string | undefined, today: string, fetcher: typeof fetch, miss = { n: 0 }): Promise<NoticeRead | null | undefined> {
   const blocks: unknown[] = [];
   let from = "";
   if (imgs.length) {
@@ -256,22 +283,19 @@ export async function readRecentNotice(env: SchedEnv, channelId: string, today: 
         const d = await download(env, `https://www.worksapis.com/v1.0/bots/${encodeURIComponent(im.bot_id)}/attachments/${encodeURIComponent(im.file_id)}`, "Bearer " + tok, fetcher);
         const mt = /^image\/(png|jpeg|gif|webp)$/.test(d.ctype) ? d.ctype : "image/png";
         blocks.push({ type: "image", source: { type: "base64", media_type: mt, data: b64(d.bytes) } });
-      } catch (e) { console.error("image dl", String((e as Error).message).slice(0, 80)); }
+      } catch (e) { miss.n++; console.error("image dl", String((e as Error).message).slice(0, 80)); }
     }
     if (blocks.length) from = "사진";
   }
-  if (!blocks.length) {
-    const pdf = await rest(env, `case_file?select=storage_path&channel_id=eq.${encodeURIComponent(channelId)}&status=eq.${encodeURIComponent("보관")}&content_type=eq.application/pdf&saved_at=gte.${since}&order=saved_at.desc&limit=1`, fetcher);
-    if (pdf[0]?.storage_path) {
-      const d = await download(env, `${env.sbUrl}/storage/v1/object/case-files/${pdf[0].storage_path}`, "Bearer " + env.sbKey, fetcher);
-      blocks.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: b64(d.bytes) } });
-      from = "통지서";
-    }
+  if (!blocks.length && pdfPath) {
+    const d = await download(env, `${env.sbUrl}/storage/v1/object/case-files/${pdfPath}`, "Bearer " + env.sbKey, fetcher);
+    blocks.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: b64(d.bytes) } });
+    from = "통지서";
   }
-  if (!blocks.length) return null;
+  if (!blocks.length) return undefined;
   const res = await fetcher("https://api.anthropic.com/v1/messages", {
     method: "POST",
-    headers: { "x-api-key": env.anthropicKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+    headers: { "x-api-key": env.anthropicKey!, "anthropic-version": "2023-06-01", "content-type": "application/json" },
     body: JSON.stringify({
       model: env.visionModel || "claude-sonnet-5-5", max_tokens: 400, system: READ_SYSTEM,
       output_config: { format: { type: "json_schema", schema: READ_SCHEMA } },
