@@ -471,16 +471,24 @@ function smsUrl(){
   var msg=smsMsg();
   return LW_SMS+'?'+(to.length>=9?'to='+to+'&':'')+'tab=sms&l_num='+encodeURIComponent(data.lNum)+'&l_code='+encodeURIComponent(data.caseNo)+(msg?'&msg='+encodeURIComponent(msg):'');
 }
-// 로웨어 [기일안내문] 양식(ajax_mode=load_appoint, 2026-11-25 원문)을 이 사건의 다가오는 기일로 채운다. 기일이 없으면 빈 칸으로 연다
-var LW_APPOINT_TPL='안녕하세요 (COMPANY) 입니다.\n\n기일 안내 드립니다.\n\n사건번호 : (CODE)\n재판기일 : (DATE) (TIME)\n법      원 : (COURT)\n법      정 : (LAWCOURT)\n\n감사합니다.\n\n* 형사사건의 경우 꼭 출석을 하여야 합니다.\n\n* 민사, 가사, 행정, 등의 사건은 특별한 경우를 제외하고 당사자가 출석하지 않으니 더 궁금하신 사항은 당사로 연락 바랍니다.';
+// 기일안내 문자(2026-11-25, 로웨어 문자현황의 실제 보낸 문구 기준): 이 사건의 다가오는 기일로 채운다. 기일이 없으면 빈 칸으로 연다
 function smsMsg(){
-  var h=(data.hearings||[]).filter(function(x){ return x.c===data.caseNo && dd(x.d)>=0 && !isMoved(x.t); })
-    .sort(function(a,b){ return (a.d+(a.tm||'')).localeCompare(b.d+(b.tm||'')); })[0];
+  var mine=(data.hearings||[]).filter(function(x){ return x.c===data.caseNo && dd(x.d)>=0; });
+  var h=mine.filter(function(x){ return !isMoved(x.t); }).sort(function(a,b){ return (a.d+(a.tm||'')).localeCompare(b.d+(b.tm||'')); })[0];
   if(!h) return '';
+  var kind=(String(h.t||'').match(/[가-힣]*기일/)||['기일'])[0];
+  var old=mine.filter(function(x){ return isMoved(x.t) && (x.d+(x.tm||''))!==(h.d+(h.tm||'')); }).sort(function(a,b){ return b.d.localeCompare(a.d); })[0];
+  var f=(data.info&&data.info.fields)||{}, name=String(f.client_name||'').replace(/\s*\(.*$/,'').trim();
   var cm=String(data.court||'').match(/^\S*법원(\s+\S*지원)?/), court=cm?cm[0]:'';
   var room=/\d+호|법정|조정실/.test(h.p||'') && !/법원|지원/.test(h.p) ? h.p : '';
-  var v={COMPANY:'법무법인 정서', CODE:data.caseNo, DATE:h.d, TIME:h.tm||'', COURT:court, LAWCOURT:room};
-  return LW_APPOINT_TPL.replace(/\((COMPANY|CODE|DATE|TIME|COURT|LAWCOURT)\)/g, function(_,k){ return v[k]; });
+  var crim=/\d(고|노|도|초|로|모|푸|감|형)/.test(data.caseNo);
+  var L=['안녕하세요'+(name?' '+name+'님,':',')+' 법무법인 정서 입니다.', '',
+    old ? old.d.replace(/-/g,'.')+(old.tm?' '+old.tm:'')+' '+kind+'이 아래와 같이 변경되어 안내 드립니다.' : kind+' 안내 드립니다.', '',
+    '사건번호 : '+data.caseNo, '재판기일 : '+h.d+(h.tm?' '+h.tm:''), '법      원 : '+court];
+  if(room) L.push('법      정 : '+room);
+  L.push('', '감사합니다.');
+  if(crim) L.push('', '* 형사사건의 경우 꼭 출석을 하여야 합니다.');
+  return L.join('\n');
 }
 function telHref(v){ var n=String(v||'').replace(/[^\d+]/g,''); return n.length>=7 ? 'tel:'+n : ''; }
 
