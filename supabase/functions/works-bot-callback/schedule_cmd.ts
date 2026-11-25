@@ -91,7 +91,7 @@ export function buildPlan(o: {
   const location = [String(o.court || "").trim(), h.room].filter(Boolean).join(" ");
   return {
     summary, date: o.date, time: o.time || h.time, location,
-    description: [o.caseNo, o.contents].filter(Boolean).join(" ") + "\n(" + (o.source || "로웨어 기일 기준") + ", 도우미가 채움)",
+    description: [o.caseNo, o.contents].filter(Boolean).join(" "), // 안내 문구 없이 사건번호·기일만(석원 2026-11-25)
     // 석원 2026-11-25: 누가 누르든 모두 서고은 캘린더에 넣는다(머리글은 제목에만)
     lawyer: SCHED_CAL_NAME, source: o.source || "로웨어 기일 기준",
   };

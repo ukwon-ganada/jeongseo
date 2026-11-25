@@ -74,11 +74,12 @@ Deno.test("사진이 로웨어와 다르면 사진 기준, 메모에 로웨어 �
   assertEquals(r.plan?.date, "2099-01-28");
   assertEquals(r.plan?.time, "14:00");
   assertEquals(r.plan?.location, "인천지방법원 316호법정");
-  assertEquals(r.plan?.description.includes("사진 기준 · 로웨어: 2099-01-10"), true);
+  assertEquals(r.plan?.source.includes("사진 기준 · 로웨어: 2099-01-10"), true);
+  assertEquals(r.plan?.description.includes("도우미"), false);
 });
 Deno.test("사진이 로웨어와 같으면 로웨어 그대로", async () => {
   const r = await planForRoom(ENV, "ch", fake({ found: true, date: "2099-01-10", time: "10:00", kind: "공판기일", room: "316호법정", court: "" }, "2099-01-10"));
-  assertEquals(r.plan?.description.includes("로웨어 기일 기준 · 사진과 같음"), true);
+  assertEquals(r.plan?.source.includes("로웨어 기일 기준 · 사진과 같음"), true);
 });
 Deno.test("로웨어에 없으면 사진으로", async () => {
   const r = await planForRoom(ENV, "ch", fake({ found: true, date: "2099-02-02", time: "9:30", kind: "선고기일", room: "318호법정", court: "인천지방법원" }, ""));
