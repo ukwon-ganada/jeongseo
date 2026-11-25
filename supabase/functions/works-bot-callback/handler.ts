@@ -32,6 +32,8 @@
 import { saveRoomFile } from "./room_file.ts";
 import { linkPicked, linkRoomAnyBot, relinkRoom } from "./room_link.ts";
 import { handleRoomFile, handleRoomText } from "./room_chat.ts";
+import { hearingNotify } from "./hearing_notify.ts";
+import { calendarUrl, handleScheduleCmd, isScheduleCmd, noteRoomImage, planForRoom } from "./schedule_cmd.ts";
 import { backfillHold, recheckAll, recheckLinked, recheckRoom, refreshRoomTitles } from "./inv_case.ts";
 
 // 우리 봇: 운영 봇(사건관리 도우미), 시험봇(정서 시험봇)
@@ -69,6 +71,7 @@ function safeEqual(a: string, b: string): boolean {
 type Env = {
   sbUrl: string; sbKey: string; botSecret: string; botSecrets?: string[];
   clientId?: string; clientSecret?: string; serviceAccount?: string; privateKey?: string;
+  scheduleBots?: string[]; notifyRooms?: string[]; notifyBot?: string;
   anthropicKey?: string; chatModel?: string; chatBots?: string[]; invChatBots?: string[]; invChatModel?: string;
 };
 
@@ -106,6 +109,16 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       console.log("titles(internal)", chs.length, (r as any).changed);
       return Response.json(r);
     }
+    // 사건 화면 메뉴 [일정](case-view action sched): 그 방 기일로 채운 웍스 캘린더 입력 창 주소
+    if (b?.sched) {
+      try {
+        const r = await planForRoom(env, String(b.sched), fetcher);
+        console.log("sched(internal)", r.plan ? "plan" : "none");
+        return Response.json(r.plan ? { url: calendarUrl(r.plan), plan: r.plan } : { why: r.why });
+      } catch (e) {
+        return Response.json({ why: "일정을 만들지 못했습니다", error: String((e as Error)?.message || e).slice(0, 120) });
+      }
+    }
     const ch = String(b?.channelId || "");
     if (!ch) return Response.json({ error: "channelId" }, { status: 400 });
     try {
@@ -129,6 +142,14 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
     let b: any = {};
     try { b = await req.json(); } catch { /* */ }
     try {
+      if (b?.action === "hearing-notify") {
+        const r = await hearingNotify(env, {
+          dryRun: !!b?.dryRun, force: !!b?.force && typeof b?.lpNum === "number", hours: typeof b?.hours === "number" ? b.hours : undefined, lpNum: typeof b?.lpNum === "number" ? b.lpNum : undefined,
+          notifyRooms: Array.isArray(b?.rooms) ? b.rooms.map(String) : env.notifyRooms, notifyBot: String(b?.bot || env.notifyBot || "13580302"),
+        }, fetcher);
+        console.log("hearing-notify", r.candidates, r.sent, r.inCalendar, r.noRoom, r.skipped);
+        return Response.json(r);
+      }
       if (b?.action === "inv-backfill") return Response.json(await backfillHold(env, BOT_IDS, b?.dryRun !== false, fetcher));
       if (b?.action === "linked-recheck") return Response.json(await recheckLinked(env, BOT_IDS, fetcher, typeof b?.part === "number" ? b.part : undefined));
       const r = await recheckAll(env, BOT_IDS, fetcher);
@@ -213,8 +234,28 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
     }
   }
 
+  // "/일정" → 로웨어 다음 기일로 채운 웍스 캘린더 입력 창 버튼 (schedule_cmd.ts). 지금은 scheduleBots(기본: 시험봇) 방만
+  const schedCmd = ev?.type === "message" && content?.type === "text" && isScheduleCmd(content?.text) && !!channelId;
+  if (schedCmd) {
+    const botId = req.headers.get("x-works-botid") || String(ev?.botId || "");
+    if ((env.scheduleBots || ["13580302"]).includes(botId)) {
+      background(handleScheduleCmd(env, botId, channelId, fetcher)
+        .then((r) => console.log("schedule", r.slice(0, 60)))
+        .catch((e) => console.error("schedule fail", String(e?.message || e).slice(0, 200))));
+    }
+  }
+
+  // 사진이 올라오면 "/일정"이 읽을 수 있게 기록만 (scheduleBots 방만)
+  if (ev?.type === "message" && content?.type === "image" && content?.fileId && channelId) {
+    const botId = req.headers.get("x-works-botid") || String(ev?.botId || "");
+    if ((env.scheduleBots || ["13580302"]).includes(botId)) {
+      background(noteRoomImage(env, botId, channelId, String(content.fileId), userId, fetcher)
+        .catch((e) => console.error("image note fail", String(e?.message || e).slice(0, 160))));
+    }
+  }
+
   // 사건방 글 → AI가 일정만 뽑아 room_event 에 (수사 사건방 글은 room_msg 에 30일 보관). 시험 봇(chatBots)은 모든 방, 운영 봇(invChatBots)은 수사 사건 방(자체 사건)만 Sonnet으로
-  if (ev?.type === "message" && content?.type === "text" && content?.text && channelId) {
+  if (!schedCmd && ev?.type === "message" && content?.type === "text" && content?.text && channelId) {
     const botId = req.headers.get("x-works-botid") || String(ev?.botId || "");
     const invOnly = (env.invChatBots || ["12905890"]).includes(botId);
     if (invOnly || (env.chatBots || ["13580302"]).includes(botId)) {
