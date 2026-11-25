@@ -127,6 +127,53 @@ function dayLabel(d: string): string {
   return `${t.getUTCMonth() + 1}.${t.getUTCDate()}.(${W[t.getUTCDay()]})`;
 }
 
+// ── 변경된 기일 가려내기 (석원 2026-11-25, 2026푸104128 김도건) ─────────────────
+// 로웨어는 변경 전 기일 줄에 결과("기일변경")를 늘 붙여 주지 않는다. 그래서
+// 같은 사건에 기일변경·연기 명령이 있고, 그 명령 뒤로 같은 종류의 앞으로 기일이 둘 이상이면
+// (결과 없는 것끼리) 마지막 것만 살아 있는 기일로 보고 앞의 것은 변경된 기일로 본다.
+export const hearingKind = (c: string) => String(c || "").replace(/\(.*$/, "").replace(/\s/g, "");
+export const isChangeOrder = (c: string) => /기일\s*(변경|연기)|(변경|연기)\s*명령|추정/.test(String(c || ""));
+export type HRow = { lp_num: number; l_num: number; date: string; contents: string; remark?: string };
+export function supersededOf(hearings: HRow[], orders: { l_num: number; date: string; contents: string }[]): Set<number> {
+  const out = new Set<number>();
+  const firstOrder = new Map<number, string>();
+  for (const o of orders) if (isChangeOrder(o.contents)) {
+    const d = String(o.date).slice(0, 10);
+    if (!firstOrder.has(o.l_num) || d < firstOrder.get(o.l_num)!) firstOrder.set(o.l_num, d);
+  }
+  const groups = new Map<string, HRow[]>();
+  for (const h of hearings) {
+    const od = firstOrder.get(h.l_num);
+    // 결과가 이미 붙은 줄(기일변경 등)은 비교에서 뺀다 (2026고단514: 12.3.에 기일변경, 12.1.이 살아 있는 기일)
+    if (!od || h.date <= od || String(h.remark || "").trim()) continue;
+    const k = h.l_num + "|" + hearingKind(h.contents);
+    groups.set(k, [...(groups.get(k) || []), h]);
+  }
+  for (const g of groups.values()) {
+    if (g.length < 2) continue;
+    const last = g.map((h) => h.date).sort().pop();
+    for (const h of g) if (h.date < last!) out.add(h.lp_num);
+  }
+  return out;
+}
+export async function fetchSuperseded(env: SchedEnv, lnums: number[], today: string, fetcher: typeof fetch = fetch): Promise<Set<number>> {
+  const out = new Set<number>();
+  const since = new Date(Date.now() - 120 * 864e5).toISOString().slice(0, 10);
+  for (let i = 0; i < lnums.length; i += 150) {
+    const ns = lnums.slice(i, i + 150).join(",");
+    const [hs, os] = await Promise.all([
+      rest(env, `lw_process_events?select=lp_num,l_num,lp_appoint_date,lp_contents,lp_remark&lp_set=eq.${encodeURIComponent("기일")}&lp_appoint_date=gte.${today}&l_num=in.(${ns})&limit=2000`, fetcher),
+      rest(env, `lw_process_events?select=l_num,lp_appoint_date,lp_contents&lp_set=in.(${encodeURIComponent("명령")},${encodeURIComponent("결정")})&lp_appoint_date=gte.${since}&l_num=in.(${ns})&limit=2000`, fetcher),
+    ]);
+    const s = supersededOf(
+      hs.map((h) => ({ lp_num: h.lp_num, l_num: h.l_num, date: String(h.lp_appoint_date).slice(0, 10), contents: h.lp_contents || "", remark: h.lp_remark || "" })),
+      os.map((o) => ({ l_num: o.l_num, date: String(o.lp_appoint_date).slice(0, 10), contents: o.lp_contents || "" })),
+    );
+    for (const n of s) out.add(n);
+  }
+  return out;
+}
+
 // 방에서 "/일정" → 계획 세우기 (보내기는 따로)
 export async function planForRoom(env: SchedEnv, channelId: string, fetcher: typeof fetch = fetch): Promise<{ plan?: Plan; why?: string }> {
   const rooms = await rest(env, "works_room_case?select=l_num,case_no,room_title,status&order=is_primary.desc,updated_at.desc&channel_id=eq." + encodeURIComponent(channelId), fetcher);
@@ -134,7 +181,9 @@ export async function planForRoom(env: SchedEnv, channelId: string, fetcher: typ
   if (!room) return { why: "이 방에 연결된 사건이 없습니다." };
   const nums = [...new Set(rooms.filter((r) => r.l_num && r.status !== "보류").map((r) => r.l_num))];
   const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
-  const ev = await rest(env, `lw_process_events?select=l_num,l_code,lp_appoint_date,lp_appoint_time,lp_contents,court&lp_set=eq.${encodeURIComponent("기일")}&lp_appoint_date=gte.${today}&l_num=in.(${nums.join(",")})&order=lp_appoint_date.asc,lp_appoint_time.asc&limit=1`, fetcher);
+  const evAll = await rest(env, `lw_process_events?select=lp_num,l_num,l_code,lp_appoint_date,lp_appoint_time,lp_contents,lp_remark,court&lp_set=eq.${encodeURIComponent("기일")}&lp_appoint_date=gte.${today}&l_num=in.(${nums.join(",")})&order=lp_appoint_date.asc,lp_appoint_time.asc&limit=20`, fetcher);
+  const gone = await fetchSuperseded(env, nums, today, fetcher).catch(() => new Set<number>());
+  const ev = evAll.filter((e) => !gone.has(e.lp_num) && !/변경|연기|추정|취소/.test(String(e.lp_remark || "") + (e.lp_contents || "")));
   const cs = await rest(env, `case_all?select=l_num,l_code,l_client,court,next_date,next_time,next_contents,raw->>l_another&l_num=in.(${nums.join(",")})`, fetcher);
   let h: { l_num: number; date: string; time: string; contents: string } | null = null;
   if (ev[0]) h = { l_num: ev[0].l_num, date: String(ev[0].lp_appoint_date).slice(0, 10), time: String(ev[0].lp_appoint_time || "").slice(0, 5), contents: ev[0].lp_contents || "" };

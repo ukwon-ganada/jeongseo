@@ -100,3 +100,26 @@ Deno.test("도우미가 알린 기일이 사진보다 늦으면 알린 기일", 
   assertEquals(r.plan?.date, "2099-02-02");
   assertEquals(r.plan?.source, "도우미 알림 기준");
 });
+
+import { supersededOf } from "./schedule_cmd.ts";
+Deno.test("기일변경명령 뒤 같은 종류 기일 둘이면 앞의 것은 변경된 기일 (2026푸104128)", () => {
+  const hs = [
+    { lp_num: 1, l_num: 9, date: "2026-12-17", contents: "심리기일(제204호 법정 16:00)" },
+    { lp_num: 2, l_num: 9, date: "2027-01-14", contents: "심리기일(제204호 법정 16:00)" },
+    { lp_num: 3, l_num: 8, date: "2026-12-17", contents: "공판기일(412호법정 11:00)" },
+    { lp_num: 4, l_num: 8, date: "2027-01-20", contents: "선고기일(412호법정 10:00)" },
+  ];
+  const os = [{ l_num: 9, date: "2026-11-13", contents: "기일변경명령" }, { l_num: 8, date: "2026-11-01", contents: "기일변경명령" }];
+  const s = supersededOf(hs, os);
+  if (!s.has(1) || s.has(2) || s.has(3) || s.has(4)) throw new Error([...s].join(","));
+  if (supersededOf(hs, []).size) throw new Error("명령 없으면 그대로");
+});
+Deno.test("결과가 붙은 뒤 기일은 비교에서 빠짐 (2026고단514)", () => {
+  const hs = [
+    { lp_num: 1, l_num: 5, date: "2026-11-26", contents: "공판기일(304호 법정 10:20)", remark: "기일변경" },
+    { lp_num: 2, l_num: 5, date: "2026-12-01", contents: "공판기일(304호 법정 10:00)", remark: "" },
+    { lp_num: 3, l_num: 5, date: "2026-12-03", contents: "공판기일(304호 법정 10:20)", remark: "기일변경" },
+  ];
+  const s = supersededOf(hs, [{ l_num: 5, date: "2026-11-20", contents: "피고인 공판기일변경명령" }]);
+  if (s.size) throw new Error([...s].join(","));
+});

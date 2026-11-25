@@ -9,7 +9,7 @@
 //  켜는 범위: notifyRooms(방 ID 목록)가 있으면 그 방만, "*"면 모든 방. notifyBot 으로 보낸다.
 // ============================================================================
 import { pemToPkcs8 } from "./room_file.ts";
-import { buildPlan, calendarUrl, lawyersFromTitle, type Plan, sendToRoom, type SchedEnv } from "./schedule_cmd.ts";
+import { buildPlan, calendarUrl, fetchSuperseded, lawyersFromTitle, type Plan, sendToRoom, type SchedEnv } from "./schedule_cmd.ts";
 
 export type NotifyOpts = { mode?: "new" | "missing"; graceHours?: number; lookbackDays?: number; force?: boolean; dryRun?: boolean; hours?: number; notifyRooms?: string[]; notifyBot: string; limit?: number; lpNum?: number };
 
@@ -87,7 +87,9 @@ export async function hearingNotify(env: SchedEnv, o: NotifyOpts, fetcher: typeo
       for (const c of part) chg.add(c.lp_num);
     }
     // 결과(lp_remark: 기일변경·연기·속행 등)가 붙은 기일은 이미 바뀌었거나 끝난 것 → 알리지 않음
-    fresh = all.filter((e) => !chg.has(e.lp_num) && !(Number(e.changed_count) > 0) && !String(e.lp_remark || "").trim() && !isPostponed(e.lp_contents));
+    // 기일변경 명령 뒤 같은 종류 기일이 또 잡혀 있으면 앞의 것은 변경된 기일 (supersededOf)
+    const gone = await fetchSuperseded(env, [...new Set(all.map((e) => e.l_num).filter(Boolean))], today, fetcher);
+    fresh = all.filter((e) => !chg.has(e.lp_num) && !gone.has(e.lp_num) && !(Number(e.changed_count) > 0) && !String(e.lp_remark || "").trim() && !isPostponed(e.lp_contents));
   } else fresh = await rest(env, `lw_process_events?select=lp_num,l_num,lp_appoint_date,lp_appoint_time,lp_contents&lp_set=eq.${giil}&lp_appoint_date=gte.${today}&first_seen_at=gte.${since}&limit=300`, fetcher);
   const ch: any[] = o.lpNum || missing ? [] : await rest(env, `lw_process_event_changes?select=lp_num,old_row&changed_at=gte.${since}&limit=500`, fetcher);
   const oldBy = new Map<number, any>();
