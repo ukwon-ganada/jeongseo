@@ -32,7 +32,7 @@
 import { saveRoomFile } from "./room_file.ts";
 import { linkPicked, linkRoomAnyBot, relinkRoom } from "./room_link.ts";
 import { handleRoomFile, handleRoomText } from "./room_chat.ts";
-import { hearingNotify } from "./hearing_notify.ts";
+import { calToken, hearingNotify, works } from "./hearing_notify.ts";
 import { saveEvent } from "./sched_save.ts";
 import { calendarUrl, handleScheduleCmd, isScheduleCmd, noteRoomImage, planForRoom } from "./schedule_cmd.ts";
 import { backfillHold, recheckAll, recheckLinked, recheckRoom, refreshRoomTitles } from "./inv_case.ts";
@@ -155,6 +155,21 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
     let b: any = {};
     try { b = await req.json(); } catch { /* */ }
     try {
+      // 캘린더 ID 알아보기(읽기만): 사람 이름 → 기본 캘린더·개인 캘린더 목록 (일정 입력 창 캘린더 지정용, 2026-11-25)
+      if (b?.action === "cal-ids") {
+        const tok = await calToken(env as any, fetcher);
+        const name = String(b?.name || "서고은");
+        let uid = "", cur = "";
+        for (let i = 0; i < 20 && !uid; i++) {
+          const j = await works(tok, `/users?count=100${cur ? "&cursor=" + encodeURIComponent(cur) : ""}`, fetcher);
+          for (const u of j.users || []) if ([u?.userName?.lastName, u?.userName?.firstName].filter(Boolean).join("") === name) uid = u.userId;
+          cur = j?.responseMetaData?.nextCursor || "";
+          if (!cur) break;
+        }
+        if (!uid) return Response.json({ error: "no user" });
+        const one = async (p: string) => { try { return await works(tok, p, fetcher); } catch (e) { return { error: String((e as Error)?.message || e).slice(0, 160) }; } };
+        return Response.json({ uid, basic: await one(`/users/${uid}/calendar`), personals: await one(`/users/${uid}/calendar-personals`) });
+      }
       if (b?.action === "hearing-notify") {
         const r = await hearingNotify(env, {
           mode: b?.mode === "missing" ? "missing" : "new", graceHours: typeof b?.graceHours === "number" ? b.graceHours : undefined,
