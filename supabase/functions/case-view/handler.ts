@@ -49,6 +49,7 @@ import { applyConfirms, computeDeadlines, deadlineEvents, DL_ACTS, isNotice, mer
 import { findPick, normTitle } from "./title_match.ts";
 import { applyWitness } from "./witness.ts";
 import { fillHearingResults } from "./hearing_result.ts";
+import { overlayScourt } from "./scourt_overlay.ts";
 import { dropKnown, dropSame, extractFromExport, msgsToExport, toRows } from "./chat_import.ts";
 import { shapeStages, diffStages, personChangeLine, isStage, noLines, chatNos, withChatNos, type NoHist } from "./stages.ts";
 // 방 제목 형제번호로 공소청 칸 채우기(2026-11-19): 바뀌는 방 목록을 석원님이 확인한 뒤 켠다
@@ -905,6 +906,9 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       } else return out({ error: "방이나 사건번호가 없습니다" }, 400);
 
       // 증인신문 기일 확정 근거(대법원 기일 참석자): 다른 조회와 함께 미리 받아 둔다
+      // 대법원 원문(석원 PC 확장이 받은 진행내용): 있으면 로웨어 줄보다 우선 (2026-11-25 석원 결정)
+      const scRowsOf = (codes: string[]) => codes.length ? rest(env, `scourt_progress_rows?select=case_code,ev_date,content,result,result_date,is_attendee&case_code=in.${enc(inList(codes))}&order=seq.asc&limit=5000`, {}, fetcher).catch(() => []) : Promise.resolve([]);
+      const scP = scRowsOf(nz(c.l_code) ? [nz(c.l_code)] : []);
       const witLogP = c.l_num != null && Number(c.l_num) > 0 ? rest(env, `lw_case_detail?select=scourt_appoint_log&l_num=eq.${c.l_num}&limit=1`, {}, fetcher).catch(() => []) : Promise.resolve([]);
       let chans: string[], rel: number[];
       let evs: any, mine: any, savedOwn: any, files: any, chat: any, checked: any, meets: any, stageLogs: any, relCases: any, titleRows: any, relEvs: any, hist: any;
@@ -941,12 +945,22 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       const end = new Date(Date.parse(today) + 28 * 864e5).toISOString().slice(0, 10);
       const myHearings = mine.filter((m: any) => isDate(m.next_date) && m.next_date.slice(0, 10) >= today && m.next_date.slice(0, 10) <= end)
         .map((m: any) => ({ c: m.l_code, d: m.next_date.slice(0, 10), tm: nz(m.next_time), t: nz(m.next_contents) || "기일", p: nz(m.court) }));
+      if ((relCases || []).length && (relEvs || []).length) {
+        const sc2 = ((await scRowsOf((relCases || []).map((x: any) => nz(x.l_code)).filter(Boolean))) || []) as any[];
+        if (sc2.length) {
+          const codeOf = new Map((relCases || []).map((x: any) => [String(x.l_num), nz(x.l_code)]));
+          const byNum = new Map<string, any[]>();
+          for (const e of relEvs) { const k = String(e.l_num); if (!byNum.has(k)) byNum.set(k, []); byNum.get(k)!.push(e); }
+          relEvs = [...byNum.entries()].flatMap(([k, list]) => overlayScourt(list, sc2.filter((r) => r.case_code === codeOf.get(k))).map((e: any) => ({ ...e, l_num: e.l_num ?? Number(k) })));
+        }
+      }
       const others: OtherCase[] = (relCases || []).filter((x: any) => x.l_code).map((x: any) => ({ code: nz(x.l_code), evs: (relEvs || []).filter((e: any) => String(e.l_num) === String(x.l_num)) }));
       // 병합 이유서 규칙(R21~R23)은 같은 심급 사건끼리만: 2심 사건이 1심 병합결정을 보고 "병합됨"이 되지 않게 (박큰별 2026-11-19)
       const sameLv = others.filter((o) => levelOf(o.code) === levelOf(nz(c.l_code)));
       // 기일 결과가 비어 있으면 대법원 기일 정보(scourt_appoint_log)의 결과로 채운다 (2026푸104128 기일변경, 2026-11-25)
       const witLog = nz(((await witLogP) || [])[0]?.scourt_appoint_log);
       evs = fillHearingResults(evs || [], witLog);
+      evs = overlayScourt(evs, (await scP) || []);
       const shaped = shapeCase(c, evs, { today, linked, myHearings, status, saved, others: sameLv });
       shaped.progress.checked = checked;
       applyWitness(shaped, evs, witLog);

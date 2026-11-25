@@ -71,6 +71,8 @@ a{color:inherit}
 .seg button+button{border-left:1px solid var(--line)}
 .seg button b{display:block;font-size:14px;color:var(--ink2)}
 .seg button[aria-current="true"]{background:var(--g-hearing-t)}
+.seg.tv button{font-size:14px;padding:9px 8px;color:var(--muted)}
+.seg.tv button[aria-current="true"]{background:var(--ink);color:#fff;font-weight:600}
 .seg button[aria-current="true"] b{color:var(--g-hearing)}
 .ctag{display:inline-block;font-size:11px;font-weight:600;border-radius:4px;padding:0 5px;margin-right:5px;background:var(--line2);color:var(--ink2);vertical-align:1px}
 
@@ -82,7 +84,9 @@ main{max-width:880px;margin:0 auto;padding:12px 16px 32px}
 .chip[aria-pressed="true"]{border-color:var(--accent);color:var(--accent-ink);background:var(--accent-tint);font-weight:600}
 .card{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:12px}
 .card-h{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 6px;font-size:13px;font-weight:600;color:var(--muted)}
-.hbtns{flex:none;display:flex;gap:6px}.hbtns label.btn-ghost{cursor:pointer}
+.hbtns{flex:none;display:flex;gap:6px;position:relative}.hbtns label.btn-ghost{cursor:pointer}
+.smspop{position:absolute;right:0;top:calc(100% + 6px);z-index:8;display:flex;gap:6px;padding:8px;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.12)}
+.smspop input{width:150px;border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:14px;background:var(--surface);color:var(--ink)}
 .imp-b{padding:12px 16px 16px}.imp-b .s{font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:8px}
 .tled{padding:4px 16px 14px}.tle-h .s{font-size:13px;color:var(--muted);padding:12px 0}
 .tle{display:grid;grid-template-columns:132px 58px 1fr auto;gap:6px;align-items:center;padding:8px 0;border-top:1px solid var(--line2)}
@@ -143,6 +147,7 @@ main{max-width:880px;margin:0 auto;padding:12px 16px 32px}
 .ev.moved .rail::after{background:var(--surface)}
 .ev.moved .tt{color:var(--muted);font-weight:500;text-decoration:line-through;text-decoration-color:var(--muted)}
 .ev.moved .pill,.li .mv{background:var(--due);color:#fff;font-weight:700;text-decoration:none}
+.ev .pill.res,.li .res{display:inline-block;font-size:11px;font-weight:600;line-height:1;padding:2px 6px;border-radius:999px;margin-left:6px;vertical-align:2px;background:transparent;color:var(--muted);border:1px solid var(--line)}
 .pill.wit,.li .wit{display:inline-block;font-size:11px;font-weight:700;line-height:1;padding:3px 6px;border-radius:999px;margin-left:6px;vertical-align:2px;background:var(--g-hearing);color:#fff;border:1px solid var(--g-hearing)}
 .pill.wit.est,.li .wit.est{background:transparent;color:var(--g-hearing)}
 .li .mv{display:inline-block;font-size:11px;font-weight:600;line-height:1;padding:3px 6px;border-radius:999px;margin-left:6px;vertical-align:2px}
@@ -356,15 +361,14 @@ html.fv-on,html.fv-on body{overflow:hidden}
         <button class="btn-ghost" id="tlref" hidden>갱신</button>
         <label class="btn-ghost" id="impbtn" hidden>대화 파일<input type="file" accept=".txt,text/plain" id="impfile" hidden></label>
         <button class="btn-ghost" id="tledit" hidden>수정</button>
+        <button class="btn-ghost" id="smsbtn" hidden>문자</button>
         <button class="btn-ghost" id="switch" hidden>사건 바꾸기</button>
       </div>
     </div>
     <div class="ctabs" id="ctabs" hidden></div>
     <nav class="tabs" id="nav" aria-label="화면" hidden>
       <button data-v="timeline">타임라인</button>
-      <button data-v="deadline">기한</button>
-      <button data-v="hearing">기일</button>
-      <button data-v="progress">나의사건</button>
+      <button data-v="dates">기일·기한</button>
       <button data-v="info">사건정보</button>
     </nav>
   </div>
@@ -425,9 +429,12 @@ var q = new URLSearchParams(location.search);
 (function(){ try{ var id=Math.random().toString(36).slice(2), bc=new BroadcastChannel('jeongseo-case');
   bc.onmessage=function(ev){ if(ev.data && ev.data.t==='open' && ev.data.id!==id && !(typeof editing!=='undefined' && editing)){ try{ window.close(); }catch(e){} } };
   bc.postMessage({t:'open', id:id}); }catch(e){} })();
+// 메뉴 3칸(석원 2026-11-25): 기일·기한 합침, 나의사건은 타임라인 안에서 [타임라인|나의사건]으로 비교. 옛 주소(?view=deadline 등)도 그대로 열림
 var view = q.get('view') || 'timeline';
 var ctx = {room:'', caseParam:q.get('case')||'', tok:''};
-var data = null, sub = {f:'all', scope:'case', p:'all'}, editing = false;
+var data = null, sub = {f:'all', scope:'case', p:'all', tv:'tl'}, editing = false;
+if(view==='progress'){ view='timeline'; sub.tv='lw'; }
+if(view==='deadline'||view==='hearing') view='dates';
 // 사건정보 단계 칸 (석원 2026-11-16): 경찰·공소청·1심·2심·3심, 지난 단계는 접어 둠
 var SK=['police','pros','c1','c2','c3'], SL={police:'경찰',pros:'공소청',c1:'1심',c2:'2심',c3:'3심'};
 var SF={police:[['org','경찰서·팀'],['no','접수번호',{copy:1}],['person','수사관',{hist:1}],['phone','전화',{tel:1,hist:1}],['mobile','휴대전화',{tel:1}]],
@@ -457,11 +464,83 @@ function emptySt(title, text){ return '<div class="empty-st"><b>'+title+'</b>'+(
 function toast(t){ var e=document.createElement('div'); e.className='toast'; e.textContent=t; document.body.appendChild(e); setTimeout(function(){ e.remove(); }, 1800); }
 var PEN_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
 var PHONE_SVG = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z"/></svg>';
+// 기일 탭 [문자] (2026-11-25): 로웨어 문자발송(팝빌) 창을 이 사건·의뢰인 번호로 연다. 보내기는 직원이 창에서 직접. PC만
+var LW_SMS='https://jeongseolaw.lawware.kr/groupware/popbill_main.html';
+function smsTo(){ var f=(data.info&&data.info.fields)||{}; return String(f.client_phone||'').split(/[,\/]/)[0].replace(/\D/g,''); }
+function smsUrl(toIn){
+  if((view!=='hearing' && view!=='dates') || sub.scope==='all' || !data || data.roomOnly) return '';
+  if(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||'')) return '';
+  var to=toIn!=null ? String(toIn).replace(/\D/g,'') : smsTo();
+  var lw=Number(data.lNum) > 0 && !!data.caseNo;
+  // 로웨어에 없는 수사 사건방(2026-11-25 석원): 사건번호 없이 사건정보의 의뢰인 번호와 조사일정 안내만으로 연다(번호가 없으면 받는번호 빈 칸)
+  if(!lw && !data.inv) return '';
+  var msg=data.inv ? invMsg() : smsMsg();
+  return LW_SMS+'?'+(to.length>=9?'to='+to+'&':'')+'tab=sms'+(lw?'&l_num='+encodeURIComponent(data.lNum)+'&l_code='+encodeURIComponent(data.caseNo):'')+(msg?'&msg='+encodeURIComponent(msg):'');
+}
+// 조사일정 안내 문자(2026-11-25, 실제 보낸 문구 기준): 사건방 대화에서 뽑은 다가오는 조사 일정으로 채운다
+function invMsg(){
+  var h=(data.hearings||[]).filter(function(x){ return x.c===data.caseNo && dd(x.d)>=0 && /조사|출석/.test(x.t||'') && !/취소|마무리|완료/.test(x.t||''); })
+    .sort(function(a,b){ return a.d.localeCompare(b.d) || (!a.tm)-(!b.tm) || String(a.tm).localeCompare(String(b.tm)); })[0];
+  if(!h) return '';
+  var f=(data.info&&data.info.fields)||{}, name=String(f.client_name||'').replace(/\s*\(.*$/,'').trim();
+  var pm=String(h.t||'').match(/[가-힣]+(경찰서|경찰청|검찰청|공소청|지청|서)(?=[\s,)]|$)/);
+  var place=pm?pm[0]:String(data.court||'').replace(/^수사 단계\s*·?\s*/,'').split(' ')[0];
+  return ['[법무법인 정서]','','안녕하세요.','법무법인 정서입니다.','',(name?name+'님 ':'')+'조사일정 안내드립니다.','',
+    '1. '+h.d.replace(/-/g,'.')+'.'+(h.tm?' '+h.tm:'')+(place?' '+place:''),
+    '2. 신분증 및 도장 지참(도장 없는 경우 지장으로 대체 가능)','','감사합니다.'].join('\n');
+}
+// 기일안내 문자(2026-11-25, 로웨어 문자현황의 실제 보낸 문구 기준): 이 사건의 다가오는 기일로 채운다. 기일이 없으면 빈 칸으로 연다
+function smsMsg(){
+  var mine=(data.hearings||[]).filter(function(x){ return x.c===data.caseNo && dd(x.d)>=0; });
+  var h=mine.filter(function(x){ return !isMoved(x.t); }).sort(function(a,b){ return (a.d+(a.tm||'')).localeCompare(b.d+(b.tm||'')); })[0];
+  if(!h) return '';
+  var kind=(String(h.t||'').match(/[가-힣]*기일/)||['기일'])[0];
+  var old=mine.filter(function(x){ return isMoved(x.t) && (x.d+(x.tm||''))!==(h.d+(h.tm||'')); }).sort(function(a,b){ return b.d.localeCompare(a.d); })[0];
+  var f=(data.info&&data.info.fields)||{}, name=String(f.client_name||'').replace(/\s*\(.*$/,'').trim();
+  var cm=String(data.court||'').match(/^\S*법원(\s+\S*지원)?/), court=cm?cm[0]:'';
+  var room=/\d+호|법정|조정실/.test(h.p||'') && !/법원|지원/.test(h.p) ? h.p : '';
+  var crim=/\d(고|노|도|초|로|모|푸|감|형)/.test(data.caseNo);
+  var L=['안녕하세요'+(name?' '+name+'님,':',')+' 법무법인 정서 입니다.', '',
+    old ? old.d.replace(/-/g,'.')+(old.tm?' '+old.tm:'')+' '+kind+'이 아래와 같이 변경되어 안내 드립니다.' : kind+' 안내 드립니다.', '',
+    '사건번호 : '+data.caseNo, '재판기일 : '+h.d+(h.tm?' '+h.tm:''), '법      원 : '+court];
+  if(room) L.push('법      정 : '+room);
+  L.push('', '감사합니다.');
+  if(crim) L.push('', '* 형사사건의 경우 꼭 출석을 하여야 합니다.');
+  return L.join('\n');
+}
+function smsAsk(){
+  var old=$('#smspop'); if(old){ old.remove(); return; }
+  var d=document.createElement('div'); d.className='smspop'; d.id='smspop';
+  d.innerHTML='<input id="smsno" inputmode="tel" placeholder="010-0000-0000" autocomplete="off"><button class="btn-ghost" id="smsgo">열기</button>';
+  $('.hbtns').appendChild(d); var i=$('#smsno'); i.focus();
+  i.addEventListener('keydown', function(e){ if(e.key==='Enter') smsGo(); if(e.key==='Escape') d.remove(); });
+}
+function smsGo(){
+  var i=$('#smsno'); if(!i) return; var raw=i.value.trim(), no=raw.replace(/\D/g,'');
+  var u=smsUrl(no.length>=9?no:''); $('#smspop').remove(); if(!u) return;
+  window.open(u, 'lw_sms', 'width=1280,height=900');
+  if(no.length<9) return;
+  var ln=data.lNum, fmt=no.length===11?no.replace(/(\d{3})(\d{4})(\d{4})/,'$1-$2-$3'):raw;
+  api({action:'save_info', lNum:ln, fields:{client_phone:fmt}}).then(function(j){
+    if(data.lNum===ln && j.fields) data.info=Object.assign({}, data.info, {fields:j.fields, saved:true, updatedBy:j.updatedBy, updatedAt:j.updatedAt});
+  }).catch(function(e){ toast('전화번호 저장 실패: '+((e&&e.message)||e)); });
+}
 function telHref(v){ var n=String(v||'').replace(/[^\d+]/g,''); return n.length>=7 ? 'tel:'+n : ''; }
 
 // ── 화면별 그리기 ─────────────────────────────────────
 var VIEWS = {
   timeline: function(){
+    var seg='<div class="seg tv"><button data-tv="tl" aria-current="'+(sub.tv!=='lw')+'">타임라인</button><button data-tv="lw" aria-current="'+(sub.tv==='lw')+'">나의사건</button></div>';
+    if(tl.on) return VIEWS.ourTl();
+    return seg+(sub.tv==='lw' ? VIEWS.progress() : VIEWS.ourTl());
+  },
+  // 기일·기한 한 화면: 아직 챙길 기한이 있으면 맨 위, 다 끝난 기한만 있으면 기일 아래
+  dates: function(){
+    if(!data.deadlines.length) return VIEWS.hearing();
+    var live=editing==='dl' || data.deadlines.some(function(x){ return !(x.st==='done'||x.cf) && (!x.d || dd(x.d)>=0); });
+    return live ? VIEWS.deadline()+VIEWS.hearing() : VIEWS.hearing()+VIEWS.deadline();
+  },
+  ourTl: function(){
     // 타임라인 = 우리가 한 일·해야 할 일, 걸러 보기 없이 한 줄로 (기한·기일은 메뉴가 따로 있음)
     // 줄 사이 간격 = 실제 날짜 차이(제곱근으로 눌러서). 45일 넘으면 점선 + '약 N개월'로 줄여 보여 줌
     var gapDiv=function(a,b){
@@ -508,6 +587,9 @@ var VIEWS = {
       // 받은 사람·낸 사람(소송기록접수통지 도달, 이유서 제출)은 제목 옆에 (2026-11-20 석원)
       if(g==='notice'||g==='filing'){ var wm=String(e.t||'').match(/\s*\(([^()]*)\)\s*$/); if(wm){ p.tt=String(e.t).slice(0,wm.index); p.ts=''; pill=wm[1].split('·').map(function(w){ return '<span class="pill who'+(w==='우리'?' us':'')+'">'+esc(w)+'</span>'; }).join(''); } }
       if(e.wit && !(g==='hearing' && isMoved(p.ts))) pill='<span class="pill wit'+(e.wit==='추정'?' est':'')+'">증인신문</span>'+pill;
+      // 속행된 기일: 취소는 아니지만 한눈에 (2026-11-23 석원, 증인신문보다 약하게)
+      var SOK=/\s*·\s*속행(\s*\(\s*추정\s*\))?\s*$/;
+      if(g==='hearing' && SOK.test(p.ts||'') && !isMoved(p.ts)){ p.ts=p.ts.replace(SOK,''); pill+='<span class="pill res">속행</span>'; }
       var moved=g==='hearing' && isMoved(p.ts); if(moved){ pill='<span class="pill">'+(p.ts.match(MOVED_RE)[0])+'</span>'; p.ts=p.ts.replace(/\s*·\s*[^·]*(변론재개|선고연기|재판연기|기일변경|기일연기|연기|추정|취소)[^·]*$/,''); }
       body+='<div class="ev '+e.k+(e.cfa?' cf'+(/^제출/.test(e.cfa)?' sub':''):'')+(g?' g-'+g:'')+(minor?' minor':'')+(key&&!moved?' key':'')+(moved?' moved':'')+'"><div class="d"><b>'+md(e.d)+'</b><small>'+wk(e.d)+'</small></div><div class="rail"></div><div class="t">'
         +'<div class="tt">'+esc(p.tt)+pill+(e.cf?fileChip(e.cf,'계약서'):'')+(e.f&&!e.minor?fileChip(e.f,'열기'):'')+'</div>'+(p.ts?'<div class="ts">'+esc(p.ts)+'</div>':'')+'</div></div>';
@@ -544,7 +626,7 @@ var VIEWS = {
     var gone=function(x){ return isMoved(x.t); };
     var up=pick.filter(function(x){return dd(x.d)>=0 && !gone(x);}).sort(function(a,b){return (a.d+a.tm).localeCompare(b.d+b.tm);});
     var past=all?[]:pick.filter(function(x){return dd(x.d)<0 || gone(x);}).sort(function(a,b){return b.d.localeCompare(a.d);});
-    var row=function(x, isPast){ var t=String(x.t||''), mv=isMoved(t) && t.match(MOVED_RE); if(mv) t=t.replace(/\s+\(.*$/,''); return '<div class="li'+(isPast?' past':'')+(mv?' moved':'')+'"><span class="tm">'+esc(x.tm||'')+'</span><div class="main"><div class="t">'+(all?'<span class="casechip">'+esc(x.c)+'</span>':'')+(mv?'<span class="x">'+esc(t)+'</span><span class="mv">'+mv[0]+'</span>':esc(t))+(x.wit&&!mv?'<span class="wit'+(x.wit==='추정'?' est':'')+'">증인신문</span>':'')+'</div>'+(x.p?'<div class="s">'+esc(x.p)+'</div>':'')+'</div></div>'; };
+    var row=function(x, isPast){ var t=String(x.t||''), mv=isMoved(t) && t.match(MOVED_RE); if(mv) t=t.replace(/\s+\(.*$/,''); var sok=!mv && /\s*\(\s*속행(\s*\(\s*추정\s*\))?\s*\)\s*$/.test(t); if(sok) t=t.replace(/\s*\(\s*속행.*$/,''); return '<div class="li'+(isPast?' past':'')+(mv?' moved':'')+'"><span class="tm">'+esc(x.tm||'')+'</span><div class="main"><div class="t">'+(all?'<span class="casechip">'+esc(x.c)+'</span>':'')+(mv?'<span class="x">'+esc(t)+'</span><span class="mv">'+mv[0]+'</span>':esc(t))+(x.wit&&!mv?'<span class="wit'+(x.wit==='추정'?' est':'')+'">증인신문</span>':'')+(sok?'<span class="res">속행</span>':'')+'</div>'+(x.p?'<div class="s">'+esc(x.p)+'</div>':'')+'</div></div>'; };
     var h=chips('scope', [['case','이 사건'],['all','내 사건 전체 · 4주']]), last='', card='';
     up.forEach(function(x){
       if(x.d!==last){ if(card) h+=card+'</div>'; last=x.d; var n=dd(x.d); card='<div class="card"><div class="card-h"><span style="color:var(--ink)">'+md(x.d)+' ('+wk(x.d)+')</span><span class="dday">'+(n===0?'오늘':'D-'+n)+'</span></div>'; }
@@ -867,7 +949,7 @@ function impPreview(file){
   if(file.size>1500000){ toast('파일이 너무 큽니다'); return; }
   var rd=new FileReader();
   rd.onload=function(){
-    imp={st:'busy', evs:[], on:{}, msg:''}; tl.on=false; view='timeline'; render(); window.scrollTo(0,0);
+    imp={st:'busy', evs:[], on:{}, msg:''}; tl.on=false; view='timeline'; sub.tv='tl'; render(); window.scrollTo(0,0);
     api({action:'chat_import_preview', lNum:data.lNum, text:String(rd.result||'')}).then(function(j){
       imp={st:'preview', evs:j.events||[], on:{}, msg:j.truncated?'파일이 길어 최근 대화만 읽었습니다':'', start:j.startDate||''};
       imp.evs.forEach(function(_,i){ imp.on[i]=true; });
@@ -955,11 +1037,49 @@ document.addEventListener('click', function(e){
   var b=e.target.closest('button'); if(!b) return;
   if(b.id==='tledit'){ if(tl.on) return; tlOpen(); window.scrollTo(0,0); }
   if(b.id==='tlref') tlRefresh(b);
+  if(b.id==='smsbtn'){ var u=smsUrl(); if(!u) return;
+    // 의뢰인 번호가 없으면 여기서 한 번 받아 사건정보에 저장하고 연다(2026-11-25 석원). 비워 두면 받는번호 빈 칸으로 연다
+    if(smsTo().length<9 && Number(data.lNum)){ smsAsk(); return; }
+    window.open(u, 'lw_sms', 'width=1280,height=900'); }
+  if(b.id==='smsgo') smsGo();
   if(b.id==='tlcancel'){ tl.on=false; render(); }
   if(b.id==='tlsave') tlSave(b);
   if(b.id==='tlreset') tlReset(b);
   if(b.id==='tladd'){ tlRead(); tl.rows.push({id:null, d:data.today||'', tm:'', t:'', hid:false, o:''}); render(); var ins=document.querySelectorAll('#main .tle-t'); if(ins.length) ins[ins.length-1].focus(); }
   if(b.dataset.tlx!==undefined){ tlRead(); var r=tl.rows[Number(b.dataset.tlx)]; if(r){ if(!r.id) tl.rows.splice(Number(b.dataset.tlx),1); else r.hid=!r.hid; } render(); }
+});
+// 전화번호·주민번호 칸: 숫자만 쳐도 '-'가 들어간다 (2026-11-24 석원). 숫자·'-'·띄어쓰기만 있는 값만 바꾼다(내선·메모 글은 그대로)
+function fmtTel(v){
+  if(!/^[\d\s-]*$/.test(v)) return v;
+  var d=v.replace(/\D/g,'').slice(0,12);
+  if(/^02/.test(d)){ if(d.length<=2) return d; if(d.length<=5) return d.slice(0,2)+'-'+d.slice(2); if(d.length<=9) return d.slice(0,2)+'-'+d.slice(2,5)+'-'+d.slice(5); return d.slice(0,2)+'-'+d.slice(2,6)+'-'+d.slice(6,10); }
+  if(/^1[5-9]\d{2}/.test(d) && d.length<=8) return d.length<=4?d:d.slice(0,4)+'-'+d.slice(4);
+  if(d.length<=3) return d; if(d.length<=6) return d.slice(0,3)+'-'+d.slice(3);
+  if(d.length<=10) return d.slice(0,3)+'-'+d.slice(3,6)+'-'+d.slice(6);
+  return d.slice(0,3)+'-'+d.slice(3,7)+'-'+d.slice(7,11);
+}
+// 한 칸 속 전화번호들(쉼표·'/'·띄어쓰기로 이어 적은 것): 번호마다 '-' 형식으로
+function phonesIn(v){
+  var out=[], m, re=/(?:0\d{1,2}|1[5-9]\d{2})[\s.-]?\d{3,4}[\s.-]?\d{4}/g;
+  while((m=re.exec(String(v||'')))) out.push(fmtTel(m[0].replace(/\D/g,'')));
+  return out;
+}
+function fmtRrn(v){
+  if(!/^[\d\s-]*$/.test(v)) return v;
+  var d=v.replace(/\D/g,'').slice(0,13);
+  return d.length<=6?d:d.slice(0,6)+'-'+d.slice(6);
+}
+document.addEventListener('input', function(e){
+  var t=e.target; if(!t || t.tagName!=='INPUT') return;
+  var f = t.getAttribute('inputmode')==='tel' ? fmtTel : t.getAttribute('data-k')==='client_rrn' ? fmtRrn : null;
+  if(!f || (e.inputType||'').indexOf('delete')===0) return;
+  var atEnd=t.selectionStart===t.value.length, nv=f(t.value);
+  if(nv!==t.value && atEnd){ t.value=nv; try{ t.setSelectionRange(nv.length,nv.length); }catch(x){} }
+});
+document.addEventListener('focusout', function(e){
+  var t=e.target; if(!t || t.tagName!=='INPUT') return;
+  var f = t.getAttribute('inputmode')==='tel' ? fmtTel : t.getAttribute('data-k')==='client_rrn' ? fmtRrn : null;
+  if(f){ var nv=f(t.value); if(nv!==t.value) t.value=nv; }
 });
 document.addEventListener('change', function(e){
   if(e.target.id==='st-start'||e.target.id==='st-cur'){
@@ -988,16 +1108,17 @@ function render(){
   var LV=ctx.levels&&ctx.levels.length>1?ctx.levels:null;
   if(LV){ $('#ctabs').hidden=false; $('#ctabs').innerHTML=LV.slice().reverse().map(function(L,gi){ return (gi?'<span class="sep"></span>':'')+'<span class="gl">'+esc(L.label)+'</span>'+L.cases.map(function(c,i){ var m=L.merged.indexOf(c)>=0, mn=!m&&L.merged.length>0; return (m&&i?'<span class="lk">←</span>':'')+'<button data-ctab="'+esc(c)+'" aria-current="'+(cnk(c)===cnk(data.caseNo))+'">'+(m?'<i>병합</i>':mn?'<i>본</i>':'')+esc(c)+'</button>'; }).join(''); }).join(''); }
   else $('#ctabs').innerHTML = ct.length<2 ? '' : ct.map(function(c,i){ var m=isMg(c), mn=!!mg&&cnk(c)===cnk(mg.main); return (m&&i?'<span class="lk">←</span>':'')+'<button data-ctab="'+esc(c)+'" aria-current="'+(c===data.caseNo)+'">'+(m?'<i>병합</i>':mn?'<i>본</i>':'')+esc(c)+'</button>'; }).join('');
-  var canTl = view==='timeline' && !!data.lNum;
+  var canTl = view==='timeline' && sub.tv!=='lw' && !!data.lNum;
   $('#impbtn').hidden = !canTl || tl.on; $('#tledit').hidden = !canTl || tl.on;
   $('#tlref').hidden = !canTl || tl.on || !(Number(data.lNum) < 0);
+  $('#smsbtn').hidden = !smsUrl(); if($('#smsbtn').hidden && $('#smspop')) $('#smspop').remove();
   $('#main').innerHTML = (VIEWS[view]||VIEWS.timeline)();
 }
 document.addEventListener('click', function(e){
   var b=e.target.closest('button'); if(!b) return;
   if(b.dataset.ctab){ if(b.dataset.ctab===data.caseNo) return; if(editing && !confirmLeave()) return; editing=false; tl.on=false; sub.lv=null; showCase({'case':b.dataset.ctab}); return; }
   if(b.dataset.v){ if(editing && editing!=='dl' && !confirmLeave()) return; editing=false; tl.on=false; view=b.dataset.v; render(); window.scrollTo(0,0); return; }
-  ['f','scope','p','lv'].forEach(function(k){ if(b.dataset[k]){ sub[k]=b.dataset[k]; render(); } });
+  ['f','scope','p','lv','tv'].forEach(function(k){ if(b.dataset[k]){ sub[k]=b.dataset[k]; render(); } });
   if(b.dataset.edit){ editing=b.dataset.edit; render(); var c=$('#main .card.editing'); if(c){ var i=c.querySelector('input,textarea,select'); if(i) i.focus(); if(c.getBoundingClientRect().top<0) c.scrollIntoView({block:'start'}); } }
   if(b.id==='cancel'){ editing=false; render(); }
   if(b.id==='dldone'){ editing=false; render(); }
@@ -1043,7 +1164,11 @@ function saveInfo(btn){
   if(ln){ var no=ln.value.replace(/\s+/g,''); if(no!==linkOrig().replace(/\s+/g,'')) return relink(btn, no); }
   var fields={}; box.querySelectorAll('[data-k]').forEach(function(el){ fields[el.dataset.k]=el.value.trim(); });
   if(box.querySelector('#xp')){
-    var xp=[]; box.querySelectorAll('.xp').forEach(function(r){ var n=r.querySelector('.xp-n').value.trim(), p=r.querySelector('.xp-p').value.trim(); if(n||p) xp.push({n:n,p:p}); });
+    var xp=[]; box.querySelectorAll('.xp').forEach(function(r){ var n=r.querySelector('.xp-n').value.trim(), p=r.querySelector('.xp-p').value.trim(), ps=phonesIn(p);
+      if(ps.length>1) ps.forEach(function(x,i){ xp.push({n:i?'':n, p:x}); }); else if(n||p) xp.push({n:n,p:p}); });
+    // 의뢰인 전화 칸에 번호가 둘 이상이면 첫 번호만 남기고 나머지는 추가 전화 칸으로 (2026-11-24 석원)
+    var cps=phonesIn(fields.client_phone||'');
+    if(cps.length>1){ fields.client_phone=cps[0]; cps.slice(1).forEach(function(x){ if(!xp.some(function(y){ return y.p===x; })) xp.push({n:'',p:x}); }); }
     fields.extra_phones = xp.length ? JSON.stringify(xp) : '';
   }
   var body={action:'save_info', lNum:data.lNum, fields:fields};
@@ -1188,6 +1313,47 @@ document.addEventListener('click', function(e){
   }
 });
 
+// ── 메뉴 [일정] (?view=sched): 이 방 기일로 채운 웍스 캘린더 입력 창으로 바로 넘어간다 (2026-11-25) ──
+function addHour(t){ var a=(t||'09:00').split(':'); var h=Math.min(+a[0]+1,23); return (h<10?'0':'')+h+':'+a[1]; }
+var SCHED_LAWYERS=['서고은','이예나','박종덕','강현구'];
+function schedForm(p, k){
+  var st=p.time||'09:00', law='서고은'; // 석원 2026-11-25: 모두 서고은 캘린더
+  var opts=SCHED_LAWYERS.indexOf(law)<0 ? [law].concat(SCHED_LAWYERS) : SCHED_LAWYERS;
+  var row=function(l,h){ return '<div class="fr"><span class="l">'+l+'</span><div style="grid-column:2/4">'+h+'</div></div>'; };
+  message('일정','', '<div class="card editing" id="schedc"><div class="card-h"><span>새 일정</span><span class="hb"><button class="edit-btn" id="schedsave">저장</button></span></div>'+
+    row('제목','<input id="s_sum" value="'+esc(p.summary||'')+'">')+
+    row('날짜','<input id="s_date" type="date" value="'+esc(p.date||'')+'">')+
+    row('시간','<div style="display:flex;gap:8px;align-items:center"><input id="s_st" type="time" style="flex:1;min-width:0" value="'+esc(st)+'"><span>~</span><input id="s_en" type="time" style="flex:1;min-width:0" value="'+esc(addHour(st))+'"></div>')+
+    row('장소','<input id="s_loc" value="'+esc(p.location||'')+'">')+
+    row('캘린더','<select id="s_law">'+opts.map(function(n){ return '<option'+(n===law?' selected':'')+'>'+esc(n)+'</option>'; }).join('')+'</select>')+
+    row('메모','<textarea id="s_desc">'+esc(p.description||'')+'</textarea>')+'</div>');
+  $('#s_st').onchange=function(){ $('#s_en').value=addHour(this.value); };
+  var b=$('#schedsave');
+  b.onclick=function(){
+    if(b.disabled) return; b.disabled=true; b.textContent='저장 중…';
+    var ev={summary:$('#s_sum').value, date:$('#s_date').value, start:$('#s_st').value, end:$('#s_en').value, location:$('#s_loc').value, lawyer:$('#s_law').value, description:$('#s_desc').value};
+    api({action:'sched-save', room:k.room||'', event:ev}).then(function(j){
+      if(j.ok){ message('일정','', emptySt('캘린더에 넣었습니다', '<div>'+esc(ev.lawyer+' · '+ev.summary)+'</div>')); return; }
+      toast(j.why||'캘린더에 넣지 못했습니다'); b.disabled=false; b.textContent='저장';
+    }).catch(function(e){ toast('캘린더에 넣지 못했습니다'); b.disabled=false; b.textContent='저장'; });
+  };
+}
+function openSched(inClient){
+  // 웍스 캘린더 입력 화면은 휴대폰에서 열리지 않음 → 휴대폰은 이 화면에서 확인·고친 뒤 [저장]하면 변호사 캘린더에 들어감(석원 2026-11-25)
+  var mobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||'');
+  message('일정','', '<div class="empty-st">일정 입력 창을 여는 중…</div>');
+  var pKey = ctx.room ? Promise.resolve({room:ctx.room}) : ctx.caseParam ? Promise.resolve({'case':ctx.caseParam}) :
+    !inClient ? api({action:'locate'}).then(function(j){ return j.room ? {room:j.room} : j['case'] ? {'case':j['case']} : null; }) : Promise.resolve(null);
+  return pKey.then(function(k){
+    if(!k) return message('일정','', emptySt('이 방을 찾지 못했습니다'));
+    return api({action:'sched', room:k.room||'', 'case':k['case']||''}).then(function(j){
+      if(j.url && mobile && j.plan) return schedForm(j.plan, k);
+      if(j.url){ location.replace(j.url); return; }
+      message('일정','', emptySt(esc(j.why||'일정을 만들지 못했습니다')));
+    });
+  }).catch(function(e){ message('일정','', emptySt('일정 입력 창을 열지 못했습니다', esc((e&&e.message)||e))); });
+}
+
 // ── WOFF 시작 ─────────────────────────────────────────
 function start(){
   perfMark('sdk');
@@ -1201,12 +1367,15 @@ function start(){
       return;
     }
     try{ ctx.tok = woff.getAccessToken ? woff.getAccessToken() : ''; }catch(e){}
+    // ?admin=1: 관리 화면(admin.html)으로 웍스 로그인 토큰을 넘긴다 (2026-11-25 관리 화면)
+    if(q.get('admin')){ try{ sessionStorage.setItem('adm_tok', ctx.tok||''); }catch(e){} location.replace('admin.html'+(location.hash||'')); return; }
     var inClient = woff.isInClient();
     var pRoom = inClient && woff.getChannelId ? Promise.resolve().then(function(){ return woff.getChannelId(); }).then(function(c){ ctx.room = c || ''; }).catch(function(){}) : Promise.resolve();
     return pRoom.then(function(){
       // 보류 방: 어느 사건인지 확정 못 함 → 사건정보·서면을 띄우지 않는다
       if(q.get('hold')) return showHold();
       if(q.get('setup')==='pc') return showSetup();
+      if(q.get('view')==='sched') return openSched(inClient);
       // PC(바깥 브라우저): 웍스가 방을 알려 주지 않으므로, 이 PC 도우미가 웍스 창의 방 제목을 읽어 찾는다
       if(!inClient && !ctx.room && !ctx.caseParam && !q.get('room')) return showLocate();
       if(!ctx.room && !ctx.caseParam) return showPicker(q.get('room') ? '이 방과 연결된 사건이 없습니다' : '');
