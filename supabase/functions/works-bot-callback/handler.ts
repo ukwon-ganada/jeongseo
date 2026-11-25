@@ -34,7 +34,7 @@ import { linkPicked, linkRoomAnyBot, relinkRoom } from "./room_link.ts";
 import { handleRoomFile, handleRoomText } from "./room_chat.ts";
 import { calToken, hearingNotify, works } from "./hearing_notify.ts";
 import { saveEvent } from "./sched_save.ts";
-import { calendarUrl, handleScheduleCmd, isScheduleCmd, noteRoomImage, planForRoom } from "./schedule_cmd.ts";
+import { calendarUrl, handleScheduleCmd, isScheduleCmd, noteRoomImage, planForRoom, readRecentNotice } from "./schedule_cmd.ts";
 import { backfillHold, recheckAll, recheckLinked, recheckRoom, refreshRoomTitles } from "./inv_case.ts";
 
 // 우리 봇: 운영 봇(사건관리 도우미), 시험봇(정서 시험봇)
@@ -156,6 +156,25 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
     try { b = await req.json(); } catch { /* */ }
     try {
       // 캘린더 ID 알아보기(읽기만): 사람 이름 → 기본 캘린더·개인 캘린더 목록 (일정 입력 창 캘린더 지정용, 2026-11-25)
+      // /일정 미리보기(시험용): 방 하나의 계획과 사진·통지서 읽은 결과
+      if (b?.action === "bot-info") {
+        const { botToken } = await import("./room_file.ts");
+        const tok = await botToken(env as any, fetcher);
+        const out: Record<string, unknown> = {};
+        for (const id of ["13580302", "12905890"]) {
+          const r = await fetcher(`https://www.worksapis.com/v1.0/bots/${id}`, { headers: { Authorization: "Bearer " + tok } });
+          const t = await r.text();
+          try { const j = JSON.parse(t); out[id] = { status: r.status, botName: j.botName, callbackEvents: j.callbackEvents, callbackUrl: j.callbackUrl, enableCallback: j.enableCallback }; } catch { out[id] = { status: r.status, t: t.slice(0, 200) }; }
+        }
+        return Response.json(out);
+      }
+      if (b?.action === "sched-debug") {
+        const ch = String(b?.room || "");
+        const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+        const read = await readRecentNotice(env as any, ch, today, fetcher).catch((e) => ({ error: String((e as Error)?.message || e).slice(0, 200) }));
+        const r = await planForRoom(env as any, ch, fetcher).catch((e) => ({ error: String((e as Error)?.message || e).slice(0, 200) }));
+        return Response.json({ read, plan: r });
+      }
       if (b?.action === "cal-ids") {
         const tok = await calToken(env as any, fetcher);
         const name = String(b?.name || "서고은");
@@ -278,6 +297,7 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
   // 사진이 올라오면 "/일정"이 읽을 수 있게 기록만 (scheduleBots 방만)
   if (ev?.type === "message" && content?.type === "image" && content?.fileId && channelId) {
     const botId = req.headers.get("x-works-botid") || String(ev?.botId || "");
+    console.log("image", botId, channelId.slice(0, 8));
     if ((env.scheduleBots || ["13580302"]).includes(botId)) {
       background(noteRoomImage(env, botId, channelId, String(content.fileId), userId, fetcher)
         .catch((e) => console.error("image note fail", String(e?.message || e).slice(0, 160))));
