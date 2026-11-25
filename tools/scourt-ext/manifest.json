@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "정서 대법원 원문 받기",
+  "version": "0.1.0",
+  "description": "로웨어가 연 대법원 사건 창의 내용을 읽어 법인 서버에 보관합니다. 대법원에 요청을 보내지 않습니다.",
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["https://ssgo.scourt.go.kr/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ],
+  "host_permissions": ["https://nyjyemjsperpakrrgzcc.supabase.co/*"],
+  "permissions": ["storage"]
+}
