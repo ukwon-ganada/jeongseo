@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """운영 봇(실제 사건방에 들어가 있는 봇)에 사건 화면 리치 메뉴를 거는 스크립트 (사무실 PC에서 실행).
 
-메뉴 다섯 칸 (방에 글이 남지 않음): 타임라인 / 기한 / 기일 / 대법원 나의사건 / 사건정보
+메뉴 네 칸 (방에 글이 남지 않음): 타임라인 / 기일·기한 / 사건정보 / 일정
   누르면 그 방 사건 화면이 해당 탭으로 바로 열림.
   휴대폰: 웍스가 방을 알려 줌. PC: 브라우저로 열리고 'PC 도우미'(v2 이상)가 웍스 창 방 제목을 읽어 방을 찾음
   웍스는 봇마다 메뉴 한 벌이라 휴대폰·PC에 같은 메뉴가 뜸
@@ -31,18 +31,19 @@ def bot_id():
 
 BID = bot_id()
 API = "https://www.worksapis.com/v1.0/bots/%s" % BID
+# 2026-11-25: 여섯째 칸 [일정 입력](?view=sched): PC는 그 방 기일로 채운 웍스 캘린더 입력 창, 휴대폰은 사건 화면에서 확인 후 [저장]
+# 2026-11-25 석원: 메뉴 4칸으로 줄임(기일·기한 합침, 나의사건은 타임라인 안에서), '일정 입력' → '일정'
+MENU = [("타임라인", "timeline"), ("기일·기한", "dates"), ("사건정보", "info"), ("일정", "sched")]
+W = 2500 // len(MENU)
 BODY = {
     "richmenuName": NAME,
     "size": {"width": 2500, "height": 843},
     "areas": [
-        # 다섯 칸 모두 uri: 휴대폰은 웍스가 방을 알려 주고, PC는 'PC 도우미'가 웍스 창 방 제목을 읽어 그 방을 찾음
+        # 모든 칸 uri: 휴대폰은 웍스가 방을 알려 주고, PC는 'PC 도우미'가 웍스 창 방 제목을 읽어 그 방을 찾음
         # PC 앱은 그림 대신 이 이름(label)을 ≡ 목록으로 보여 줌
-        {"bounds": {"x": 500 * i, "y": 0, "width": 500, "height": 843},
+        {"bounds": {"x": W * i, "y": 0, "width": (2500 - W * i) if i == len(MENU) - 1 else W, "height": 843},
          "action": {"type": "uri", "label": label, "uri": WOFF + "?view=" + view}}
-        for i, (label, view) in enumerate([
-            ("타임라인", "timeline"), ("기한", "deadline"), ("기일", "hearing"),
-            ("대법원 나의사건", "progress"), ("사건정보", "info"),
-        ])
+        for i, (label, view) in enumerate(MENU)
     ],
 }
 
