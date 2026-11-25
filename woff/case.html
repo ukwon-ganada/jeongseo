@@ -467,14 +467,14 @@ var PHONE_SVG = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"
 // 기일 탭 [문자] (2026-11-25): 로웨어 문자발송(팝빌) 창을 이 사건·의뢰인 번호로 연다. 보내기는 직원이 창에서 직접. PC만
 var LW_SMS='https://jeongseolaw.lawware.kr/groupware/popbill_main.html';
 function smsTo(){ var f=(data.info&&data.info.fields)||{}; return String(f.client_phone||'').split(/[,\/]/)[0].replace(/\D/g,''); }
-function smsUrl(toIn){
+function smsUrl(toIn, ov){
   if((view!=='hearing' && view!=='dates') || sub.scope==='all' || !data || data.roomOnly) return '';
   if(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||'')) return '';
   var to=toIn!=null ? String(toIn).replace(/\D/g,'') : smsTo();
   var lw=Number(data.lNum) > 0 && !!data.caseNo;
   // 로웨어에 없는 수사 사건방(2026-11-25 석원): 사건번호 없이 사건정보의 의뢰인 번호와 조사일정 안내만으로 연다(번호가 없으면 받는번호 빈 칸)
   if(!lw && !data.inv) return '';
-  var msg=data.inv ? invMsg() : smsMsg();
+  var msg=data.inv ? invMsg() : smsMsg(ov);
   return LW_SMS+'?'+(to.length>=9?'to='+to+'&':'')+'tab=sms'+(lw?'&l_num='+encodeURIComponent(data.lNum)+'&l_code='+encodeURIComponent(data.caseNo):'')+(msg?'&msg='+encodeURIComponent(msg):'');
 }
 // 조사일정 안내 문자(2026-11-25, 실제 보낸 문구 기준): 사건방 대화에서 뽑은 다가오는 조사 일정으로 채운다
@@ -490,14 +490,17 @@ function invMsg(){
     '2. 신분증 및 도장 지참(도장 없는 경우 지장으로 대체 가능)','','감사합니다.'].join('\n');
 }
 // 기일안내 문자(2026-11-25, 로웨어 문자현황의 실제 보낸 문구 기준): 이 사건의 다가오는 기일로 채운다. 기일이 없으면 빈 칸으로 연다
-function smsMsg(){
+// ov: 로웨어에 아직 없는 새 기일(직원이 올린 사진·통지서나 도우미 알림으로 [일정]이 찾은 것). 있으면 그 기일로 채우고, 로웨어의 지난 날짜는 '변경' 안내로
+function smsMsg(ov){
   var mine=(data.hearings||[]).filter(function(x){ return x.c===data.caseNo && dd(x.d)>=0; });
   var h=mine.filter(function(x){ return !isMoved(x.t); }).sort(function(a,b){ return (a.d+(a.tm||'')).localeCompare(b.d+(b.tm||'')); })[0];
+  var old=null;
+  if(ov){ if(h && (h.d+(h.tm||''))!==(ov.d+(ov.tm||''))) old=h; h={d:ov.d, tm:ov.tm, t:ov.kind, p:ov.room, court:ov.court}; }
   if(!h) return '';
   var kind=(String(h.t||'').match(/[가-힣]*기일/)||['기일'])[0];
-  var old=mine.filter(function(x){ return isMoved(x.t) && (x.d+(x.tm||''))!==(h.d+(h.tm||'')); }).sort(function(a,b){ return b.d.localeCompare(a.d); })[0];
+  if(!ov) old=mine.filter(function(x){ return isMoved(x.t) && (x.d+(x.tm||''))!==(h.d+(h.tm||'')); }).sort(function(a,b){ return b.d.localeCompare(a.d); })[0];
   var f=(data.info&&data.info.fields)||{}, name=String(f.client_name||'').replace(/\s*\(.*$/,'').trim();
-  var cm=String(data.court||'').match(/^\S*법원(\s+\S*지원)?/), court=cm?cm[0]:'';
+  var cm=String(h.court||data.court||'').match(/^\S*법원(\s+\S*지원)?/), court=cm?cm[0]:'';
   var room=/\d+호|법정|조정실/.test(h.p||'') && !/법원|지원/.test(h.p) ? h.p : '';
   var crim=/\d(고|노|도|초|로|모|푸|감|형)/.test(data.caseNo);
   var L=['안녕하세요'+(name?' '+name+'님,':',')+' 법무법인 정서 입니다.', '',
@@ -507,6 +510,21 @@ function smsMsg(){
   L.push('', '감사합니다.');
   if(crim) L.push('', '* 형사사건의 경우 꼭 출석을 하여야 합니다.');
   return L.join('\n');
+}
+// [일정]과 같은 판단(case-view sched → 로웨어 / 도우미 알림 / 최근 사진·통지서)으로 로웨어에 아직 없는 기일을 찾는다
+function planOverride(p){
+  if(!p || !p.date || /^로웨어/.test(p.source||'')) return null;
+  var desc=String(p.description||''), par=(desc.match(/\(([^()]*)\)\s*$/)||['',''])[1].replace(/\s*\d{1,2}:\d{2}\s*$/,'').trim();
+  var loc=String(p.location||''), room=par || loc.replace(/^\S*법원(\s+\S*지원)?\s*/,'');
+  return {d:p.date, tm:p.time||'', kind:(desc.match(/[가-힣]*기일/)||['기일'])[0], court:loc, room:room};
+}
+function smsOpen(to){
+  var w=window.open('about:blank', 'lw_sms', 'width=1280,height=900'), base=smsUrl(to);
+  if(!w || !base) return;
+  if(data.inv || !(Number(data.lNum) > 0)){ w.location=base; return; }
+  api({action:'sched', room:ctx.room||'', 'case':data.caseNo}).then(function(j){
+    var ov=planOverride(j && j.plan); w.location = ov ? (smsUrl(to, ov) || base) : base;
+  }).catch(function(){ w.location=base; });
 }
 function smsAsk(){
   var old=$('#smspop'); if(old){ old.remove(); return; }
@@ -518,7 +536,7 @@ function smsAsk(){
 function smsGo(){
   var i=$('#smsno'); if(!i) return; var raw=i.value.trim(), no=raw.replace(/\D/g,'');
   var u=smsUrl(no.length>=9?no:''); $('#smspop').remove(); if(!u) return;
-  window.open(u, 'lw_sms', 'width=1280,height=900');
+  smsOpen(no.length>=9?no:'');
   if(no.length<9) return;
   var ln=data.lNum, fmt=no.length===11?no.replace(/(\d{3})(\d{4})(\d{4})/,'$1-$2-$3'):raw;
   api({action:'save_info', lNum:ln, fields:{client_phone:fmt}}).then(function(j){
@@ -1040,7 +1058,7 @@ document.addEventListener('click', function(e){
   if(b.id==='smsbtn'){ var u=smsUrl(); if(!u) return;
     // 의뢰인 번호가 없으면 여기서 한 번 받아 사건정보에 저장하고 연다(2026-11-25 석원). 비워 두면 받는번호 빈 칸으로 연다
     if(smsTo().length<9 && Number(data.lNum)){ smsAsk(); return; }
-    window.open(u, 'lw_sms', 'width=1280,height=900'); }
+    smsOpen(); }
   if(b.id==='smsgo') smsGo();
   if(b.id==='tlcancel'){ tl.on=false; render(); }
   if(b.id==='tlsave') tlSave(b);
