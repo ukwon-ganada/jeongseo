@@ -155,8 +155,8 @@ export async function hearingNotify(env: SchedEnv, o: NotifyOpts, fetcher: typeo
     });
     const client = String(c.l_client || "").split(/[,(]/)[0].trim();
     const lws = lawyersFromTitle(room.room_title || "");
-    // 방 제목에 변호사 표시가 없으면 담당 변호사들 + 기일 일정을 쓰는 변호사 넷의 캘린더를 다 본다
-    const who = lws.length ? lws.map((l) => l.name) : [...new Set([...String(c.charge_lawyer || "").split(/[,\s]+/).filter(Boolean), "서고은", "이예나", "박종덕", "강현구"])];
+    // 머리글 변호사 캘린더를 먼저 보고, 없으면 담당 변호사·변호사 넷 캘린더도 본다(박) 사건도 서고은 캘린더에 넣는 경우가 많음, 2026-11-25 신상현·소현섭)
+    const who = [...new Set([...lws.map((l) => l.name), ...String(c.charge_lawyer || "").split(/[,\s]+/).filter(Boolean), "서고은", "이예나", "박종덕", "강현구"])];
     let inCal = false;
     const seenCal: string[] = [];
     for (const n of o.force ? [] : who) {
