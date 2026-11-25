@@ -84,3 +84,17 @@ Deno.test("로웨어에 없으면 사진으로", async () => {
   assertEquals(r.plan?.summary, "강)선고_임윤선");
   assertEquals(r.plan?.time, "09:30");
 });
+
+Deno.test("도우미가 알린 기일이 사진보다 늦으면 알린 기일", async () => {
+  const base = fake({ found: true, date: "2099-03-01", time: "10:00", kind: "공판기일", room: "1호", court: "" }, "2099-01-10");
+  const f = (async (input: string | URL | Request, init?: RequestInit) => {
+    const u = String(input);
+    if (u.includes("/hearing_notice")) return new Response(JSON.stringify([{ l_num: 1, ev_date: "2099-02-02", ev_time: "11:10", contents: "선고기일(318호법정 11:10)", created_at: new Date().toISOString() }]));
+    if (u.includes("/room_image") && u.includes("select=created_at")) return new Response(JSON.stringify([{ created_at: new Date(Date.now() - 3600e3).toISOString() }]));
+    return base(input, init);
+  }) as typeof fetch;
+  const r = await planForRoom(ENV, "ch", f);
+  assertEquals(r.plan?.summary, "강)선고_임윤선");
+  assertEquals(r.plan?.date, "2099-02-02");
+  assertEquals(r.plan?.source, "도우미 알림 기준");
+});

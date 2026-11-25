@@ -32,6 +32,7 @@
 import { saveRoomFile } from "./room_file.ts";
 import { linkPicked, linkRoomAnyBot, relinkRoom } from "./room_link.ts";
 import { handleRoomFile, handleRoomText } from "./room_chat.ts";
+import { hearingNotify } from "./hearing_notify.ts";
 import { calendarUrl, handleScheduleCmd, isScheduleCmd, noteRoomImage, planForRoom } from "./schedule_cmd.ts";
 import { backfillHold, recheckAll, recheckLinked, recheckRoom, refreshRoomTitles } from "./inv_case.ts";
 
@@ -70,7 +71,7 @@ function safeEqual(a: string, b: string): boolean {
 type Env = {
   sbUrl: string; sbKey: string; botSecret: string; botSecrets?: string[];
   clientId?: string; clientSecret?: string; serviceAccount?: string; privateKey?: string;
-  scheduleBots?: string[];
+  scheduleBots?: string[]; notifyRooms?: string[]; notifyBot?: string;
   anthropicKey?: string; chatModel?: string; chatBots?: string[]; invChatBots?: string[]; invChatModel?: string;
 };
 
@@ -141,6 +142,14 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
     let b: any = {};
     try { b = await req.json(); } catch { /* */ }
     try {
+      if (b?.action === "hearing-notify") {
+        const r = await hearingNotify(env, {
+          dryRun: !!b?.dryRun, hours: typeof b?.hours === "number" ? b.hours : undefined, lpNum: typeof b?.lpNum === "number" ? b.lpNum : undefined,
+          notifyRooms: Array.isArray(b?.rooms) ? b.rooms.map(String) : env.notifyRooms, notifyBot: String(b?.bot || env.notifyBot || "13580302"),
+        }, fetcher);
+        console.log("hearing-notify", r.candidates, r.sent, r.inCalendar, r.noRoom, r.skipped);
+        return Response.json(r);
+      }
       if (b?.action === "inv-backfill") return Response.json(await backfillHold(env, BOT_IDS, b?.dryRun !== false, fetcher));
       if (b?.action === "linked-recheck") return Response.json(await recheckLinked(env, BOT_IDS, fetcher, typeof b?.part === "number" ? b.part : undefined));
       const r = await recheckAll(env, BOT_IDS, fetcher);

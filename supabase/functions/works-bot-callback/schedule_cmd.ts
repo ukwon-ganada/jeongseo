@@ -130,9 +130,22 @@ export async function planForRoom(env: SchedEnv, channelId: string, fetcher: typ
     const c = cs.filter((c) => c.next_date && String(c.next_date).slice(0, 10) >= today && /기일/.test(c.next_contents || "")).sort((a, b) => String(a.next_date).localeCompare(String(b.next_date)))[0];
     if (c) h = { l_num: c.l_num, date: String(c.next_date).slice(0, 10), time: String(c.next_time || "").slice(0, 5), contents: c.next_contents || "" };
   }
-  // 최근 사진·통지서 읽기 (없거나 실패하면 로웨어만)
+  // 도우미가 먼저 알린 기일(hearing_notice)이 최근 사진·통지서보다 늦게 나왔으면 그 기일을 쓴다
   let src = "로웨어 기일 기준";
-  const read = await readRecentNotice(env, channelId, today, fetcher).catch((e) => { console.error("notice read fail", String(e?.message || e).slice(0, 160)); return null; });
+  const since48 = new Date(Date.now() - 48 * 3600e3).toISOString();
+  const [nt, im, pf] = await Promise.all([
+    rest(env, `hearing_notice?select=l_num,ev_date,ev_time,contents,created_at&channel_id=eq.${encodeURIComponent(channelId)}&status=eq.sent&ev_date=gte.${today}&created_at=gte.${new Date(Date.now() - 7 * 864e5).toISOString()}&order=created_at.desc&limit=1`, fetcher),
+    rest(env, `room_image?select=created_at&channel_id=eq.${encodeURIComponent(channelId)}&created_at=gte.${since48}&order=created_at.desc&limit=1`, fetcher),
+    rest(env, `case_file?select=saved_at&channel_id=eq.${encodeURIComponent(channelId)}&content_type=eq.application/pdf&saved_at=gte.${since48}&order=saved_at.desc&limit=1`, fetcher),
+  ]);
+  const fileAt = [im[0]?.created_at, pf[0]?.saved_at].filter(Boolean).map((x) => Date.parse(x)).sort((a, b) => b - a)[0] || 0;
+  const notice = nt[0] && Date.parse(nt[0].created_at) > fileAt ? nt[0] : null;
+  if (notice) {
+    h = { l_num: notice.l_num, date: notice.ev_date, time: String(notice.ev_time || "").slice(0, 5), contents: notice.contents || "" };
+    src = "도우미 알림 기준";
+  }
+  // 최근 사진·통지서 읽기 (없거나 실패하면 로웨어만)
+  const read = notice ? null : await readRecentNotice(env, channelId, today, fetcher).catch((e) => { console.error("notice read fail", String(e?.message || e).slice(0, 160)); return null; });
   if (read && read.date >= today && (read.time || read.kind)) {
     const same = h && h.date === read.date && (!read.time || h.time === read.time);
     if (!same) {
