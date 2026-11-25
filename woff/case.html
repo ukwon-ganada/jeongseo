@@ -1226,15 +1226,40 @@ document.addEventListener('click', function(e){
 });
 
 // ── 메뉴 [일정] (?view=sched): 이 방 기일로 채운 웍스 캘린더 입력 창으로 바로 넘어간다 (2026-11-25) ──
+function addHour(t){ var a=(t||'09:00').split(':'); var h=Math.min(+a[0]+1,23); return (h<10?'0':'')+h+':'+a[1]; }
+var SCHED_LAWYERS=['서고은','이예나','박종덕','강현구'];
+function schedForm(p, k){
+  var st=p.time||'09:00', law=p.lawyer||'서고은';
+  var opts=SCHED_LAWYERS.indexOf(law)<0 ? [law].concat(SCHED_LAWYERS) : SCHED_LAWYERS;
+  var row=function(l,h){ return '<div class="fr"><span class="l">'+l+'</span><div style="grid-column:2/4">'+h+'</div></div>'; };
+  message('일정','', '<div class="card editing" id="schedc"><div class="card-h"><span>새 일정</span><span class="hb"><button class="edit-btn" id="schedsave">저장</button></span></div>'+
+    row('제목','<input id="s_sum" value="'+esc(p.summary||'')+'">')+
+    row('날짜','<input id="s_date" type="date" value="'+esc(p.date||'')+'">')+
+    row('시간','<div style="display:flex;gap:8px;align-items:center"><input id="s_st" type="time" style="flex:1;min-width:0" value="'+esc(st)+'"><span>~</span><input id="s_en" type="time" style="flex:1;min-width:0" value="'+esc(addHour(st))+'"></div>')+
+    row('장소','<input id="s_loc" value="'+esc(p.location||'')+'">')+
+    row('캘린더','<select id="s_law">'+opts.map(function(n){ return '<option'+(n===law?' selected':'')+'>'+esc(n)+'</option>'; }).join('')+'</select>')+
+    row('메모','<textarea id="s_desc">'+esc(p.description||'')+'</textarea>')+'</div>');
+  $('#s_st').onchange=function(){ $('#s_en').value=addHour(this.value); };
+  var b=$('#schedsave');
+  b.onclick=function(){
+    if(b.disabled) return; b.disabled=true; b.textContent='저장 중…';
+    var ev={summary:$('#s_sum').value, date:$('#s_date').value, start:$('#s_st').value, end:$('#s_en').value, location:$('#s_loc').value, lawyer:$('#s_law').value, description:$('#s_desc').value};
+    api({action:'sched-save', room:k.room||'', event:ev}).then(function(j){
+      if(j.ok){ message('일정','', emptySt('캘린더에 넣었습니다', '<div>'+esc(ev.lawyer+' · '+ev.summary)+'</div>')); return; }
+      toast(j.why||'캘린더에 넣지 못했습니다'); b.disabled=false; b.textContent='저장';
+    }).catch(function(e){ toast('캘린더에 넣지 못했습니다'); b.disabled=false; b.textContent='저장'; });
+  };
+}
 function openSched(inClient){
-  // 웍스 캘린더 입력 화면은 휴대폰에서 열리지 않음 → 휴대폰은 빼기(석원 2026-11-25)
-  if(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||'')) return message('일정','', emptySt('일정 입력은 PC에서만 됩니다'));
+  // 웍스 캘린더 입력 화면은 휴대폰에서 열리지 않음 → 휴대폰은 이 화면에서 확인·고친 뒤 [저장]하면 변호사 캘린더에 들어감(석원 2026-11-25)
+  var mobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||'');
   message('일정','', '<div class="empty-st">일정 입력 창을 여는 중…</div>');
   var pKey = ctx.room ? Promise.resolve({room:ctx.room}) : ctx.caseParam ? Promise.resolve({'case':ctx.caseParam}) :
     !inClient ? api({action:'locate'}).then(function(j){ return j.room ? {room:j.room} : j['case'] ? {'case':j['case']} : null; }) : Promise.resolve(null);
   return pKey.then(function(k){
     if(!k) return message('일정','', emptySt('이 방을 찾지 못했습니다'));
     return api({action:'sched', room:k.room||'', 'case':k['case']||''}).then(function(j){
+      if(j.url && mobile && j.plan) return schedForm(j.plan, k);
       if(j.url){ location.replace(j.url); return; }
       message('일정','', emptySt(esc(j.why||'일정을 만들지 못했습니다')));
     });
