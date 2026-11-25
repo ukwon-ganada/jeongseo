@@ -35,6 +35,9 @@ const LAWYERS: Record<string, { name: string; head: string }> = {
   "박": { name: "박종덕", head: "박)" },
   "강": { name: "강현구", head: "강)" },
 };
+export const SCHED_CAL_NAME = "서고은";
+export const SCHED_CAL_ID = "c_300128754_94b87c71-5b0e-45a9-a182-441d49dd49b4"; // 서고은 기본 캘린더 (cal-ids로 확인)
+
 export function lawyersFromTitle(title: string): { name: string; head: string }[] {
   const lead = String(title || "").split("(")[0]; // 사건 구분 "(형/…)" 앞까지만
   const out: { name: string; head: string }[] = [];
@@ -89,7 +92,8 @@ export function buildPlan(o: {
   return {
     summary, date: o.date, time: o.time || h.time, location,
     description: [o.caseNo, o.contents].filter(Boolean).join(" ") + "\n(" + (o.source || "로웨어 기일 기준") + ", 도우미가 채움)",
-    lawyer: lw?.name || null, source: o.source || "로웨어 기일 기준",
+    // 석원 2026-11-25: 누가 누르든 모두 서고은 캘린더에 넣는다(머리글은 제목에만)
+    lawyer: SCHED_CAL_NAME, source: o.source || "로웨어 기일 기준",
   };
 }
 
