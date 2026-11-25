@@ -14,6 +14,7 @@ Deno.test("방 제목 → 변호사", () => {
   assertEquals(lawyerFromTitle("서)신)◎(형/피의)박정미")?.head, "");
   assertEquals(lawyerFromTitle("박)신)★(형/고소)김가나_사기_인천 2026고단55")?.name, "박종덕");
   assertEquals(lawyerFromTitle("신)(형/피고)홍길동"), null);
+  assertEquals(lawyerFromTitle("서)박)신!(형/피고인7)이강현_폭처벌")?.name, "박종덕");
   assertEquals(lawyerFromTitle("(형/고소)이경옥_사기(안병근)"), null); // 괄호 안 "근)" 같은 건 안 봄
 });
 

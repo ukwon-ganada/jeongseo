@@ -35,10 +35,16 @@ const LAWYERS: Record<string, { name: string; head: string }> = {
   "박": { name: "박종덕", head: "박)" },
   "강": { name: "강현구", head: "강)" },
 };
-export function lawyerFromTitle(title: string): { name: string; head: string } | null {
+export function lawyersFromTitle(title: string): { name: string; head: string }[] {
   const lead = String(title || "").split("(")[0]; // 사건 구분 "(형/…)" 앞까지만
-  for (const m of lead.matchAll(/([가-힣])\)/g)) if (LAWYERS[m[1]]) return LAWYERS[m[1]];
-  return null;
+  const out: { name: string; head: string }[] = [];
+  for (const m of lead.matchAll(/([가-힣])\)/g)) if (LAWYERS[m[1]] && !out.includes(LAWYERS[m[1]])) out.push(LAWYERS[m[1]]);
+  return out;
+}
+// 둘 이상이면("서)박)…") 서고은 변호사 말고 다른 변호사 일정으로 본다 (실제 캘린더: 박종덕 캘린더 "박)공판_이강현")
+export function lawyerFromTitle(title: string): { name: string; head: string } | null {
+  const all = lawyersFromTitle(title);
+  return all.find((l) => l.name !== "서고은") || all[0] || null;
 }
 
 // 형사 사건부호 (그 밖은 민사·가사·행정으로 보고 "의뢰인/상대방")

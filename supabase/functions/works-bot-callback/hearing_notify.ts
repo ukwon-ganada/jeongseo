@@ -9,7 +9,7 @@
 //  켜는 범위: notifyRooms(방 ID 목록)가 있으면 그 방만, "*"면 모든 방. notifyBot 으로 보낸다.
 // ============================================================================
 import { pemToPkcs8 } from "./room_file.ts";
-import { buildPlan, calendarUrl, lawyerFromTitle, type Plan, sendToRoom, type SchedEnv } from "./schedule_cmd.ts";
+import { buildPlan, calendarUrl, lawyersFromTitle, type Plan, sendToRoom, type SchedEnv } from "./schedule_cmd.ts";
 
 export type NotifyOpts = { dryRun?: boolean; hours?: number; notifyRooms?: string[]; notifyBot: string; limit?: number; lpNum?: number };
 
@@ -136,9 +136,9 @@ export async function hearingNotify(env: SchedEnv, o: NotifyOpts, fetcher: typeo
       gukseon: gkSet.has(norm(c.l_code)), date: r.date, time: r.time, contents: r.contents, source: "도우미 알림",
     });
     const client = String(c.l_client || "").split(/[,(]/)[0].trim();
-    const lw = lawyerFromTitle(room.room_title || "");
+    const lws = lawyersFromTitle(room.room_title || "");
     // 방 제목에 변호사 표시가 없으면 담당 변호사들 + 기일 일정을 쓰는 변호사 넷의 캘린더를 다 본다
-    const who = lw ? [lw.name] : [...new Set([...String(c.charge_lawyer || "").split(/[,\s]+/).filter(Boolean), "서고은", "이예나", "박종덕", "강현구"])];
+    const who = lws.length ? lws.map((l) => l.name) : [...new Set([...String(c.charge_lawyer || "").split(/[,\s]+/).filter(Boolean), "서고은", "이예나", "박종덕", "강현구"])];
     let inCal = false;
     for (const n of who) {
       if (alreadyInCalendar(await calEvents(n, r.date).catch(() => []), client, plan.time)) { inCal = true; break; }
