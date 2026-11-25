@@ -158,14 +158,17 @@ export async function hearingNotify(env: SchedEnv, o: NotifyOpts, fetcher: typeo
     // 방 제목에 변호사 표시가 없으면 담당 변호사들 + 기일 일정을 쓰는 변호사 넷의 캘린더를 다 본다
     const who = lws.length ? lws.map((l) => l.name) : [...new Set([...String(c.charge_lawyer || "").split(/[,\s]+/).filter(Boolean), "서고은", "이예나", "박종덕", "강현구"])];
     let inCal = false;
+    const seenCal: string[] = [];
     for (const n of o.force ? [] : who) {
-      if (alreadyInCalendar(await calEvents(n, r.date).catch(() => []), client, plan.time)) { inCal = true; break; }
+      const evs = await calEvents(n, r.date).catch(() => []);
+      if (alreadyInCalendar(evs, client, plan.time)) { inCal = true; break; }
+      if (o.dryRun) for (const e of evs) seenCal.push(`${n}: ${e.start.slice(11, 16) || "종일"} ${e.summary}`);
     }
     // 바뀐 기일: 전에 알린 날짜 또는 로웨어 옛 값
     const p = prevBy.get(r.lp_num), old = oldBy.get(r.lp_num);
     const before = p ? `${p.ev_date} ${p.ev_time || ""}`.trim() : old?.lp_appoint_date ? `${String(old.lp_appoint_date).slice(0, 10)} ${String(old.lp_appoint_time || "").slice(0, 5)}`.trim() : "";
     const was = before && before !== `${r.date} ${r.time}`.trim() ? before : "";
-    out.items.push({ room: room.channel_id.slice(0, 8), summary: plan.summary, date: r.date, time: plan.time, inCal, was, contents: r.contents.slice(0, 40) });
+    out.items.push({ room: room.channel_id.slice(0, 8), summary: plan.summary, date: r.date, time: plan.time, inCal, was, contents: r.contents.slice(0, 40), client, who, ...(inCal || !o.dryRun ? {} : { seenCal: seenCal.slice(0, 30) }) });
     if (inCal) { out.inCalendar++; records.push(rec(r, room.channel_id, "in_calendar", plan)); continue; }
     if (!o.dryRun) {
       await sendToRoom(env, o.notifyBot, room.channel_id, noticeMessage(plan, was, missing), fetcher);
