@@ -25,8 +25,9 @@ async function rest(env: SchedEnv, path: string, fetcher: typeof fetch, init: Re
 // 캘린더 읽기 토큰 (calendar.read user.read — meet-sync 와 같은 권한)
 const b64url = (b: Uint8Array | string) =>
   btoa(typeof b === "string" ? unescape(encodeURIComponent(b)) : String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-let calTok: { token: string; until: number } | null = null;
-async function calToken(env: SchedEnv, fetcher: typeof fetch): Promise<string> {
+const calToks = new Map<string, { token: string; until: number }>();
+export async function calToken(env: SchedEnv, fetcher: typeof fetch, scope = "calendar.read user.read"): Promise<string> {
+  const calTok = calToks.get(scope);
   if (calTok && calTok.until > Date.now()) return calTok.token;
   const { clientId, clientSecret, serviceAccount, privateKey } = env;
   if (!clientId || !clientSecret || !serviceAccount || !privateKey) throw new Error("웍스 열쇠 시크릿 없음");
@@ -37,15 +38,15 @@ async function calToken(env: SchedEnv, fetcher: typeof fetch): Promise<string> {
   const sig = new Uint8Array(await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, new TextEncoder().encode(head + "." + claim)));
   const r = await fetcher("https://auth.worksmobile.com/oauth2/v2.0/token", {
     method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ assertion: head + "." + claim + "." + b64url(sig), grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", client_id: clientId, client_secret: clientSecret, scope: "calendar.read user.read" }),
+    body: new URLSearchParams({ assertion: head + "." + claim + "." + b64url(sig), grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", client_id: clientId, client_secret: clientSecret, scope }),
   });
   const t = await r.text();
   if (!r.ok) throw new Error("캘린더 토큰 실패 " + r.status + " " + t.slice(0, 100));
   const j = JSON.parse(t);
-  calTok = { token: j.access_token, until: Date.now() + 50 * 60e3 };
-  return calTok.token;
+  calToks.set(scope, { token: j.access_token, until: Date.now() + 50 * 60e3 });
+  return j.access_token;
 }
-async function works(tok: string, path: string, fetcher: typeof fetch): Promise<any> {
+export async function works(tok: string, path: string, fetcher: typeof fetch): Promise<any> {
   const r = await fetcher("https://www.worksapis.com/v1.0" + path, { headers: { Authorization: "Bearer " + tok } });
   const t = await r.text();
   if (!r.ok) throw new Error("works " + r.status + " " + t.slice(0, 100));

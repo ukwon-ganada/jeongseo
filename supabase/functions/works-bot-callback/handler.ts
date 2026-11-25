@@ -33,6 +33,7 @@ import { saveRoomFile } from "./room_file.ts";
 import { linkPicked, linkRoomAnyBot, relinkRoom } from "./room_link.ts";
 import { handleRoomFile, handleRoomText } from "./room_chat.ts";
 import { hearingNotify } from "./hearing_notify.ts";
+import { saveEvent } from "./sched_save.ts";
 import { calendarUrl, handleScheduleCmd, isScheduleCmd, noteRoomImage, planForRoom } from "./schedule_cmd.ts";
 import { backfillHold, recheckAll, recheckLinked, recheckRoom, refreshRoomTitles } from "./inv_case.ts";
 
@@ -108,6 +109,18 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       const r = await refreshRoomTitles(env, BOT_IDS, chs, fetcher).catch((e) => ({ changed: 0, error: String(e?.message || e).slice(0, 120) }));
       console.log("titles(internal)", chs.length, (r as any).changed);
       return Response.json(r);
+    }
+    // 휴대폰 [일정 입력] → [저장] (case-view action sched-save): 확인한 일정을 변호사 캘린더에 넣기
+    if (b?.schedSave) {
+      try {
+        const r = await saveEvent(env as any, b.schedSave, fetcher);
+        console.log("schedSave(internal)", r.ok ? "ok" : r.why);
+        return Response.json(r);
+      } catch (e) {
+        const m = String((e as Error)?.message || e);
+        console.log("schedSave(internal) error", m.slice(0, 160));
+        return Response.json({ why: /scope|토큰 실패 4/i.test(m) ? "캘린더 쓰기 권한이 아직 없습니다" : "캘린더에 넣지 못했습니다" });
+      }
     }
     // 사건 화면 메뉴 [일정](case-view action sched): 그 방 기일로 채운 웍스 캘린더 입력 창 주소
     if (b?.sched) {
