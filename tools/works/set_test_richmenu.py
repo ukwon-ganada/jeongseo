@@ -20,15 +20,16 @@ from set_test_menu import load_cred, token, BOT_ID, WOFF
 API = "https://www.worksapis.com/v1.0/bots/%s" % BOT_ID
 IMG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "richmenu_test.png")
 
+# 2026-11-25: 운영 메뉴 5칸 + [일정 입력](?view=sched → 이 방 기일로 채운 웍스 캘린더 입력 창)을 시험봇에서 먼저 확인
+MENU = [("timeline", "타임라인"), ("deadline", "기한"), ("hearing", "기일"), ("progress", "대법원 나의사건"), ("info", "사건정보"), ("sched", "일정 입력")]
+W = 2500 // len(MENU)
 BODY = {
-    "richmenuName": "정서 시험 리치메뉴",
+    "richmenuName": "정서 시험 리치메뉴 (일정 입력)",
     "size": {"width": 2500, "height": 843},
     "areas": [
-        {"bounds": {"x": 0, "y": 0, "width": 1250, "height": 843},
-         "action": {"type": "uri", "label": "사건 화면 열기", "uri": WOFF + "?view=timeline"}},
-        # displayText 없음 → 방에 글이 남지 않아야 함
-        {"bounds": {"x": 1250, "y": 0, "width": 1250, "height": 843},
-         "action": {"type": "postback", "label": "이 방 사건 보기", "data": "room-case"}},
+        {"bounds": {"x": W * i, "y": 0, "width": (2500 - W * i) if i == len(MENU) - 1 else W, "height": 843},
+         "action": {"type": "uri", "label": label, "uri": WOFF + "?view=" + view}}
+        for i, (view, label) in enumerate(MENU)
     ],
 }
 
