@@ -1238,6 +1238,8 @@ function start(){
       return;
     }
     try{ ctx.tok = woff.getAccessToken ? woff.getAccessToken() : ''; }catch(e){}
+    // ?admin=1: 관리 화면(admin.html)으로 웍스 로그인 토큰을 넘긴다 (2026-11-25 관리 화면)
+    if(q.get('admin')){ try{ sessionStorage.setItem('adm_tok', ctx.tok||''); }catch(e){} location.replace('admin.html'+(location.hash||'')); return; }
     var inClient = woff.isInClient();
     var pRoom = inClient && woff.getChannelId ? Promise.resolve().then(function(){ return woff.getChannelId(); }).then(function(c){ ctx.room = c || ''; }).catch(function(){}) : Promise.resolve();
     return pRoom.then(function(){
