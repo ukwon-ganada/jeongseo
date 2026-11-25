@@ -659,7 +659,7 @@ export function caseNosIn(s: string): string[] {
 }
 
 // 아직 연결 안 된 방 자동 연결: works-bot-callback 함수에 부탁 (웍스 봇 열쇠가 거기 있음). 실패해도 화면은 계속
-async function autoLink(env: Env, body: { channelId?: string; lNum?: number | null; relink?: boolean; by?: string; sched?: string }, fetcher: typeof fetch): Promise<{ linked: number; how: string } | null> {
+async function autoLink(env: Env, body: { channelId?: string; lNum?: number | null; relink?: boolean; by?: string; sched?: string; schedSave?: unknown }, fetcher: typeof fetch): Promise<{ linked: number; how: string } | null> {
   try {
     const r = await fetcher(env.sbUrl + "/functions/v1/works-bot-callback", {
       method: "POST", headers: { "Content-Type": "application/json", "x-internal-key": env.sbKey }, body: JSON.stringify(body),
@@ -792,7 +792,14 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       if (!room) return json({ why: "이 사건의 방을 찾지 못했습니다" });
       const r = await autoLink(env, { sched: room } as any, fetcher) as any;
       bg(logView(env, who, "sched:" + (r?.url ? "ok" : "none"), room, null, fetcher));
-      return json(r?.url ? { url: r.url } : { why: nz(r?.why) || "일정을 만들지 못했습니다" });
+      return json(r?.url ? { url: r.url, plan: r.plan ?? null } : { why: nz(r?.why) || "일정을 만들지 못했습니다" });
+    }
+    // 휴대폰 [일정 입력] → [저장]: 확인·고친 일정을 변호사 캘린더에 넣기 (works-bot-callback 내부 schedSave)
+    if (body?.action === "sched-save") {
+      const e = body.event || {};
+      const r = await autoLink(env, { schedSave: e } as any, fetcher) as any;
+      bg(logView(env, who, "sched-save:" + (r?.ok ? "ok" : "fail"), nz(body.room), null, fetcher));
+      return json(r?.ok ? { ok: true } : { why: nz(r?.why) || "캘린더에 넣지 못했습니다" });
     }
 
     let located: { room?: string; case?: string } | null = null;
