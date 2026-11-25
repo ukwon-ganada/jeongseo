@@ -71,6 +71,8 @@ a{color:inherit}
 .seg button+button{border-left:1px solid var(--line)}
 .seg button b{display:block;font-size:14px;color:var(--ink2)}
 .seg button[aria-current="true"]{background:var(--g-hearing-t)}
+.seg.tv button{font-size:14px;padding:9px 8px;color:var(--muted)}
+.seg.tv button[aria-current="true"]{background:var(--ink);color:#fff;font-weight:600}
 .seg button[aria-current="true"] b{color:var(--g-hearing)}
 .ctag{display:inline-block;font-size:11px;font-weight:600;border-radius:4px;padding:0 5px;margin-right:5px;background:var(--line2);color:var(--ink2);vertical-align:1px}
 
@@ -363,9 +365,7 @@ html.fv-on,html.fv-on body{overflow:hidden}
     <div class="ctabs" id="ctabs" hidden></div>
     <nav class="tabs" id="nav" aria-label="화면" hidden>
       <button data-v="timeline">타임라인</button>
-      <button data-v="deadline">기한</button>
-      <button data-v="hearing">기일</button>
-      <button data-v="progress">나의사건</button>
+      <button data-v="dates">기일·기한</button>
       <button data-v="info">사건정보</button>
     </nav>
   </div>
@@ -426,9 +426,12 @@ var q = new URLSearchParams(location.search);
 (function(){ try{ var id=Math.random().toString(36).slice(2), bc=new BroadcastChannel('jeongseo-case');
   bc.onmessage=function(ev){ if(ev.data && ev.data.t==='open' && ev.data.id!==id && !(typeof editing!=='undefined' && editing)){ try{ window.close(); }catch(e){} } };
   bc.postMessage({t:'open', id:id}); }catch(e){} })();
+// 메뉴 3칸(석원 2026-11-25): 기일·기한 합침, 나의사건은 타임라인 안에서 [타임라인|나의사건]으로 비교. 옛 주소(?view=deadline 등)도 그대로 열림
 var view = q.get('view') || 'timeline';
 var ctx = {room:'', caseParam:q.get('case')||'', tok:''};
-var data = null, sub = {f:'all', scope:'case', p:'all'}, editing = false;
+var data = null, sub = {f:'all', scope:'case', p:'all', tv:'tl'}, editing = false;
+if(view==='progress'){ view='timeline'; sub.tv='lw'; }
+if(view==='deadline'||view==='hearing') view='dates';
 // 사건정보 단계 칸 (석원 2026-11-16): 경찰·공소청·1심·2심·3심, 지난 단계는 접어 둠
 var SK=['police','pros','c1','c2','c3'], SL={police:'경찰',pros:'공소청',c1:'1심',c2:'2심',c3:'3심'};
 var SF={police:[['org','경찰서·팀'],['no','접수번호',{copy:1}],['person','수사관',{hist:1}],['phone','전화',{tel:1,hist:1}],['mobile','휴대전화',{tel:1}]],
@@ -463,6 +466,17 @@ function telHref(v){ var n=String(v||'').replace(/[^\d+]/g,''); return n.length>
 // ── 화면별 그리기 ─────────────────────────────────────
 var VIEWS = {
   timeline: function(){
+    var seg='<div class="seg tv"><button data-tv="tl" aria-current="'+(sub.tv!=='lw')+'">타임라인</button><button data-tv="lw" aria-current="'+(sub.tv==='lw')+'">나의사건</button></div>';
+    if(tl.on) return VIEWS.ourTl();
+    return seg+(sub.tv==='lw' ? VIEWS.progress() : VIEWS.ourTl());
+  },
+  // 기일·기한 한 화면: 아직 챙길 기한이 있으면 맨 위, 다 끝난 기한만 있으면 기일 아래
+  dates: function(){
+    if(!data.deadlines.length) return VIEWS.hearing();
+    var live=editing==='dl' || data.deadlines.some(function(x){ return !(x.st==='done'||x.cf) && (!x.d || dd(x.d)>=0); });
+    return live ? VIEWS.deadline()+VIEWS.hearing() : VIEWS.hearing()+VIEWS.deadline();
+  },
+  ourTl: function(){
     // 타임라인 = 우리가 한 일·해야 할 일, 걸러 보기 없이 한 줄로 (기한·기일은 메뉴가 따로 있음)
     // 줄 사이 간격 = 실제 날짜 차이(제곱근으로 눌러서). 45일 넘으면 점선 + '약 N개월'로 줄여 보여 줌
     var gapDiv=function(a,b){
@@ -871,7 +885,7 @@ function impPreview(file){
   if(file.size>1500000){ toast('파일이 너무 큽니다'); return; }
   var rd=new FileReader();
   rd.onload=function(){
-    imp={st:'busy', evs:[], on:{}, msg:''}; tl.on=false; view='timeline'; render(); window.scrollTo(0,0);
+    imp={st:'busy', evs:[], on:{}, msg:''}; tl.on=false; view='timeline'; sub.tv='tl'; render(); window.scrollTo(0,0);
     api({action:'chat_import_preview', lNum:data.lNum, text:String(rd.result||'')}).then(function(j){
       imp={st:'preview', evs:j.events||[], on:{}, msg:j.truncated?'파일이 길어 최근 대화만 읽었습니다':'', start:j.startDate||''};
       imp.evs.forEach(function(_,i){ imp.on[i]=true; });
@@ -1025,7 +1039,7 @@ function render(){
   var LV=ctx.levels&&ctx.levels.length>1?ctx.levels:null;
   if(LV){ $('#ctabs').hidden=false; $('#ctabs').innerHTML=LV.slice().reverse().map(function(L,gi){ return (gi?'<span class="sep"></span>':'')+'<span class="gl">'+esc(L.label)+'</span>'+L.cases.map(function(c,i){ var m=L.merged.indexOf(c)>=0, mn=!m&&L.merged.length>0; return (m&&i?'<span class="lk">←</span>':'')+'<button data-ctab="'+esc(c)+'" aria-current="'+(cnk(c)===cnk(data.caseNo))+'">'+(m?'<i>병합</i>':mn?'<i>본</i>':'')+esc(c)+'</button>'; }).join(''); }).join(''); }
   else $('#ctabs').innerHTML = ct.length<2 ? '' : ct.map(function(c,i){ var m=isMg(c), mn=!!mg&&cnk(c)===cnk(mg.main); return (m&&i?'<span class="lk">←</span>':'')+'<button data-ctab="'+esc(c)+'" aria-current="'+(c===data.caseNo)+'">'+(m?'<i>병합</i>':mn?'<i>본</i>':'')+esc(c)+'</button>'; }).join('');
-  var canTl = view==='timeline' && !!data.lNum;
+  var canTl = view==='timeline' && sub.tv!=='lw' && !!data.lNum;
   $('#impbtn').hidden = !canTl || tl.on; $('#tledit').hidden = !canTl || tl.on;
   $('#tlref').hidden = !canTl || tl.on || !(Number(data.lNum) < 0);
   $('#main').innerHTML = (VIEWS[view]||VIEWS.timeline)();
@@ -1034,7 +1048,7 @@ document.addEventListener('click', function(e){
   var b=e.target.closest('button'); if(!b) return;
   if(b.dataset.ctab){ if(b.dataset.ctab===data.caseNo) return; if(editing && !confirmLeave()) return; editing=false; tl.on=false; sub.lv=null; showCase({'case':b.dataset.ctab}); return; }
   if(b.dataset.v){ if(editing && editing!=='dl' && !confirmLeave()) return; editing=false; tl.on=false; view=b.dataset.v; render(); window.scrollTo(0,0); return; }
-  ['f','scope','p','lv'].forEach(function(k){ if(b.dataset[k]){ sub[k]=b.dataset[k]; render(); } });
+  ['f','scope','p','lv','tv'].forEach(function(k){ if(b.dataset[k]){ sub[k]=b.dataset[k]; render(); } });
   if(b.dataset.edit){ editing=b.dataset.edit; render(); var c=$('#main .card.editing'); if(c){ var i=c.querySelector('input,textarea,select'); if(i) i.focus(); if(c.getBoundingClientRect().top<0) c.scrollIntoView({block:'start'}); } }
   if(b.id==='cancel'){ editing=false; render(); }
   if(b.id==='dldone'){ editing=false; render(); }
