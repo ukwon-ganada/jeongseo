@@ -246,12 +246,17 @@ export function computeDeadlines(code: string, evs: any[], today: string, others
       // 검사만 상소 + 우리가 '항소이유에 대한 답변서'를 냈으면 우리는 피항소인 → 이유서 의무 없음
       // 상소장접수통지 기록이 없어도(로웨어에 하급심 줄이 빠진 사건) 우리가 이유서 없이 '항소이유에 대한 답변서'만 냈으면
       // 검사 상소에 답한 피항소인으로 본다 → 이유서 의무 없음, 알림 끔 (2026-11-24 석원, 천준명 2026노100191)
-      const answered = !doneOn ? filings.find((f) => inRound(f) && /이유에\s*대한\s*답변서/.test(nz(f.lp_contents))) : undefined;
-      const warn = prosOnly && !answered ? "상소장접수통지서가 우리 측에만 송달됨 — 검사만 상소했다면 이유서 제출 의무가 없습니다. 확인 필요"
+      // 가장 정확한 기준(2026-11-25 석원): 이 심급 상소장을 검사만 내고 우리는 안 냈으면 이유서 의무 없음
+      const appeals = list.filter((e) => inRound(e) && /(항소|상고)장\s*제출/.test(nz(e.lp_contents)));
+      const ourAppeal = appeals.find((e) => ourFiling(nz(e.lp_contents), ours, single));
+      const prosAppeal = appeals.find((e) => /^\s*검사/.test(nz(e.lp_contents)));
+      const prosFiled = !doneOn && prosAppeal && !ourAppeal ? prosAppeal : undefined;
+      const answered = !doneOn && !prosFiled && !ourAppeal ? filings.find((f) => inRound(f) && /이유에\s*대한\s*답변서/.test(nz(f.lp_contents))) : undefined;
+      const warn = prosFiled || answered ? undefined : prosOnly ? "상소장접수통지서가 우리 측에만 송달됨 — 검사만 상소했다면 이유서 제출 의무가 없습니다. 확인 필요"
         : first.who !== "우리" && !it.got.some((g) => g.who === "우리") ? "우리 법인 수신 기록이 없어 의뢰인 수신일로 계산했습니다. 기간이 이미 진행 중일 수 있습니다" : undefined;
       out.push({
-        t: what + " 마감", d: due, kind: what, doneOn, st: doneOn || held || answered ? "done" : "open", who: first.who,
-        hold: held ? (held === ended ? "종국 " + md(held._d) : "공판기일 진행 " + md(held._d)) : answered ? "검사 상소 · 답변서 " + md(answered._d) : undefined, warn,
+        t: what + " 마감", d: due, kind: what, doneOn, st: doneOn || held || prosFiled || answered ? "done" : "open", who: first.who,
+        hold: held ? (held === ended ? "종국 " + md(held._d) : "공판기일 진행 " + md(held._d)) : prosFiled ? "검사만 " + (stage === 2 ? "항소" : "상고") + " " + md(prosFiled._d) : answered ? "검사 상소 · 답변서 " + md(answered._d) : undefined, warn,
         why: "기록접수통지 도달 " + md(first.d) + "(" + first.who + ") + 20일" + (moved ? " (쉬는 날이라 다음 평일)" : "") +
           (mg.into ? " · " + mg.into + "에 병합됨" + (mg.done ? ", 그 사건에 제출 " + md(mg.done) : ", 그 사건에 제출") : ""),
       });
