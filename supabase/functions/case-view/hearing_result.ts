@@ -9,7 +9,8 @@ const norm = (s: string) => s.replace(/\s+/g, "");
 
 // 마지막으로 받아 온 기일 정보에서 날짜별 {제목, 결과}
 export function logResults(log: string): { d: string; t: string; r: string }[] {
-  const blocks = nz(log).split(/^\[\d{4}-\d{2}-\d{2} [\d:]+\]\s*$/m).map((b) => b.trim()).filter((b) => /\d{4}\.\d{2}\.\d{2}/.test(b));
+  // 받아 올 때마다 "[날짜 시각]"(오래된 것은 "[날짜 ~ 날짜]"로 묶임) … "===" 묶음으로 붙는다
+  const blocks = nz(log).split(/^===\s*$|^\[\d{4}-\d{2}-\d{2}[^\]\n]*\]\s*$/m).map((b) => b.trim()).filter((b) => /\d{4}\.\d{2}\.\d{2}/.test(b));
   const last = blocks.pop() || "";
   const out: { d: string; t: string; r: string }[] = [];
   for (const line of last.split("\n")) {
