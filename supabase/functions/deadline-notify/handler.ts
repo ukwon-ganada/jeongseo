@@ -44,7 +44,16 @@ async function restAll(env: Env, path: string, fetcher: typeof fetch): Promise<a
 const inList = (xs: (string | number)[]) => "(" + xs.map((x) => typeof x === "number" ? x : '"' + String(x).replace(/"/g, "") + '"').join(",") + ")";
 
 export type Item = { room: string; code: string; head: string; kind: string; due: string; send: boolean; why: string; lines?: string[] };
-export type Plan = { today: string; rooms: { channel: string; text: string; cards: any[] }[]; items: Item[]; noRoom: { code: string; client: string; charge: string; kind: string; due: string; why: string }[] };
+export type Plan = { today: string; rooms: { channel: string; text: string; cards: any[] }[]; items: Item[]; noRoom: { code: string; client: string; charge: string; kind: string; due: string; why: string }[]; all: AllItem[] };
+// 관리 화면용: 계산된 기한 전부(보내든 안 보내든, 방이 있든 없든)
+export type AllItem = { lNum: number; lCode: string; code: string; client: string; charge: string; room: string | null; kind: string; due: string; st: string; dlWhy: string; send: boolean; why: string; muted: boolean };
+
+// 관리 화면에서 끈 알림 (deadline_mute, 2026-11-25 석원 "사건을 조회해서 알람을 끄거나")
+//   kind = '' 이면 그 사건 전체, 아니면 그 기한(종류·만료일) 하나
+export type Mute = { l_code: string; kind: string; due: string | null };
+export function isMuted(mutes: Mute[], code: string, kind: string, due: string): boolean {
+  return mutes.some((m) => m.l_code === code && (!m.kind || (m.kind === kind && (!m.due || m.due.slice(0, 10) === due))));
+}
 
 export async function buildPlan(env: Env, today: string, fetcher: typeof fetch = fetch): Promise<Plan> {
   // 1) 기한이 생길 수 있는 사건: 최근 선고·기록접수통지가 있는 사건 (7일 + 50일 경과 + 여유)
@@ -91,12 +100,17 @@ export async function buildPlan(env: Env, today: string, fetcher: typeof fetch =
   }
   const sent: SentRow[] = (await restAll(env, `sent?select=body,sent_at&sent_at=gte.${addDays(today, -120)}`, fetcher)).map((r) => ({ body: nz(r.body), sent_at: nz(r.sent_at) }));
 
-  const plan: Plan = { today, rooms: [], items: [], noRoom: [] };
+  const mutes: Mute[] = (await restAll(env, `deadline_mute?select=l_code,kind,due&undone_at=is.null`, fetcher).catch(() => [])).map((m) => ({ l_code: nz(m.l_code), kind: nz(m.kind), due: m.due ? nz(m.due) : null }));
+
+  const plan: Plan = { today, rooms: [], items: [], noRoom: [], all: [] };
   const perRoom = new Map<string, { code: string; client: string; charge: string; lines: string[]; cards: any[] }>();
   const add = (c: any, room: any | null, dls: Deadline[], codeShown: string) => {
     for (const dl of dls) {
       const code = nz(c.l_code);
-      const p = pick(dl, code, today, sent, cf.get(cfKey(code, dl.kind, dl.d)));
+      const muted = isMuted(mutes, code, dl.kind, dl.d);
+      const p0 = pick(dl, code, today, sent, cf.get(cfKey(code, dl.kind, dl.d)));
+      const p = muted && p0.send ? { send: false, why: "알림 끔" } : p0;
+      plan.all.push({ lNum: Number(c.l_num), lCode: code, code: codeShown, client: nz(c.l_client), charge: nz(c.charge_lawyer), room: room ? room.channel_id : null, kind: dl.kind, due: dl.d, st: nz(dl.st), dlWhy: nz(dl.why), send: p.send, why: p.why, muted });
       if (!room) {
         if (p.send) plan.noRoom.push({ code: codeShown, client: nz(c.l_client), charge: nz(c.charge_lawyer), kind: dl.kind, due: dl.d, why: dl.why });
         continue;
