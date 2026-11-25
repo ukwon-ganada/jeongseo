@@ -217,6 +217,9 @@ main{max-width:880px;margin:0 auto;padding:12px 16px 32px}
 .pg.hl{box-shadow:inset 3px 0 0 var(--accent)}
 .pg.dim{opacity:.45}
 .pg.plan .d{color:var(--due);font-weight:600}
+.pg.moved .c>span.x{text-decoration:line-through;color:var(--muted)}
+.pg.moved.plan .d{color:var(--muted);font-weight:400}
+.pg .mv{display:inline-block;font-size:11px;font-weight:700;line-height:1;padding:3px 6px;border-radius:999px;margin-left:6px;vertical-align:2px;background:var(--due);color:#fff}
 /* 파일 보기 창: 화면 전체, 왼쪽 위 ← 로 그대로 타임라인 */
 .fv{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;flex-direction:column}
 .fv[hidden]{display:none}
@@ -568,7 +571,8 @@ var VIEWS = {
     h+='<div class="meta">'+ln.join(' · ')+'</div>';
     if(!rows.length) return h+emptySt('최근 한 달 진행내용이 없습니다');
     return h+'<div class="card">'+rows.map(function(x){
-      var cls=(x.o||x.u)?' hl':x.x?' dim':'';
+      var cls=(x.o||x.u)?' hl':x.x?' dim':'', mv=x.k==='기일' && isMoved(x.r) && String(x.r).match(MOVED_RE);
+      if(mv) return '<div class="pg moved'+(x.p?' plan':'')+'"><span class="d">'+x.d+'</span><div><div class="c">'+(x.cn?'<span class="ctag">'+esc(x.cn)+'</span>':'')+'<span class="x">'+esc(x.c)+'</span><span class="mv">'+mv[0]+'</span></div></div></div>';
       return '<div class="pg'+cls+(x.p?' plan':'')+'"><span class="d">'+x.d+'</span><div><div class="c">'+(x.cn?'<span class="ctag">'+esc(x.cn)+'</span>':'')+esc(x.c)+'</div>'+(x.r?'<div class="r">'+esc(x.r)+'</div>':'')+'</div></div>';
     }).join('')+'</div>';
   },
