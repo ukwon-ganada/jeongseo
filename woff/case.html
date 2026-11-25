@@ -462,7 +462,7 @@ var PHONE_SVG = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"
 // 기일 탭 [문자] (2026-11-25): 로웨어 문자발송(팝빌) 창을 이 사건·의뢰인 번호로 연다. 보내기는 직원이 창에서 직접. PC만
 var LW_SMS='https://jeongseolaw.lawware.kr/groupware/popbill_main.html';
 function smsUrl(){
-  if(view!=='hearing' || sub.scope==='all' || !data || data.roomOnly || !(Number(data.lNum) > 0) || !data.caseNo) return '';
+  if((view!=='hearing' && view!=='dates') || sub.scope==='all' || !data || data.roomOnly || !(Number(data.lNum) > 0) || !data.caseNo) return '';
   if(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||'')) return '';
   var f=(data.info&&data.info.fields)||{}, to=String(f.client_phone||'').split(/[,\/]/)[0].replace(/\D/g,'');
   return LW_SMS+'?'+(to.length>=9?'to='+to+'&':'')+'tab=sms&l_num='+encodeURIComponent(data.lNum)+'&l_code='+encodeURIComponent(data.caseNo);
