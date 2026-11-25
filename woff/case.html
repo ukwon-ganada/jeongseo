@@ -1227,6 +1227,8 @@ document.addEventListener('click', function(e){
 
 // ── 메뉴 [일정] (?view=sched): 이 방 기일로 채운 웍스 캘린더 입력 창으로 바로 넘어간다 (2026-11-25) ──
 function openSched(inClient){
+  // 웍스 캘린더 입력 화면은 휴대폰에서 열리지 않음 → 휴대폰은 빼기(석원 2026-11-25)
+  if(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||'')) return message('일정','', emptySt('일정 입력은 PC에서만 됩니다'));
   message('일정','', '<div class="empty-st">일정 입력 창을 여는 중…</div>');
   var pKey = ctx.room ? Promise.resolve({room:ctx.room}) : ctx.caseParam ? Promise.resolve({'case':ctx.caseParam}) :
     !inClient ? api({action:'locate'}).then(function(j){ return j.room ? {room:j.room} : j['case'] ? {'case':j['case']} : null; }) : Promise.resolve(null);
