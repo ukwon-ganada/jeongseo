@@ -157,6 +157,16 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
     try {
       // 캘린더 ID 알아보기(읽기만): 사람 이름 → 기본 캘린더·개인 캘린더 목록 (일정 입력 창 캘린더 지정용, 2026-11-25)
       // /일정 미리보기(시험용): 방 하나의 계획과 사진·통지서 읽은 결과
+      // 시험봇도 사진(image) 이벤트를 받게 (운영 봇은 이미 받음, 2026-11-25)
+      if (b?.action === "testbot-image") {
+        const { botToken } = await import("./room_file.ts");
+        const tok = await botToken(env as any, fetcher);
+        const r = await fetcher("https://www.worksapis.com/v1.0/bots/13580302", {
+          method: "PATCH", headers: { Authorization: "Bearer " + tok, "Content-Type": "application/json" },
+          body: JSON.stringify({ enableCallback: true, callbackEvents: ["text", "file", "image"] }),
+        });
+        return Response.json({ status: r.status, body: (await r.text()).slice(0, 300) });
+      }
       if (b?.action === "bot-info") {
         const { botToken } = await import("./room_file.ts");
         const tok = await botToken(env as any, fetcher);

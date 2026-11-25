@@ -144,6 +144,7 @@ export async function planForRoom(env: SchedEnv, channelId: string, fetcher: typ
   }
   // 도우미가 먼저 알린 기일(hearing_notice)이 최근 사진·통지서보다 늦게 나왔으면 그 기일을 쓴다
   let src = "로웨어 기일 기준";
+  let usedRead = false;
   const since48 = new Date(Date.now() - 48 * 3600e3).toISOString();
   const [nt, im, pf] = await Promise.all([
     rest(env, `hearing_notice?select=l_num,ev_date,ev_time,contents,created_at&channel_id=eq.${encodeURIComponent(channelId)}&status=eq.sent&ev_date=gte.${today}&created_at=gte.${new Date(Date.now() - 7 * 864e5).toISOString()}&order=created_at.desc&limit=1`, fetcher),
@@ -164,6 +165,7 @@ export async function planForRoom(env: SchedEnv, channelId: string, fetcher: typ
       const lw = h ? `로웨어: ${h.date} ${h.time} ${h.contents}` : "로웨어에 아직 없음";
       h = { l_num: h?.l_num ?? room.l_num, date: read.date, time: read.time, contents: `${read.kind || "기일"}(${[read.room, read.time].filter(Boolean).join(" ")})` };
       src = `${read.from} 기준 · ${lw}`;
+      usedRead = true;
     } else src = `로웨어 기일 기준 · ${read.from}과 같음`;
   }
   if (!h) return { why: "로웨어에 앞으로 잡힌 기일이 없고, 최근 올라온 사진·통지서에서도 찾지 못했습니다." };
@@ -173,7 +175,7 @@ export async function planForRoom(env: SchedEnv, channelId: string, fetcher: typ
   const norm = (s: string) => String(s || "").replace(/\s/g, "");
   const gukseon = gk.some((g) => norm(g.caseNumber) === norm(caseNo));
   const plan = buildPlan({
-    roomTitle: room.room_title || "", caseNo, client: c.l_client || "", another: c.l_another || "", court: c.court || read?.court || "",
+    roomTitle: room.room_title || "", caseNo, client: c.l_client || "", another: c.l_another || "", court: (usedRead ? read?.court : "") || c.court || read?.court || "",
     gukseon, date: h.date, time: h.time, contents: h.contents, source: src,
   });
   return { plan };
