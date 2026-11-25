@@ -11,7 +11,7 @@
 import { pemToPkcs8 } from "./room_file.ts";
 import { buildPlan, calendarUrl, lawyersFromTitle, type Plan, sendToRoom, type SchedEnv } from "./schedule_cmd.ts";
 
-export type NotifyOpts = { dryRun?: boolean; hours?: number; notifyRooms?: string[]; notifyBot: string; limit?: number; lpNum?: number };
+export type NotifyOpts = { force?: boolean; dryRun?: boolean; hours?: number; notifyRooms?: string[]; notifyBot: string; limit?: number; lpNum?: number };
 
 async function rest(env: SchedEnv, path: string, fetcher: typeof fetch, init: RequestInit = {}): Promise<any> {
   const r = await fetcher(env.sbUrl + "/rest/v1/" + path, {
@@ -89,7 +89,7 @@ export async function hearingNotify(env: SchedEnv, o: NotifyOpts, fetcher: typeo
   const seen = new Set(prev.map((p) => `${p.lp_num}|${p.ev_date}|${p.ev_time || ""}`));
   const prevBy = new Map<number, any>();
   for (const p of prev) if (!prevBy.has(p.lp_num)) prevBy.set(p.lp_num, p);
-  const todo = rows.filter((r) => !seen.has(`${r.lp_num}|${r.date}|${r.time}`)).slice(0, o.limit ?? 40);
+  const todo = rows.filter((r) => o.force || !seen.has(`${r.lp_num}|${r.date}|${r.time}`)).slice(0, o.limit ?? 40);
   out.done = rows.length - todo.length;
   if (!todo.length) return out;
 
@@ -140,7 +140,7 @@ export async function hearingNotify(env: SchedEnv, o: NotifyOpts, fetcher: typeo
     // 방 제목에 변호사 표시가 없으면 담당 변호사들 + 기일 일정을 쓰는 변호사 넷의 캘린더를 다 본다
     const who = lws.length ? lws.map((l) => l.name) : [...new Set([...String(c.charge_lawyer || "").split(/[,\s]+/).filter(Boolean), "서고은", "이예나", "박종덕", "강현구"])];
     let inCal = false;
-    for (const n of who) {
+    for (const n of o.force ? [] : who) {
       if (alreadyInCalendar(await calEvents(n, r.date).catch(() => []), client, plan.time)) { inCal = true; break; }
     }
     // 바뀐 기일: 전에 알린 날짜 또는 로웨어 옛 값
