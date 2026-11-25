@@ -1229,7 +1229,7 @@ document.addEventListener('click', function(e){
 function addHour(t){ var a=(t||'09:00').split(':'); var h=Math.min(+a[0]+1,23); return (h<10?'0':'')+h+':'+a[1]; }
 var SCHED_LAWYERS=['서고은','이예나','박종덕','강현구'];
 function schedForm(p, k){
-  var st=p.time||'09:00', law=p.lawyer||'서고은';
+  var st=p.time||'09:00', law='서고은'; // 석원 2026-11-25: 모두 서고은 캘린더
   var opts=SCHED_LAWYERS.indexOf(law)<0 ? [law].concat(SCHED_LAWYERS) : SCHED_LAWYERS;
   var row=function(l,h){ return '<div class="fr"><span class="l">'+l+'</span><div style="grid-column:2/4">'+h+'</div></div>'; };
   message('일정','', '<div class="card editing" id="schedc"><div class="card-h"><span>새 일정</span><span class="hb"><button class="edit-btn" id="schedsave">저장</button></span></div>'+
