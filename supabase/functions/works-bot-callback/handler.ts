@@ -32,7 +32,7 @@
 import { saveRoomFile } from "./room_file.ts";
 import { linkPicked, linkRoomAnyBot, relinkRoom } from "./room_link.ts";
 import { handleRoomFile, handleRoomText } from "./room_chat.ts";
-import { handleScheduleCmd, isScheduleCmd, noteRoomImage } from "./schedule_cmd.ts";
+import { calendarUrl, handleScheduleCmd, isScheduleCmd, noteRoomImage, planForRoom } from "./schedule_cmd.ts";
 import { backfillHold, recheckAll, recheckLinked, recheckRoom, refreshRoomTitles } from "./inv_case.ts";
 
 // 우리 봇: 운영 봇(사건관리 도우미), 시험봇(정서 시험봇)
@@ -107,6 +107,16 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       const r = await refreshRoomTitles(env, BOT_IDS, chs, fetcher).catch((e) => ({ changed: 0, error: String(e?.message || e).slice(0, 120) }));
       console.log("titles(internal)", chs.length, (r as any).changed);
       return Response.json(r);
+    }
+    // 사건 화면 메뉴 [일정](case-view action sched): 그 방 기일로 채운 웍스 캘린더 입력 창 주소
+    if (b?.sched) {
+      try {
+        const r = await planForRoom(env, String(b.sched), fetcher);
+        console.log("sched(internal)", r.plan ? "plan" : "none");
+        return Response.json(r.plan ? { url: calendarUrl(r.plan), plan: r.plan } : { why: r.why });
+      } catch (e) {
+        return Response.json({ why: "일정을 만들지 못했습니다", error: String((e as Error)?.message || e).slice(0, 120) });
+      }
     }
     const ch = String(b?.channelId || "");
     if (!ch) return Response.json({ error: "channelId" }, { status: 400 });
