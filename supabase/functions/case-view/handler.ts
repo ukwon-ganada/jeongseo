@@ -48,6 +48,7 @@ import { rankEvents } from "./timeline_rank.ts";
 import { applyConfirms, computeDeadlines, deadlineEvents, DL_ACTS, isNotice, mergeRoles, ourDefendants, type OtherCase } from "./deadlines.ts";
 import { findPick, normTitle } from "./title_match.ts";
 import { applyWitness } from "./witness.ts";
+import { fillHearingResults } from "./hearing_result.ts";
 import { dropKnown, dropSame, extractFromExport, msgsToExport, toRows } from "./chat_import.ts";
 import { shapeStages, diffStages, personChangeLine, isStage, noLines, chatNos, withChatNos, type NoHist } from "./stages.ts";
 // 방 제목 형제번호로 공소청 칸 채우기(2026-11-19): 바뀌는 방 목록을 석원님이 확인한 뒤 켠다
@@ -943,9 +944,12 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       const others: OtherCase[] = (relCases || []).filter((x: any) => x.l_code).map((x: any) => ({ code: nz(x.l_code), evs: (relEvs || []).filter((e: any) => String(e.l_num) === String(x.l_num)) }));
       // 병합 이유서 규칙(R21~R23)은 같은 심급 사건끼리만: 2심 사건이 1심 병합결정을 보고 "병합됨"이 되지 않게 (박큰별 2026-11-19)
       const sameLv = others.filter((o) => levelOf(o.code) === levelOf(nz(c.l_code)));
-      const shaped = shapeCase(c, evs || [], { today, linked, myHearings, status, saved, others: sameLv });
+      // 기일 결과가 비어 있으면 대법원 기일 정보(scourt_appoint_log)의 결과로 채운다 (2026푸104128 기일변경, 2026-11-25)
+      const witLog = nz(((await witLogP) || [])[0]?.scourt_appoint_log);
+      evs = fillHearingResults(evs || [], witLog);
+      const shaped = shapeCase(c, evs, { today, linked, myHearings, status, saved, others: sameLv });
       shaped.progress.checked = checked;
-      applyWitness(shaped, evs || [], nz(((await witLogP) || [])[0]?.scourt_appoint_log));
+      applyWitness(shaped, evs, witLog);
       const titles = (titleRows || []) as any[];
       const roomTitle = nz(titles[0]?.room_title);
       // 심급 묶음: 같은 방 사건을 1심·2심…으로 묶고, 지난 심급 업무 줄과 심급별 나의사건 기록을 만든다
