@@ -10,11 +10,15 @@
 //      종류: 공판·선고(형사) / 변론·판결선고(민사) / 조정·심문·심리 등은 "기일"만 뺀다
 //      민사·가사는 "의뢰인/상대방", 국선은 "국선 이름". (증인) 같은 표시는 직원이 창에서 붙인다.
 //  · 시간은 기일 시각부터 1시간, 장소는 "법원 법정" (예: 인천지방법원 316호법정)
+//  · 사진·통지서(석원 2026-11-25): 방에 최근 48시간 안에 올라온 사진(나의사건 캡처 등)·PDF가 있으면
+//    AI가 그중 앞으로 있을 기일(표시된 줄 우선)을 읽는다. 로웨어와 같으면 로웨어 그대로,
+//    다르거나 로웨어에 없으면 사진·통지서 기준으로 채우고 메모에 로웨어 값을 적어 둔다.
+//    웍스 콜백에는 "어느 글에 답장했는지"가 오지 않아(2026-11-25 로그 확인) 태그 대신 최근 파일을 본다.
 // ============================================================================
 import { botToken } from "./room_file.ts";
 
 export type SchedEnv = {
-  sbUrl: string; sbKey: string;
+  sbUrl: string; sbKey: string; anthropicKey?: string; visionModel?: string;
   clientId?: string; clientSecret?: string; serviceAccount?: string; privateKey?: string;
 };
 
@@ -62,12 +66,12 @@ export function kindWord(kind: string, criminal: boolean): string {
 }
 
 export type Plan = {
-  summary: string; date: string; time: string; location: string; description: string; lawyer: string | null;
+  summary: string; date: string; time: string; location: string; description: string; lawyer: string | null; source: string;
 };
 
 export function buildPlan(o: {
   roomTitle: string; caseNo: string; client: string; another: string; court: string; gukseon: boolean;
-  date: string; time: string; contents: string;
+  date: string; time: string; contents: string; source?: string;
 }): Plan {
   const lw = lawyerFromTitle(o.roomTitle);
   const crim = isCriminal(o.caseNo);
@@ -78,8 +82,8 @@ export function buildPlan(o: {
   const location = [String(o.court || "").trim(), h.room].filter(Boolean).join(" ");
   return {
     summary, date: o.date, time: o.time || h.time, location,
-    description: [o.caseNo, o.contents].filter(Boolean).join(" ") + "\n(로웨어 기일 기준, 도우미가 채움)",
-    lawyer: lw?.name || null,
+    description: [o.caseNo, o.contents].filter(Boolean).join(" ") + "\n(" + (o.source || "로웨어 기일 기준") + ", 도우미가 채움)",
+    lawyer: lw?.name || null, source: o.source || "로웨어 기일 기준",
   };
 }
 
@@ -126,15 +130,26 @@ export async function planForRoom(env: SchedEnv, channelId: string, fetcher: typ
     const c = cs.filter((c) => c.next_date && String(c.next_date).slice(0, 10) >= today && /기일/.test(c.next_contents || "")).sort((a, b) => String(a.next_date).localeCompare(String(b.next_date)))[0];
     if (c) h = { l_num: c.l_num, date: String(c.next_date).slice(0, 10), time: String(c.next_time || "").slice(0, 5), contents: c.next_contents || "" };
   }
-  if (!h) return { why: "로웨어에 앞으로 잡힌 기일이 없습니다." };
+  // 최근 사진·통지서 읽기 (없거나 실패하면 로웨어만)
+  let src = "로웨어 기일 기준";
+  const read = await readRecentNotice(env, channelId, today, fetcher).catch((e) => { console.error("notice read fail", String(e?.message || e).slice(0, 160)); return null; });
+  if (read && read.date >= today && (read.time || read.kind)) {
+    const same = h && h.date === read.date && (!read.time || h.time === read.time);
+    if (!same) {
+      const lw = h ? `로웨어: ${h.date} ${h.time} ${h.contents}` : "로웨어에 아직 없음";
+      h = { l_num: h?.l_num ?? room.l_num, date: read.date, time: read.time, contents: `${read.kind || "기일"}(${[read.room, read.time].filter(Boolean).join(" ")})` };
+      src = `${read.from} 기준 · ${lw}`;
+    } else src = `로웨어 기일 기준 · ${read.from}과 같음`;
+  }
+  if (!h) return { why: "로웨어에 앞으로 잡힌 기일이 없고, 최근 올라온 사진·통지서에서도 찾지 못했습니다." };
   const c = cs.find((x) => x.l_num === h!.l_num) || cs[0] || {};
   const caseNo = String(c.l_code || room.case_no || "");
   const gk = await rest(env, "gukseon_cases?select=data->>caseNumber&limit=3000", fetcher);
   const norm = (s: string) => String(s || "").replace(/\s/g, "");
   const gukseon = gk.some((g) => norm(g.caseNumber) === norm(caseNo));
   const plan = buildPlan({
-    roomTitle: room.room_title || "", caseNo, client: c.l_client || "", another: c.l_another || "", court: c.court || "",
-    gukseon, date: h.date, time: h.time, contents: h.contents,
+    roomTitle: room.room_title || "", caseNo, client: c.l_client || "", another: c.l_another || "", court: c.court || read?.court || "",
+    gukseon, date: h.date, time: h.time, contents: h.contents, source: src,
   });
   return { plan };
 }
@@ -152,7 +167,7 @@ export function planMessage(p: Plan): unknown {
   const when = dayLabel(p.date) + (p.time ? " " + p.time : "");
   return {
     type: "button_template",
-    contentText: `${p.summary}\n${when} · ${p.location || "장소 없음"}` + (p.lawyer ? `\n캘린더: ${p.lawyer}` : ""),
+    contentText: `${p.summary}\n${when} · ${p.location || "장소 없음"}` + (p.lawyer ? `\n캘린더: ${p.lawyer}` : "") + (p.source.startsWith("로웨어") ? "" : `\n${p.source}`),
     actions: [{ type: "uri", label: "일정 입력 창 열기", uri: calendarUrl(p) }],
   };
 }
@@ -162,4 +177,101 @@ export async function handleScheduleCmd(env: SchedEnv, botId: string, channelId:
   const content = r.plan ? planMessage(r.plan) : { type: "text", text: "일정을 채우지 못했습니다: " + r.why };
   await sendToRoom(env, botId, channelId, content, fetcher);
   return r.plan ? "sent" : "none:" + r.why;
+}
+
+// ── 사진·통지서 읽기 ─────────────────────────────────────────────────────────
+export type NoticeRead = { date: string; time: string; kind: string; room: string; court: string; from: string };
+
+const READ_SCHEMA = {
+  type: "object", additionalProperties: false, required: ["found", "date", "time", "kind", "room", "court"],
+  properties: {
+    found: { type: "boolean" }, date: { type: "string" }, time: { type: "string" },
+    kind: { type: "string" }, room: { type: "string" }, court: { type: "string" },
+  },
+};
+const READ_SYSTEM = `법률사무소 사건방에 올라온 사진(대법원 나의사건 화면 캡처 등)이나 법원 통지서에서 앞으로 열릴 재판 기일 하나를 읽는다.
+- 오늘 이후의 기일 중, 표시(테두리·밑줄)된 줄이 있으면 그 줄, 없으면 가장 가까운 기일.
+- date는 YYYY-MM-DD, time은 HH:MM(24시간). kind는 화면 글자 그대로(예: 공판기일, 선고기일, 변론기일, 판결선고기일, 조정기일).
+- room은 법정(예: 316호법정), court는 법원 이름(예: 인천지방법원). 모르면 빈 글자.
+- 기일이 없거나 읽을 수 없으면 found=false.`;
+
+async function download(env: SchedEnv, url: string, auth: string, fetcher: typeof fetch): Promise<{ bytes: Uint8Array; ctype: string }> {
+  const a = await fetcher(url, { headers: { Authorization: auth, ...(auth.includes(env.sbKey) ? { apikey: env.sbKey } : {}) }, redirect: "manual" });
+  let res = a;
+  if (a.status >= 300 && a.status < 400) {
+    const loc = a.headers.get("location"); await a.body?.cancel();
+    if (!loc) throw new Error("주소 없음");
+    res = await fetcher(loc, { headers: { Authorization: auth } });
+  }
+  if (!res.ok) throw new Error("내려받기 " + res.status);
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  if (bytes.length > 8 * 1024 * 1024) throw new Error("8MB 넘음");
+  return { bytes, ctype: (res.headers.get("content-type") || "").split(";")[0].trim() };
+}
+
+function b64(bytes: Uint8Array): string {
+  let s = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+
+// 방에 최근(48시간) 올라온 사진 최대 2장, 없으면 PDF 1개를 AI로 읽는다
+export async function readRecentNotice(env: SchedEnv, channelId: string, today: string, fetcher: typeof fetch = fetch): Promise<NoticeRead | null> {
+  if (!env.anthropicKey) return null;
+  const since = new Date(Date.now() - 48 * 3600e3).toISOString();
+  const imgs = await rest(env, `room_image?select=bot_id,file_id&channel_id=eq.${encodeURIComponent(channelId)}&created_at=gte.${since}&order=created_at.desc&limit=2`, fetcher);
+  const blocks: unknown[] = [];
+  let from = "";
+  if (imgs.length) {
+    const tok = await botToken(env as any, fetcher);
+    for (const im of imgs.reverse()) {
+      try {
+        const d = await download(env, `https://www.worksapis.com/v1.0/bots/${encodeURIComponent(im.bot_id)}/attachments/${encodeURIComponent(im.file_id)}`, "Bearer " + tok, fetcher);
+        const mt = /^image\/(png|jpeg|gif|webp)$/.test(d.ctype) ? d.ctype : "image/png";
+        blocks.push({ type: "image", source: { type: "base64", media_type: mt, data: b64(d.bytes) } });
+      } catch (e) { console.error("image dl", String((e as Error).message).slice(0, 80)); }
+    }
+    if (blocks.length) from = "사진";
+  }
+  if (!blocks.length) {
+    const pdf = await rest(env, `case_file?select=storage_path&channel_id=eq.${encodeURIComponent(channelId)}&status=eq.${encodeURIComponent("보관")}&content_type=eq.application/pdf&saved_at=gte.${since}&order=saved_at.desc&limit=1`, fetcher);
+    if (pdf[0]?.storage_path) {
+      const d = await download(env, `${env.sbUrl}/storage/v1/object/case-files/${pdf[0].storage_path}`, "Bearer " + env.sbKey, fetcher);
+      blocks.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: b64(d.bytes) } });
+      from = "통지서";
+    }
+  }
+  if (!blocks.length) return null;
+  const res = await fetcher("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "x-api-key": env.anthropicKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+    body: JSON.stringify({
+      model: env.visionModel || "claude-sonnet-5-5", max_tokens: 400, system: READ_SYSTEM,
+      output_config: { format: { type: "json_schema", schema: READ_SCHEMA } },
+      messages: [{ role: "user", content: [...blocks, { type: "text", text: `오늘은 ${today}입니다.` }] }],
+    }),
+  });
+  if (!res.ok) throw new Error("anthropic " + res.status + " " + (await res.text().catch(() => "")).slice(0, 160));
+  const data = await res.json();
+  const out = (Array.isArray(data?.content) ? data.content : []).filter((b: any) => b?.type === "text").map((b: any) => b.text || "").join("");
+  const j = JSON.parse(out || "{}");
+  if (!j.found || !/^\d{4}-\d{2}-\d{2}$/.test(j.date || "")) return null;
+  const tm = String(j.time || "").match(/^(\d{1,2}):(\d{2})/);
+  return { date: j.date, time: tm ? tm[1].padStart(2, "0") + ":" + tm[2] : "", kind: String(j.kind || "").trim(), room: String(j.room || "").trim(), court: String(j.court || "").trim(), from };
+}
+
+// 사진이 올라오면 기록만 해 둔다(파일 내용은 보관하지 않음, "/일정" 때 웍스에서 다시 받음)
+export async function noteRoomImage(env: SchedEnv, botId: string, channelId: string, fileId: string, userId: string | undefined, fetcher: typeof fetch = fetch) {
+  const r = await fetcher(env.sbUrl + "/rest/v1/room_image?on_conflict=file_id", {
+    method: "POST",
+    headers: { apikey: env.sbKey, Authorization: "Bearer " + env.sbKey, "Content-Type": "application/json", Prefer: "resolution=ignore-duplicates,return=minimal" },
+    body: JSON.stringify({ bot_id: botId, channel_id: channelId, file_id: fileId, works_user_id: userId ?? null }),
+  });
+  if (!r.ok) throw new Error("room_image " + r.status + " " + (await r.text()).slice(0, 100));
+  await r.body?.cancel();
+  // 7일 지난 기록은 지운다
+  const old = new Date(Date.now() - 7 * 864e5).toISOString();
+  await fetcher(env.sbUrl + "/rest/v1/room_image?created_at=lt." + old, {
+    method: "DELETE", headers: { apikey: env.sbKey, Authorization: "Bearer " + env.sbKey, Prefer: "return=minimal" },
+  }).then((x) => x.body?.cancel()).catch(() => {});
 }

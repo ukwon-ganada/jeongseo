@@ -32,7 +32,7 @@
 import { saveRoomFile } from "./room_file.ts";
 import { linkPicked, linkRoomAnyBot, relinkRoom } from "./room_link.ts";
 import { handleRoomFile, handleRoomText } from "./room_chat.ts";
-import { handleScheduleCmd, isScheduleCmd } from "./schedule_cmd.ts";
+import { handleScheduleCmd, isScheduleCmd, noteRoomImage } from "./schedule_cmd.ts";
 import { backfillHold, recheckAll, recheckLinked, recheckRoom, refreshRoomTitles } from "./inv_case.ts";
 
 // 우리 봇: 운영 봇(사건관리 도우미), 시험봇(정서 시험봇)
@@ -223,6 +223,15 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       background(handleScheduleCmd(env, botId, channelId, fetcher)
         .then((r) => console.log("schedule", r.slice(0, 60)))
         .catch((e) => console.error("schedule fail", String(e?.message || e).slice(0, 200))));
+    }
+  }
+
+  // 사진이 올라오면 "/일정"이 읽을 수 있게 기록만 (scheduleBots 방만)
+  if (ev?.type === "message" && content?.type === "image" && content?.fileId && channelId) {
+    const botId = req.headers.get("x-works-botid") || String(ev?.botId || "");
+    if ((env.scheduleBots || ["13580302"]).includes(botId)) {
+      background(noteRoomImage(env, botId, channelId, String(content.fileId), userId, fetcher)
+        .catch((e) => console.error("image note fail", String(e?.message || e).slice(0, 160))));
     }
   }
 
