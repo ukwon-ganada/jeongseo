@@ -166,14 +166,22 @@ Deno.test("상소장접수통지가 우리 쪽에만 → 검사만 상소 경고
     S("2026-10-19", "피고인1 변호인  법무법인 정서 소송기록접수통지서/항소이유서/전자소송안내문 발송", "2026-10-21"),
   ], "2026-11-13");
   const r = dl.find((x) => x.kind === "항소이유서")!;
-  assertEquals([r.d, r.st, /검사만/.test(r.warn || "")], ["2026-11-09", "open", true]);
+  // 검사 항소장만 있고 우리 항소장이 없으면 이유서 의무 없음 (2026-11-25 석원)
+  assertEquals([r.d, r.st, r.hold], ["2026-11-09", "done", "검사만 항소 10.08"]);
+  // 검사 항소장 줄이 빠진 기록(접수통지만) → 경고만
+  const noLine = computeDeadlines("2026노9004", [
+    { lp_set: "접수", lp_appoint_date: "2026-10-01", lp_contents: "피고인 김OO 종국 : 선고" },
+    S("2026-10-12", "피고인1  김OO 항소장접수통지서 발송", "2026-10-15"),
+    S("2026-10-19", "피고인1 변호인  법무법인 정서 소송기록접수통지서/항소이유서/전자소송안내문 발송", "2026-10-21"),
+  ], "2026-11-13").find((x) => x.kind === "항소이유서")!;
+  assertEquals([noLine.st, /검사만/.test(noLine.warn || "")], ["open", true]);
   const ans = computeDeadlines("2026노9004", [
     F("2026-10-08", "검사  박OO 항소장 제출"),
     S("2026-10-12", "피고인1  김OO 항소장접수통지서 발송", "2026-10-15"),
     S("2026-10-19", "피고인1 변호인  법무법인 정서 소송기록접수통지서/항소이유서/전자소송안내문 발송", "2026-10-21"),
     F("2026-10-27", "피고인1 변호인  법OOOOOO 항소이유에 대한 답변서 제출"),
   ], "2026-11-13").find((x) => x.kind === "항소이유서")!;
-  assertEquals([ans.st, ans.hold, ans.warn], ["done", "검사 상소 · 답변서 10.27", undefined]);
+  assertEquals([ans.st, ans.hold, ans.warn], ["done", "검사만 항소 10.08", undefined]);
   const noNotice = computeDeadlines("2026노9004", [
     S("2026-10-19", "피고인1 변호인  법무법인 정서 소송기록접수통지서/항소이유서/전자소송안내문 발송", "2026-10-21"),
     F("2026-10-27", "피고인1 변호인  법OOOOOO 항소이유에 대한 답변서 제출"),
@@ -187,6 +195,15 @@ Deno.test("상소장접수통지가 우리 쪽에만 → 검사만 상소 경고
     F("2026-11-05", "피고인1 변호인  법OOOOOO 항소이유서 제출"),
   ], "2026-11-13").find((x) => x.kind === "항소이유서")!;
   assertEquals([both.st, both.doneOn], ["done", "2026-11-05"]);
+  // 1심 기록이 있으면: 검사만 항소장 → 이유서 의무 없음 (2026-11-25 석원)
+  const verdict = { lp_set: "접수", lp_appoint_date: "2026-10-01", lp_contents: "피고인 천OO 종국 : 선고" };
+  const notice = S("2026-10-19", "피고인1 변호인  법무법인 정서 소송기록접수통지서/항소이유서/전자소송안내문 발송", "2026-10-21");
+  const pros = computeDeadlines("2026노9004", [verdict, F("2026-10-08", "검사  황OO 항소장 제출"), notice], "2026-11-13").find((x) => x.kind === "항소이유서")!;
+  assertEquals([pros.st, pros.hold, pros.warn], ["done", "검사만 항소 10.08", undefined]);
+  // 우리도 항소장을 냈으면 답변서가 있어도 이유서 의무 그대로
+  const twoWay = computeDeadlines("2026노9004", [verdict, F("2026-10-08", "검사  황OO 항소장 제출"), F("2026-10-07", "피고인1 변호인  법OOOOOO 항소장 제출"), notice,
+    F("2026-10-27", "피고인1 변호인  법OOOOOO 항소이유에 대한 답변서 제출")], "2026-11-13").find((x) => x.kind === "항소이유서")!;
+  assertEquals([twoWay.st, twoWay.d], ["open", "2026-11-10"]);
   const r2 = computeDeadlines("2026노9", [S("2026-11-02", "피고인  김OO 소송기록접수통지서 발송", "2026-11-03")], "2026-11-13")[0];
   assertEquals(/우리 법인 수신 기록이 없/.test(r2.warn || ""), true);
 });
