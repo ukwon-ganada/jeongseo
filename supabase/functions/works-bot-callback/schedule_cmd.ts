@@ -110,6 +110,8 @@ export function calendarUrl(p: Plan): string {
   }
   if (p.location) q.set("location", p.location);
   if (p.description) q.set("description", p.description);
+  // 서고은 캘린더로 열기(석원 2026-11-25 시험: 세 이름을 함께 주면 캘린더 칸이 "서고은"으로 나옴. 어느 이름이 듣는지는 미확인이라 셋 다)
+  for (const k of ["calendarId", "calendarUid", "calId"]) q.set(k, SCHED_CAL_ID);
   return CAL_EDIT + "?" + q.toString();
 }
 
