@@ -17,3 +17,11 @@ Deno.test("알림 글", () => {
   assertEquals(m.contentText.split("\n")[1], "강)공판_임윤선");
   assertEquals((noticeMessage(p, "") as any).contentText.split("\n")[0], "새 기일");
 });
+
+import { isPostponed } from "./hearing_notify.ts";
+Deno.test("연기·변경 기일 거르기", () => {
+  assertEquals(isPostponed("공판기일(316호 법정 14:00)"), false);
+  assertEquals(isPostponed("공판기일(316호 법정 14:00) 기일변경"), true);
+  assertEquals(isPostponed("변론기일 (연기)"), true);
+  assertEquals(isPostponed("선고기일 추정"), true);
+});

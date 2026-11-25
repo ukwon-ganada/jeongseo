@@ -157,6 +157,8 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
     try {
       if (b?.action === "hearing-notify") {
         const r = await hearingNotify(env, {
+          mode: b?.mode === "missing" ? "missing" : "new", graceHours: typeof b?.graceHours === "number" ? b.graceHours : undefined,
+          lookbackDays: typeof b?.lookbackDays === "number" ? b.lookbackDays : undefined, limit: typeof b?.limit === "number" ? b.limit : undefined,
           dryRun: !!b?.dryRun, force: !!b?.force && typeof b?.lpNum === "number", hours: typeof b?.hours === "number" ? b.hours : undefined, lpNum: typeof b?.lpNum === "number" ? b.lpNum : undefined,
           notifyRooms: Array.isArray(b?.rooms) ? b.rooms.map(String) : env.notifyRooms, notifyBot: String(b?.bot || env.notifyBot || "13580302"),
         }, fetcher);

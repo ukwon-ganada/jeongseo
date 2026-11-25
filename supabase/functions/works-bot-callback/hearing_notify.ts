@@ -11,7 +11,7 @@
 import { pemToPkcs8 } from "./room_file.ts";
 import { buildPlan, calendarUrl, lawyersFromTitle, type Plan, sendToRoom, type SchedEnv } from "./schedule_cmd.ts";
 
-export type NotifyOpts = { force?: boolean; dryRun?: boolean; hours?: number; notifyRooms?: string[]; notifyBot: string; limit?: number; lpNum?: number };
+export type NotifyOpts = { mode?: "new" | "missing"; graceHours?: number; lookbackDays?: number; force?: boolean; dryRun?: boolean; hours?: number; notifyRooms?: string[]; notifyBot: string; limit?: number; lpNum?: number };
 
 async function rest(env: SchedEnv, path: string, fetcher: typeof fetch, init: RequestInit = {}): Promise<any> {
   const r = await fetcher(env.sbUrl + "/rest/v1/" + path, {
@@ -62,6 +62,8 @@ export function alreadyInCalendar(events: { summary: string; start: string }[], 
   return events.some((e) => !/취소/.test(e.summary) && e.summary.includes(name) && (!time || !e.start.includes("T") || e.start.slice(11, 16) === time));
 }
 
+export const isPostponed = (c: string) => /연기|변경|추정|취소/.test(String(c || ""));
+
 type Row = { lp_num: number; l_num: number; date: string; time: string; contents: string };
 
 export async function hearingNotify(env: SchedEnv, o: NotifyOpts, fetcher: typeof fetch = fetch) {
@@ -69,10 +71,25 @@ export async function hearingNotify(env: SchedEnv, o: NotifyOpts, fetcher: typeo
   const since = new Date(Date.now() - (o.hours ?? 2) * 3600e3).toISOString();
   const giil = encodeURIComponent("기일");
   // 1) 후보: 새로 들어온 기일 + 최근 바뀐 기일
-  const fresh: any[] = o.lpNum
-    ? await rest(env, `lw_process_events?select=lp_num,l_num,lp_appoint_date,lp_appoint_time,lp_contents&lp_num=eq.${o.lpNum}`, fetcher)
-    : await rest(env, `lw_process_events?select=lp_num,l_num,lp_appoint_date,lp_appoint_time,lp_contents&lp_set=eq.${giil}&lp_appoint_date=gte.${today}&first_seen_at=gte.${since}&limit=300`, fetcher);
-  const ch: any[] = o.lpNum ? [] : await rest(env, `lw_process_event_changes?select=lp_num,old_row&changed_at=gte.${since}&limit=500`, fetcher);
+  const missing = o.mode === "missing";
+  let fresh: any[];
+  if (o.lpNum) fresh = await rest(env, `lw_process_events?select=lp_num,l_num,lp_appoint_date,lp_appoint_time,lp_contents&lp_num=eq.${o.lpNum}`, fetcher);
+  else if (missing) {
+    // 빠진 기일(석원 2026-11-25): 로웨어에 들어온 지 하루(graceHours)가 지났는데도 캘린더에 없는 앞으로의 기일만.
+    // 연기·변경된 기일(바뀐 기록이 있거나 내용에 연기·변경·추정·취소)은 알리지 않는다
+    const upTo = new Date(Date.now() - (o.graceHours ?? 24) * 3600e3).toISOString();
+    const from = new Date(Date.now() - (o.lookbackDays ?? 14) * 864e5).toISOString();
+    const all: any[] = await rest(env, `lw_process_events?select=lp_num,l_num,lp_appoint_date,lp_appoint_time,lp_contents,lp_remark,changed_count&lp_set=eq.${giil}&lp_appoint_date=gte.${today}&first_seen_at=lte.${upTo}&first_seen_at=gte.${from}&limit=1000`, fetcher);
+    const nums = all.map((e) => e.lp_num);
+    const chg = new Set<number>();
+    for (let i = 0; i < nums.length; i += 200) {
+      const part: any[] = await rest(env, `lw_process_event_changes?select=lp_num&lp_num=in.(${nums.slice(i, i + 200).join(",")})`, fetcher);
+      for (const c of part) chg.add(c.lp_num);
+    }
+    // 결과(lp_remark: 기일변경·연기·속행 등)가 붙은 기일은 이미 바뀌었거나 끝난 것 → 알리지 않음
+    fresh = all.filter((e) => !chg.has(e.lp_num) && !(Number(e.changed_count) > 0) && !String(e.lp_remark || "").trim() && !isPostponed(e.lp_contents));
+  } else fresh = await rest(env, `lw_process_events?select=lp_num,l_num,lp_appoint_date,lp_appoint_time,lp_contents&lp_set=eq.${giil}&lp_appoint_date=gte.${today}&first_seen_at=gte.${since}&limit=300`, fetcher);
+  const ch: any[] = o.lpNum || missing ? [] : await rest(env, `lw_process_event_changes?select=lp_num,old_row&changed_at=gte.${since}&limit=500`, fetcher);
   const oldBy = new Map<number, any>();
   for (const c of ch) oldBy.set(c.lp_num, c.old_row);
   const chNums = [...oldBy.keys()].filter((n) => !fresh.some((f) => f.lp_num === n));
@@ -90,7 +107,7 @@ export async function hearingNotify(env: SchedEnv, o: NotifyOpts, fetcher: typeo
   const seen = new Set(prev.map((p) => `${p.lp_num}|${p.ev_date}|${p.ev_time || ""}`));
   const prevBy = new Map<number, any>();
   for (const p of prev) if (!prevBy.has(p.lp_num)) prevBy.set(p.lp_num, p);
-  const todo = rows.filter((r) => o.force || !seen.has(`${r.lp_num}|${r.date}|${r.time}`)).slice(0, o.limit ?? 40);
+  const todo = rows.filter((r) => o.force || !seen.has(`${r.lp_num}|${r.date}|${r.time}`)).slice(0, o.limit ?? (missing ? 80 : 40));
   out.done = rows.length - todo.length;
   if (!todo.length) return out;
 
@@ -148,10 +165,10 @@ export async function hearingNotify(env: SchedEnv, o: NotifyOpts, fetcher: typeo
     const p = prevBy.get(r.lp_num), old = oldBy.get(r.lp_num);
     const before = p ? `${p.ev_date} ${p.ev_time || ""}`.trim() : old?.lp_appoint_date ? `${String(old.lp_appoint_date).slice(0, 10)} ${String(old.lp_appoint_time || "").slice(0, 5)}`.trim() : "";
     const was = before && before !== `${r.date} ${r.time}`.trim() ? before : "";
-    out.items.push({ room: room.channel_id.slice(0, 8), summary: plan.summary, date: r.date, time: plan.time, inCal, was });
+    out.items.push({ room: room.channel_id.slice(0, 8), summary: plan.summary, date: r.date, time: plan.time, inCal, was, contents: r.contents.slice(0, 40) });
     if (inCal) { out.inCalendar++; records.push(rec(r, room.channel_id, "in_calendar", plan)); continue; }
     if (!o.dryRun) {
-      await sendToRoom(env, o.notifyBot, room.channel_id, noticeMessage(plan, was), fetcher);
+      await sendToRoom(env, o.notifyBot, room.channel_id, noticeMessage(plan, was, missing), fetcher);
       out.sent++;
     }
     records.push(rec(r, room.channel_id, "sent", plan, was));
@@ -170,8 +187,8 @@ function rec(r: Row, channel: string | null, status: string, plan: Plan | null, 
 
 const W = ["일", "월", "화", "수", "목", "금", "토"];
 const dl = (d: string) => { const t = new Date(d + "T00:00:00Z"); return `${t.getUTCMonth() + 1}.${t.getUTCDate()}.(${W[t.getUTCDay()]})`; };
-export function noticeMessage(p: Plan, was: string): unknown {
-  const head = was ? `기일 변경 · 전 ${dl(was.slice(0, 10))}${was.slice(11) ? " " + was.slice(11) : ""}` : "새 기일";
+export function noticeMessage(p: Plan, was: string, missing = false): unknown {
+  const head = missing ? "캘린더에 없는 기일" : was ? `기일 변경 · 전 ${dl(was.slice(0, 10))}${was.slice(11) ? " " + was.slice(11) : ""}` : "새 기일";
   return {
     type: "button_template",
     contentText: `${head}\n${p.summary}\n${dl(p.date)}${p.time ? " " + p.time : ""} · ${p.location || "장소 없음"}` + (p.lawyer ? `\n캘린더: ${p.lawyer}` : ""),
