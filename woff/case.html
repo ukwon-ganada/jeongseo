@@ -1225,6 +1225,20 @@ document.addEventListener('click', function(e){
   }
 });
 
+// ── 메뉴 [일정] (?view=sched): 이 방 기일로 채운 웍스 캘린더 입력 창으로 바로 넘어간다 (2026-11-25) ──
+function openSched(inClient){
+  message('일정','', '<div class="empty-st">일정 입력 창을 여는 중…</div>');
+  var pKey = ctx.room ? Promise.resolve({room:ctx.room}) : ctx.caseParam ? Promise.resolve({'case':ctx.caseParam}) :
+    !inClient ? api({action:'locate'}).then(function(j){ return j.room ? {room:j.room} : j['case'] ? {'case':j['case']} : null; }) : Promise.resolve(null);
+  return pKey.then(function(k){
+    if(!k) return message('일정','', emptySt('이 방을 찾지 못했습니다'));
+    return api({action:'sched', room:k.room||'', 'case':k['case']||''}).then(function(j){
+      if(j.url){ location.replace(j.url); return; }
+      message('일정','', emptySt(esc(j.why||'일정을 만들지 못했습니다')));
+    });
+  }).catch(function(e){ message('일정','', emptySt('일정 입력 창을 열지 못했습니다', esc((e&&e.message)||e))); });
+}
+
 // ── WOFF 시작 ─────────────────────────────────────────
 function start(){
   perfMark('sdk');
@@ -1246,6 +1260,7 @@ function start(){
       // 보류 방: 어느 사건인지 확정 못 함 → 사건정보·서면을 띄우지 않는다
       if(q.get('hold')) return showHold();
       if(q.get('setup')==='pc') return showSetup();
+      if(q.get('view')==='sched') return openSched(inClient);
       // PC(바깥 브라우저): 웍스가 방을 알려 주지 않으므로, 이 PC 도우미가 웍스 창의 방 제목을 읽어 찾는다
       if(!inClient && !ctx.room && !ctx.caseParam && !q.get('room')) return showLocate();
       if(!ctx.room && !ctx.caseParam) return showPicker(q.get('room') ? '이 방과 연결된 사건이 없습니다' : '');
