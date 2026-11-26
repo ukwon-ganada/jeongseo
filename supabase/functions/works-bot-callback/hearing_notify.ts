@@ -57,10 +57,15 @@ export async function works(tok: string, path: string, fetcher: typeof fetch): P
 const addDays = (d: string, n: number) => new Date(Date.parse(d + "T00:00:00Z") + n * 864e5).toISOString().slice(0, 10);
 
 // 캘린더에 이미 있나: 그날 일정 제목에 의뢰인 이름이 있고, 시각이 있으면 시작 시각도 같을 때
+// 이름 맞추기용: 회사 표기((주)·주식회사·㈜ 등)·"외 N명"·띄어쓰기를 걷어 낸다 (2026-11-26 "(주)라임산업개발" vs "주식회사 라임산업개발")
+export const coreName = (s: string) => String(s || "")
+  .replace(/주식회사|유한회사|사단법인|재단법인|\(주\)|\(유\)|㈜|\(사\)|\(재\)/g, "")
+  .replace(/\s*(외|外)\s*\d+\s*(명|인)?.*$/, "")
+  .replace(/\s/g, "");
 export function alreadyInCalendar(events: { summary: string; start: string }[], client: string, time: string): boolean {
-  const name = String(client || "").trim();
+  const name = coreName(client);
   if (name.length < 2) return false;
-  return events.some((e) => !/취소/.test(e.summary) && e.summary.includes(name) && (!time || !e.start.includes("T") || e.start.slice(11, 16) === time));
+  return events.some((e) => !/취소/.test(e.summary) && coreName(e.summary.replace(/\s*(외|外)\s*\d+\s*(명|인)?/g, "")).includes(name) && (!time || !e.start.includes("T") || e.start.slice(11, 16) === time));
 }
 
 export const isRehab = (code: string) => /\d(개회|개확|개보|하단|하면|하합|하확|회단|회합|회확|간회)\d/.test(String(code || "").replace(/\s/g, ""));
@@ -185,6 +190,8 @@ export async function hearingNotify(env: SchedEnv, o: NotifyOpts, fetcher: typeo
     const client = String(c.l_client || "").split(/[,(]/)[0].trim();
     // 회생·파산 사건은 알리지 않는다(석원 2026-11-26 "회생사건은 빼고")
     if (isRehab(c.l_code || "")) { out.skipped++; continue; }
+    // 다른 변호사 국선(서고은 국선 목록에 없는 국선 사건)은 보지 않는다(석원 2026-11-26 정세연·유빈)
+    if (/국선/.test(c.l_client || "") && !gkSet.has(norm(c.l_code))) { out.skipped++; continue; }
     const lws = lawyersFromTitle(room?.room_title || "");
     // 머리글 변호사 캘린더를 먼저 보고, 없으면 담당 변호사·변호사 넷 캘린더도 본다(박) 사건도 서고은 캘린더에 넣는 경우가 많음, 2026-11-25 신상현·소현섭)
     const who = [...new Set([...lws.map((l) => l.name), ...String(c.charge_lawyer || "").split(/[,\s]+/).filter(Boolean), "서고은", "이예나", "박종덕", "강현구"])];

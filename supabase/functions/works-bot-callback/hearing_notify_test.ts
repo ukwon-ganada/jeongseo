@@ -39,3 +39,11 @@ Deno.test("우리 법인 사임 줄", () => {
   if (isOurResign("피고 소송대리인 법OOOOOOOOOOOOOOOO 소송대리인 사임신고서 제")) throw new Error("4");
   if (isOurResign("원고 소송대리인 문수종소송대리인 사임신고서 제출")) throw new Error("5");
 });
+Deno.test("회사 표기·외 N명 차이를 넘어 캘린더 짝 찾기 (2026-11-26)", () => {
+  const ok = (sum: string, client: string, t: string) => alreadyInCalendar([{ summary: sum, start: "2026-12-10T" + t + ":00+09:00" }], client, t);
+  if (!ok("예)변론_(주)라임산업개발/(주)천지플래닛", "주식회사 라임산업개발", "14:00")) throw new Error("라임");
+  if (!ok("강)변론_주식회사보은/김종로", "주식회사 보은", "10:00")) throw new Error("보은");
+  if (!ok("강)변론_김응구 외 4명/새롬건설(주)", "김응구 外4", "14:20")) throw new Error("김응구");
+  if (!ok("(영상)(박)변론_(주)부강이엔지/(주)진성중공업", "주식회사 부강이엔지", "15:50")) throw new Error("부강");
+  if (ok("예)변론_(주)진성아이엔디/(주)한올개발 외 1명", "주식회사 엔씨엠 외 1명", "16:00")) throw new Error("엔씨엠");
+});
