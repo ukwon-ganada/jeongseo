@@ -102,7 +102,7 @@
   }
   function docBadge(t) {
     t = t || '형사';
-    var cls = t === '민사' ? 'civil' : (t === '가사' ? 'family' : 'crim');
+    var cls = t === '민사' ? 'civil' : (t === '가사' ? 'family' : (t === '자문' ? 'jamun' : 'crim'));
     return '<span class="creg-doc creg-doc-' + cls + '">' + esc(t) + '</span>';
   }
   function statusOf(it) {
@@ -180,6 +180,7 @@
             '<button class="creg-tchip" data-t="형사" onclick="ContractReg.type(\'형사\')">형사</button>' +
             '<button class="creg-tchip" data-t="민사" onclick="ContractReg.type(\'민사\')">민사</button>' +
             '<button class="creg-tchip" data-t="가사" onclick="ContractReg.type(\'가사\')">가사</button>' +
+            '<button class="creg-tchip" data-t="자문" onclick="ContractReg.type(\'자문\')">자문</button>' +
           '</div>' +
           '<select class="creg-sort creg-mgrsel" id="creg-mgrsel" onchange="ContractReg.mgr(this.value)" aria-label="담당자 필터"></select>' +
           '<select class="creg-sort" id="creg-sort" onchange="ContractReg.sort(this.value)">' +

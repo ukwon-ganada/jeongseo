@@ -206,6 +206,11 @@
       <div class="type-body"><div class="type-name">가사</div><div class="type-desc">가사사건 송무위임계약서</div></div>
       <div class="type-arrow">›</div>
     </div>
+    <div class="type-item" onclick="goContract('자문')">
+      <div class="type-dot type-dot-jamun"></div>
+      <div class="type-body"><div class="type-name">자문</div><div class="type-desc">법률자문계약서</div></div>
+      <div class="type-arrow">›</div>
+    </div>
     <button class="sh-cancel" onclick="closeTypeSheet()">취소</button>
   </div>
 </div>
@@ -216,7 +221,7 @@
       <div class="cts-back" onclick="openContractList()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>계약서 목록
       </div>
-      <div class="cts-title">송무위임계약서</div>
+      <div class="cts-title" id="cts-title">송무위임계약서</div>
       <div class="cts-sub" id="cts-sub">형사</div>
     </div>
     <div class="cts-actions">
@@ -921,6 +926,137 @@
   </div>
 </div><!-- /family-page2 -->
 
+<!-- ═══ 자문 PAGE 1 (1회성 법률자문계약서 · 한 장) ═══ -->
+<div class="page jamun-page" id="jamun-page1" style="display:none;">
+  <div class="page-content">
+  <img class="watermark" src="./watermark.png" alt="">
+
+  <div class="doc-title">법 률 자 문 계 약 서</div>
+
+  <div class="info-table-wrap"><table class="info-table">
+    <colgroup>
+      <col style="width:18mm"><col style="width:16mm"><col>
+      <col style="width:16mm"><col><col style="width:14mm"><col>
+    </colgroup>
+    <tr>
+      <td class="th-cell" rowspan="3">위임인</td>
+      <td class="th-sub">상호</td>
+      <td class="val-cell editable" onclick="openModal('bizName','상호')"><span id="jm-val-bizName" class="placeholder">상호</span></td>
+      <td class="th-sub" style="font-size:7.5pt;">사업자번호</td>
+      <td class="val-cell editable" onclick="openModal('bizNo','사업자등록번호')"><span id="jm-val-bizNo" class="placeholder">사업자등록번호</span></td>
+      <td class="th-sub">대표자</td>
+      <td class="val-cell editable" onclick="openModal('name','대표자(의뢰인명)')"><span id="jm-val-name" class="placeholder">의뢰인명</span></td>
+    </tr>
+    <tr>
+      <td class="th-sub">연락처</td>
+      <td class="val-cell editable" onclick="openModal('tel','연락처')"><span id="jm-val-tel" class="placeholder">연락처</span></td>
+      <td class="th-sub" style="font-size:7.5pt;">생년월일</td>
+      <td class="val-cell editable" onclick="openModal('ssn','생년월일+성별')"><span id="jm-val-ssn" class="placeholder">생년월일+성별</span></td>
+      <td class="th-sub">이메일</td>
+      <td class="val-cell editable" onclick="openModal('email','이메일')"><span id="jm-val-email" class="placeholder">이메일</span></td>
+    </tr>
+    <tr>
+      <td class="th-sub">주소</td>
+      <td class="val-cell editable" colspan="5" onclick="openModal('addr','주소')"><span id="jm-val-addr" class="placeholder">주소</span></td>
+    </tr>
+    <tr>
+      <td class="th-cell">자문사항</td>
+      <td class="val-cell editable js-case-edit" colspan="6" onclick="openModal('casename','자문사항')"><span id="jm-val-casename" class="placeholder">자문사항</span></td>
+    </tr>
+    <tr class="fee-row">
+      <td class="th-cell">자문료</td>
+      <td colspan="6" style="padding:5px 8px;">
+        <input type="text" id="jm-inp-fee1" class="fee-input" placeholder="0" oninput="formatFee(this)"> 만원 (부가가치세 <span id="jm-vat1-text">별도</span>)
+      </td>
+    </tr>
+    <tr class="receipt-row">
+      <td class="th-cell">계산서</td>
+      <td colspan="4" style="padding:5px 8px;">
+        <div class="receipt-items">
+          <label class="receipt-item"><input type="radio" name="jm-receipt" value="세금계산서" checked> 세금계산서 발행</label>
+          <label class="receipt-item"><input type="radio" name="jm-receipt" value="현금영수증"> 현금영수증 발행</label>
+        </div>
+      </td>
+      <td class="th-sub" style="white-space:nowrap;font-size:7.5pt;">입금자명</td>
+      <td class="val-cell editable" onclick="openModal('payer','입금자명')"><span id="jm-val-payer" class="placeholder">입금자명</span></td>
+    </tr>
+    <tr>
+      <td class="th-cell" style="font-size:8pt;">입금계좌</td>
+      <td colspan="6" style="padding:5px 8px;font-size:8.5pt;">
+        <select class="account-select" id="jm-sel-account">
+          <option value="smg">새마을금고 9002-2057-8814-5 (예금주: 법무법인 정서)</option>
+          <option value="hana">하나은행 748-910745-40207 (예금주: 서고은)</option>
+        </select>
+      </td>
+    </tr>
+  </table></div>
+
+  <p class="contract-intro">
+    위임인(이하 '갑')과 법무법인 정서(이하 '을')는 위 자문사항에 관한 법률자문에 관하여 다음과 같이 계약(이하 '이 계약')한다.
+  </p>
+
+  <div class="article-block"><span class="article-title">제1조 (자문사항)</span><br>
+  을은 갑의 요청에 따라 위 자문사항에 관하여 법률자문을 제공한다.</div>
+
+  <div class="article-block"><span class="article-title">제2조 (자문의 방법)</span><br>
+  을은 대면 상담, 전화, 이메일, 서면 등 적절한 방법으로 자문을 제공한다. 이 계약은 1회성 자문으로, 소송·고소 등 사건의 대리는 포함하지 않으며 이를 원하는 경우 별도의 위임계약을 체결한다.</div>
+
+  <div class="article-block"><span class="article-title">제3조 (자문료)</span><br>
+  <div class="article-indent">① 갑은 을에게 위 자문료를 이 계약 체결과 동시에 위 입금계좌로 지급한다.</div>
+  <div class="article-indent">② 을은 자문료 입금이 확인되면 갑에게 위에서 정한 바에 따라 세금계산서 또는 현금영수증을 발행한다.</div>
+  </div>
+
+  <div class="article-block"><span class="article-title">제4조 (자문료의 반환)</span><br>
+  자문료는 자문 착수 이후에는 반환하지 않는다. 다만 을의 책임 있는 사유로 자문이 이루어지지 못한 경우에는 그러하지 아니하다.</div>
+
+  <div class="article-block"><span class="article-title">제5조 (비밀유지)</span><br>
+  을은 자문 과정에서 알게 된 갑의 정보를 법령에 따른 경우를 제외하고 제3자에게 누설하지 않는다.</div>
+
+  <div class="article-block"><span class="article-title">제6조 (자문의 한계)</span><br>
+  을의 자문은 갑이 제공한 사실과 자료를 바탕으로 하며, 갑이 사실을 누락하거나 사실과 다르게 알린 경우 을은 그로 인한 결과에 책임을 지지 않는다.</div>
+
+  <div class="article-block"><span class="article-title">제7조 (기타)</span><br>
+  이 계약에 정하지 않은 사항은 민법 및 변호사법 등 관계 법령과 일반 관행에 따른다.</div>
+
+  <div class="special-note">※ 기타 특약사항</div>
+  <textarea id="jm-special-extra" placeholder="추가 특약사항을 입력하세요" style="width:100%;min-height:26px;max-height:120px;font-size:9pt;font-family:var(--font-body);line-height:1.6;border:none;border-bottom:1px solid #bbb;outline:none;resize:vertical;background:transparent;padding:1px 0 2px;color:#111;overflow:hidden;" oninput="autoResize(this)" onfocus="this.style.borderBottomColor='#000'" onblur="this.style.borderBottomColor='#bbb'"></textarea>
+
+  <p class="contract-intro" style="margin-top:8px;">갑과 을은 이 계약서 체결을 증명하기 위해 계약서 1부를 작성하여 각자 기명날인한 후, 을이 그 원본을 보관하고 갑에게 사본을 1부 교부한다.</p>
+
+  <div class="sign-date" id="jm-sign-date" style="text-align:center;margin:14px 0 10px;font-size:9.5pt;">2026.   .   .</div>
+
+  <table class="sign-table" style="border-top:1px solid #ccc;">
+    <tr>
+      <td style="width:48%;border-right:1px solid #e0e0e0;padding:8px 10px 6px;">
+        <div class="sign-party">위임인</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+          <span id="jm-sign-name-display" style="font-size:9.5pt;"></span>
+          <div class="sign-stamp-circle" id="jmStampCircleWrap">
+            <canvas id="jmSigCanvas" width="150" height="64"></canvas>
+            <span class="sign-stamp-label" id="jmStampLabel">(인)<br>서명</span>
+          </div>
+        </div>
+        <button class="sign-clear-btn" onclick="clearJamunSignature()">서명 지우기</button>
+      </td>
+      <td style="width:52%;padding:8px 8px 6px 14px;vertical-align:top;position:relative;">
+        <div class="sign-party">수임인</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+          <div class="firm-name-text" style="font-size:11pt;font-weight:700;">법무법인 정서</div>
+          <img class="firm-stamp" src="./firm-stamp.png" alt="직인">
+        </div>
+        <div class="firm-info">
+          <div class="firm-lawyers">서고은 변호사 · 양선화 변호사 · 이예나 변호사</div>
+          <div style="margin-top:3px;">인천광역시 미추홀구 한나루로 436, 501호 (학익동, 두원계전빌딩)</div>
+          <div style="margin-top:2px;">전화 032-868-7171 &nbsp;·&nbsp; FAX 032-868-7676</div>
+          <div>이메일 jeosngseo@jeongseo.com</div>
+        </div>
+      </td>
+    </tr>
+  </table>
+
+  </div>
+</div><!-- /jamun-page1 -->
+
 
 <!-- 모달 -->
 <div class="modal-overlay" id="modalOverlay" onclick="closeModalOutside(event)">
@@ -1005,13 +1141,13 @@
     <!-- 의뢰인명 + 사건명 (한 줄) -->
     <div class="fs-group">
       <div class="fs-row2">
-        <div class="fs-field"><label class="fs-label">의뢰인명</label><input type="text" class="fs-input" id="f-name" placeholder="홍길동"></div>
-        <div class="fs-field"><label class="fs-label">사건명</label><input type="text" class="fs-input" id="f-casename" placeholder="사기"></div>
+        <div class="fs-field"><label class="fs-label" id="f-name-label">의뢰인명</label><input type="text" class="fs-input" id="f-name" placeholder="홍길동"></div>
+        <div class="fs-field"><label class="fs-label" id="f-casename-label">사건명</label><input type="text" class="fs-input" id="f-casename" placeholder="사기"></div>
       </div>
     </div>
 
-    <!-- 업무 범위 -->
-    <div class="fs-group">
+    <!-- 업무 범위 (자문계약서에는 없음) -->
+    <div class="fs-group" id="fs-scope-group">
       <div class="fs-field criminal-scope-field">
         <div class="fs-chips">
           <div class="fs-chip" data-chip="police" onclick="toggleChip(this)">수사(경찰)</div>
@@ -1053,7 +1189,7 @@
     <!-- 수임 조건 (착수금 · 2차보수 · 성공보수) -->
     <div class="fs-group">
       <div class="fs-field fs-fee-row">
-        <label class="fs-label">착수금 (만원)</label>
+        <label class="fs-label" id="f-fee1-label">착수금 (만원)</label>
         <div class="fs-fee-line">
           <input type="text" class="fs-input" id="f-fee1" placeholder="0" inputmode="numeric">
           <div class="fs-vat fs-radio on vat-inc" id="vat1-toggle" data-radio="vat1" data-val="포함" onclick="toggleVat(this)">VAT 포함</div>
@@ -1094,10 +1230,18 @@
 
     <!-- ═══ 어두운 구역: 의뢰인이 계약서 작성 시 채우는 정보 ═══ -->
     <div class="fs-client-zone">
-      <div class="fs-zone-cap">사건 상세 · 위임인 정보</div>
+      <div class="fs-zone-cap" id="fs-zone-cap">사건 상세 · 위임인 정보</div>
 
-      <!-- 사건번호 + 관할 (한 줄) -->
-      <div class="fs-group">
+      <!-- 자문 전용: 상호 + 사업자등록번호 -->
+      <div class="fs-group jamun-only-field" style="display:none;">
+        <div class="fs-row2">
+          <div class="fs-field"><label class="fs-label">상호</label><input type="text" class="fs-input" id="f-bizName" placeholder="정서상사"></div>
+          <div class="fs-field"><label class="fs-label">사업자등록번호</label><input type="text" class="fs-input" id="f-bizNo" placeholder="000-00-00000" inputmode="numeric" oninput="applyLiveFormat(this,formatBizNo)"></div>
+        </div>
+      </div>
+
+      <!-- 사건번호 + 관할 (한 줄) · 자문계약서에는 없음 -->
+      <div class="fs-group" id="fs-case-group">
         <div class="fs-row2">
           <div class="fs-field"><label class="fs-label">사건번호</label><input type="text" class="fs-input" id="f-casenum" placeholder="2026고단1234"></div>
           <div class="fs-field"><label class="fs-label">관할</label><input type="text" class="fs-input" id="f-court" placeholder="인천지방법원"></div>
@@ -1433,14 +1577,17 @@ function goContract(type){
   setTimeout(function(){openFormSheet();},150);
 }
 var currentDocType='형사';
+/* 계약서 종류별 문서 이름 (자문만 '법률자문계약서', 나머지는 송무위임계약서) */
+function docTitleOf(type){return type==='자문'?'법률자문계약서':'송무위임계약서';}
 function switchContractType(type){
   // 모든 계약서 page 숨김
   var allPages=document.querySelectorAll('#ctContent .page');
   allPages.forEach(function(p){p.style.display='none';});
   // 해당 타입 page만 표시
-  var cls = (type==='형사')?'criminal-page':(type==='민사')?'civil-page':'family-page';
+  var cls = (type==='형사')?'criminal-page':(type==='민사')?'civil-page':(type==='자문')?'jamun-page':'family-page';
   var pages=document.querySelectorAll('#ctContent .'+cls);
   pages.forEach(function(p){p.style.display='';});
+  var ctt=document.getElementById('cts-title');if(ctt)ctt.textContent=docTitleOf(type);
 }
 function scrollContractTop(){
   setTimeout(function(){
@@ -1469,7 +1616,7 @@ function resetContract(){
   // 계좌 첫번째로
   var acc=document.getElementById('sel-account');if(acc)acc.selectedIndex=0;
   // 특약 (형사·민사·가사)
-  ['special-extra','cv-special-extra','fm-special-extra'].forEach(function(id){
+  ['special-extra','cv-special-extra','fm-special-extra','jm-special-extra'].forEach(function(id){
     var se=document.getElementById(id);if(se){se.value='';autoResize(se);}
   });
   // 날짜 오늘로
@@ -1479,6 +1626,7 @@ function resetContract(){
   clearSignature();
   clearCivilSignature();
   clearFamilySignature();
+  clearJamunSignature();
   // 민사 필드 초기화
   ['cv-chk-trial','cv-chk-mediation','cv-chk-preserve','cv-chk-other'].forEach(function(id){var e=document.getElementById(id);if(e)e.checked=false;});
   ['cv-inp-trial','cv-inp-other','cv-inp-fee1','cv-inp-success'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
@@ -1487,14 +1635,18 @@ function resetContract(){
   ['fm-chk-trial','fm-chk-mediation','fm-chk-presolve','fm-chk-preserve','fm-chk-other'].forEach(function(id){var e=document.getElementById(id);if(e)e.checked=false;});
   ['fm-inp-trial','fm-inp-other','fm-inp-fee1','fm-inp-success'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
   document.querySelectorAll('input[name="fm-receipt"]').forEach(function(r,i){r.checked=(i===0);});
-  // 민사·가사 부가세 표기 기본값(별도)
-  ['cv-vat1-text','fm-vat1-text'].forEach(function(id){var e=document.getElementById(id);if(e)e.textContent='별도';});
+  // 자문 필드 초기화
+  sv('jm-inp-fee1','');
+  document.querySelectorAll('input[name="jm-receipt"]').forEach(function(r,i){r.checked=(i===0);});
+  var jmAcc=document.getElementById('jm-sel-account');if(jmAcc)jmAcc.selectedIndex=0;
+  // 민사·가사·자문 부가세 표기 기본값(별도)
+  ['cv-vat1-text','fm-vat1-text','jm-vat1-text'].forEach(function(id){var e=document.getElementById(id);if(e)e.textContent='별도';});
   // 줌 초기화
   if(window._resetZoom)window._resetZoom();
 }
 
 /* ═══ Supabase 연동 ═══ */
-var APP_VERSION='v138';
+var APP_VERSION='v139';
 var SUPABASE_URL='https://nyjyemjsperpakrrgzcc.supabase.co';
 var SUPABASE_KEY='sb_publishable_QKl9MIt2_MflYnpN41VRvg_cNIAbYhU';
 /* SMS 본인확인(OTP) 스위치. 솔라피·Edge Function·OTP SQL 준비가 끝나면 true 로 바꾸고 재배포.
@@ -1559,6 +1711,13 @@ function collectFormData(){
     fd.special=vv('fm-special-extra');
     var fsc=document.getElementById('fmSigCanvas');
     try{fd.signature=(fsc&&window._fmHasSig)?fsc.toDataURL('image/png'):'';}catch(e){fd.signature='';}
+  }else if(currentDocType==='자문'){
+    fd.fee={fee1:vv('jm-inp-fee1'),vat1:(document.getElementById('jm-vat1-text')||{}).textContent};
+    fd.account=vv('jm-sel-account');
+    fd.receipt=rv('jm-receipt');
+    fd.special=vv('jm-special-extra');
+    var jsc=document.getElementById('jmSigCanvas');
+    try{fd.signature=(jsc&&window._jmHasSig)?jsc.toDataURL('image/png'):'';}catch(e){fd.signature='';}
   }
   fd.month=vv('inp-month');
   fd.day=vv('inp-day');
@@ -1621,6 +1780,13 @@ function restoreFormData(fd){
     if(fd.receipt)sr('fm-receipt',fd.receipt);
     if(fd.special!==undefined){sv('fm-special-extra',fd.special);var fse=document.getElementById('fm-special-extra');if(fse)autoResize(fse);}
     if(fd.signature){restoreSignatureByType(fd.signature,'가사');}
+  }else if(dt==='자문'){
+    if(fd.fee)sv('jm-inp-fee1',fd.fee.fee1);
+    if(fd.fee&&fd.fee.vat1){var jmvt=document.getElementById('jm-vat1-text');if(jmvt)jmvt.textContent=fd.fee.vat1;}
+    if(fd.account)sv('jm-sel-account',fd.account);
+    if(fd.receipt)sr('jm-receipt',fd.receipt);
+    if(fd.special!==undefined){sv('jm-special-extra',fd.special);var jse=document.getElementById('jm-special-extra');if(jse)autoResize(jse);}
+    if(fd.signature){restoreSignatureByType(fd.signature,'자문');}
   }
   if(fd.month)sv('inp-month',fd.month);
   if(fd.day)sv('inp-day',fd.day);
@@ -1859,10 +2025,10 @@ function copySignLink(){
 async function shareSignLink(){
   var link=document.getElementById('signLinkInput').value;
   var clientName=getClientName()||'';
-  var msg='[법무법인 정서] '+(clientName?clientName+'님 ':'')+'송무위임계약서 서명을 요청드립니다.\n아래 링크에서 서명해 주세요 (96시간 내 유효).\n'+link;
+  var msg='[법무법인 정서] '+(clientName?clientName+'님 ':'')+docTitleOf(currentDocType)+' 서명을 요청드립니다.\n아래 링크에서 서명해 주세요 (96시간 내 유효).\n'+link;
   if(navigator.share){
     try{
-      await navigator.share({title:'송무위임계약서 서명 요청',text:msg});
+      await navigator.share({title:docTitleOf(currentDocType)+' 서명 요청',text:msg});
       markSignSent('share');
     }catch(e){/* 사용자 취소 */}
   }else{
@@ -1979,19 +2145,28 @@ function renderSignContract(rec){
   if(fd.account==='hana')accountTxt='하나은행 748-910745-40207 (예금주: 서고은)';
 
   var html='';
-  html+='<div class="sd-doctitle">송무위임계약서 ('+docType+')</div>';
+  var isJm=(docType==='자문');
+  var smSub=document.querySelector('.sign-mode-sub');if(smSub)smSub.textContent=docTitleOf(docType)+' 서명';
+  html+='<div class="sd-doctitle">'+(isJm?'법률자문계약서':'송무위임계약서 ('+docType+')')+'</div>';
   html+='<div class="sd-lead">아래 <b>계약 내용</b>을 먼저 확인하신 뒤, <b>본인 정보 입력 → 서명</b> 순서로 진행됩니다.</div>';
 
   /* ── ① 계약 핵심 내용 (읽기전용) — 의뢰인이 가장 먼저 확인할 업무범위·수임료·계좌 ── */
   html+='<div class="sd-sec">';
   html+='<div class="sd-sec-head"><span class="sd-sec-num">1</span>계약 핵심 내용</div>';
   html+='<table class="sd-table sd-summary">';
+  if(isJm){
+    html+=roRow('자문사항',d.casename||'');
+    html+=roRow('자문료',fee1?fee1+' 만원 (부가세 '+((fd.fee&&fd.fee.vat1)?fd.fee.vat1:'별도')+')':'');
+  }else{
   html+=roRow('사건명',d.casename||'');
   html+=roRow('관할법원',d.court||'');
   html+=roRow('사건번호',d.casenum||'');
   if(docType==='민사'){ html+=roRow('상대방 성명',d.oppName||''); }
   html+=roRow('업무범위',scope.join(', '));
-  if(docType==='형사'){
+  }
+  if(isJm){
+    // 자문료는 위에서 표시
+  }else if(docType==='형사'){
     html+=roRow('착수금',fee1?fee1+' 만원'+(fd.fee.vat1?' (VAT '+fd.fee.vat1+')':''):'');
     html+=roRow('2차 보수',fee2?fee2+' 만원'+(fd.fee.vat2?' (VAT '+fd.fee.vat2+')':''):'');
   }else{
@@ -2016,12 +2191,16 @@ function renderSignContract(rec){
   html+='<div class="sd-sec-head"><span class="sd-sec-num">2</span>본인 정보 입력</div>';
   html+='<div class="sd-verify-hint">✔ <b>본인 확인</b>을 위해 <b>연락처</b>와 <b>생년월일+성별</b>(예: 900101-1)을 정확히 입력해 주세요. 주민등록번호 뒷자리는 수집하지 않습니다. 입력하신 정보는 서명과 함께 기록됩니다.</div>';
   html+='<table class="sd-table">';
-  html+=roRow('성명',d.name||'');
+  if(isJm){
+    html+=inputRow('상호','sf-bizName',d.bizName||'','상호','');
+    html+=inputRow('사업자등록번호','sf-bizNo',d.bizNo||'','000-00-00000','ssn');
+  }
+  html+=roRow(isJm?'대표자':'성명',d.name||'');
   html+=inputRow('연락처 *','sf-tel',d.tel||'','010-0000-0000','tel');
   html+=inputRow('생년월일+성별 *','sf-ssn',d.ssn||'','900101-1','ssn');
   html+=addrRow('주소','sf-addr',d.addr||'');
   html+=inputRow('이메일','sf-email',d.email||'','email@example.com','email');
-  html+=receiptRow(fd.receipt||'현금영수증');
+  html+=receiptRow(fd.receipt||(isJm?'세금계산서':'현금영수증'));
   html+=inputRow('입금자명','sf-payer',d.payer||'','입금자명','');
   html+='</table>';
   html+='</div>';
@@ -2031,6 +2210,7 @@ function renderSignContract(rec){
   // 입력 필드에 자동 포맷 연결
   var telEl=document.getElementById('sf-tel');if(telEl)telEl.oninput=function(){applyLiveFormat(telEl,formatPhone);};
   var ssnEl=document.getElementById('sf-ssn');if(ssnEl)ssnEl.oninput=function(){applyLiveFormat(ssnEl,formatBirth);};
+  var bizNoEl=document.getElementById('sf-bizNo');if(bizNoEl)bizNoEl.oninput=function(){applyLiveFormat(bizNoEl,formatBizNo);};
 
   function roRow(label,val){
     return '<tr><td class="sd-th">'+label+'</td><td class="sd-td">'+(val?escapeHtml(val):'<span class="sd-empty">-</span>')+'</td></tr>';
@@ -2070,7 +2250,7 @@ function toggleSignOriginal(){
 }
 /* 계약서 종류별 표준 조항 전문을 화면의 계약서 템플릿에서 그대로 가져와 읽기전용으로 구성 */
 function buildSignOriginalHtml(docType){
-  var cls=(docType==='민사')?'civil-page':(docType==='가사')?'family-page':'criminal-page';
+  var cls=(docType==='민사')?'civil-page':(docType==='가사')?'family-page':(docType==='자문')?'jamun-page':'criminal-page';
   var pages=document.querySelectorAll('.'+cls);
   var wrap=document.createElement('div');
   for(var i=0;i<pages.length;i++){
@@ -2158,6 +2338,8 @@ async function submitCounterpartySign(){
     var addr=gv3('sf-addr');if(addr!==undefined)newFd.data.addr=addr;
     var email=gv3('sf-email');if(email!==undefined)newFd.data.email=email;
     var payer=gv3('sf-payer');if(payer!==undefined)newFd.data.payer=payer;
+    var bizName=gv3('sf-bizName');if(bizName!==undefined)newFd.data.bizName=bizName;
+    var bizNo=gv3('sf-bizNo');if(bizNo!==undefined)newFd.data.bizNo=bizNo;
     var receipt=rv3('sf-receipt');if(receipt!==undefined)newFd.receipt=receipt;
     // 동의 항목·시각 기록용 (서버가 audit로만 옮기고 계약본문엔 반영 안 함)
     newFd.__consent={version:CONSENT_VERSION, at:new Date().toISOString(),
@@ -2317,7 +2499,8 @@ function resetConsent(){ _consent={js:false,privacy:false,contract:false}; _pain
 function openTermsSheet(key){
   var it=CONSENT_ITEMS.filter(function(x){return x.key===key;})[0]; if(!it)return;
   document.getElementById('termsTitle').textContent=it.title;
-  document.getElementById('termsBody').textContent=it.body;
+  var _dtT=(signModeRecord&&signModeRecord.doc_type)||'';
+  document.getElementById('termsBody').textContent=(_dtT==='자문')?it.body.replace('(송무위임계약서)','(법률자문계약서)'):it.body;
   document.getElementById('termsOverlay').classList.add('active');
 }
 function closeTermsSheet(){ var o=document.getElementById('termsOverlay'); if(o)o.classList.remove('active'); }
@@ -2358,7 +2541,7 @@ async function _renderSignedCanvases(){
   var canvases=await capturePages();
   if(!canvases||!canvases.length)throw new Error('계약서 페이지를 찾지 못했습니다');
   var d=new Date(info.signedAt||Date.now());var p=function(n){return (n<10?'0':'')+n;};
-  var base='송무위임계약서(서명본)_'+(info.clientName||'의뢰인')+'_'+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate());
+  var base=docTitleOf(dt)+'(서명본)_'+(info.clientName||'의뢰인')+'_'+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate());
   return {canvases:canvases, base:base};
 }
 /* 여러 페이지 캔버스를 세로로 이어붙여 1장으로 */
@@ -2491,7 +2674,7 @@ function renderContractList(){
       var hasHist=it.sent_at||it.accessed_at||it.signed_at||it.sign_status;
       var histBtn=hasHist?'<button class="lc-hist-btn" onclick="event.stopPropagation();openHistorySheet(\''+it.id+'\')" aria-label="서명 이력"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg></button>':'';
       var dtp=it.doc_type||'형사';
-      var dtBadgeCls=(dtp==='민사')?'lc-b-civil':(dtp==='가사')?'lc-b-family':'lc-b-crim';
+      var dtBadgeCls=(dtp==='민사')?'lc-b-civil':(dtp==='가사')?'lc-b-family':(dtp==='자문')?'lc-b-jamun':'lc-b-crim';
       html+='<div class="list-card" onclick="openContractDetail(\''+it.id+'\')">'+
         '<div class="lc-badge '+dtBadgeCls+'">'+dtp+'</div>'+
         '<div class="lc-body"><div class="lc-name">'+esc(name)+(it.sign_status==='signed'?'<span class="lc-signed">✓ 서명완료</span>':(it.sign_status==='requested'?'<span class="lc-pending">서명대기</span>':''))+'</div><div class="lc-meta">'+esc(meta)+'</div>'+mgrLine+histLine+'</div>'+
@@ -2643,8 +2826,8 @@ function openContractDetail(id){
 }
 /* 타입별 위임인 서명 캔버스에 서명 복원 */
 function restoreSignatureByType(dataUrl,docType){
-  var canvasId=(docType==='민사')?'cvSigCanvas':(docType==='가사')?'fmSigCanvas':'sigCanvas';
-  var labelId=(docType==='민사')?'cvStampLabel':(docType==='가사')?'fmStampLabel':'stampLabel';
+  var canvasId=(docType==='민사')?'cvSigCanvas':(docType==='가사')?'fmSigCanvas':(docType==='자문')?'jmSigCanvas':'sigCanvas';
+  var labelId=(docType==='민사')?'cvStampLabel':(docType==='가사')?'fmStampLabel':(docType==='자문')?'jmStampLabel':'stampLabel';
   var canvas=document.getElementById(canvasId);if(!canvas)return;
   var ctx=canvas.getContext('2d');
   var img=new Image();
@@ -2653,6 +2836,7 @@ function restoreSignatureByType(dataUrl,docType){
     ctx.drawImage(img,0,0,canvas.width,canvas.height);
     if(docType==='민사')window._cvHasSig=true;
     else if(docType==='가사')window._fmHasSig=true;
+    else if(docType==='자문')window._jmHasSig=true;
     else window._hasSig=true;
     var l=document.getElementById(labelId);if(l)l.style.display='none';
   };
@@ -2694,6 +2878,22 @@ function openFormSheet(){
   var isCivil=(currentDocType==='민사');
   var isFamily=(currentDocType==='가사');
   var isCrim=(currentDocType==='형사');
+  var isJamun=(currentDocType==='자문');
+  // 자문계약서: 업무범위·사건번호/관할 대신 상호·사업자번호, 라벨도 자문용으로
+  var _disp=function(id,show){var e=document.getElementById(id);if(e)e.style.display=show?'':'none';};
+  _disp('fs-scope-group',!isJamun);
+  _disp('fs-case-group',!isJamun);
+  document.querySelectorAll('.jamun-only-field').forEach(function(e){e.style.display=isJamun?'':'none';});
+  var _txt=function(id,t){var e=document.getElementById(id);if(e)e.textContent=t;};
+  _txt('f-name-label',isJamun?'대표자(의뢰인)명':'의뢰인명');
+  _txt('f-casename-label',isJamun?'자문 내용':'사건명');
+  _txt('f-fee1-label',isJamun?'자문료 (만원)':'착수금 (만원)');
+  _txt('fs-zone-cap',isJamun?'사업자 · 위임인 정보':'사건 상세 · 위임인 정보');
+  var _cn=document.getElementById('f-casename');if(_cn)_cn.placeholder=isJamun?'거래계약서 검토':'사기';
+  if(isJamun){
+    var _bn=document.getElementById('f-bizName');if(_bn)_bn.value=data.bizName||'';
+    var _bno=document.getElementById('f-bizNo');if(_bno)_bno.value=data.bizNo||'';
+  }
   // 상대방 정보: 민사만
   document.querySelectorAll('.civil-only-field').forEach(function(e){
     // 상대방 정보 블록은 민사만, 성공보수 블록은 민사+가사
@@ -2774,7 +2974,7 @@ function openFormSheet(){
   }
   // 심급·기타·착수금은 모델(data)이 아닌 타입별 DOM 필드에 저장됨(민사 cv-, 가사 fm-, 형사 무접두).
   // applyFormSheet의 기록 위치와 동일한 접두사로 읽어야 저장본을 다시 열 때 값이 비지 않음.
-  var _fsPre=isCivil?'cv-':(isFamily?'fm-':'');
+  var _fsPre=isCivil?'cv-':(isFamily?'fm-':(isJamun?'jm-':''));
   document.getElementById('f-trial').value=vv(_fsPre+'inp-trial');
   (function(){var tv=document.getElementById('f-trial').value;
     document.querySelectorAll('.fs-subchip[data-trial]').forEach(function(s){s.classList.toggle('on',s.getAttribute('data-trial')===tv);});
@@ -2787,11 +2987,12 @@ function openFormSheet(){
   var vat1Init;
   if(isCivil){var cvt=document.getElementById('cv-vat1-text');vat1Init=cvt?cvt.textContent.trim():'별도';}
   else if(isFamily){var fmt=document.getElementById('fm-vat1-text');vat1Init=fmt?fmt.textContent.trim():'별도';}
+  else if(isJamun){var jmt=document.getElementById('jm-vat1-text');vat1Init=jmt?jmt.textContent.trim():'별도';}
   else{vat1Init=rv('vat1');}
-  setRadioUI('vat1',vat1Init);setRadioUI('vat2',rv('vat2'));setRadioUI('receipt',rv('receipt'));
-  var _accId=isCivil?'cv-sel-account':isFamily?'fm-sel-account':'sel-account';
+  setRadioUI('vat1',vat1Init);setRadioUI('vat2',rv('vat2'));setRadioUI('receipt',isJamun?(rv('jm-receipt')||'세금계산서'):rv('receipt'));
+  var _accId=isCivil?'cv-sel-account':isFamily?'fm-sel-account':isJamun?'jm-sel-account':'sel-account';
   setFormAccount(vv(_accId)||'smg');
-  document.getElementById('f-special').value=isCivil?vv('cv-special-extra'):isFamily?vv('fm-special-extra'):vv('special-extra');
+  document.getElementById('f-special').value=isCivil?vv('cv-special-extra'):isFamily?vv('fm-special-extra'):isJamun?vv('jm-special-extra'):vv('special-extra');
   document.getElementById('f-month').value=vv('inp-month');
   document.getElementById('f-day').value=vv('inp-day');
   // 바텀시트 슬라이드업: 시작 위치(아래) 확정 후 .active 로 올림
@@ -2941,6 +3142,14 @@ function applyFormSheet(){
     var fFee1F=document.getElementById('f-fee1').value.trim();
     var fmFee1=document.getElementById('fm-inp-fee1');if(fmFee1)fmFee1.value=fFee1F;
   }
+  // 자문 전용 필드 (상호·사업자번호·자문료·계산서)
+  if(currentDocType==='자문'){
+    data.bizName=(document.getElementById('f-bizName').value||'').trim();
+    data.bizNo=(document.getElementById('f-bizNo').value||'').trim();
+    sv('jm-inp-fee1',document.getElementById('f-fee1').value.trim());
+    var jmFee=document.getElementById('jm-inp-fee1');if(jmFee)formatFee(jmFee);
+    sr('jm-receipt',getRadioUI('receipt'));
+  }
   data.payer=document.getElementById('f-payer').value.trim();
   for(var k in data){render(k);}
   // 업무범위 칩 → 체크박스
@@ -2958,10 +3167,11 @@ function applyFormSheet(){
   var vat1Val=getRadioUI('vat1')||'별도';
   var cvVat=document.getElementById('cv-vat1-text');if(cvVat)cvVat.textContent=vat1Val;
   var fmVat=document.getElementById('fm-vat1-text');if(fmVat)fmVat.textContent=vat1Val;
-  var _accId2=(currentDocType==='민사')?'cv-sel-account':(currentDocType==='가사')?'fm-sel-account':'sel-account';
+  var jmVat=document.getElementById('jm-vat1-text');if(jmVat)jmVat.textContent=vat1Val;
+  var _accId2=(currentDocType==='민사')?'cv-sel-account':(currentDocType==='가사')?'fm-sel-account':(currentDocType==='자문')?'jm-sel-account':'sel-account';
   sv(_accId2,document.getElementById('f-account').value);
   var specialVal=document.getElementById('f-special').value;
-  ['special-extra','cv-special-extra','fm-special-extra'].forEach(function(id){
+  ['special-extra','cv-special-extra','fm-special-extra','jm-special-extra'].forEach(function(id){
     var t=document.getElementById(id);if(t){t.value=specialVal;autoResize(t);}
   });
   sv('inp-month',document.getElementById('f-month').value);
@@ -3003,7 +3213,7 @@ function getClientName(){
   return (n&&n.textContent&&n.textContent!=='의뢰인명')?n.textContent:'';
 }
 function buildFileName(){
-  var parts=['('+(currentDocType||'형사')+')송무위임계약서'];
+  var parts=[currentDocType==='자문'?'법률자문계약서':'('+(currentDocType||'형사')+')송무위임계약서'];
   var name=getClientName();
   if(name)parts.push(name);
   var caseNum=(data.casenum||'').trim();
@@ -3289,17 +3499,19 @@ function fallbackDownload(blob,fileName){
   alert('이미지가 저장되었습니다.\n갤러리에서 카카오톡·이메일로 공유해 주세요.');
 }
 
-var data={name:'',tel:'',ssn:'',casenum:'',court:'',casename:'',addr:'',email:'',payer:'',oppName:'',oppTel:'',oppSsn:'',oppAddr:'',success:''};
-var labelMap={name:'의뢰인명',tel:'연락처',ssn:'주민등록번호',casenum:'사건번호',court:'관할 법원',casename:'사건명',addr:'주소',email:'이메일',payer:'입금자명',oppName:'상대방 성명',oppTel:'상대방 연락처',oppSsn:'-',oppAddr:'상대방 주소'};
+var data={name:'',tel:'',ssn:'',casenum:'',court:'',casename:'',addr:'',email:'',payer:'',oppName:'',oppTel:'',oppSsn:'',oppAddr:'',success:'',bizName:'',bizNo:''};
+var labelMap={name:'의뢰인명',tel:'연락처',ssn:'주민등록번호',casenum:'사건번호',court:'관할 법원',casename:'사건명',addr:'주소',email:'이메일',payer:'입금자명',oppName:'상대방 성명',oppTel:'상대방 연락처',oppSsn:'-',oppAddr:'상대방 주소',bizName:'상호',bizNo:'사업자등록번호'};
 function render(key){
   // 형사(val-) + 민사(cv-val-) + 가사(fm-val-) 양쪽 갱신
-  ['val-','cv-val-','fm-val-'].forEach(function(prefix){
+  ['val-','cv-val-','fm-val-','jm-val-'].forEach(function(prefix){
     var el=document.getElementById(prefix+key);
     if(!el)return;
+    // 자문계약서의 사건명 칸은 '자문사항'으로 표시
+    var ph=(prefix==='jm-val-'&&key==='casename')?'자문사항':(labelMap[key]||'');
     if(data[key]){
       el.textContent=data[key];el.classList.remove('placeholder');
     }else{
-      el.textContent=labelMap[key]||'';el.classList.add('placeholder');
+      el.textContent=ph;el.classList.add('placeholder');
     }
   });
   // 위임인 성명 → 서명란 이름 표시
@@ -3307,6 +3519,7 @@ function render(key){
     var s=document.getElementById('sign-name-display');if(s)s.textContent=data[key]||'';
     var cs=document.getElementById('cv-sign-name-display');if(cs)cs.textContent=data[key]||'';
     var fs=document.getElementById('fm-sign-name-display');if(fs)fs.textContent=data[key]||'';
+    var js=document.getElementById('jm-sign-name-display');if(js)js.textContent=data[key]||'';
   }
 }
 var currentKey='';
@@ -3334,6 +3547,7 @@ function openModal(key,label){
   if(key==='tel'||key==='oppTel')inp.oninput=function(){applyLiveFormat(inp,formatPhone);};
   else if(key==='ssn'){inp.oninput=function(){applyLiveFormat(inp,formatBirth);};inp.placeholder='900101-1 (생년월일+성별)';}   // 계약서 위임인: 생년월일+성별만
   else if(key==='oppSsn'){inp.oninput=function(){applyLiveFormat(inp,formatSSN);};inp.placeholder='000000-0000000';}
+  else if(key==='bizNo'){inp.oninput=function(){applyLiveFormat(inp,formatBizNo);};inp.placeholder='000-00-00000';}
   document.getElementById('modalOverlay').classList.add('active');
   setTimeout(function(){inp.focus();},80);
 }
@@ -3523,7 +3737,8 @@ function clearSignaturePad(opts){
 var SIGPAD={
   형사:{canvasId:'sigCanvas',ctxKey:'_sigCtx',hasKey:'_hasSig',labelId:'stampLabel'},
   민사:{canvasId:'cvSigCanvas',ctxKey:'_cvSigCtx',hasKey:'_cvHasSig',labelId:'cvStampLabel'},
-  가사:{canvasId:'fmSigCanvas',ctxKey:'_fmSigCtx',hasKey:'_fmHasSig',labelId:'fmStampLabel'}
+  가사:{canvasId:'fmSigCanvas',ctxKey:'_fmSigCtx',hasKey:'_fmHasSig',labelId:'fmStampLabel'},
+  자문:{canvasId:'jmSigCanvas',ctxKey:'_jmSigCtx',hasKey:'_jmHasSig',labelId:'jmStampLabel'}
 };
 
 /* 형사 서명 캔버스 */
@@ -3541,6 +3756,16 @@ function syncCivilField(){
 /* 가사 서명 캔버스 */
 function initFamilySignCanvas(){setupSignaturePad(SIGPAD['가사']);}
 function clearFamilySignature(){clearSignaturePad(SIGPAD['가사']);}
+/* 자문 서명 캔버스 */
+function initJamunSignCanvas(){setupSignaturePad(SIGPAD['자문']);}
+function clearJamunSignature(){clearSignaturePad(SIGPAD['자문']);}
+/* 사업자등록번호 하이픈 포맷 (000-00-00000) */
+function formatBizNo(v){
+  var n=String(v||'').replace(/[^0-9]/g,'').slice(0,10);
+  if(n.length<=3)return n;
+  if(n.length<=5)return n.slice(0,3)+'-'+n.slice(3);
+  return n.slice(0,3)+'-'+n.slice(3,5)+'-'+n.slice(5);
+}
 /* 가사 성공보수 % 입력 → data 동기화 */
 function syncFamilyField(){
   var s=document.getElementById('fm-inp-success');
@@ -3556,6 +3781,7 @@ function updateCivilFamilyDate(){
   var txt=(m&&d)?(y+'. '+m+'. '+d+'.'):(y+'.   .   .');
   var cv=document.getElementById('cv-sign-date');if(cv)cv.textContent=txt;
   var fm=document.getElementById('fm-sign-date');if(fm)fm.textContent=txt;
+  var jm=document.getElementById('jm-sign-date');if(jm)jm.textContent=txt;
 }
 
 document.addEventListener('DOMContentLoaded',function(){
@@ -3576,6 +3802,7 @@ document.addEventListener('DOMContentLoaded',function(){
   initSignCanvas();
   initCivilSignCanvas();
   initFamilySignCanvas();
+  initJamunSignCanvas();
 
   // ═══ 계약서 핀치 줌 (두 손가락 확대/축소) ═══
   (function(){
