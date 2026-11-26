@@ -207,6 +207,15 @@ main{max-width:880px;margin:0 auto;padding:12px 16px 32px}
 .li .s{font-size:13px;color:var(--muted);margin-top:2px}
 .li .tm{flex:none;width:52px;font-size:14px;font-weight:700;font-variant-numeric:tabular-nums}
 .li.past{opacity:.5}
+/* 기일별 출석·불출석 (2026-11-26): 불출석 기일은 흐리게 */
+.hrbar{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.hrbar .chips{flex:1;min-width:0}
+.li.ab .t,.li.ab .s,.li.ab .tm{color:var(--muted)}.li.ab{opacity:.55}
+.li .abp,.ev .pill.abp{display:inline-block;font-size:11px;font-weight:600;line-height:1;padding:3px 6px;border-radius:999px;margin-left:6px;vertical-align:2px;background:var(--line2);color:var(--muted);border:1px solid var(--line)}
+.li.hre{align-items:center}.li.hre.ab{opacity:1}
+.li .cfb{flex:none;display:flex;gap:6px}
+.li .cfb button{border:1px solid var(--line);background:var(--surface);color:var(--ink2);border-radius:8px;padding:7px 12px;font-size:13px;font-weight:600;white-space:nowrap}
+.li .cfb button.on{border-color:var(--ink2);background:var(--ink2);color:var(--surface)}
+.li .cfb button:disabled{opacity:.5}
 .casechip{display:inline-block;font-size:12px;color:var(--accent-ink);background:var(--accent-tint);border-radius:4px;padding:0 6px;margin-right:6px}
 .dday{flex:none;font-size:12px;font-weight:700;color:var(--due);background:var(--due-tint);border-radius:6px;padding:2px 8px}
 .dday.past{color:var(--muted);background:var(--line2)}
@@ -493,7 +502,8 @@ function invMsg(){
 // ov: 로웨어에 아직 없는 새 기일(직원이 올린 사진·통지서나 도우미 알림으로 [일정]이 찾은 것). 있으면 그 기일로 채우고, 로웨어의 지난 날짜는 '변경' 안내로
 function smsMsg(ov){
   var mine=(data.hearings||[]).filter(function(x){ return x.c===data.caseNo && dd(x.d)>=0; });
-  var h=mine.filter(function(x){ return !isMoved(x.t); }).sort(function(a,b){ return (a.d+(a.tm||'')).localeCompare(b.d+(b.tm||'')); })[0];
+  // 불출석으로 표시한 기일은 우리 기일이 아니다(2026-11-26 석원, 김우석 2026고단1492)
+  var h=mine.filter(function(x){ return !isMoved(x.t) && !x.ab; }).sort(function(a,b){ return (a.d+(a.tm||'')).localeCompare(b.d+(b.tm||'')); })[0];
   var old=null;
   // 로웨어 기일이 오늘이거나 지났으면 열린 기일(속행 뒤 다음 기일 지정)이지 변경이 아니다(2026-11-26 김우석 2026고단1492). 앞으로의 기일이 바뀐 것만 '변경' 안내
   if(ov){ if(h && dd(h.d)>0 && (h.d+(h.tm||''))!==(ov.d+(ov.tm||''))) old=h; h={d:ov.d, tm:ov.tm, t:ov.kind, p:ov.room, court:ov.court}; }
@@ -595,7 +605,7 @@ var VIEWS = {
       if(!todayDone && today && e.d>=today && prevD && prevD<today){ body+='<div class="today"><b>오늘</b><span class="rail"></span><i></i></div>'; todayDone=true; prevD=''; }
       var g=e.g||(e.src==='chat'?'chat':''), w=e.w;
       // 중요도 3단계(2026-11-19 석원): 1 처분·결과 크게·따로 색 / 2 보통 / 3 작고 흐리게
-      var minor=w!=null ? (w===3 && g!=='limit') : (g==='msg'||g==='chat');
+      var minor=e.ab ? true : w!=null ? (w===3 && g!=='limit') : (g==='msg'||g==='chat');
       var key=w!=null ? w===1 : (!minor && g!=='limit' && /조사|송치|기소|처분/.test(e.t||''));
       if(prevD && y===prevY) body+=gapDiv(prevD, e.d);
       if(lvs && e.lv!=null && e.lv>shownLv){ shownLv=e.lv; body+=bandHtml(e.lv); }
@@ -609,6 +619,7 @@ var VIEWS = {
       // 속행된 기일: 취소는 아니지만 한눈에 (2026-11-23 석원, 증인신문보다 약하게)
       var SOK=/\s*·\s*속행(\s*\(\s*추정\s*\))?\s*$/;
       if(g==='hearing' && SOK.test(p.ts||'') && !isMoved(p.ts)){ p.ts=p.ts.replace(SOK,''); pill+='<span class="pill res">속행</span>'; }
+      if(e.ab && !isMoved(p.ts)) pill='<span class="pill abp">불출석</span>';
       var moved=g==='hearing' && isMoved(p.ts); if(moved){ pill='<span class="pill">'+(p.ts.match(MOVED_RE)[0])+'</span>'; p.ts=p.ts.replace(/\s*·\s*[^·]*(변론재개|선고연기|재판연기|기일변경|기일연기|연기|추정|취소)[^·]*$/,''); }
       body+='<div class="ev '+e.k+(e.cfa?' cf'+(/^제출/.test(e.cfa)?' sub':''):'')+(g?' g-'+g:'')+(minor?' minor':'')+(key&&!moved?' key':'')+(moved?' moved':'')+'"><div class="d"><b>'+md(e.d)+'</b><small>'+wk(e.d)+'</small></div><div class="rail"></div><div class="t">'
         +'<div class="tt">'+esc(p.tt)+pill+(e.cf?fileChip(e.cf,'계약서'):'')+(e.f&&!e.minor?fileChip(e.f,'열기'):'')+'</div>'+(p.ts?'<div class="ts">'+esc(p.ts)+'</div>':'')+'</div></div>';
@@ -645,13 +656,22 @@ var VIEWS = {
     var gone=function(x){ return isMoved(x.t); };
     var up=pick.filter(function(x){return dd(x.d)>=0 && !gone(x);}).sort(function(a,b){return (a.d+a.tm).localeCompare(b.d+b.tm);});
     var past=all?[]:pick.filter(function(x){return dd(x.d)<0 || gone(x);}).sort(function(a,b){return b.d.localeCompare(a.d);});
-    var row=function(x, isPast){ var t=String(x.t||''), mv=isMoved(t) && t.match(MOVED_RE); if(mv) t=t.replace(/\s+\(.*$/,''); var sok=!mv && /\s*\(\s*속행(\s*\(\s*추정\s*\))?\s*\)\s*$/.test(t); if(sok) t=t.replace(/\s*\(\s*속행.*$/,''); return '<div class="li'+(isPast?' past':'')+(mv?' moved':'')+'"><span class="tm">'+esc(x.tm||'')+'</span><div class="main"><div class="t">'+(all?'<span class="casechip">'+esc(x.c)+'</span>':'')+(mv?'<span class="x">'+esc(t)+'</span><span class="mv">'+mv[0]+'</span>':esc(t))+(x.wit&&!mv?'<span class="wit'+(x.wit==='추정'?' est':'')+'">증인신문</span>':'')+(sok?'<span class="res">속행</span>':'')+'</div>'+(x.p?'<div class="s">'+esc(x.p)+'</div>':'')+'</div></div>'; };
-    var h=chips('scope', [['case','이 사건'],['all','내 사건 전체 · 4주']]), last='', card='';
-    up.forEach(function(x){
-      if(x.d!==last){ if(card) h+=card+'</div>'; last=x.d; var n=dd(x.d); card='<div class="card"><div class="card-h"><span style="color:var(--ink)">'+md(x.d)+' ('+wk(x.d)+')</span><span class="dday">'+(n===0?'오늘':'D-'+n)+'</span></div>'; }
-      card+=row(x,false);
+    // 기일별 출석·불출석(2026-11-26 석원): [수정]에서 다가오는 기일마다 고른다. 불출석은 흐리게, [문자]·[일정]·알림에서 빠짐
+    var can=!all && Number(data.lNum)>0 && !data.roomOnly && !data.inv && up.length>0, ed=can && editing==='hr';
+    hrRows=up;
+    var row=function(x, isPast, i){ var t=String(x.t||''), mv=isMoved(t) && t.match(MOVED_RE); if(mv) t=t.replace(/\s+\(.*$/,''); var sok=!mv && /\s*\(\s*속행(\s*\(\s*추정\s*\))?\s*\)\s*$/.test(t); if(sok) t=t.replace(/\s*\(\s*속행.*$/,'');
+      var ab=!isPast && x.ab, right='';
+      if(ed && !isPast) right='<span class="cfb"><button data-hra="1" data-hri="'+i+'"'+(!x.ab?' class="on"':'')+'>출석</button><button data-hra="0" data-hri="'+i+'"'+(x.ab?' class="on"':'')+'>불출석</button></span>';
+      return '<div class="li'+(isPast?' past':'')+(mv?' moved':'')+(ab?' ab':'')+(right?' hre':'')+'"><span class="tm">'+esc(x.tm||'')+'</span><div class="main"><div class="t">'+(all?'<span class="casechip">'+esc(x.c)+'</span>':'')+(mv?'<span class="x">'+esc(t)+'</span><span class="mv">'+mv[0]+'</span>':esc(t))+(x.wit&&!mv?'<span class="wit'+(x.wit==='추정'?' est':'')+'">증인신문</span>':'')+(sok?'<span class="res">속행</span>':'')+(ab&&!ed?'<span class="abp">불출석</span>':'')+'</div>'+(x.p?'<div class="s">'+esc(x.p)+'</div>':'')+'</div>'+right+'</div>'; };
+    var h='<div class="hrbar">'+chips('scope', [['case','이 사건'],['all','내 사건 전체 · 4주']])+(can&&!editing?'<button class="edit-btn" data-edit="hr">'+PEN_SVG+'수정</button>':'')+'</div>', last='', card='', allAb=true;
+    var close=function(){ if(card) h+=card.replace('<span class="dday">','<span class="dday'+(allAb&&!ed?' past':'')+'">')+'</div>'; };
+    up.forEach(function(x,i){
+      if(x.d!==last){ close(); last=x.d; allAb=true; var n=dd(x.d); card='<div class="card'+(ed?' editing':'')+'"><div class="card-h"><span style="color:var(--ink)">'+md(x.d)+' ('+wk(x.d)+')</span><span class="dday">'+(n===0?'오늘':'D-'+n)+'</span></div>'; }
+      if(!x.ab) allAb=false;
+      card+=row(x,false,i);
     });
-    if(card) h+=card+'</div>';
+    close();
+    if(ed) h+='<div class="card"><div class="cardbar"><button class="ok" id="hrdone">완료</button></div></div>';
     if(past.length) h+='<div class="card"><div class="card-h">'+(past.some(function(x){return dd(x.d)>=0;})?'변경·지난 기일':'지난 기일')+'</div>'+past.map(function(x){ return row({tm:md(x.d), t:x.t, p:x.p, wit:x.wit}, true); }).join('')+'</div>';
     return (up.length||past.length) ? h : h+emptySt('기일이 없습니다');
   },
@@ -1136,11 +1156,13 @@ function render(){
 document.addEventListener('click', function(e){
   var b=e.target.closest('button'); if(!b) return;
   if(b.dataset.ctab){ if(b.dataset.ctab===data.caseNo) return; if(editing && !confirmLeave()) return; editing=false; tl.on=false; sub.lv=null; showCase({'case':b.dataset.ctab}); return; }
-  if(b.dataset.v){ if(editing && editing!=='dl' && !confirmLeave()) return; editing=false; tl.on=false; view=b.dataset.v; render(); window.scrollTo(0,0); return; }
+  if(b.dataset.v){ if(editing && editing!=='dl' && editing!=='hr' && !confirmLeave()) return; editing=false; tl.on=false; view=b.dataset.v; render(); window.scrollTo(0,0); return; }
   ['f','scope','p','lv','tv'].forEach(function(k){ if(b.dataset[k]){ sub[k]=b.dataset[k]; render(); } });
   if(b.dataset.edit){ editing=b.dataset.edit; render(); var c=$('#main .card.editing'); if(c){ var i=c.querySelector('input,textarea,select'); if(i) i.focus(); if(c.getBoundingClientRect().top<0) c.scrollIntoView({block:'start'}); } }
   if(b.id==='cancel'){ editing=false; render(); }
   if(b.id==='dldone'){ editing=false; render(); }
+  if(b.id==='hrdone'){ editing=false; render(); }
+  if(b.dataset.hra) hrAttend(b);
   if(b.dataset.dla) dlConfirm(b);
   if(b.id==='save') saveInfo(b);
   if(b.dataset.copy){ copyText(b.dataset.copy); }
@@ -1165,6 +1187,19 @@ function dlConfirm(b){
   api({action:undo?'dl_undo':'dl_confirm', lNum:data.lNum, room:ctx.room||'', kind:x.kind, due:x.d, act:a}).then(function(j){
     x.cf=j.cf||null;
     (data.events||[]).forEach(function(e){ if(e.g==='limit' && e.dk===x.kind && e.d===x.d){ e.cfa=x.cf?x.cf.a:null; } });
+    render();
+  }).catch(function(e){ render(); toast('저장 실패: '+((e&&e.message)||e)); });
+}
+// 기일 출석·불출석 저장: 누르는 즉시. 출석은 표시를 지워 기본(출석)으로, 로웨어에 없던 출석 기일은 출석 표시를 남긴다
+var hrRows=[];
+function hrAttend(b){
+  var x=hrRows[+b.dataset.hri]; if(!x) return;
+  var on=b.dataset.hra==='1'; if(on===!x.ab) return;
+  b.parentNode.querySelectorAll('button').forEach(function(y){ y.disabled=true; });
+  var kind=(String(x.t||'').match(/[가-힣]*기일/)||[''])[0];
+  api({action:'hearing_attend', lNum:data.lNum, room:ctx.room||'', date:x.d, attend:on ? (x.add ? true : null) : false, tm:x.tm||'', kind:kind, place:x.p||''}).then(function(){
+    (data.hearings||[]).forEach(function(h){ if(h.c===data.caseNo && h.d===x.d) h.ab=on?0:1; });
+    (data.events||[]).forEach(function(e){ if(e.g==='hearing' && e.d===x.d) e.ab=on?0:1; });
     render();
   }).catch(function(e){ render(); toast('저장 실패: '+((e&&e.message)||e)); });
 }
