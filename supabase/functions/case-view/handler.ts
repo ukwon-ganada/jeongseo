@@ -50,6 +50,7 @@ import { findPick, normTitle } from "./title_match.ts";
 import { applyWitness } from "./witness.ts";
 import { fillHearingResults } from "./hearing_result.ts";
 import { overlayScourt } from "./scourt_overlay.ts";
+import { applyAttend, cleanAttendBody, type AttendRow } from "./hearing_attend.ts";
 import { dropKnown, dropSame, extractFromExport, msgsToExport, toRows } from "./chat_import.ts";
 import { shapeStages, diffStages, personChangeLine, isStage, noLines, chatNos, withChatNos, type NoHist } from "./stages.ts";
 // 방 제목 형제번호로 공소청 칸 채우기(2026-11-19): 바뀌는 방 목록을 석원님이 확인한 뒤 켠다
@@ -924,6 +925,10 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       const end = new Date(Date.parse(today) + 28 * 864e5).toISOString().slice(0, 10);
       const myHearings = mine.filter((m: any) => isDate(m.next_date) && m.next_date.slice(0, 10) >= today && m.next_date.slice(0, 10) <= end)
         .map((m: any) => ({ c: m.l_code, d: m.next_date.slice(0, 10), tm: nz(m.next_time), t: nz(m.next_contents) || "기일", p: nz(m.court) }));
+      const attCodes = new Map<number, string>((mine || []).filter((m: any) => m.l_num != null).map((m: any) => [Number(m.l_num), nz(m.l_code)]));
+      const myCodes = new Set(myHearings.map((h: any) => h.c));
+      const attNums = [...new Set([Number(c.l_num), ...[...attCodes].filter(([, v]) => myCodes.has(v)).map(([n]) => n)].filter((n) => Number.isFinite(n) && n > 0))];
+      const attP = attNums.length ? rest(env, `hearing_attend?select=l_num,hdate,attend,htime,kind,place,source&l_num=in.(${attNums.join(",")})&limit=2000`, {}, fetcher).catch(() => []) : Promise.resolve([]);
       if ((relCases || []).length && (relEvs || []).length) {
         const sc2 = ((await scRowsOf((relCases || []).map((x: any) => nz(x.l_code)).filter(Boolean))) || []) as any[];
         if (sc2.length) {
@@ -942,6 +947,8 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       evs = overlayScourt(evs, (await scP) || []);
       const shaped = shapeCase(c, evs, { today, linked, myHearings, status, saved, others: sameLv });
       shaped.progress.checked = checked;
+      // 기일별 우리 출석 여부(2026-11-26 석원): 불출석 기일은 흐리게, 로웨어에 없는 출석 기일은 더함
+      applyAttend(shaped, ((await attP) || []) as AttendRow[], Number(c.l_num), today, attCodes);
       applyWitness(shaped, evs, witLog);
       const titles = (titleRows || []) as any[];
       const roomTitle = nz(titles[0]?.room_title);
@@ -1174,6 +1181,22 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
       const ins = await rest(env, "deadline_confirm?select=id", { method: "POST", headers: { Prefer: "return=representation" },
         body: JSON.stringify({ l_code: code, kind, due, action: act, works_user_id: who.userId || null, channel_id: nz(body.room) || null }) }, fetcher);
       return json({ ok: true, cf: { a: act, id: ins?.[0]?.id ?? null } });
+    }
+    // 기일별 출석·불출석 (2026-11-26 석원): attend true/false 저장, null 이면 표시 지우기(= 출석, 기본)
+    if (body?.action === "hearing_attend") {
+      const lNum = Number(body.lNum);
+      const a = cleanAttendBody(body);
+      if (!Number.isFinite(lNum) || lNum <= 0 || !a) return json({ error: "기일이 없습니다" }, 400);
+      const key = `hearing_attend?l_num=eq.${lNum}&hdate=eq.${a.date}`;
+      if (a.attend === null) {
+        await rest(env, key, { method: "DELETE", headers: { Prefer: "return=minimal" } }, fetcher);
+      } else {
+        await rest(env, "hearing_attend?on_conflict=l_num,hdate", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+          body: JSON.stringify({ l_num: lNum, hdate: a.date, attend: a.attend, htime: a.htime || null, kind: a.kind || null, place: a.place || null,
+            source: "직원", note: null, by_name: who.name || who.userId || null, channel_id: nz(body.room) || null, updated_at: new Date().toISOString() }) }, fetcher);
+      }
+      bg(logView(env, who, "attend:" + (a.attend === null ? "clear" : a.attend ? "on" : "off"), nz(body.room), null, fetcher));
+      return json({ ok: true, date: a.date, attend: a.attend });
     }
     if (body?.action === "save_info") {
       const lNum = Number(body.lNum);
