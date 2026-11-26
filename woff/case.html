@@ -624,7 +624,7 @@ var VIEWS = {
       if(e.ab && !isMoved(p.ts)) pill='<span class="pill abp">불출석</span>';
       var moved=g==='hearing' && isMoved(p.ts); if(moved){ pill='<span class="pill">'+(p.ts.match(MOVED_RE)[0])+'</span>'; p.ts=p.ts.replace(/\s*·\s*[^·]*(변론재개|선고연기|재판연기|기일변경|기일연기|연기|추정|취소)[^·]*$/,''); }
       body+='<div class="ev '+e.k+(e.cfa?' cf'+(/^제출/.test(e.cfa)?' sub':''):'')+(g?' g-'+g:'')+(minor?' minor':'')+(key&&!moved?' key':'')+(moved?' moved':'')+'"><div class="d"><b>'+md(e.d)+'</b><small>'+wk(e.d)+'</small></div><div class="rail"></div><div class="t">'
-        +'<div class="tt">'+esc(p.tt)+pill+(e.cf?fileChip(e.cf,'계약서'):'')+(e.f&&!e.minor?fileChip(e.f,'열기'):'')+'</div>'+(p.ts?'<div class="ts">'+esc(p.ts)+'</div>':'')+'</div></div>';
+        +'<div class="tt">'+esc(p.tt)+pill+(e.cf?fileChip(e.cf,'계약서'):'')+(e.fs&&e.fs.length>1&&!e.minor?e.fs.map(function(x,i){ return fileChip(x,'열기 '+(i+1)); }).join(''):e.f&&!e.minor?fileChip(e.f,'열기'):'')+'</div>'+(p.ts?'<div class="ts">'+esc(p.ts)+'</div>':'')+'</div></div>';
     });
     return h+'<div class="card tl">'+body+'</div>';
   },
@@ -828,6 +828,7 @@ function nearChoices(d, key, wide, contract){
     var k=e.lp!=null?'lp:'+e.lp:e.lk;
     if(k===key) return;
     if(e.f) used[e.f.id]=1;
+    (e.fs||[]).forEach(function(x){ used[x.id]=1; });
     if(e.cf) used[e.cf.id]=1;
   });
   return (data.fileChoices||[]).filter(function(f){
