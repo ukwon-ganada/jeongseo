@@ -113,8 +113,9 @@ export async function hearingNotify(env: SchedEnv, o: NotifyOpts, fetcher: typeo
   if (!rows.length) return out;
 
   // 이미 알린 것(같은 기일·같은 시각)은 건너뛴다
-  const prev: any[] = await rest(env, `hearing_notice?select=lp_num,ev_date,ev_time&lp_num=in.(${[...new Set(rows.map((r) => r.lp_num))].join(",")})&order=created_at.desc`, fetcher);
-  const seen = new Set(prev.map((p) => `${p.lp_num}|${p.ev_date}|${p.ev_time || ""}`));
+  const prev: any[] = await rest(env, `hearing_notice?select=lp_num,ev_date,ev_time,status&lp_num=in.(${[...new Set(rows.map((r) => r.lp_num))].join(",")})&order=created_at.desc`, fetcher);
+  // 일정 방으로 모을 때는 "사건 방 없음"으로 넘겼던 기일도 다시 본다
+  const seen = new Set(prev.filter((p) => !(o.toRoom && p.status === "no_room")).map((p) => `${p.lp_num}|${p.ev_date}|${p.ev_time || ""}`));
   const prevBy = new Map<number, any>();
   for (const p of prev) if (!prevBy.has(p.lp_num)) prevBy.set(p.lp_num, p);
   const todo = rows.filter((r) => o.force || !seen.has(`${r.lp_num}|${r.date}|${r.time}`)).slice(0, o.limit ?? (missing ? 80 : 40));
@@ -190,7 +191,7 @@ export async function hearingNotify(env: SchedEnv, o: NotifyOpts, fetcher: typeo
   }
   if (!o.dryRun && records.length) {
     await rest(env, "hearing_notice?on_conflict=lp_num,ev_date,ev_time", fetcher, {
-      method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=minimal" }, body: JSON.stringify(records),
+      method: "POST", headers: { Prefer: (o.toRoom ? "resolution=merge-duplicates" : "resolution=ignore-duplicates") + ",return=minimal" }, body: JSON.stringify(records),
     });
   }
   return out;
