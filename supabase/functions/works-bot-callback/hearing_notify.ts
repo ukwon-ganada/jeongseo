@@ -12,7 +12,7 @@ import { pemToPkcs8 } from "./room_file.ts";
 import { scourtAdjust } from "./scourt_hearings.ts";
 import { attendKey, buildPlan, calendarUrl, fetchAttend, fetchSuperseded, lawyersFromTitle, type Plan, sendToRoom, type SchedEnv } from "./schedule_cmd.ts";
 
-export type NotifyOpts = { mode?: "new" | "missing"; graceHours?: number; lookbackDays?: number; force?: boolean; dryRun?: boolean; hours?: number; notifyRooms?: string[]; notifyBot: string; limit?: number; lpNum?: number; toRoom?: string; scourt?: boolean };
+export type NotifyOpts = { mode?: "new" | "missing"; graceHours?: number; lookbackDays?: number; force?: boolean; dryRun?: boolean; hours?: number; notifyRooms?: string[]; notifyBot: string; limit?: number; lpNum?: number; toRoom?: string; scourt?: boolean; noRecord?: boolean };
 
 async function rest(env: SchedEnv, path: string, fetcher: typeof fetch, init: RequestInit = {}): Promise<any> {
   const r = await fetcher(env.sbUrl + "/rest/v1/" + path, {
@@ -194,7 +194,7 @@ export async function hearingNotify(env: SchedEnv, o: NotifyOpts, fetcher: typeo
     }
     records.push(rec(r, dest, "sent", plan, was));
   }
-  if (!o.dryRun && records.length) {
+  if (!o.dryRun && !o.noRecord && records.length) {
     await rest(env, "hearing_notice?on_conflict=lp_num,ev_date,ev_time", fetcher, {
       method: "POST", headers: { Prefer: (o.toRoom ? "resolution=merge-duplicates" : "resolution=ignore-duplicates") + ",return=minimal" }, body: JSON.stringify(records),
     });
