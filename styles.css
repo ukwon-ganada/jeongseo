@@ -700,6 +700,10 @@ body.print-emulate td.js-case-edit{background:transparent!important;box-shadow:n
 .civil-page .article-indent{line-height:1.4;letter-spacing:-0.2px;}
 .civil-page .article-indent2{line-height:1.38;letter-spacing:-0.2px;}
 .civil-page .contract-intro{line-height:1.42;margin:5px 0 4px;letter-spacing:-0.2px;}
+/* 자문 압축 (한 장에 들어가도록) */
+.jamun-page .article-block{line-height:1.4;margin-bottom:2px;letter-spacing:-0.2px;}
+.jamun-page .article-indent{line-height:1.4;letter-spacing:-0.2px;}
+.jamun-page .contract-intro{line-height:1.42;margin:5px 0 4px;letter-spacing:-0.2px;}
 /* 가사 압축 (민사와 동일) */
 .family-page .article-block{line-height:1.4;margin-bottom:2px;letter-spacing:-0.2px;}
 .family-page .article-indent{line-height:1.4;letter-spacing:-0.2px;}
@@ -915,6 +919,8 @@ body.print-emulate td.js-case-edit{background:transparent!important;box-shadow:n
   #screen-contract #civil-page2 .special-note,#screen-contract #family-page2 .special-note{margin-top:1px!important;margin-bottom:0!important;}
   #screen-contract .civil-footnote{font-size:6.5pt!important;line-height:1.25!important;padding-top:5px!important;}
   #screen-contract .civil-page,#screen-contract .family-page{padding:11mm 16mm 5mm!important;}
+  #screen-contract .jamun-page{padding:11mm 16mm 5mm!important;}
+  #screen-contract .jamun-page .article-block{margin-bottom:2px!important;}
   #screen-contract .article-block{margin-bottom:4px!important;}
   #screen-contract .page:last-of-type{page-break-after:auto;}
   #screen-contract .info-table td,#screen-contract .th-cell,#screen-contract .th-sub{font-size:9pt!important;}
@@ -981,6 +987,8 @@ body.print-emulate #screen-contract #civil-page2 .sign-date,body.print-emulate #
 body.print-emulate #screen-contract #civil-page2 .special-note,body.print-emulate #screen-contract #family-page2 .special-note{margin-top:1px!important;margin-bottom:0!important;}
 body.print-emulate #screen-contract .civil-footnote{font-size:6.5pt!important;line-height:1.25!important;padding-top:5px!important;}
 body.print-emulate #screen-contract .civil-page,body.print-emulate #screen-contract .family-page{padding:11mm 16mm 5mm!important;}
+body.print-emulate #screen-contract .jamun-page{padding:11mm 16mm 5mm!important;}
+body.print-emulate #screen-contract .jamun-page .article-block{margin-bottom:2px!important;}
 body.print-emulate #screen-contract .article-block{margin-bottom:4px!important;}
 body.print-emulate #screen-contract .info-table td,body.print-emulate #screen-contract .th-cell,body.print-emulate #screen-contract .th-sub{font-size:9pt!important;}
 body.print-emulate #screen-contract .scope-item,body.print-emulate #screen-contract .fee-row td,body.print-emulate #screen-contract .receipt-row{font-size:9pt!important;}

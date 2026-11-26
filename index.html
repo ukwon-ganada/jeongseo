@@ -963,9 +963,20 @@
       <td class="th-cell">자문사항</td>
       <td class="val-cell editable js-case-edit" colspan="6" onclick="openModal('casename','자문사항')"><span id="jm-val-casename" class="placeholder">자문사항</span></td>
     </tr>
+    <tr>
+      <td class="th-cell">자문기간</td>
+      <td colspan="6" style="padding:5px 8px;">
+        <input type="text" id="jm-inp-pstart" class="fee-input" style="width:86px;text-align:center;" placeholder="2026. 1. 1."> 부터
+        <input type="text" id="jm-inp-pend" class="fee-input" style="width:86px;text-align:center;" placeholder="2026. 12. 31."> 까지
+      </td>
+    </tr>
     <tr class="fee-row">
       <td class="th-cell">자문료</td>
       <td colspan="6" style="padding:5px 8px;">
+        <select id="jm-sel-feetype" class="account-select" style="width:auto;margin-right:4px;">
+          <option value="월정액">매월</option>
+          <option value="일시불">기간 전체 일시불</option>
+        </select>
         <input type="text" id="jm-inp-fee1" class="fee-input" placeholder="0" oninput="formatFee(this)"> 만원 (부가가치세 <span id="jm-vat1-text">별도</span>)
       </td>
     </tr>
@@ -995,27 +1006,34 @@
     위임인(이하 '갑')과 법무법인 정서(이하 '을')는 위 자문사항에 관한 법률자문에 관하여 다음과 같이 계약(이하 '이 계약')한다.
   </p>
 
-  <div class="article-block"><span class="article-title">제1조 (자문사항)</span><br>
-  을은 갑의 요청에 따라 위 자문사항에 관하여 법률자문을 제공한다.</div>
-
-  <div class="article-block"><span class="article-title">제2조 (자문의 방법)</span><br>
-  을은 대면 상담, 전화, 이메일, 서면 등 적절한 방법으로 자문을 제공한다. 이 계약은 1회성 자문으로, 소송·고소 등 사건의 대리는 포함하지 않으며 이를 원하는 경우 별도의 위임계약을 체결한다.</div>
-
-  <div class="article-block"><span class="article-title">제3조 (자문료)</span><br>
-  <div class="article-indent">① 갑은 을에게 위 자문료를 이 계약 체결과 동시에 위 입금계좌로 지급한다.</div>
-  <div class="article-indent">② 을은 자문료 입금이 확인되면 갑에게 위에서 정한 바에 따라 세금계산서 또는 현금영수증을 발행한다.</div>
+  <div class="article-block"><span class="article-title">제1조 (자문사항 및 자문기간)</span><br>
+  <div class="article-indent">① 을은 갑의 요청에 따라 위 자문사항에 관하여 법률자문을 제공한다.</div>
+  <div class="article-indent">② 자문기간은 위 자문기간란에 적은 시작일부터 종료일까지로 한다.</div>
   </div>
 
-  <div class="article-block"><span class="article-title">제4조 (자문료의 반환)</span><br>
-  자문료는 자문 착수 이후에는 반환하지 않는다. 다만 을의 책임 있는 사유로 자문이 이루어지지 못한 경우에는 그러하지 아니하다.</div>
+  <div class="article-block"><span class="article-title">제2조 (자문의 방법)</span><br>
+  을은 자문기간 동안 대면 상담, 전화, 이메일, 서면 등 적절한 방법으로 자문을 제공한다. 소송·고소 등 사건의 대리는 이 계약에 포함하지 않으며, 이를 원하는 경우 별도의 위임계약을 체결한다.</div>
 
-  <div class="article-block"><span class="article-title">제5조 (비밀유지)</span><br>
+  <div class="article-block"><span class="article-title">제3조 (자문료)</span><br>
+  <div class="article-indent">① 자문료가 '매월'인 경우, 갑은 첫 달 자문료를 이 계약 체결과 동시에 지급하고, 그 다음 달부터는 자문기간 동안 매월 자문기간 시작일에 해당하는 날까지 해당 월의 자문료를 위 입금계좌로 지급한다.</div>
+  <div class="article-indent">② 자문료가 '기간 전체 일시불'인 경우, 갑은 이 계약 체결과 동시에 자문기간 전체의 자문료를 위 입금계좌로 지급한다.</div>
+  </div>
+
+  <div class="article-block"><span class="article-title">제4조 (계약의 해지와 자문료의 반환)</span><br>
+  <div class="article-indent">① 갑 또는 을은 상대방에게 서면(이메일 포함)으로 알려 이 계약을 해지할 수 있다.</div>
+  <div class="article-indent">② 이미 지급한 자문료는 반환하지 않는다. 다만 을의 책임 있는 사유로 해지된 경우, 을은 남은 자문기간에 해당하는 자문료를 갑에게 반환한다.</div>
+  </div>
+
+  <div class="article-block"><span class="article-title">제5조 (자문기간의 연장)</span><br>
+  자문기간이 끝나기 전에 갑과 을이 서면(이메일 포함)으로 합의하면 같은 조건으로 자문기간을 연장할 수 있다.</div>
+
+  <div class="article-block"><span class="article-title">제6조 (비밀유지)</span><br>
   을은 자문 과정에서 알게 된 갑의 정보를 법령에 따른 경우를 제외하고 제3자에게 누설하지 않는다.</div>
 
-  <div class="article-block"><span class="article-title">제6조 (자문의 한계)</span><br>
+  <div class="article-block"><span class="article-title">제7조 (자문의 한계)</span><br>
   을의 자문은 갑이 제공한 사실과 자료를 바탕으로 하며, 갑이 사실을 누락하거나 사실과 다르게 알린 경우 을은 그로 인한 결과에 책임을 지지 않는다.</div>
 
-  <div class="article-block"><span class="article-title">제7조 (기타)</span><br>
+  <div class="article-block"><span class="article-title">제8조 (기타)</span><br>
   이 계약에 정하지 않은 사항은 민법 및 변호사법 등 관계 법령과 일반 관행에 따른다.</div>
 
   <div class="special-note">※ 기타 특약사항</div>
@@ -1207,6 +1225,21 @@
           <label class="fs-label">성공보수 (%)</label>
           <input type="text" class="fs-input" id="f-success" placeholder="예: 10" inputmode="numeric">
           <div class="fs-hint">경제적 이익가액의 몇 %인지 입력 (부가세 별도)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 자문 전용: 자문기간 · 자문료 지급방식 -->
+    <div class="fs-group jamun-only-field" style="display:none;">
+      <div class="fs-row2">
+        <div class="fs-field"><label class="fs-label">자문 시작일</label><input type="date" class="fs-input" id="f-pstart"></div>
+        <div class="fs-field"><label class="fs-label">자문 종료일</label><input type="date" class="fs-input" id="f-pend"></div>
+      </div>
+      <div class="fs-field" style="margin-top:6px;">
+        <label class="fs-label">자문료 지급</label>
+        <div class="fs-radiogroup">
+          <div class="fs-radio" data-radio="feetype" data-val="월정액" onclick="pickRadio(this)">매월</div>
+          <div class="fs-radio" data-radio="feetype" data-val="일시불" onclick="pickRadio(this)">기간 전체 일시불</div>
         </div>
       </div>
     </div>
@@ -1636,7 +1669,8 @@ function resetContract(){
   ['fm-inp-trial','fm-inp-other','fm-inp-fee1','fm-inp-success'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
   document.querySelectorAll('input[name="fm-receipt"]').forEach(function(r,i){r.checked=(i===0);});
   // 자문 필드 초기화
-  sv('jm-inp-fee1','');
+  sv('jm-inp-fee1','');sv('jm-inp-pstart','');sv('jm-inp-pend','');
+  var jmFt=document.getElementById('jm-sel-feetype');if(jmFt)jmFt.selectedIndex=0;
   document.querySelectorAll('input[name="jm-receipt"]').forEach(function(r,i){r.checked=(i===0);});
   var jmAcc=document.getElementById('jm-sel-account');if(jmAcc)jmAcc.selectedIndex=0;
   // 민사·가사·자문 부가세 표기 기본값(별도)
@@ -1646,7 +1680,7 @@ function resetContract(){
 }
 
 /* ═══ Supabase 연동 ═══ */
-var APP_VERSION='v139';
+var APP_VERSION='v140';
 var SUPABASE_URL='https://nyjyemjsperpakrrgzcc.supabase.co';
 var SUPABASE_KEY='sb_publishable_QKl9MIt2_MflYnpN41VRvg_cNIAbYhU';
 /* SMS 본인확인(OTP) 스위치. 솔라피·Edge Function·OTP SQL 준비가 끝나면 true 로 바꾸고 재배포.
@@ -1712,7 +1746,8 @@ function collectFormData(){
     var fsc=document.getElementById('fmSigCanvas');
     try{fd.signature=(fsc&&window._fmHasSig)?fsc.toDataURL('image/png'):'';}catch(e){fd.signature='';}
   }else if(currentDocType==='자문'){
-    fd.fee={fee1:vv('jm-inp-fee1'),vat1:(document.getElementById('jm-vat1-text')||{}).textContent};
+    fd.fee={fee1:vv('jm-inp-fee1'),vat1:(document.getElementById('jm-vat1-text')||{}).textContent,type:vv('jm-sel-feetype')};
+    fd.period={start:vv('jm-inp-pstart'),end:vv('jm-inp-pend')};
     fd.account=vv('jm-sel-account');
     fd.receipt=rv('jm-receipt');
     fd.special=vv('jm-special-extra');
@@ -1782,6 +1817,8 @@ function restoreFormData(fd){
     if(fd.signature){restoreSignatureByType(fd.signature,'가사');}
   }else if(dt==='자문'){
     if(fd.fee)sv('jm-inp-fee1',fd.fee.fee1);
+    if(fd.fee&&fd.fee.type)sv('jm-sel-feetype',fd.fee.type);
+    if(fd.period){sv('jm-inp-pstart',fd.period.start);sv('jm-inp-pend',fd.period.end);}
     if(fd.fee&&fd.fee.vat1){var jmvt=document.getElementById('jm-vat1-text');if(jmvt)jmvt.textContent=fd.fee.vat1;}
     if(fd.account)sv('jm-sel-account',fd.account);
     if(fd.receipt)sr('jm-receipt',fd.receipt);
@@ -2156,7 +2193,10 @@ function renderSignContract(rec){
   html+='<table class="sd-table sd-summary">';
   if(isJm){
     html+=roRow('자문사항',d.casename||'');
-    html+=roRow('자문료',fee1?fee1+' 만원 (부가세 '+((fd.fee&&fd.fee.vat1)?fd.fee.vat1:'별도')+')':'');
+    var _pd=fd.period||{};
+    html+=roRow('자문기간',(_pd.start||_pd.end)?((_pd.start||'')+' ~ '+(_pd.end||'')):'');
+    var _ft=(fd.fee&&fd.fee.type==='일시불')?'기간 전체 일시불 ':'매월 ';
+    html+=roRow('자문료',fee1?_ft+fee1+' 만원 (부가세 '+((fd.fee&&fd.fee.vat1)?fd.fee.vat1:'별도')+')':'');
   }else{
   html+=roRow('사건명',d.casename||'');
   html+=roRow('관할법원',d.court||'');
@@ -2891,6 +2931,9 @@ function openFormSheet(){
   _txt('fs-zone-cap',isJamun?'사업자 · 위임인 정보':'사건 상세 · 위임인 정보');
   var _cn=document.getElementById('f-casename');if(_cn)_cn.placeholder=isJamun?'거래계약서 검토':'사기';
   if(isJamun){
+    var _ps=document.getElementById('f-pstart');if(_ps)_ps.value=jmToIso(vv('jm-inp-pstart'));
+    var _pe=document.getElementById('f-pend');if(_pe)_pe.value=jmToIso(vv('jm-inp-pend'));
+    setRadioUI('feetype',vv('jm-sel-feetype')||'월정액');
     var _bn=document.getElementById('f-bizName');if(_bn)_bn.value=data.bizName||'';
     var _bno=document.getElementById('f-bizNo');if(_bno)_bno.value=data.bizNo||'';
   }
@@ -3149,6 +3192,9 @@ function applyFormSheet(){
     sv('jm-inp-fee1',document.getElementById('f-fee1').value.trim());
     var jmFee=document.getElementById('jm-inp-fee1');if(jmFee)formatFee(jmFee);
     sr('jm-receipt',getRadioUI('receipt'));
+    sv('jm-inp-pstart',jmFromIso(document.getElementById('f-pstart').value));
+    sv('jm-inp-pend',jmFromIso(document.getElementById('f-pend').value));
+    sv('jm-sel-feetype',getRadioUI('feetype')||'월정액');
   }
   data.payer=document.getElementById('f-payer').value.trim();
   for(var k in data){render(k);}
@@ -3759,6 +3805,9 @@ function clearFamilySignature(){clearSignaturePad(SIGPAD['가사']);}
 /* 자문 서명 캔버스 */
 function initJamunSignCanvas(){setupSignaturePad(SIGPAD['자문']);}
 function clearJamunSignature(){clearSignaturePad(SIGPAD['자문']);}
+/* 자문기간 날짜 변환: 입력창(2026-12-01) ↔ 계약서 표기(2026. 12. 1.) */
+function jmFromIso(v){var m=String(v||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);return m?(m[1]+'. '+(+m[2])+'. '+(+m[3])+'.'):'';}
+function jmToIso(v){var m=String(v||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);if(!m)return '';var p=function(n){return ('0'+n).slice(-2);};return m[1]+'-'+p(m[2])+'-'+p(m[3]);}
 /* 사업자등록번호 하이픈 포맷 (000-00-00000) */
 function formatBizNo(v){
   var n=String(v||'').replace(/[^0-9]/g,'').slice(0,10);
