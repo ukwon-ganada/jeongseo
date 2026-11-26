@@ -86,20 +86,30 @@ export async function hearingNotify(env: SchedEnv, o: NotifyOpts, fetcher: typeo
   if (o.lpNum) fresh = await rest(env, `lw_process_events?select=lp_num,l_num,lp_appoint_date,lp_appoint_time,lp_contents&lp_num=eq.${o.lpNum}`, fetcher);
   else if (missing) {
     // 빠진 기일(석원 2026-11-25): 로웨어에 들어온 지 하루(graceHours)가 지났는데도 캘린더에 없는 앞으로의 기일만.
-    // 연기·변경된 기일(바뀐 기록이 있거나 내용에 연기·변경·추정·취소)은 알리지 않는다
+    // 연기·변경으로 끝난 옛 기일(결과가 붙었거나 내용에 연기·변경·추정·취소)은 알리지 않는다. 바뀐 새 날짜는 하루 뒤부터 본다
     const upTo = new Date(Date.now() - (o.graceHours ?? 24) * 3600e3).toISOString();
     const from = new Date(Date.now() - (o.lookbackDays ?? 14) * 864e5).toISOString();
-    const all: any[] = await rest(env, `lw_process_events?select=lp_num,l_num,lp_appoint_date,lp_appoint_time,lp_contents,lp_remark,changed_count&lp_set=eq.${giil}&lp_appoint_date=gte.${today}&first_seen_at=lte.${upTo}&first_seen_at=gte.${from}&limit=1000`, fetcher);
+    const sel = "lp_num,l_num,lp_appoint_date,lp_appoint_time,lp_contents,lp_remark,changed_count";
+    const all: any[] = await rest(env, `lw_process_events?select=${sel}&lp_set=eq.${giil}&lp_appoint_date=gte.${today}&first_seen_at=lte.${upTo}&first_seen_at=gte.${from}&limit=1000`, fetcher);
+    // 날짜·시각이 바뀐 기일(석원 2026-11-26): 전산상 마지막으로 바뀐 지 하루(graceHours)가 지나야 본다
+    const recent: any[] = await rest(env, `lw_process_event_changes?select=lp_num,changed_at&changed_at=gte.${from}&limit=3000`, fetcher);
+    const lastChg = new Map<number, string>();
+    for (const c of recent) if (!lastChg.has(c.lp_num) || c.changed_at > lastChg.get(c.lp_num)!) lastChg.set(c.lp_num, c.changed_at);
+    const extraNums = [...lastChg.keys()].filter((n) => !all.some((e) => e.lp_num === n));
+    for (let i = 0; i < extraNums.length; i += 200) {
+      all.push(...await rest(env, `lw_process_events?select=${sel}&lp_set=eq.${giil}&lp_appoint_date=gte.${today}&lp_num=in.(${extraNums.slice(i, i + 200).join(",")})`, fetcher));
+    }
     const nums = all.map((e) => e.lp_num);
     const chg = new Set<number>();
     for (let i = 0; i < nums.length; i += 200) {
-      const part: any[] = await rest(env, `lw_process_event_changes?select=lp_num&lp_num=in.(${nums.slice(i, i + 200).join(",")})`, fetcher);
+      const part: any[] = await rest(env, `lw_process_event_changes?select=lp_num,changed_at&lp_num=in.(${nums.slice(i, i + 200).join(",")})&changed_at=gt.${upTo}`, fetcher);
       for (const c of part) chg.add(c.lp_num);
     }
     // 결과(lp_remark: 기일변경·연기·속행 등)가 붙은 기일은 이미 바뀌었거나 끝난 것 → 알리지 않음
     // 기일변경 명령 뒤 같은 종류 기일이 또 잡혀 있으면 앞의 것은 변경된 기일 (supersededOf)
     const gone = await fetchSuperseded(env, [...new Set(all.map((e) => e.l_num).filter(Boolean))], today, fetcher);
-    fresh = all.filter((e) => !chg.has(e.lp_num) && !gone.has(e.lp_num) && !(Number(e.changed_count) > 0) && !String(e.lp_remark || "").trim() && !isPostponed(e.lp_contents));
+    // chg = 하루 안에 바뀐 기일(아직 기다림). 결과(기일변경 등)가 붙은 옛 기일, 내용에 연기·변경·추정·취소가 있는 기일은 뺀다
+    fresh = all.filter((e) => !chg.has(e.lp_num) && !gone.has(e.lp_num) && !String(e.lp_remark || "").trim() && !isPostponed(e.lp_contents));
     // 대법원 원문(있는 사건만): 원문에 결과가 붙은 기일은 빼고, 원문에만 있는 기일은 더한다
     const sc = !o.scourt ? null : await scourtFuture(env, today, upTo, fetcher).catch((e) => { console.error("scourt", String(e?.message || e).slice(0, 120)); return null; });
     if (sc) {
