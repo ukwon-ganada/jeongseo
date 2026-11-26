@@ -118,6 +118,15 @@ async function fetchFeed(store: Record<string, string>, from: string, to: string
   return { rows, total };
 }
 
+// 다른 팀 사건은 받지 않는다(석원 2026-11-26: "정필성 변호사 사건은 우리 사건이 아니니 정보를 수집하지 않아도 된다").
+// 담당 변호사 칸에 정필성이 있고 우리 팀(서고은 변호사 팀) 이름이 없으면 다른 팀 사건.
+const OTHER_TEAM = /정필성/;
+const OUR_TEAM = /서고은|강현구|이예나|양선화|박종덕|원가을/;
+export function isOtherTeam(chargeLawyer: unknown): boolean {
+  const s = String(chargeLawyer ?? "");
+  return OTHER_TEAM.test(s) && !OUR_TEAM.test(s);
+}
+
 // 상세(lw_case_detail.info) → 사건 목록 표(cases) 한 줄. 사무실 PC가 넣는 줄과 같은 칸 이름.
 export function caseRowFromDetail(d: { l_num: number; info: Record<string, any> }) {
   const i = d.info || {};
@@ -190,7 +199,9 @@ Deno.serve(async (req) => {
 
     // 1·2) 하루 변경분 + 송달 도달일
     const feed = await fetchFeed(store, from, to, startOffset);
-    const rows = feed.rows;
+    const { data: allCases } = await db.from("cases").select("l_num, l_code, charge_lawyer");
+    const skip = new Set((allCases ?? []).filter((c: any) => isOtherTeam(c.charge_lawyer)).map((c: any) => Number(c.l_num)));
+    const rows = feed.rows.filter((r: any) => !skip.has(Number(r.l_num)));
     total = feed.total;
     result.fetched = rows.length;
     for (let i = 0; i < rows.length; i += 200) {
@@ -207,9 +218,8 @@ Deno.serve(async (req) => {
     if (targets.length < detailLimit) {
       const { data: seen } = await db.from("lw_case_detail").select("l_num, fetched_at");
       const seenAt = new Map((seen ?? []).map((s: any) => [Number(s.l_num), s.fetched_at]));
-      const { data: cases } = await db.from("cases").select("l_num, l_code");
-      const rest = (cases ?? [])
-        .filter((c: any) => !touched.has(Number(c.l_num)))
+      const rest = (allCases ?? [])
+        .filter((c: any) => !touched.has(Number(c.l_num)) && !skip.has(Number(c.l_num)))
         .sort((a: any, b: any) => String(seenAt.get(Number(a.l_num)) ?? "").localeCompare(String(seenAt.get(Number(b.l_num)) ?? "")));
       for (const c of rest) {
         if (targets.length >= detailLimit) break;
@@ -217,9 +227,19 @@ Deno.serve(async (req) => {
       }
     }
     const details = [];
+    const newOther: number[] = [];
     for (const [l_num, l_code] of targets.slice(0, Math.max(detailLimit, touched.size))) {
       if (Date.now() - t0 > TIME_BUDGET_MS) break;
-      try { details.push(await fetchDetail(store, l_num, l_code)); } catch (_e) { /* 한 건 실패는 다음 회차에 */ }
+      try {
+        const d = await fetchDetail(store, l_num, l_code);
+        // 처음 보는 사건인데 상세를 보니 다른 팀 사건이면 저장하지 않고, 방금 받은 진행내역도 지운다
+        if (isOtherTeam(d.info?.l_charge_lawyer)) newOther.push(l_num);
+        else details.push(d);
+      } catch (_e) { /* 한 건 실패는 다음 회차에 */ }
+    }
+    if (newOther.length) {
+      await db.from("lw_process_events").delete().in("l_num", newOther);
+      console.log("다른 팀 사건 뺌", newOther.length);
     }
     if (details.length) {
       const { error } = await db.from("lw_case_detail").upsert(details, { onConflict: "l_num" });
