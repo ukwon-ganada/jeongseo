@@ -63,6 +63,7 @@ export function alreadyInCalendar(events: { summary: string; start: string }[], 
   return events.some((e) => !/취소/.test(e.summary) && e.summary.includes(name) && (!time || !e.start.includes("T") || e.start.slice(11, 16) === time));
 }
 
+export const isRehab = (code: string) => /\d(개회|개확|개보|하단|하면|하합|하확|회단|회합|회확|간회)\d/.test(String(code || "").replace(/\s/g, ""));
 export const isPostponed = (c: string) => /연기|변경|추정|취소/.test(String(c || ""));
 
 type Row = { lp_num: number; l_num: number; date: string; time: string; contents: string; sc?: boolean };
@@ -172,6 +173,8 @@ export async function hearingNotify(env: SchedEnv, o: NotifyOpts, fetcher: typeo
       gukseon: gkSet.has(norm(c.l_code)), date: r.date, time: r.time, contents: r.contents, source: "도우미 알림",
     });
     const client = String(c.l_client || "").split(/[,(]/)[0].trim();
+    // 회생·파산 사건은 알리지 않는다(석원 2026-11-26 "회생사건은 빼고")
+    if (isRehab(c.l_code || "")) { out.skipped++; continue; }
     const lws = lawyersFromTitle(room?.room_title || "");
     // 머리글 변호사 캘린더를 먼저 보고, 없으면 담당 변호사·변호사 넷 캘린더도 본다(박) 사건도 서고은 캘린더에 넣는 경우가 많음, 2026-11-25 신상현·소현섭)
     const who = [...new Set([...lws.map((l) => l.name), ...String(c.charge_lawyer || "").split(/[,\s]+/).filter(Boolean), "서고은", "이예나", "박종덕", "강현구"])];

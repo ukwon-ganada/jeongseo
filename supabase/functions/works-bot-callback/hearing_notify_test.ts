@@ -25,3 +25,9 @@ Deno.test("연기·변경 기일 거르기", () => {
   assertEquals(isPostponed("변론기일 (연기)"), true);
   assertEquals(isPostponed("선고기일 추정"), true);
 });
+
+import { isRehab } from "./hearing_notify.ts";
+Deno.test("회생·파산 사건번호", () => {
+  for (const c of ["2025하단690", "2026개회10427", "2025개회118243", "2026하단100956"]) if (!isRehab(c)) throw new Error(c);
+  for (const c of ["2026가단13347", "2026고단1492", "2026노1748", "2026드단760", "2026카단7915"]) if (isRehab(c)) throw new Error(c);
+});
