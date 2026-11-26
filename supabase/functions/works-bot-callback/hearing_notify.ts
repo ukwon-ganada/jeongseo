@@ -64,6 +64,9 @@ export function alreadyInCalendar(events: { summary: string; start: string }[], 
 }
 
 export const isRehab = (code: string) => /\d(개회|개확|개보|하단|하면|하합|하확|회단|회합|회확|간회)\d/.test(String(code || "").replace(/\s/g, ""));
+// 우리 법인 사임: "법무법인 정서"(가림 표기 법OOOOOO, 7글자) 또는 우리 변호사 이름 + 사임
+const OURS = /법무법인\s*정서|법O{6}(?!O)|서고은|이예나|박종덕|강현구|양선화/;
+export const isOurResign = (c: string) => /사임/.test(String(c || "")) && OURS.test(String(c || ""));
 export const isPostponed = (c: string) => /연기|변경|추정|취소/.test(String(c || ""));
 
 type Row = { lp_num: number; l_num: number; date: string; time: string; contents: string; sc?: boolean };
@@ -114,6 +117,13 @@ export async function hearingNotify(env: SchedEnv, o: NotifyOpts, fetcher: typeo
   if (rows.length) {
     const { absent } = await fetchAttend(env, rows.map((r) => r.l_num), today, fetcher).catch(() => ({ absent: new Set<string>() }));
     for (let i = rows.length - 1; i >= 0; i--) if (absent.has(attendKey(rows[i].l_num, rows[i].date))) rows.splice(i, 1);
+  }
+  // 사임·종결한 사건은 알리지 않는다(석원 2026-11-26): 로웨어 진행내역의 "종결" 줄, 우리 법인 사임 제출 줄
+  if (rows.length) {
+    const ln = [...new Set(rows.map((r) => r.l_num))];
+    const ends: any[] = await rest(env, `lw_process_events?select=l_num,lp_set,lp_contents&l_num=in.(${ln.join(",")})&or=(lp_set.eq.${encodeURIComponent("종결")},lp_contents.like.*${encodeURIComponent("사임")}*)&limit=2000`, fetcher).catch(() => []);
+    const gone = new Set(ends.filter((e) => e.lp_set === "종결" || isOurResign(e.lp_contents)).map((e) => e.l_num));
+    for (let i = rows.length - 1; i >= 0; i--) if (gone.has(rows[i].l_num)) rows.splice(i, 1);
   }
   const out = { candidates: rows.length, sent: 0, inCalendar: 0, noRoom: 0, skipped: 0, done: 0, items: [] as any[] };
   if (!rows.length) return out;

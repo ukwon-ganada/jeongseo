@@ -31,3 +31,11 @@ Deno.test("회생·파산 사건번호", () => {
   for (const c of ["2025하단690", "2026개회10427", "2025개회118243", "2026하단100956"]) if (!isRehab(c)) throw new Error(c);
   for (const c of ["2026가단13347", "2026고단1492", "2026노1748", "2026드단760", "2026카단7915"]) if (isRehab(c)) throw new Error(c);
 });
+import { isOurResign } from "./hearing_notify.ts";
+Deno.test("우리 법인 사임 줄", () => {
+  if (!isOurResign("피고인1 변호인  법OOOOOO 변호인 사임신고서 제출")) throw new Error("1");
+  if (!isOurResign("피고인2 변호인  법OOOOOO 사임계 제출")) throw new Error("2");
+  if (isOurResign("변호인  법무법인 도울 변호인 사임신고서 제출")) throw new Error("3");
+  if (isOurResign("피고 소송대리인 법OOOOOOOOOOOOOOOO 소송대리인 사임신고서 제")) throw new Error("4");
+  if (isOurResign("원고 소송대리인 문수종소송대리인 사임신고서 제출")) throw new Error("5");
+});
