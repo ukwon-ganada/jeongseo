@@ -39,7 +39,7 @@ const isDoc = (f: any) => !!(f.pdf || DOC_RE.test(nz(f.n)));
 // 자동으로 붙일 수 있는 파일: PDF만 (한글·워드는 초안). 직원이 [수정]에서 고른 파일은 형식과 관계없이 그대로
 export const isPdf = (f: any) => !!(f.pdf || /\.pdf$/i.test(nz(f.n)));
 // 판단 기준이 바뀌면 올린다: 예전 판단을 모두 다시 묻게 된다
-const RULE_VER = "v8-exam";
+const RULE_VER = "v9-multi";
 
 // AI에게 보여 줄 줄: 지난 일(예정 아님)의 우리 제출·기일/선고·처분 줄. 사소한 제출, 직원이 뺀 줄, 직원이 파일을 고른 줄은 뺀다
 // 앞으로의 줄(due)은 빼되, 방 대화에서 뽑은 '우리 제출 예정' 줄과 기일 줄(신문사항은 그 기일에 법정에서 냄, 2026-11-23 석원)은 넣는다(2026-11-20: 선임계 제출 '예정' 줄에 오늘 올린 선임계 PDF)
@@ -74,13 +74,13 @@ const SYSTEM = [
   "- PDF에는 서면 본문뿐 아니라 그 서면의 첨부서류(증거, 참고자료, 별지, 진단서, 합의서, 영수증, 판결 사본 등)도 섞여 있다. 첨부서류는 붙이지 않는다. 같은 이름의 한글 초안이 있었거나, 제출 지시 바로 앞뒤에 올라온 PDF가 서면 본문일 가능성이 높다.",
   "- 우리와 의뢰인이 맺은 위임계약서·약정서(수임 계약)는 '사건 선임' 줄에 붙인다. 증거로 낸 다른 사람들 사이의 계약서·약정서는 붙이지 않는다.",
   "- 우리가 낸 서면(의견서, 변론요지서, 항소이유서, 선임계·선임신고서, 탄원서, 고소장 등)은 그 제출 줄에 붙인다. 파일은 보통 제출일 당일이나 며칠 전에 올라온다.",
-  "- 증인신문사항·피고인신문사항은 전자로 내지 않고 법정에서 내므로 제출 줄이 없다. 그 신문을 하는 공판기일 줄(파일이 올라온 날이나 그 뒤 가장 가까운 공판기일)에 붙인다. 증인신문사항은 [증인신문 기일] 줄이 있으면 그 줄에 붙인다. 공판기일 줄에는 신문사항 말고 다른 서면은 붙이지 않는다.",
+  "- 증인신문사항·피고인신문사항은 전자로 내지 않고 법정에서 내므로 제출 줄이 없다. 그 신문을 하는 공판기일 줄(파일이 올라온 날이나 그 뒤 가장 가까운 공판기일)에 붙인다. 증인신문사항은 [증인신문 기일] 줄이 있으면 그 줄에 붙인다. 공판기일 줄에는 신문사항 말고 다른 서면은 붙이지 않는다. 신문사항은 증인·피고인마다 따로 있으므로, 같은 기일의 서로 다른 사람 신문사항은 모두 그 줄을 고른다(같은 사람 것이 여럿이면 그 사람의 최종본만).",
   "- 기관에서 받은 중요한 문서도 붙인다. 판결문·결정문은 선고·결정 줄에, 공소장은 '공소장 부본 도달' 줄(없으면 기소 줄)에, 불송치·송치 결정서, 불기소 결정서·이유서, 고소·고발사건 결정결과 통지서, 수사결과 통지서는 그 처분(송치·불송치·불기소·기소) 줄에, 수사진행상황 통지서는 그 통지 줄에 붙인다. 통지 줄이 따로 없고 수사진행상황 통지서가 알리는 일이 송치·불송치 같은 처분이면(같은 무렵 그 처분 줄이 있으면) 그 처분 줄에 붙인다. 고소·고발사건 결정결과 통지서·수사결과 통지서는 무렵의 처분 줄이 하나뿐이면, 그 줄에 '일부 송치·일부 불송치'처럼 여러 처분이 섞여 있어도 그 줄에 붙인다. 받은 문서는 처분보다 며칠~몇 달 뒤에 올라오기도 한다.",
   "- 판결문·결정문은 사건번호를 본다. '사건:'에 적힌 이 사건 번호와 같은 판결문을 이 사건 선고 줄에 붙인다. 원심(1심) 판결문처럼 다른 사건번호의 판결문은 이 사건 선고 줄에 붙이지 않는다. 판결문은 선고 뒤 몇 달 지나 올라오기도 한다.",
   "- 단, 우리 서면에 첨부한 사본('첨부서류 1. 수사결과 통지서 사본', '증 제○호증' 등)은 받은 문서 줄에 붙이지 않는다.",
   "- 줄 제목이 서류 이름 대신 '우편 제출', '서면 제출'처럼 뭉뚱그려져 있으면 그 무렵 방 대화를 보고 어떤 서류인지 판단한다.",
   "- 초안·검토용·수정 중 파일, 편지·사진·참고자료·증거자료처럼 그 줄의 서류 자체가 아닌 파일은 붙이지 않는다.",
-  "- 한 줄에 맞는 파일이 여럿이면 최종본(가장 늦게 올라온 것)만 고르고 나머지는 붙이지 않는다.",
+  "- 한 줄에 맞는 파일이 여럿이면 최종본(가장 늦게 올라온 것)만 고르고 나머지는 붙이지 않는다(공판기일 줄의 사람별 신문사항은 예외).",
   "- 확신이 없으면 붙이지 않는다(line=null). 엉뚱한 줄에 붙는 것보다 안 붙는 것이 낫다.",
   "- '(이미 붙음: …)' 줄은 다른 파일이 붙어 있는 줄이다. 새 파일이 같은 서류의 더 나중 최종본일 때만 그 줄을 고른다.",
   "모든 파일(F1, F2 …)에 대해 답한다. line에는 줄 번호(L1, L2 …)만 적고, 붙이지 않으면 '없음'. why는 한국어 한 문장으로 짧게.",
@@ -157,20 +157,24 @@ export async function askMatch(ai: AiEnv, user: string, fetcher: typeof fetch = 
 
 // 기억된 판단을 타임라인에 붙인다: 줄마다 가장 늦게 올라온 파일 하나, 직원이 고른 줄·뺀 줄·사소한 줄은 손대지 않음
 export function applyMatches(events: any[], files: any[], cache: Map<number, MatchRow>, lines: any[]) {
-  for (const e of events) { if (e.f?.ai) e.f = null; if (e.cf?.ai) e.cf = null; }
+  for (const e of events) { if (e.f?.ai) e.f = null; if (e.cf?.ai) e.cf = null; if (e.fs) delete e.fs; }
   const byKey = new Map<string, any>();
   for (const e of lines) byKey.set(lineKey(e), e);
   const used = new Set(events.flatMap((e) => [e.f?.pick === 1 ? e.f.id : null, e.cf?.id]).filter((x) => x != null));
-  const best = new Map<string, any>();
+  const best = new Map<string, any>(), many = new Map<string, any[]>();
   for (const f of files) {
     const m = cache.get(Number(f.id));
     if (!m || !m.line_key || used.has(f.id) || f.lp != null) continue;
     if (!byKey.has(m.line_key)) continue;
+    // 법원 기일 줄은 신문사항이 사람마다 따로라 여러 개를 모두 붙인다(2026-11-26 석원)
+    const ln = byKey.get(m.line_key);
+    if (ln.g === "hearing" && ln.src !== "chat") (many.get(m.line_key) ?? many.set(m.line_key, []).get(m.line_key)!).push(f);
     const cur = best.get(m.line_key), man = m.sig === MANUAL, curMan = cur && cache.get(Number(cur.id))?.sig === MANUAL;
     if (!cur || (man && !curMan) || (man === !!curMan && f.at > cur.at)) best.set(m.line_key, f);
   }
   // 사건 선임 줄에 고른 파일은 계약서 자리(cf)에
   for (const [k, f] of best) { const e = byKey.get(k); if (e.g === "accept") e.cf = { id: f.id, n: f.n, ai: 1 }; else e.f = { id: f.id, n: f.n, pick: 0, ai: 1 }; }
+  for (const [k, fs] of many) if (fs.length > 1) byKey.get(k).fs = fs.sort((a, b) => a.at - b.at).map((f) => ({ id: f.id, n: f.n }));
   // [수정]에서 직접 고를 수 있게 로웨어 제출 줄(lp)이 아닌 후보 줄에 열쇠를 붙여 둔다
   for (const e of lines) if (e.lp == null) e.lk = lineKey(e);
   return events;

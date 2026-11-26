@@ -251,3 +251,23 @@ Deno.test("신문사항(2026-11-23 석원): 오늘 공판기일 줄도 후보, �
   const w = buildPrompt("2025고단1 홍길동", [{ d: "2026-11-24", k: "due", g: "hearing", t: "공판기일", wit: "추정" }], [{ id: 4, d: "2026-11-23", n: "증인신문사항_261123.pdf", at: Date.parse("2026-11-23T01:30:00Z") }], []);
   assert(w.user.includes("[증인신문 기일]"), w.user);
 });
+
+Deno.test("공판기일 줄엔 사람별 신문사항 여러 개(fs), 제출 줄은 최종본 하나 (2026-11-26 석원)", () => {
+  const ev: any[] = [
+    { d: "2026-11-23", k: "done", g: "hearing", t: "공판기일(제318호 법정 15:20)" },
+    { d: "2026-11-23", k: "ours", g: "ours", t: "의견서 제출", src: "chat", rid: 7 },
+  ];
+  const lines = candidateLines(ev, /열람/);
+  const at = (h: number) => Date.parse("2026-11-23T0" + h + ":00:00Z");
+  const files = [
+    { id: 1, n: "피고인갑신문사항.pdf", d: "2026-11-23", at: at(1), pdf: 1 },
+    { id: 2, n: "피고인을신문사항.pdf", d: "2026-11-23", at: at(2), pdf: 1 },
+    { id: 3, n: "의견서1.pdf", d: "2026-11-23", at: at(3), pdf: 1 },
+    { id: 4, n: "의견서2.pdf", d: "2026-11-23", at: at(4), pdf: 1 },
+  ];
+  const hk = lineKey(ev[0]);
+  const cache = new Map<number, any>(files.map((f) => [f.id, { file_id: f.id, line_key: f.id <= 2 ? hk : "r:7", sig: "x" }]));
+  applyMatches(ev, files, cache, lines);
+  assert(ev[0].f?.id === 2 && ev[0].fs?.length === 2 && ev[0].fs[0].id === 1, "기일 줄 여러 개: " + JSON.stringify(ev[0]));
+  assert(ev[1].f?.id === 4 && !ev[1].fs, "제출 줄은 하나: " + JSON.stringify(ev[1]));
+});
