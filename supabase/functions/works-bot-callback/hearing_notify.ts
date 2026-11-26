@@ -62,10 +62,16 @@ export const coreName = (s: string) => String(s || "")
   .replace(/주식회사|유한회사|사단법인|재단법인|\(주\)|\(유\)|㈜|\(사\)|\(재\)/g, "")
   .replace(/\s*(외|外)\s*\d+\s*(명|인)?.*$/, "")
   .replace(/\s/g, "");
-export function alreadyInCalendar(events: { summary: string; start: string }[], client: string, time: string): boolean {
-  const name = coreName(client);
-  if (name.length < 2) return false;
-  return events.some((e) => !/취소/.test(e.summary) && coreName(e.summary.replace(/\s*(외|外)\s*\d+\s*(명|인)?/g, "")).includes(name) && (!time || !e.start.includes("T") || e.start.slice(11, 16) === time));
+// 당사자 이름 하나라도 맞으면 된다(우리 의뢰인이 로웨어에 앞에 안 나올 수 있음). 긴 이름은 앞 5글자만 본다
+// (2026-11-26 "주안10구역주택재개발정비사업조합" vs 캘린더 "주안10구역조합"). 시각이 같아야 하므로 앞 5글자로도 충분히 좁다
+export function alreadyInCalendar(events: { summary: string; start: string }[], client: string | string[], time: string): boolean {
+  const names = [...new Set((Array.isArray(client) ? client : [client]).map(coreName).filter((n) => n.length >= 2).map((n) => n.length > 5 ? n.slice(0, 5) : n))];
+  if (!names.length) return false;
+  return events.some((e) => {
+    if (/취소/.test(e.summary) || !(!time || !e.start.includes("T") || e.start.slice(11, 16) === time)) return false;
+    const sum = coreName(e.summary.replace(/\s*(외|外)\s*\d+\s*(명|인)?/g, ""));
+    return names.some((n) => sum.includes(n));
+  });
 }
 
 export const isRehab = (code: string) => /\d(개회|개확|개보|하단|하면|하합|하확|회단|회합|회확|간회)\d/.test(String(code || "").replace(/\s/g, ""));
@@ -198,6 +204,7 @@ export async function hearingNotify(env: SchedEnv, o: NotifyOpts, fetcher: typeo
       gukseon: gkSet.has(norm(c.l_code)), date: r.date, time: r.time, contents: r.contents, source: "도우미 알림",
     });
     const client = String(c.l_client || "").split(/[,(]/)[0].trim();
+    const parties = [client, ...String(c.l_another || "").split(/[,/]/).map((x) => x.replace(/\(.*?\)/g, "").trim())].filter(Boolean);
     // 회생·파산 사건은 알리지 않는다(석원 2026-11-26 "회생사건은 빼고")
     if (isRehab(c.l_code || "")) { out.skipped++; continue; }
     // 다른 변호사 국선(서고은 국선 목록에 없는 국선 사건)은 보지 않는다(석원 2026-11-26 정세연·유빈)
@@ -209,7 +216,7 @@ export async function hearingNotify(env: SchedEnv, o: NotifyOpts, fetcher: typeo
     const seenCal: string[] = [];
     for (const n of o.force ? [] : who) {
       const evs = await calEvents(n, r.date).catch(() => []);
-      if (alreadyInCalendar(evs, client, plan.time)) { inCal = true; break; }
+      if (alreadyInCalendar(evs, parties, plan.time)) { inCal = true; break; }
       if (o.dryRun) for (const e of evs) seenCal.push(`${n}: ${e.start.slice(11, 16) || "종일"} ${e.summary}`);
     }
     // 바뀐 기일: 전에 알린 날짜 또는 로웨어 옛 값

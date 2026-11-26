@@ -47,3 +47,9 @@ Deno.test("회사 표기·외 N명 차이를 넘어 캘린더 짝 찾기 (2026-1
   if (!ok("(영상)(박)변론_(주)부강이엔지/(주)진성중공업", "주식회사 부강이엔지", "15:50")) throw new Error("부강");
   if (ok("예)변론_(주)진성아이엔디/(주)한올개발 외 1명", "주식회사 엔씨엠 외 1명", "16:00")) throw new Error("엔씨엠");
 });
+Deno.test("상대방 이름·줄인 조합 이름으로도 짝 찾기 (주안10구역)", () => {
+  const evs = [{ summary: "강)변론_주안10구역조합/인천광역시 외 1명", start: "2026-12-15T14:50:00+09:00" }];
+  if (!alreadyInCalendar(evs, ["인천광역시 미추홀구", "주안10구역주택재개발정비사업조합"], "14:50")) throw new Error("주안");
+  if (alreadyInCalendar(evs, ["김철수"], "14:50")) throw new Error("다른 사람");
+  if (alreadyInCalendar(evs, ["인천광역시 미추홀구"], "10:00")) throw new Error("시각");
+});
