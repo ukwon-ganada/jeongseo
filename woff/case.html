@@ -495,7 +495,8 @@ function smsMsg(ov){
   var mine=(data.hearings||[]).filter(function(x){ return x.c===data.caseNo && dd(x.d)>=0; });
   var h=mine.filter(function(x){ return !isMoved(x.t); }).sort(function(a,b){ return (a.d+(a.tm||'')).localeCompare(b.d+(b.tm||'')); })[0];
   var old=null;
-  if(ov){ if(h && (h.d+(h.tm||''))!==(ov.d+(ov.tm||''))) old=h; h={d:ov.d, tm:ov.tm, t:ov.kind, p:ov.room, court:ov.court}; }
+  // 로웨어 기일이 오늘이거나 지났으면 열린 기일(속행 뒤 다음 기일 지정)이지 변경이 아니다(2026-11-26 김우석 2026고단1492). 앞으로의 기일이 바뀐 것만 '변경' 안내
+  if(ov){ if(h && dd(h.d)>0 && (h.d+(h.tm||''))!==(ov.d+(ov.tm||''))) old=h; h={d:ov.d, tm:ov.tm, t:ov.kind, p:ov.room, court:ov.court}; }
   if(!h) return '';
   var kind=(String(h.t||'').match(/[가-힣]*기일/)||['기일'])[0];
   if(!ov) old=mine.filter(function(x){ return isMoved(x.t) && (x.d+(x.tm||''))!==(h.d+(h.tm||'')); }).sort(function(a,b){ return b.d.localeCompare(a.d); })[0];
