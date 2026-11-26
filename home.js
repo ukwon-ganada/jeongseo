@@ -63,11 +63,12 @@ var PC_ORDER = [
   { id: 'gukseon' }
 ];
 
-/* 폰 홈: 계약서 종류 풀스크린 스와이프 카드 (민사–형사–가사, 형사가 가운데서 시작) */
+/* 폰 홈: 계약서 종류 풀스크린 스와이프 카드 (민사–형사–가사–자문, 형사에서 시작) */
 var CONTRACT_CARDS = [
   { type: '민사', img: './civil.jpg',    sub: '민사사건 송무위임계약서' },
   { type: '형사', img: './criminal.jpg', sub: '형사사건 송무위임계약서' },
-  { type: '가사', img: './family.jpg',   sub: '가사사건 송무위임계약서' }
+  { type: '가사', img: './family.jpg',   sub: '가사사건 송무위임계약서' },
+  { type: '자문', img: './jamun.jpg',    sub: '법률자문계약서' }
 ];
 
 /* 전체 기능 화면: 폰 홈에 안 올린 나머지 (표기가 조금 다른 것은 name/desc 덮어씀) */

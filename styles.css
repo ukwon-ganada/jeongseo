@@ -453,6 +453,7 @@ html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black)
 .type-dot-criminal{background:#2d4a7c;}
 .type-dot-civil{background:#e8dcc0;border:1px solid #c9b98f;}
 .type-dot-family{background:#e89bb0;}
+.type-dot-jamun{background:#9cc3b4;}
 .type-body{flex:1;}
 .type-name{font-size:14px;font-weight:500;}
 .type-desc{font-size:12px;color:var(--gray-400);margin-top:1px;}
@@ -519,6 +520,7 @@ html,body{height:100%;font-family:var(--font);background:#fff;color:var(--black)
 .lc-badge.lc-b-crim{background:#111;border-color:#111;color:#fff;}
 .lc-badge.lc-b-civil{background:#fff;border-color:#111;color:#111;}
 .lc-badge.lc-b-family{background:#e4e4e4;border-color:#e4e4e4;color:#333;}
+.lc-badge.lc-b-jamun{background:#e3f1ec;border-color:#e3f1ec;color:#2f6b55;}
 .lc-body{flex:1;min-width:0;}
 .lc-name{font-size:17px;font-weight:600;color:var(--black);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .lc-meta{font-size:15px;color:var(--gray-500);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -1625,6 +1627,8 @@ body.contract-locked .ct-bb-sign{pointer-events:none;color:var(--success)!import
   #typeSheet .type-dot-civil::before,#seonimTypeSheet .type-dot-civil::before{content:"민";}
   #typeSheet .type-dot-family{background:linear-gradient(155deg,#f3d7de,#e6b6c4);color:#7a3b52;border:1px solid #dca7b8;}
   #typeSheet .type-dot-family::before{content:"가";}
+  #typeSheet .type-dot-jamun{background:linear-gradient(155deg,#dcefe7,#b9dccd);color:#2f6b55;border:1px solid #a9d0bf;}
+  #typeSheet .type-dot-jamun::before{content:"자";}
 
   /* (2) 열람 법원/검찰: 구분 강조 없이 가시성만 — 아이콘을 네이비 글래스 타일로 통일 */
   #yeollamTypeSheet .yl-type-ico{
@@ -1772,6 +1776,7 @@ body.contract-locked .ct-bb-sign{pointer-events:none;color:var(--success)!import
 .creg-doc-crim{background:#fde8e4;color:#b8402d;}
 .creg-doc-civil{background:#e3ecfb;color:#2f5fb0;}
 .creg-doc-family{background:#eae4f7;color:#6b46b0;}
+.creg-doc-jamun{background:#e3f1ec;color:#2f6b55;}
 .creg-st{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;}
 .creg-st-dot{width:6px;height:6px;border-radius:50%;}
 .creg-st-signed{color:#1f7a4d;}.creg-st-signed .creg-st-dot{background:#2f9e6a;}
