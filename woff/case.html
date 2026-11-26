@@ -501,7 +501,9 @@ function invMsg(){
 // 기일안내 문자(2026-11-25, 로웨어 문자현황의 실제 보낸 문구 기준): 이 사건의 다가오는 기일로 채운다. 기일이 없으면 빈 칸으로 연다
 // ov: 로웨어에 아직 없는 새 기일(직원이 올린 사진·통지서나 도우미 알림으로 [일정]이 찾은 것). 있으면 그 기일로 채우고, 로웨어의 지난 날짜는 '변경' 안내로
 function smsMsg(ov){
-  var mine=(data.hearings||[]).filter(function(x){ return x.c===data.caseNo && dd(x.d)>=0; });
+  // 오늘 기일은 시각이 지났으면 이미 열린 기일(2026-11-26 김우석: 오늘 10:30 공판 뒤 [문자]가 오늘 기일로 채움)
+  var nowHm=new Date(Date.now()+9*3600e3).toISOString().slice(11,16);
+  var mine=(data.hearings||[]).filter(function(x){ return x.c===data.caseNo && (dd(x.d)>0 || (dd(x.d)===0 && (!x.tm || x.tm>nowHm))); });
   // 불출석으로 표시한 기일은 우리 기일이 아니다(2026-11-26 석원, 김우석 2026고단1492)
   var h=mine.filter(function(x){ return !isMoved(x.t) && !x.ab; }).sort(function(a,b){ return (a.d+(a.tm||'')).localeCompare(b.d+(b.tm||'')); })[0];
   var old=null;
