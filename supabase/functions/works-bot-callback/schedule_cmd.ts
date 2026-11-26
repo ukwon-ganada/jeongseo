@@ -174,6 +174,24 @@ export async function fetchSuperseded(env: SchedEnv, lnums: number[], today: str
   return out;
 }
 
+// ── 기일별 우리 출석 여부 (석원 2026-11-26, 김우석 2026고단1492) ─────────────────
+// 공범이 많아 기일이 여러 개면 우리 피고인은 일부 기일(예: 선고)에만 나간다. 사건 화면 [수정]이나 방 글로 정한 표시(hearing_attend)를 따른다.
+// 불출석 기일은 [일정]·빠진 기일 알림에서 빼고, 로웨어에 아직 없는 출석 기일은 우리 기일 후보로 더한다. 표시가 없으면 지금처럼(출석)
+export type Attend = { l_num: number; hdate: string; attend: boolean; htime?: string | null; kind?: string | null; place?: string | null };
+export async function fetchAttend(env: SchedEnv, lnums: number[], today: string, fetcher: typeof fetch = fetch): Promise<{ absent: Set<string>; extra: Attend[] }> {
+  const absent = new Set<string>(), extra: Attend[] = [];
+  const ns = [...new Set(lnums.filter((n) => Number(n) > 0))];
+  for (let i = 0; i < ns.length; i += 150) {
+    const rows: Attend[] = await rest(env, `hearing_attend?select=l_num,hdate,attend,htime,kind,place&hdate=gte.${today}&l_num=in.(${ns.slice(i, i + 150).join(",")})&limit=3000`, fetcher);
+    for (const r of rows) {
+      const k = r.l_num + "|" + String(r.hdate).slice(0, 10);
+      if (r.attend === false) absent.add(k); else extra.push(r);
+    }
+  }
+  return { absent, extra };
+}
+export const attendKey = (lNum: number, date: string) => lNum + "|" + String(date).slice(0, 10);
+
 // 방에서 "/일정" → 계획 세우기 (보내기는 따로)
 export async function planForRoom(env: SchedEnv, channelId: string, fetcher: typeof fetch = fetch): Promise<{ plan?: Plan; why?: string }> {
   const rooms = await rest(env, "works_room_case?select=l_num,case_no,room_title,status&order=is_primary.desc,updated_at.desc&channel_id=eq." + encodeURIComponent(channelId), fetcher);
@@ -183,16 +201,22 @@ export async function planForRoom(env: SchedEnv, channelId: string, fetcher: typ
   const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
   const evAll = await rest(env, `lw_process_events?select=lp_num,l_num,l_code,lp_appoint_date,lp_appoint_time,lp_contents,lp_remark,court&lp_set=eq.${encodeURIComponent("기일")}&lp_appoint_date=gte.${today}&l_num=in.(${nums.join(",")})&order=lp_appoint_date.asc,lp_appoint_time.asc&limit=20`, fetcher);
   const gone = await fetchSuperseded(env, nums, today, fetcher).catch(() => new Set<number>());
-  const ev = evAll.filter((e) => !gone.has(e.lp_num) && !/변경|연기|추정|취소/.test(String(e.lp_remark || "") + (e.lp_contents || "")));
+  const att = await fetchAttend(env, nums, today, fetcher).catch(() => ({ absent: new Set<string>(), extra: [] as Attend[] }));
+  const ev = evAll.filter((e) => !gone.has(e.lp_num) && !att.absent.has(attendKey(e.l_num, e.lp_appoint_date)) && !/변경|연기|추정|취소/.test(String(e.lp_remark || "") + (e.lp_contents || "")));
   const cs = await rest(env, `case_all?select=l_num,l_code,l_client,court,next_date,next_time,next_contents,raw->>l_another&l_num=in.(${nums.join(",")})`, fetcher);
   let h: { l_num: number; date: string; time: string; contents: string } | null = null;
-  if (ev[0]) h = { l_num: ev[0].l_num, date: String(ev[0].lp_appoint_date).slice(0, 10), time: String(ev[0].lp_appoint_time || "").slice(0, 5), contents: ev[0].lp_contents || "" };
-  else {
+  // 출석으로 표시했는데 로웨어에 아직 없는 기일(방 글로 먼저 안 선고기일 등)도 후보
+  const add = att.extra.filter((a) => !evAll.some((e) => e.l_num === a.l_num && String(e.lp_appoint_date).slice(0, 10) === String(a.hdate).slice(0, 10)))
+    .map((a) => ({ l_num: a.l_num, date: String(a.hdate).slice(0, 10), time: String(a.htime || "").slice(0, 5), contents: (a.kind || "기일") + ([a.place, a.htime].filter(Boolean).length ? "(" + [a.place, a.htime].filter(Boolean).join(" ") + ")" : "") }));
+  const lw = ev.map((e) => ({ l_num: e.l_num, date: String(e.lp_appoint_date).slice(0, 10), time: String(e.lp_appoint_time || "").slice(0, 5), contents: e.lp_contents || "" }));
+  const pick = [...lw, ...add].sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))[0];
+  if (pick) h = pick;
+  else if (!att.absent.size) {
     const c = cs.filter((c) => c.next_date && String(c.next_date).slice(0, 10) >= today && /기일/.test(c.next_contents || "")).sort((a, b) => String(a.next_date).localeCompare(String(b.next_date)))[0];
     if (c) h = { l_num: c.l_num, date: String(c.next_date).slice(0, 10), time: String(c.next_time || "").slice(0, 5), contents: c.next_contents || "" };
   }
   // 도우미가 먼저 알린 기일(hearing_notice)이 최근 사진·통지서보다 늦게 나왔으면 그 기일을 쓴다
-  let src = "로웨어 기일 기준";
+  let src = pick && add.includes(pick as any) ? "출석 표시 기준" : "로웨어 기일 기준";
   let usedRead = false;
   const since48 = new Date(Date.now() - 48 * 3600e3).toISOString();
   const [nt, im, pf] = await Promise.all([

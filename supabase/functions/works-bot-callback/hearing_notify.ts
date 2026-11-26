@@ -9,7 +9,7 @@
 //  켜는 범위: notifyRooms(방 ID 목록)가 있으면 그 방만, "*"면 모든 방. notifyBot 으로 보낸다.
 // ============================================================================
 import { pemToPkcs8 } from "./room_file.ts";
-import { buildPlan, calendarUrl, fetchSuperseded, lawyersFromTitle, type Plan, sendToRoom, type SchedEnv } from "./schedule_cmd.ts";
+import { attendKey, buildPlan, calendarUrl, fetchAttend, fetchSuperseded, lawyersFromTitle, type Plan, sendToRoom, type SchedEnv } from "./schedule_cmd.ts";
 
 export type NotifyOpts = { mode?: "new" | "missing"; graceHours?: number; lookbackDays?: number; force?: boolean; dryRun?: boolean; hours?: number; notifyRooms?: string[]; notifyBot: string; limit?: number; lpNum?: number };
 
@@ -101,6 +101,11 @@ export async function hearingNotify(env: SchedEnv, o: NotifyOpts, fetcher: typeo
   const rows: Row[] = [...fresh, ...changed].map((e) => ({
     lp_num: e.lp_num, l_num: e.l_num, date: String(e.lp_appoint_date).slice(0, 10), time: String(e.lp_appoint_time || "").slice(0, 5), contents: e.lp_contents || "",
   })).filter((r) => r.l_num && /^\d{4}-\d{2}-\d{2}$/.test(r.date));
+  // 우리가 나가지 않는 기일(사건 화면에서 불출석으로 표시, 2026-11-26)은 알리지 않는다
+  if (rows.length) {
+    const { absent } = await fetchAttend(env, rows.map((r) => r.l_num), today, fetcher).catch(() => ({ absent: new Set<string>() }));
+    for (let i = rows.length - 1; i >= 0; i--) if (absent.has(attendKey(rows[i].l_num, rows[i].date))) rows.splice(i, 1);
+  }
   const out = { candidates: rows.length, sent: 0, inCalendar: 0, noRoom: 0, skipped: 0, done: 0, items: [] as any[] };
   if (!rows.length) return out;
 

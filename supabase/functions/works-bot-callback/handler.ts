@@ -29,6 +29,7 @@
 //         (Callback 이벤트: postback + 파일 + 텍스트(시험봇만))
 // ============================================================================
 
+import { handleAttendText, looksLikeAttend } from "./attend_text.ts";
 import { saveRoomFile } from "./room_file.ts";
 import { linkPicked, linkRoomAnyBot, relinkRoom } from "./room_link.ts";
 import { handleRoomFile, handleRoomText } from "./room_chat.ts";
@@ -311,6 +312,17 @@ export async function handle(req: Request, env: Env, fetcher: typeof fetch = fet
     if ((env.scheduleBots || ["13580302"]).includes(botId)) {
       background(noteRoomImage(env, botId, channelId, String(content.fileId), userId, fetcher)
         .catch((e) => console.error("image note fail", String(e?.message || e).slice(0, 160))));
+    }
+  }
+
+  // 사건방 글 → 우리 출석 기일 표시(2026-11-26 석원, 김우석 2026고단1492): "4월 15일 선고만 갑니다" 같은 글만 AI에. 두 봇 모두
+  if (!schedCmd && ev?.type === "message" && content?.type === "text" && channelId && looksLikeAttend(String(content?.text || ""))) {
+    const botId = req.headers.get("x-works-botid") || String(ev?.botId || "");
+    if ((env.scheduleBots || ["13580302"]).includes(botId)) {
+      background(handleAttendText({ sbUrl: env.sbUrl, sbKey: env.sbKey, anthropicKey: env.anthropicKey, model: "claude-sonnet-5-5" },
+        { channelId, text: String(content.text), sentAt: ev?.issuedTime || ev?.createdTime, userId }, fetcher)
+        .then((r) => console.log("attend", r.how, r.saved))
+        .catch((e) => console.error("attend fail", String(e?.message || e).slice(0, 200))));
     }
   }
 
