@@ -22,7 +22,7 @@ const APPT = new Set(["조사", "출석요구", "기일"]);
 export const KINDS = ["사건접수", "고소장제출", "조사", "출석요구", "송치", "처분", "기소", "기일", "서면제출", "기타"] as const;
 
 // 날짜·시각·수사 절차 낱말이 하나라도 있어야 AI에 보낸다
-const CUE = /(\d{1,2}\s*[\/.월]\s*\d{1,2}|\d{1,2}\s*일|\d{1,2}\s*시|\d{1,2}:\d{2}|오늘|내일|모레|다음\s*주|이번\s*주|[월화수목금]요일|고소|고발|접수|조사|출석|송치|불송치|기소|불기소|처분|기일|공판|제출|진술|대질|소환|구속|영장|약식)/;
+const CUE = /(\d{1,2}\s*[\/.월]\s*\d{1,2}|\d{1,2}\s*일|\d{1,2}\s*시|\d{1,2}:\d{2}|오늘|내일|모레|다음\s*주|이번\s*주|[월화수목금]요일|고소|고발|접수|조사|통지|출석|송치|불송치|기소|불기소|처분|기일|공판|제출|진술|대질|소환|구속|영장|약식)/;
 export function looksLikeEvent(text: string): boolean {
   const t = String(text || "").trim();
   return t.length >= 6 && CUE.test(t);
@@ -65,6 +65,7 @@ const SYSTEM = [
   "제출처(경찰서·공소청·법원 등)는 대화나 앞 글에 분명히 나올 때만 적는다. 짐작해서 '추정'·'불명'으로 적지 말고, 모르면 제출처 없이 '재정신청서 제출'처럼 쓴다.",
   "'보내겠습니다'처럼 할 일이면 예정, '제출했습니다'·'발송 완료'처럼 끝난 일이면 완료로 한다. 같은 제출을 두고 여러 글이 오가도 한 일이다.",
   "filed는 기한 관리에 쓰인다. 이번 글(앞 글 맥락 포함)이 항고장·재정신청서·이의신청서·항소이유서 같은 서류를 실제로 냈다(접수·발송 완료)는 뜻일 때만 그 서류를 적는다. 낼 예정, 작성 중, 초안 공유, 마감일 안내, '아직 안 냈다', 제출 지시, 다른 사람(상대방·검사)이 낸 것, 열람복사 신청처럼 기한과 무관한 서류면 빈 문자열로 한다. 애매하면 빈 문자열.",
+  "대화가 '[파일 올림] 파일이름'이면 방에 파일만 올라온 것이다. 경찰·검찰·법원이 보낸 통지서·결정서(수사결과 통지서, 불기소 이유 통지, 공소장 등)면 파일 이름으로 무슨 처분인지(송치·불송치·불기소·기소 등) 판단해 state=완료로 넣는다. 날짜는 파일 이름의 날짜(예: 261120 → 2026-11-20), 없으면 보낸 날. summary 예: '송치 (수사결과 통지서 수령)', '불송치 (수사결과 통지서 수령)'. 괄호 속 '송치등'·'불송치등' 같은 양식 이름보다 파일 이름 전체의 뜻을 본다. 우리가 낸 서면·초안 파일이거나 무슨 처분인지 알 수 없으면 넣지 않는다.",
   "골라낼 것이 없으면 events를 빈 배열로 한다. 확실하지 않으면 넣지 않는다.",
 ].join("\n");
 
@@ -190,4 +191,12 @@ export async function handleRoomText(env: ChatEnv, a: { channelId: string; text:
     await up.body?.cancel();
   }
   return { saved: rows.length, how: "ai" };
+}
+
+// 파일만 올라온 글(통지서 PDF 등)도 일정으로 (2026-11-20 박유정 방: 수사결과 통지서 PDF만 올라와 송치 줄이 안 생김)
+export const NOTICE_FILE = /통지|결정서|결정문|처분|송치|불송치|기소|공소장|소환|출석\s*요구|약식\s*명령/;
+export async function handleRoomFile(env: ChatEnv, a: { channelId: string; fileName: string; sentAt?: string; invOnly?: boolean; userId?: string }, fetcher: typeof fetch = fetch): Promise<{ saved: number; how: string }> {
+  const name = String(a.fileName || "").trim();
+  if (!NOTICE_FILE.test(name)) return { saved: 0, how: "not-notice" };
+  return handleRoomText(env, { channelId: a.channelId, text: "[파일 올림] " + name, sentAt: a.sentAt, invOnly: a.invOnly, userId: a.userId }, fetcher);
 }
