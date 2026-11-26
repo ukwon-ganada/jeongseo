@@ -202,7 +202,9 @@ export async function planForRoom(env: SchedEnv, channelId: string, fetcher: typ
   const evAll = await rest(env, `lw_process_events?select=lp_num,l_num,l_code,lp_appoint_date,lp_appoint_time,lp_contents,lp_remark,court&lp_set=eq.${encodeURIComponent("기일")}&lp_appoint_date=gte.${today}&l_num=in.(${nums.join(",")})&order=lp_appoint_date.asc,lp_appoint_time.asc&limit=20`, fetcher);
   const gone = await fetchSuperseded(env, nums, today, fetcher).catch(() => new Set<number>());
   const att = await fetchAttend(env, nums, today, fetcher).catch(() => ({ absent: new Set<string>(), extra: [] as Attend[] }));
-  const ev = evAll.filter((e) => !gone.has(e.lp_num) && !att.absent.has(attendKey(e.l_num, e.lp_appoint_date)) && !/변경|연기|추정|취소/.test(String(e.lp_remark || "") + (e.lp_contents || "")));
+  // 오늘 기일은 시각이 지났으면 이미 열린 기일(2026-11-26 김우석 2026고단1492: 오늘 10:30 공판 뒤 [일정]·[문자]가 오늘로 채움)
+  const nowHm = new Date(Date.now() + 9 * 3600e3).toISOString().slice(11, 16);
+  const ev = evAll.filter((e) => !(String(e.lp_appoint_date).slice(0, 10) === today && String(e.lp_appoint_time || "").slice(0, 5) && String(e.lp_appoint_time).slice(0, 5) <= nowHm) && !gone.has(e.lp_num) && !att.absent.has(attendKey(e.l_num, e.lp_appoint_date)) && !/변경|연기|추정|취소/.test(String(e.lp_remark || "") + (e.lp_contents || "")));
   const cs = await rest(env, `case_all?select=l_num,l_code,l_client,court,next_date,next_time,next_contents,raw->>l_another&l_num=in.(${nums.join(",")})`, fetcher);
   let h: { l_num: number; date: string; time: string; contents: string } | null = null;
   // 출석으로 표시했는데 로웨어에 아직 없는 기일(방 글로 먼저 안 선고기일 등)도 후보
