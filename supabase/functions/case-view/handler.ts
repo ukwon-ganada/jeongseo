@@ -296,7 +296,7 @@ export function shapeCase(c: any, evs: any[], opts: { today: string; linked: str
     events.push({ d: nextDate, k: "due", g: "hearing", t: "다음 기일 " + [nz(c.next_time), nz(c.next_contents)].filter(Boolean).join(" ") });
   }
   // 법정기한(형사, 잠정 계산) — 석원 2026-11-13. 규칙서 엔진이 생기면 그 결과로 바꾼다.
-  const deadlines = computeDeadlines(c.l_code, evs, today, opts.others || []);
+  const deadlines = computeDeadlines(c.l_code, evs, today, opts.others || [], nz(c.client_position));
   events.push(...deadlineEvents(deadlines, today));
   events.sort(byDay);
 
