@@ -12,7 +12,7 @@ import { pemToPkcs8 } from "./room_file.ts";
 import { scourtAdjust } from "./scourt_hearings.ts";
 import { attendKey, buildPlan, calendarUrl, fetchAttend, fetchSuperseded, lawyersFromTitle, type Plan, sendToRoom, type SchedEnv } from "./schedule_cmd.ts";
 
-export type NotifyOpts = { mode?: "new" | "missing"; graceHours?: number; lookbackDays?: number; force?: boolean; dryRun?: boolean; hours?: number; notifyRooms?: string[]; notifyBot: string; limit?: number; lpNum?: number; toRoom?: string; scourt?: boolean; noRecord?: boolean };
+export type NotifyOpts = { mode?: "new" | "missing"; graceHours?: number; lookbackDays?: number; force?: boolean; dryRun?: boolean; hours?: number; notifyRooms?: string[]; notifyBot: string; limit?: number; lpNum?: number; toRoom?: string; scourt?: boolean; noRecord?: boolean; maxDays?: number };
 
 async function rest(env: SchedEnv, path: string, fetcher: typeof fetch, init: RequestInit = {}): Promise<any> {
   const r = await fetcher(env.sbUrl + "/rest/v1/" + path, {
@@ -96,14 +96,16 @@ export async function hearingNotify(env: SchedEnv, o: NotifyOpts, fetcher: typeo
     const upTo = new Date(Date.now() - (o.graceHours ?? 24) * 3600e3).toISOString();
     const from = new Date(Date.now() - (o.lookbackDays ?? 14) * 864e5).toISOString();
     const sel = "lp_num,l_num,lp_appoint_date,lp_appoint_time,lp_contents,lp_remark,changed_count";
-    const all: any[] = await rest(env, `lw_process_events?select=${sel}&lp_set=eq.${giil}&lp_appoint_date=gte.${today}&first_seen_at=lte.${upTo}&first_seen_at=gte.${from}&limit=1000`, fetcher);
+    // maxDays: 기일이 N일 안으로 다가온 것만(석원 2026-11-27 "기일 3일전에도 일정에 없는 경우") — 보통 graceHours 0 과 함께
+    const dTo = o.maxDays != null ? `&lp_appoint_date=lte.${new Date(Date.parse(today + "T00:00:00Z") + o.maxDays * 864e5).toISOString().slice(0, 10)}` : "";
+    const all: any[] = await rest(env, `lw_process_events?select=${sel}&lp_set=eq.${giil}&lp_appoint_date=gte.${today}${dTo}&first_seen_at=lte.${upTo}&first_seen_at=gte.${from}&limit=1000`, fetcher);
     // 날짜·시각이 바뀐 기일(석원 2026-11-26): 전산상 마지막으로 바뀐 지 하루(graceHours)가 지나야 본다
     const recent: any[] = await rest(env, `lw_process_event_changes?select=lp_num,changed_at&changed_at=gte.${from}&limit=3000`, fetcher);
     const lastChg = new Map<number, string>();
     for (const c of recent) if (!lastChg.has(c.lp_num) || c.changed_at > lastChg.get(c.lp_num)!) lastChg.set(c.lp_num, c.changed_at);
     const extraNums = [...lastChg.keys()].filter((n) => !all.some((e) => e.lp_num === n));
     for (let i = 0; i < extraNums.length; i += 200) {
-      all.push(...await rest(env, `lw_process_events?select=${sel}&lp_set=eq.${giil}&lp_appoint_date=gte.${today}&lp_num=in.(${extraNums.slice(i, i + 200).join(",")})`, fetcher));
+      all.push(...await rest(env, `lw_process_events?select=${sel}&lp_set=eq.${giil}&lp_appoint_date=gte.${today}${dTo}&lp_num=in.(${extraNums.slice(i, i + 200).join(",")})`, fetcher));
     }
     const nums = all.map((e) => e.lp_num);
     const chg = new Set<number>();
@@ -121,7 +123,7 @@ export async function hearingNotify(env: SchedEnv, o: NotifyOpts, fetcher: typeo
     if (sc) {
       const adj = scourtAdjust(sc.lw, sc.sc);
       fresh = [...fresh.filter((e) => !adj.drop.has(e.lp_num)),
-        ...adj.add.map((a) => ({ lp_num: a.lp_num, l_num: a.l_num, lp_appoint_date: a.date, lp_appoint_time: a.time, lp_contents: a.contents, sc: true }))];
+        ...adj.add.filter((a) => !dTo || a.date <= dTo.slice(-10)).map((a) => ({ lp_num: a.lp_num, l_num: a.l_num, lp_appoint_date: a.date, lp_appoint_time: a.time, lp_contents: a.contents, sc: true }))];
     }
   } else fresh = await rest(env, `lw_process_events?select=lp_num,l_num,lp_appoint_date,lp_appoint_time,lp_contents&lp_set=eq.${giil}&lp_appoint_date=gte.${today}&first_seen_at=gte.${since}&limit=300`, fetcher);
   const ch: any[] = o.lpNum || missing ? [] : await rest(env, `lw_process_event_changes?select=lp_num,old_row&changed_at=gte.${since}&limit=500`, fetcher);
