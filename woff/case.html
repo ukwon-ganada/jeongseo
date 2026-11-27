@@ -475,6 +475,8 @@ var PEN_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke
 var PHONE_SVG = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z"/></svg>';
 // 기일 탭 [문자] (2026-11-25): 로웨어 문자발송(팝빌) 창을 이 사건·의뢰인 번호로 연다. 보내기는 직원이 창에서 직접. PC만
 var LW_SMS='https://jeongseolaw.lawware.kr/groupware/popbill_main.html';
+// 수사 단계인지: 자체 수사 사건(inv)이거나, 로웨어 사건이라도 법원 사건번호(2026고단1492처럼 숫자+한글+숫자)가 아니면(2026-2013 같은 경찰 사건) 수사로 본다(2026-11-27 석원)
+function smsInv(){ var c=String(data.caseNo||'').replace(/\s/g,''); return !!data.inv || /형제|내사|진정/.test(c) || !/^\d{2,4}[가-힣]{1,4}\d+$/.test(c); }
 function smsTo(){ var f=(data.info&&data.info.fields)||{}; return String(f.client_phone||'').split(/[,\/]/)[0].replace(/\D/g,''); }
 function smsUrl(toIn, ov){
   if((view!=='hearing' && view!=='dates') || sub.scope==='all' || !data || data.roomOnly) return '';
@@ -482,8 +484,8 @@ function smsUrl(toIn, ov){
   var to=toIn!=null ? String(toIn).replace(/\D/g,'') : smsTo();
   var lw=Number(data.lNum) > 0 && !!data.caseNo;
   // 로웨어에 없는 수사 사건방(2026-11-25 석원): 사건번호 없이 사건정보의 의뢰인 번호와 조사일정 안내만으로 연다(번호가 없으면 받는번호 빈 칸)
-  if(!lw && !data.inv) return '';
-  var msg=data.inv ? invMsg() : smsMsg(ov);
+  if(!lw && !smsInv()) return '';
+  var msg=smsInv() ? invMsg() : smsMsg(ov);
   return LW_SMS+'?'+(to.length>=9?'to='+to+'&':'')+'tab=sms'+(lw?'&l_num='+encodeURIComponent(data.lNum)+'&l_code='+encodeURIComponent(data.caseNo):'')+(msg?'&msg='+encodeURIComponent(msg):'');
 }
 // 조사일정 안내 문자(2026-11-25, 실제 보낸 문구 기준): 사건방 대화에서 뽑은 다가오는 조사 일정으로 채운다
@@ -492,7 +494,7 @@ function invMsg(){
     .sort(function(a,b){ return a.d.localeCompare(b.d) || (!a.tm)-(!b.tm) || String(a.tm).localeCompare(String(b.tm)); })[0];
   if(!h) return '';
   var f=(data.info&&data.info.fields)||{}, name=String(f.client_name||'').replace(/\s*\(.*$/,'').trim();
-  var pm=String(h.t||'').match(/[가-힣]+(경찰서|경찰청|검찰청|공소청|지청|서)(?=[\s,)]|$)/);
+  var pm=String(h.t||'').match(/[가-힣]+(경찰서|경찰청|검찰청|지검|지청|공소청|서)(?=[\s,()]|$)/);
   var place=pm?pm[0]:String(data.court||'').replace(/^수사 단계\s*·?\s*/,'').split(' ')[0];
   return ['[법무법인 정서]','','안녕하세요.','법무법인 정서입니다.','',(name?name+'님 ':'')+'조사일정 안내드립니다.','',
     '1. '+h.d.replace(/-/g,'.')+'.'+(h.tm?' '+h.tm:'')+(place?' '+place:''),
@@ -534,7 +536,7 @@ function planOverride(p){
 function smsOpen(to){
   var w=window.open('about:blank', 'lw_sms', 'width=1280,height=900'), base=smsUrl(to);
   if(!w || !base) return;
-  if(data.inv || !(Number(data.lNum) > 0)){ w.location=base; return; }
+  if(smsInv() || !(Number(data.lNum) > 0)){ w.location=base; return; }
   api({action:'sched', room:ctx.room||'', 'case':data.caseNo}).then(function(j){
     var ov=planOverride(j && j.plan); w.location = ov ? (smsUrl(to, ov) || base) : base;
   }).catch(function(){ w.location=base; });
